@@ -603,5 +603,214 @@ exit:
   ret void
 }
 
+;; The i16 store to an address loaded in the latch is scalarized, so each lane
+;; must use its own loaded address.
+define void @load_addr_store_i16(ptr noalias %a, ptr noalias %b, ptr align 2 dereferenceable(2000) %ee.src) {
+; SSE2-LABEL: define void @load_addr_store_i16(
+; SSE2-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], ptr align 2 dereferenceable(2000) [[EE_SRC:%.*]]) #[[ATTR0]] {
+; SSE2-NEXT:  [[ENTRY:.*:]]
+; SSE2-NEXT:    br label %[[VECTOR_PH:.*]]
+; SSE2:       [[VECTOR_PH]]:
+; SSE2-NEXT:    br label %[[VECTOR_BODY:.*]]
+; SSE2:       [[VECTOR_BODY]]:
+; SSE2-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[LOOP_LATCH2:.*]] ]
+; SSE2-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i16, ptr [[EE_SRC]], i64 [[INDEX]]
+; SSE2-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i16>, ptr [[TMP0]], align 2
+; SSE2-NEXT:    [[TMP1:%.*]] = icmp sgt <2 x i16> [[WIDE_LOAD]], splat (i16 500)
+; SSE2-NEXT:    [[TMP2:%.*]] = freeze <2 x i1> [[TMP1]]
+; SSE2-NEXT:    [[TMP3:%.*]] = call i1 @llvm.vector.reduce.or.v2i1(<2 x i1> [[TMP2]])
+; SSE2-NEXT:    br i1 [[TMP3]], label %[[LOOP_LATCH2]], label %[[VECTOR_BODY_NONBAILING:.*]]
+; SSE2:       [[VECTOR_BODY_NONBAILING]]:
+; SSE2-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw i64, ptr [[B]], i64 [[INDEX]]
+; SSE2-NEXT:    [[WIDE_LOAD1:%.*]] = load <2 x i64>, ptr [[TMP4]], align 8
+; SSE2-NEXT:    [[TMP5:%.*]] = extractelement <2 x i64> [[WIDE_LOAD1]], i64 0
+; SSE2-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[TMP5]]
+; SSE2-NEXT:    [[TMP7:%.*]] = extractelement <2 x i64> [[WIDE_LOAD1]], i64 1
+; SSE2-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[TMP7]]
+; SSE2-NEXT:    store i16 0, ptr [[TMP6]], align 2
+; SSE2-NEXT:    store i16 0, ptr [[TMP8]], align 2
+; SSE2-NEXT:    br label %[[LOOP_LATCH2]]
+; SSE2:       [[LOOP_LATCH2]]:
+; SSE2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
+; SSE2-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
+; SSE2-NEXT:    [[TMP10:%.*]] = or i1 [[TMP3]], [[TMP9]]
+; SSE2-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
+; SSE2:       [[MIDDLE_BLOCK]]:
+; SSE2-NEXT:    [[TMP11:%.*]] = select i1 [[TMP3]], i64 0, i64 2
+; SSE2-NEXT:    [[TMP12:%.*]] = add i64 [[INDEX]], [[TMP11]]
+; SSE2-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[TMP12]], 1000
+; SSE2-NEXT:    br i1 [[TMP13]], label %[[EXIT:.*]], label %[[SCALAR_PH:.*]]
+; SSE2:       [[SCALAR_PH]]:
+; SSE2-NEXT:    br label %[[LOOP_HEADER:.*]]
+; SSE2:       [[LOOP_HEADER]]:
+; SSE2-NEXT:    [[IV:%.*]] = phi i64 [ [[TMP12]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; SSE2-NEXT:    [[EE_ADDR:%.*]] = getelementptr inbounds nuw i16, ptr [[EE_SRC]], i64 [[IV]]
+; SSE2-NEXT:    [[EE_VAL:%.*]] = load i16, ptr [[EE_ADDR]], align 2
+; SSE2-NEXT:    [[EE_COND:%.*]] = icmp sgt i16 [[EE_VAL]], 500
+; SSE2-NEXT:    br i1 [[EE_COND]], label %[[EXIT]], label %[[LOOP_LATCH]]
+; SSE2:       [[LOOP_LATCH]]:
+; SSE2-NEXT:    [[B_ADDR:%.*]] = getelementptr inbounds nuw i64, ptr [[B]], i64 [[IV]]
+; SSE2-NEXT:    [[IDX:%.*]] = load i64, ptr [[B_ADDR]], align 8
+; SSE2-NEXT:    [[A_ADDR:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[IDX]]
+; SSE2-NEXT:    store i16 0, ptr [[A_ADDR]], align 2
+; SSE2-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; SSE2-NEXT:    [[COUNTED_COND:%.*]] = icmp eq i64 [[IV_NEXT]], 1000
+; SSE2-NEXT:    br i1 [[COUNTED_COND]], label %[[EXIT]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP9:![0-9]+]]
+; SSE2:       [[EXIT]]:
+; SSE2-NEXT:    ret void
+;
+; AVX2-LABEL: define void @load_addr_store_i16(
+; AVX2-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], ptr align 2 dereferenceable(2000) [[EE_SRC:%.*]]) #[[ATTR0]] {
+; AVX2-NEXT:  [[ENTRY:.*:]]
+; AVX2-NEXT:    br label %[[VECTOR_PH:.*]]
+; AVX2:       [[VECTOR_PH]]:
+; AVX2-NEXT:    br label %[[VECTOR_BODY:.*]]
+; AVX2:       [[VECTOR_BODY]]:
+; AVX2-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[LOOP_LATCH2:.*]] ]
+; AVX2-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i16, ptr [[EE_SRC]], i64 [[INDEX]]
+; AVX2-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i16>, ptr [[TMP0]], align 2
+; AVX2-NEXT:    [[TMP1:%.*]] = icmp sgt <4 x i16> [[WIDE_LOAD]], splat (i16 500)
+; AVX2-NEXT:    [[TMP2:%.*]] = freeze <4 x i1> [[TMP1]]
+; AVX2-NEXT:    [[TMP3:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP2]])
+; AVX2-NEXT:    br i1 [[TMP3]], label %[[LOOP_LATCH2]], label %[[VECTOR_BODY_NONBAILING:.*]]
+; AVX2:       [[VECTOR_BODY_NONBAILING]]:
+; AVX2-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw i64, ptr [[B]], i64 [[INDEX]]
+; AVX2-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x i64>, ptr [[TMP4]], align 8
+; AVX2-NEXT:    [[TMP5:%.*]] = extractelement <4 x i64> [[WIDE_LOAD1]], i64 0
+; AVX2-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[TMP5]]
+; AVX2-NEXT:    [[TMP7:%.*]] = extractelement <4 x i64> [[WIDE_LOAD1]], i64 1
+; AVX2-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[TMP7]]
+; AVX2-NEXT:    [[TMP9:%.*]] = extractelement <4 x i64> [[WIDE_LOAD1]], i64 2
+; AVX2-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[TMP9]]
+; AVX2-NEXT:    [[TMP11:%.*]] = extractelement <4 x i64> [[WIDE_LOAD1]], i64 3
+; AVX2-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[TMP11]]
+; AVX2-NEXT:    store i16 0, ptr [[TMP6]], align 2
+; AVX2-NEXT:    store i16 0, ptr [[TMP8]], align 2
+; AVX2-NEXT:    store i16 0, ptr [[TMP10]], align 2
+; AVX2-NEXT:    store i16 0, ptr [[TMP12]], align 2
+; AVX2-NEXT:    br label %[[LOOP_LATCH2]]
+; AVX2:       [[LOOP_LATCH2]]:
+; AVX2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; AVX2-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
+; AVX2-NEXT:    [[TMP14:%.*]] = or i1 [[TMP3]], [[TMP13]]
+; AVX2-NEXT:    br i1 [[TMP14]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
+; AVX2:       [[MIDDLE_BLOCK]]:
+; AVX2-NEXT:    [[TMP15:%.*]] = select i1 [[TMP3]], i64 0, i64 4
+; AVX2-NEXT:    [[TMP16:%.*]] = add i64 [[INDEX]], [[TMP15]]
+; AVX2-NEXT:    [[TMP17:%.*]] = icmp eq i64 [[TMP16]], 1000
+; AVX2-NEXT:    br i1 [[TMP17]], label %[[EXIT:.*]], label %[[SCALAR_PH:.*]]
+; AVX2:       [[SCALAR_PH]]:
+; AVX2-NEXT:    br label %[[LOOP_HEADER:.*]]
+; AVX2:       [[LOOP_HEADER]]:
+; AVX2-NEXT:    [[IV:%.*]] = phi i64 [ [[TMP16]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; AVX2-NEXT:    [[EE_ADDR:%.*]] = getelementptr inbounds nuw i16, ptr [[EE_SRC]], i64 [[IV]]
+; AVX2-NEXT:    [[EE_VAL:%.*]] = load i16, ptr [[EE_ADDR]], align 2
+; AVX2-NEXT:    [[EE_COND:%.*]] = icmp sgt i16 [[EE_VAL]], 500
+; AVX2-NEXT:    br i1 [[EE_COND]], label %[[EXIT]], label %[[LOOP_LATCH]]
+; AVX2:       [[LOOP_LATCH]]:
+; AVX2-NEXT:    [[B_ADDR:%.*]] = getelementptr inbounds nuw i64, ptr [[B]], i64 [[IV]]
+; AVX2-NEXT:    [[IDX:%.*]] = load i64, ptr [[B_ADDR]], align 8
+; AVX2-NEXT:    [[A_ADDR:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[IDX]]
+; AVX2-NEXT:    store i16 0, ptr [[A_ADDR]], align 2
+; AVX2-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; AVX2-NEXT:    [[COUNTED_COND:%.*]] = icmp eq i64 [[IV_NEXT]], 1000
+; AVX2-NEXT:    br i1 [[COUNTED_COND]], label %[[EXIT]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP11:![0-9]+]]
+; AVX2:       [[EXIT]]:
+; AVX2-NEXT:    ret void
+;
+; AVX512-LABEL: define void @load_addr_store_i16(
+; AVX512-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], ptr align 2 dereferenceable(2000) [[EE_SRC:%.*]]) #[[ATTR0]] {
+; AVX512-NEXT:  [[ENTRY:.*:]]
+; AVX512-NEXT:    br label %[[VECTOR_PH:.*]]
+; AVX512:       [[VECTOR_PH]]:
+; AVX512-NEXT:    br label %[[VECTOR_BODY:.*]]
+; AVX512:       [[VECTOR_BODY]]:
+; AVX512-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[LOOP_LATCH2:.*]] ]
+; AVX512-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i16, ptr [[EE_SRC]], i64 [[INDEX]]
+; AVX512-NEXT:    [[WIDE_LOAD:%.*]] = load <8 x i16>, ptr [[TMP0]], align 2
+; AVX512-NEXT:    [[TMP1:%.*]] = icmp sgt <8 x i16> [[WIDE_LOAD]], splat (i16 500)
+; AVX512-NEXT:    [[TMP2:%.*]] = freeze <8 x i1> [[TMP1]]
+; AVX512-NEXT:    [[TMP3:%.*]] = call i1 @llvm.vector.reduce.or.v8i1(<8 x i1> [[TMP2]])
+; AVX512-NEXT:    br i1 [[TMP3]], label %[[LOOP_LATCH2]], label %[[VECTOR_BODY_NONBAILING:.*]]
+; AVX512:       [[VECTOR_BODY_NONBAILING]]:
+; AVX512-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw i64, ptr [[B]], i64 [[INDEX]]
+; AVX512-NEXT:    [[WIDE_LOAD1:%.*]] = load <8 x i64>, ptr [[TMP4]], align 8
+; AVX512-NEXT:    [[TMP5:%.*]] = extractelement <8 x i64> [[WIDE_LOAD1]], i64 0
+; AVX512-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[TMP5]]
+; AVX512-NEXT:    [[TMP7:%.*]] = extractelement <8 x i64> [[WIDE_LOAD1]], i64 1
+; AVX512-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[TMP7]]
+; AVX512-NEXT:    [[TMP9:%.*]] = extractelement <8 x i64> [[WIDE_LOAD1]], i64 2
+; AVX512-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[TMP9]]
+; AVX512-NEXT:    [[TMP11:%.*]] = extractelement <8 x i64> [[WIDE_LOAD1]], i64 3
+; AVX512-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[TMP11]]
+; AVX512-NEXT:    [[TMP13:%.*]] = extractelement <8 x i64> [[WIDE_LOAD1]], i64 4
+; AVX512-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[TMP13]]
+; AVX512-NEXT:    [[TMP15:%.*]] = extractelement <8 x i64> [[WIDE_LOAD1]], i64 5
+; AVX512-NEXT:    [[TMP16:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[TMP15]]
+; AVX512-NEXT:    [[TMP17:%.*]] = extractelement <8 x i64> [[WIDE_LOAD1]], i64 6
+; AVX512-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[TMP17]]
+; AVX512-NEXT:    [[TMP19:%.*]] = extractelement <8 x i64> [[WIDE_LOAD1]], i64 7
+; AVX512-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[TMP19]]
+; AVX512-NEXT:    store i16 0, ptr [[TMP6]], align 2
+; AVX512-NEXT:    store i16 0, ptr [[TMP8]], align 2
+; AVX512-NEXT:    store i16 0, ptr [[TMP10]], align 2
+; AVX512-NEXT:    store i16 0, ptr [[TMP12]], align 2
+; AVX512-NEXT:    store i16 0, ptr [[TMP14]], align 2
+; AVX512-NEXT:    store i16 0, ptr [[TMP16]], align 2
+; AVX512-NEXT:    store i16 0, ptr [[TMP18]], align 2
+; AVX512-NEXT:    store i16 0, ptr [[TMP20]], align 2
+; AVX512-NEXT:    br label %[[LOOP_LATCH2]]
+; AVX512:       [[LOOP_LATCH2]]:
+; AVX512-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
+; AVX512-NEXT:    [[TMP21:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
+; AVX512-NEXT:    [[TMP22:%.*]] = or i1 [[TMP3]], [[TMP21]]
+; AVX512-NEXT:    br i1 [[TMP22]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
+; AVX512:       [[MIDDLE_BLOCK]]:
+; AVX512-NEXT:    [[TMP23:%.*]] = select i1 [[TMP3]], i64 0, i64 8
+; AVX512-NEXT:    [[TMP24:%.*]] = add i64 [[INDEX]], [[TMP23]]
+; AVX512-NEXT:    [[TMP25:%.*]] = icmp eq i64 [[TMP24]], 1000
+; AVX512-NEXT:    br i1 [[TMP25]], label %[[EXIT:.*]], label %[[SCALAR_PH:.*]]
+; AVX512:       [[SCALAR_PH]]:
+; AVX512-NEXT:    br label %[[LOOP_HEADER:.*]]
+; AVX512:       [[LOOP_HEADER]]:
+; AVX512-NEXT:    [[IV:%.*]] = phi i64 [ [[TMP24]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; AVX512-NEXT:    [[EE_ADDR:%.*]] = getelementptr inbounds nuw i16, ptr [[EE_SRC]], i64 [[IV]]
+; AVX512-NEXT:    [[EE_VAL:%.*]] = load i16, ptr [[EE_ADDR]], align 2
+; AVX512-NEXT:    [[EE_COND:%.*]] = icmp sgt i16 [[EE_VAL]], 500
+; AVX512-NEXT:    br i1 [[EE_COND]], label %[[EXIT]], label %[[LOOP_LATCH]]
+; AVX512:       [[LOOP_LATCH]]:
+; AVX512-NEXT:    [[B_ADDR:%.*]] = getelementptr inbounds nuw i64, ptr [[B]], i64 [[IV]]
+; AVX512-NEXT:    [[IDX:%.*]] = load i64, ptr [[B_ADDR]], align 8
+; AVX512-NEXT:    [[A_ADDR:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[IDX]]
+; AVX512-NEXT:    store i16 0, ptr [[A_ADDR]], align 2
+; AVX512-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; AVX512-NEXT:    [[COUNTED_COND:%.*]] = icmp eq i64 [[IV_NEXT]], 1000
+; AVX512-NEXT:    br i1 [[COUNTED_COND]], label %[[EXIT]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP11:![0-9]+]]
+; AVX512:       [[EXIT]]:
+; AVX512-NEXT:    ret void
+;
+entry:
+  br label %loop.header
+
+loop.header:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  %ee.addr = getelementptr inbounds nuw i16, ptr %ee.src, i64 %iv
+  %ee.val = load i16, ptr %ee.addr, align 2
+  %ee.cond = icmp sgt i16 %ee.val, 500
+  br i1 %ee.cond, label %exit, label %loop.latch
+
+loop.latch:
+  %b.addr = getelementptr inbounds nuw i64, ptr %b, i64 %iv
+  %idx = load i64, ptr %b.addr, align 8
+  %a.addr = getelementptr inbounds i16, ptr %a, i64 %idx
+  store i16 0, ptr %a.addr, align 2
+  %iv.next = add nuw nsw i64 %iv, 1
+  %counted.cond = icmp eq i64 %iv.next, 1000
+  br i1 %counted.cond, label %exit, label %loop.header
+
+exit:
+  ret void
+}
+
 !0 = distinct !{!0, !1}
 !1 = !{!"llvm.loop.vectorize.width", i32 4}
