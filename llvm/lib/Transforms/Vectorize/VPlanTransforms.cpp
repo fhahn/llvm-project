@@ -4088,54 +4088,20 @@ static SmallVector<SmallVector<VPReplicateRecipe *, 4>>
 collectComplementaryPredicatedMemOps(VPlan &Plan,
                                      PredicatedScalarEvolution &PSE,
                                      const Loop *L) {
-  static_assert(Opcode == Instruction::Load || Opcode == Instruction::Store,
-                "Only Load and Store opcodes supported");
-
-  // For each address, collect operations with the same or complementary masks.
-  SmallVector<SmallVector<VPReplicateRecipe *, 4>> AllGroups;
   auto Groups = collectGroupedReplicateMemOps<Opcode>(
       Plan, PSE, L,
       [](VPReplicateRecipe *RepR) { return RepR->isPredicated(); });
-  for (auto Recipes : Groups) {
-    if (Recipes.size() < 2)
-      continue;
-
-    assert(all_equal(map_range(Recipes, getLoadStoreValueType)) &&
-           "Expected all recipes in group to have the same load-store type");
-
-    // Collect groups with the same or complementary masks.
-    for (VPReplicateRecipe *&RecipeI : Recipes) {
-      if (!RecipeI)
-        continue;
-
-      VPValue *MaskI = RecipeI->getMask();
-      SmallVector<VPReplicateRecipe *, 4> Group;
-      Group.push_back(RecipeI);
-      RecipeI = nullptr;
-
-      // Find all operations with the same or complementary masks.
-      bool HasComplementaryMask = false;
-      for (VPReplicateRecipe *&RecipeJ : Recipes) {
-        if (!RecipeJ)
-          continue;
-
-        VPValue *MaskJ = RecipeJ->getMask();
-        // Check if any operation in the group has a complementary mask with
-        // another, that is M1 == NOT(M2) or M2 == NOT(M1).
-        HasComplementaryMask |= match(MaskI, m_Not(m_Specific(MaskJ))) ||
-                                match(MaskJ, m_Not(m_Specific(MaskI)));
-        Group.push_back(RecipeJ);
-        RecipeJ = nullptr;
-      }
-
-      if (HasComplementaryMask) {
-        assert(Group.size() >= 2 && "must have at least 2 entries");
-        AllGroups.push_back(std::move(Group));
-      }
-    }
-  }
-
-  return AllGroups;
+  // Only keep groups where the mask of the first operation is complementary to
+  // the mask of another one, that is M0 == NOT(M) or M == NOT(M0).
+  erase_if(Groups, [](ArrayRef<VPReplicateRecipe *> Recipes) {
+    VPValue *Mask0 = Recipes[0]->getMask();
+    return none_of(drop_begin(Recipes), [Mask0](VPReplicateRecipe *R) {
+      VPValue *Mask = R->getMask();
+      return match(Mask0, m_Not(m_Specific(Mask))) ||
+             match(Mask, m_Not(m_Specific(Mask0)));
+    });
+  });
+  return Groups;
 }
 
 // Find the recipe with minimum alignment in the group.
