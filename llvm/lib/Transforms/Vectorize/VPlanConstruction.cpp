@@ -1611,17 +1611,24 @@ static VPValue *createDiffRuntimeChecks(VPlan &Plan, VPBuilder &Builder,
   SmallDenseSet<std::pair<const SCEV *, const SCEV *>, 8> SeenCompares;
   VPValue *Cond = Plan.getFalse();
   for (const PointerDiffInfo &C : Checks) {
-    auto Ops = getDiffCheckOperands(C, SE, VF, UF);
-    if (!Ops)
-      return Plan.getTrue();
+    // A cached compare may come from a check without the vscale bound, so add
+    // the bound first.
+    if (auto Bound = getDiffCheckVScaleBound(C, SE, VF, UF)) {
+      VPValue *Wrap = Builder.createICmp(
+          CmpInst::ICMP_UGT, Expander.expand(Bound->first),
+          Expander.expand(Bound->second), DL, "diff.check.wrap");
+      Cond = Builder.createOr(Cond, Wrap, DL, "conflict.rdx");
+    }
+    auto [DiffSCEV, ThresholdMinusOneSCEV] =
+        getDiffCheckOperands(C, SE, VF, UF);
     // If the same compare has already been created earlier, there is no need to
     // check it again.
-    if (!SeenCompares.insert(*Ops).second)
+    if (!SeenCompares.insert({DiffSCEV, ThresholdMinusOneSCEV}).second)
       continue;
 
     Type *Ty = C.SinkStart->getType();
-    VPValue *ThresholdMinusOne = Expander.expand(Ops->second);
-    VPValue *Diff = Expander.expand(Ops->first);
+    VPValue *ThresholdMinusOne = Expander.expand(ThresholdMinusOneSCEV);
+    VPValue *Diff = Expander.expand(DiffSCEV);
     // Use (Diff - 1) <u (Threshold - 1), equivalent to 0 <u Diff <u Threshold.
     VPValue *DiffMinusOne =
         Builder.createSub(Diff, Plan.getConstantInt(Ty, 1), DL);

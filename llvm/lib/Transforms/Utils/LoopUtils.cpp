@@ -2266,7 +2266,7 @@ Value *llvm::addRuntimeChecks(
   return MemoryRuntimeCheck;
 }
 
-std::optional<std::pair<const SCEV *, const SCEV *>>
+std::pair<const SCEV *, const SCEV *>
 llvm::getDiffCheckOperands(const PointerDiffInfo &C, ScalarEvolution &SE,
                            ElementCount VF, unsigned IC) {
   assert(IC > 0 && C.AccessSize > 0 &&
@@ -2280,20 +2280,30 @@ llvm::getDiffCheckOperands(const PointerDiffInfo &C, ScalarEvolution &SE,
   const SCEV *Diff = SE.getMinusSCEV(C.SinkStart, C.SrcStart);
   if (!C.IsSymmetric)
     return std::make_pair(Diff, SE.getMinusSCEV(T, SE.getOne(Ty)));
-  // The compare is exact iff T <= 2^(BW - 1), so treat larger T as a conflict,
-  // and conservatively all scalable VFs. T fits in BW + 96 bits, as VF, IC,
-  // AccessSize and Span are 32-bit.
-  unsigned BW = SE.getTypeSizeInBits(Ty);
-  if (VF.isScalable() ||
-      (APInt(BW + 96, VF.getFixedValue()) * IC * C.AccessSize + C.Span -
-       C.AccessSize)
-          .ugt(APInt::getOneBitSet(BW + 96, BW - 1)))
-    return std::nullopt;
   // |Diff| < T iff 0 < Diff + T < 2 * T.
   Diff = SE.getAddExpr(Diff, T);
   return std::make_pair(
       Diff,
       SE.getMinusSCEV(SE.getMulExpr(T, SE.getConstant(Ty, 2)), SE.getOne(Ty)));
+}
+
+std::optional<std::pair<const SCEV *, const SCEV *>>
+llvm::getDiffCheckVScaleBound(const PointerDiffInfo &C, ScalarEvolution &SE,
+                              ElementCount VF, unsigned IC) {
+  if (!C.IsSymmetric)
+    return std::nullopt;
+  // 2 * T - 1 wraps iff T > 2^(BW - 1), so treat vscales above the largest one
+  // for which it does not as a conflict. AccessSize and Span are below 2^32.
+  Type *Ty = C.SinkStart->getType();
+  unsigned BW = SE.getTypeSizeInBits(Ty);
+  APInt MaxVScale = (APInt::getOneBitSet(BW + 32, BW - 1) + C.AccessSize)
+                        .usub_sat(APInt(BW + 32, C.Span))
+                        .udiv(C.AccessSize)
+                        .udiv(uint64_t(VF.getKnownMinValue()) * IC);
+  const SCEV *VScale = VF.isScalable() ? SE.getVScale(Ty) : SE.getOne(Ty);
+  if (MaxVScale.uge(SE.getUnsignedRangeMax(VScale).zext(BW + 32)))
+    return std::nullopt;
+  return std::make_pair(VScale, SE.getConstant(MaxVScale.trunc(BW)));
 }
 
 Value *llvm::addDiffRuntimeChecks(Instruction *Loc,
@@ -2304,19 +2314,26 @@ Value *llvm::addDiffRuntimeChecks(Instruction *Loc,
   IRBuilder ChkBuilder(Loc->getIterator(),
                        InstSimplifyFolder(Loc->getDataLayout()));
   // Our instructions might fold to a constant.
-  Value *MemoryRuntimeCheck = nullptr;
+  Value *MemoryRuntimeCheck = ChkBuilder.getFalse();
 
   auto &SE = *Expander.getSE();
   // Map to keep track of created compares, The key is the pair of operands for
   // the compare, to allow detecting and re-using redundant compares.
   DenseMap<std::pair<Value *, Value *>, Value *> SeenCompares;
   for (const PointerDiffInfo &C : Checks) {
-    auto Ops = getDiffCheckOperands(C, SE, VF, IC);
-    if (!Ops)
-      return ChkBuilder.getTrue();
     Type *Ty = C.SinkStart->getType();
-    Value *ThresholdMinusOne = Expander.expandCodeFor(Ops->second, Ty, Loc);
-    Value *Diff = Expander.expandCodeFor(Ops->first, Ty, Loc);
+    // A cached compare may come from a check without the vscale bound, so add
+    // the bound first.
+    if (auto Bound = getDiffCheckVScaleBound(C, SE, VF, IC)) {
+      Value *Wrap = ChkBuilder.CreateICmpUGT(
+          Expander.expandCodeFor(Bound->first, Ty, Loc),
+          Expander.expandCodeFor(Bound->second, Ty, Loc), "diff.check.wrap");
+      MemoryRuntimeCheck =
+          ChkBuilder.CreateOr(MemoryRuntimeCheck, Wrap, "conflict.rdx");
+    }
+    auto Ops = getDiffCheckOperands(C, SE, VF, IC);
+    Value *ThresholdMinusOne = Expander.expandCodeFor(Ops.second, Ty, Loc);
+    Value *Diff = Expander.expandCodeFor(Ops.first, Ty, Loc);
 
     // Check if the same compare has already been created earlier. In that case,
     // there is no need to check it again.
@@ -2332,11 +2349,8 @@ Value *llvm::addDiffRuntimeChecks(Instruction *Loc,
     if (C.NeedsFreeze)
       IsConflict =
           ChkBuilder.CreateFreeze(IsConflict, IsConflict->getName() + ".fr");
-    if (MemoryRuntimeCheck) {
-      IsConflict =
-          ChkBuilder.CreateOr(MemoryRuntimeCheck, IsConflict, "conflict.rdx");
-    }
-    MemoryRuntimeCheck = IsConflict;
+    MemoryRuntimeCheck =
+        ChkBuilder.CreateOr(MemoryRuntimeCheck, IsConflict, "conflict.rdx");
   }
 
   Expander.eraseDeadInstructions(MemoryRuntimeCheck);
