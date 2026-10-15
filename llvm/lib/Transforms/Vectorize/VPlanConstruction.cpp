@@ -1038,17 +1038,10 @@ bool VPlanTransforms::finalizeSCEVPredicates(VPlan &Plan,
                                              unsigned SCEVCheckThreshold,
                                              OptimizationRemarkEmitter *ORE,
                                              Loop *TheLoop) {
-  // Collect which wide IVs have predicates and add them to PSE.
   auto [HeaderVPBB, _] = VPBlockUtils::getPlainCFGHeaderAndLatch(Plan);
-  SmallPtrSet<VPWidenInductionRecipe *, 4> PredicatedIVs;
   for (VPWidenInductionRecipe &WideIV :
-       make_isa_range<VPWidenInductionRecipe>(HeaderVPBB->phis())) {
-    if (WideIV.getNoWrapPredicates().empty())
-      continue;
-    PredicatedIVs.insert(&WideIV);
-    for (const auto *P : WideIV.getNoWrapPredicates())
-      PSE.addPredicate(*P);
-  }
+       make_isa_range<VPWidenInductionRecipe>(HeaderVPBB->phis()))
+    PSE.addPredicates(WideIV.getNoWrapPredicates());
 
   unsigned TotalComplexity = PSE.getPredicate().getComplexity();
   if (TotalComplexity && OptForSize) {
