@@ -16,7 +16,6 @@ target triple = "x86_64-unknown-linux-gnu"
 ; scatter operation. %tmp3 (and the induction variable) should not be marked
 ; uniform-after-vectorization.
 ;
-; DEBUG:       LV: Found uniform instruction: %tmp0 = getelementptr inbounds %data, ptr %d, i64 0, i32 3, i64 %i
 ; DEBUG-NOT:   LV: Found uniform instruction: %tmp3 = getelementptr inbounds %data, ptr %d, i64 0, i32 0, i64 %i
 ; DEBUG-NOT:   LV: Found uniform instruction: %i = phi i64 [ %i.next, %for.body ], [ 0, %entry ]
 ; DEBUG-NOT:   LV: Found uniform instruction: %i.next = add nuw nsw i64 %i, 5

@@ -56,6 +56,9 @@ public:
   /// Returns true if the target prefers vectorized addressing.
   bool prefersVectorizedAddressing() const;
 
+  /// Returns true if a scalar epilogue is allowed.
+  bool isEpilogueAllowed() const;
+
   /// Create and return a widened recipe for a non-phi recipe \p R if one can be
   /// created within the given VF \p Range.
   VPRecipeBase *tryToCreateWidenNonPhiRecipe(VPSingleDefRecipe *R,

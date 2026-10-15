@@ -353,6 +353,15 @@ struct VPCostContext {
   /// Forwards to LoopVectorizationCostModel::isMaskRequired.
   bool isMaskRequired(Instruction *I) const;
 
+  /// Returns true if masked interleave groups can be used.
+  bool useMaskedInterleavedAccesses() const;
+
+  /// Returns the legacy cost model's cost for the load or store \p I at \p VF
+  /// when not interleaved, i.e. of a gather/scatter or of scalarizing it, and
+  /// whether it is a gather/scatter.
+  std::pair<InstructionCost, bool> getLegacyMemOpCost(Instruction *I,
+                                                      ElementCount VF) const;
+
   /// Returns the OperandInfo for \p V, if it is a live-in.
   TargetTransformInfo::OperandValueInfo getOperandInfo(VPValue *V) const;
 

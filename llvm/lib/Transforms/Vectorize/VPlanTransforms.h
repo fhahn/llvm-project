@@ -349,15 +349,6 @@ struct VPlanTransforms {
   /// %load = vp.load %ptr, EVL
   static void optimizeEVLMasks(VPlan &Plan);
 
-  // For each Interleave Group in \p InterleaveGroups replace the Recipes
-  // widening its memory instructions with a single VPInterleaveRecipe at its
-  // insertion point.
-  static void createInterleaveGroups(
-      VPlan &Plan,
-      const SmallPtrSetImpl<const InterleaveGroup<Instruction> *>
-          &InterleaveGroups,
-      const bool &EpilogueAllowed);
-
   /// Transform widen memory recipes into strided access recipes when legal
   /// and profitable. Clamps \p Range to maintain consistency with widen
   /// decisions of \p Plan, and uses \p Ctx to evaluate the cost.
@@ -621,11 +612,13 @@ struct VPlanTransforms {
   static void createPartialReductions(VPlan &Plan, VPCostContext &CostCtx,
                                       VFRange &Range);
 
-  /// Convert load/store VPInstructions in \p Plan into widened or replicate
-  /// recipes. Non load/store input instructions are left unchanged.
+  /// Convert load/store VPInstructions in \p Plan into interleave, widened or
+  /// replicate recipes, using the interleave groups from \p IAI. Non load/store
+  /// input instructions are left unchanged.
   static void makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
                                          VPRecipeBuilder &RecipeBuilder,
-                                         VPCostContext &CostCtx);
+                                         VPCostContext &CostCtx,
+                                         const InterleavedAccessInfo &IAI);
 
   /// Make VPlan-based scalarization decision prior to delegating to the ones
   /// made by the legacy CM. Only transforms "usesFirstLaneOnly` def-use chains

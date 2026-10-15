@@ -572,7 +572,6 @@ public:
     CM_Unknown,
     CM_Widen,         // For consecutive accesses with stride +1.
     CM_Widen_Reverse, // For consecutive accesses with stride -1.
-    CM_Interleave,
     CM_GatherScatter,
     CM_Scalarize,
     /// A widening decision that has been invalidated after replacing the
@@ -584,7 +583,7 @@ public:
 #ifndef NDEBUG
   static constexpr StringLiteral getInstWideningStr(InstWidening W) {
     constexpr StringLiteral WideningStr[] = {
-        "Unknown",       "Widen",     "Widen_Reverse",      "Interleave",
+        "Unknown",       "Widen",     "Widen_Reverse",
         "GatherScatter", "Scalarize", "InvalidatedDecision"};
     return WideningStr[W];
   }
@@ -599,33 +598,6 @@ public:
                       << getInstWideningStr(W) << " for VF " << VF
                       << " and instruction: " << *I << '\n');
     WideningDecisions[{I, VF}] = {W, Cost};
-  }
-
-  /// Save vectorization decision \p W and \p Cost taken by the cost model for
-  /// interleaving group \p Grp and vector width \p VF.
-  void setWideningDecision(const InterleaveGroup<Instruction> *Grp,
-                           ElementCount VF, InstWidening W,
-                           InstructionCost Cost) {
-    assert(VF.isVector() && "Expected VF >=2");
-    /// Broadcast this decicion to all instructions inside the group.
-    /// When interleaving, the cost will only be assigned one instruction, the
-    /// insert position. For other cases, add the appropriate fraction of the
-    /// total cost to each instruction. This ensures accurate costs are used,
-    /// even if the insert position instruction is not used.
-    InstructionCost InsertPosCost = Cost;
-    InstructionCost OtherMemberCost = 0;
-    if (W != CM_Interleave)
-      OtherMemberCost = InsertPosCost = Cost / Grp->getNumMembers();
-    ;
-    for (auto *I : Grp->members()) {
-      LLVM_DEBUG(dbgs() << "LV: Setting widening decision to "
-                        << getInstWideningStr(W) << " for VF " << VF
-                        << " and instruction: " << *I << '\n');
-      if (Grp->getInsertPos() == I)
-        WideningDecisions[{I, VF}] = {W, InsertPosCost};
-      else
-        WideningDecisions[{I, VF}] = {W, OtherMemberCost};
-    }
   }
 
   /// Return the cost model decision for the given instruction \p I and vector
@@ -757,14 +729,9 @@ public:
   std::optional<InstWidening> memoryInstructionCanBeWidened(Instruction *I,
                                                             ElementCount VF);
 
-  /// Returns true if \p I is a memory instruction in an interleaved-group
-  /// of memory accesses that can be vectorized with wide vector loads/stores
-  /// and shuffles.
-  bool interleavedAccessCanBeWidened(Instruction *I, ElementCount VF) const;
-
   /// Returns true if the target machine supports masked loads or stores
   /// for \p I's data type and alignment. The caller must ensure the access is
-  /// consecutive or part of an interleave group.
+  /// consecutive.
   bool isLegalMaskedLoadOrStore(Instruction *I, ElementCount VF) const;
 
   /// Returns true if the target machine supports gather or scatter for \p I's
@@ -1038,9 +1005,6 @@ private:
 
   /// The cost computation for scalarized memory instruction.
   InstructionCost getMemInstScalarizationCost(Instruction *I, ElementCount VF);
-
-  /// The cost computation for interleaving group of memory instructions.
-  InstructionCost getInterleaveGroupCost(Instruction *I, ElementCount VF) const;
 
   /// The cost computation for Gather/Scatter instruction.
   InstructionCost getGatherScatterCost(Instruction *I, ElementCount VF) const;
@@ -2274,78 +2238,6 @@ LoopVectorizationCostModel::getDivRemSpeculationCost(Instruction *I,
   return {ScalarizationCost, MaskedCost};
 }
 
-bool LoopVectorizationCostModel::interleavedAccessCanBeWidened(
-    Instruction *I, ElementCount VF) const {
-  assert(isAccessInterleaved(I) && "Expecting interleaved access.");
-  assert(getWideningDecision(I, VF) == CM_Unknown &&
-         "Decision should not be set yet.");
-  auto *Group = getInterleavedAccessGroup(I);
-  assert(Group && "Must have a group.");
-  unsigned InterleaveFactor = Group->getFactor();
-
-  // If the instruction's allocated size doesn't equal its type size, it
-  // requires padding and will be scalarized.
-  auto &DL = I->getDataLayout();
-  auto *ScalarTy = getLoadStoreType(I);
-  if (hasIrregularType(ScalarTy, DL))
-    return false;
-
-  // For scalable vectors, the interleave factors must be <= 8 since we require
-  // the (de)interleaveN intrinsics instead of shufflevectors.
-  if (VF.isScalable() && InterleaveFactor > 8)
-    return false;
-
-  // If the group involves a non-integral pointer, we may not be able to
-  // losslessly cast all values to a common type.
-  bool ScalarNI = DL.isNonIntegralPointerType(ScalarTy);
-  for (Instruction *Member : Group->members()) {
-    auto *MemberTy = getLoadStoreType(Member);
-    bool MemberNI = DL.isNonIntegralPointerType(MemberTy);
-    // Don't coerce non-integral pointers to integers or vice versa.
-    if (MemberNI != ScalarNI)
-      // TODO: Consider adding special nullptr value case here
-      return false;
-    if (MemberNI && ScalarNI &&
-        ScalarTy->getPointerAddressSpace() !=
-            MemberTy->getPointerAddressSpace())
-      return false;
-  }
-
-  // Check if masking is required.
-  // A Group may need masking for one of two reasons: it resides in a block that
-  // needs predication, or it was decided to use masking to deal with gaps
-  // (either a gap at the end of a load-access that may result in a speculative
-  // load, or any gaps in a store-access).
-  bool PredicatedAccessRequiresMasking =
-      blockNeedsPredicationForAnyReason(I->getParent()) && isMaskRequired(I);
-  bool LoadAccessWithGapsRequiresEpilogMasking =
-      isa<LoadInst>(I) && Group->requiresScalarEpilogue() &&
-      !isEpilogueAllowed();
-  bool StoreAccessWithGapsRequiresMasking =
-      isa<StoreInst>(I) && !Group->isFull();
-  if (!PredicatedAccessRequiresMasking &&
-      !LoadAccessWithGapsRequiresEpilogMasking &&
-      !StoreAccessWithGapsRequiresMasking)
-    return true;
-
-  // If masked interleaving is required, we expect that the user/target had
-  // enabled it, because otherwise it either wouldn't have been created or
-  // it should have been invalidated by the CostModel.
-  assert(useMaskedInterleavedAccesses(Opts, TTI) &&
-         "Masked interleave-groups for predicated accesses are not enabled.");
-
-  if (Group->isReverse())
-    return false;
-
-  // TODO: Support interleaved access that requires a gap mask for scalable VFs.
-  bool NeedsMaskForGaps = LoadAccessWithGapsRequiresEpilogMasking ||
-                          StoreAccessWithGapsRequiresMasking;
-  if (VF.isScalable() && NeedsMaskForGaps)
-    return false;
-
-  return isLegalMaskedLoadOrStore(I, VF);
-}
-
 std::optional<LoopVectorizationCostModel::InstWidening>
 LoopVectorizationCostModel::memoryInstructionCanBeWidened(Instruction *I,
                                                           ElementCount VF) {
@@ -2480,9 +2372,7 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
     if (IsUniformMemOpUse(I))
       return true;
 
-    return (WideningDecision == CM_Widen ||
-            WideningDecision == CM_Widen_Reverse ||
-            WideningDecision == CM_Interleave);
+    return WideningDecision == CM_Widen || WideningDecision == CM_Widen_Reverse;
   };
 
   // Returns true if Ptr is the pointer operand of a memory access instruction
@@ -4152,46 +4042,6 @@ LoopVectorizationCostModel::getGatherScatterCost(Instruction *I,
 }
 
 InstructionCost
-LoopVectorizationCostModel::getInterleaveGroupCost(Instruction *I,
-                                                   ElementCount VF) const {
-  const auto *Group = getInterleavedAccessGroup(I);
-  assert(Group && "Fail to get an interleaved access group.");
-
-  Instruction *InsertPos = Group->getInsertPos();
-  Type *ValTy = getLoadStoreType(InsertPos);
-  auto *VectorTy = cast<VectorType>(toVectorTy(ValTy, VF));
-  unsigned AS = getLoadStoreAddressSpace(InsertPos);
-
-  unsigned InterleaveFactor = Group->getFactor();
-  auto *WideVecTy = VectorType::get(ValTy, VF * InterleaveFactor);
-
-  // Holds the indices of existing members in the interleaved group.
-  SmallVector<unsigned, 4> Indices;
-  for (unsigned IF = 0; IF < InterleaveFactor; IF++)
-    if (Group->getMember(IF))
-      Indices.push_back(IF);
-
-  // Calculate the cost of the whole interleaved group.
-  bool UseMaskForGaps =
-      (Group->requiresScalarEpilogue() && !isEpilogueAllowed()) ||
-      (isa<StoreInst>(I) && !Group->isFull());
-  InstructionCost Cost = TTI.getInterleavedMemoryOpCost(
-      InsertPos->getOpcode(), WideVecTy, Group->getFactor(), Indices,
-      Group->getAlign(), AS, Config.CostKind, isMaskRequired(I),
-      UseMaskForGaps);
-
-  if (Group->isReverse()) {
-    // TODO: Add support for reversed masked interleaved access.
-    assert(!isMaskRequired(I) &&
-           "Reverse masked interleaved access not supported.");
-    Cost += Group->getNumMembers() *
-            TTI.getShuffleCost(TargetTransformInfo::SK_Reverse, VectorTy,
-                               VectorTy, Config.CostKind, {}, 0);
-  }
-  return Cost;
-}
-
-InstructionCost
 LoopVectorizationCostModel::getMemoryInstructionCost(Instruction *I,
                                                      ElementCount VF) {
   // Calculate scalar cost only. Vectorization cost should be ready at this
@@ -4354,59 +4204,19 @@ void LoopVectorizationCostModel::setCostBasedWideningDecision(ElementCount VF) {
         continue;
       }
 
-      // Choose between Interleaving, Gather/Scatter or Scalarization.
-      InstructionCost InterleaveCost = InstructionCost::getInvalid();
-      unsigned NumAccesses = 1;
-      if (isAccessInterleaved(&I)) {
-        const auto *Group = getInterleavedAccessGroup(&I);
-        assert(Group && "Fail to get an interleaved access group.");
-
-        NumAccesses = Group->getNumMembers();
-        if (interleavedAccessCanBeWidened(&I, VF))
-          InterleaveCost = getInterleaveGroupCost(&I, VF);
-      }
-
-      InstructionCost GatherScatterCost =
-          isLegalGatherOrScatter(&I, VF)
-              ? getGatherScatterCost(&I, VF) * NumAccesses
-              : InstructionCost::getInvalid();
-
-      InstructionCost ScalarizationCost =
-          getMemInstScalarizationCost(&I, VF) * NumAccesses;
-
-      // Choose better solution for the current VF,
-      // write down this decision and use it during vectorization.
-      InstructionCost Cost;
-      InstWidening Decision;
-      if (InterleaveCost <= GatherScatterCost &&
-          InterleaveCost < ScalarizationCost) {
-        Decision = CM_Interleave;
-        Cost = InterleaveCost;
-      } else if (GatherScatterCost < ScalarizationCost) {
-        Decision = CM_GatherScatter;
-        Cost = GatherScatterCost;
-      } else {
-        Decision = CM_Scalarize;
-        Cost = ScalarizationCost;
-      }
-      LLVM_DEBUG(
-          dbgs() << "LV: Memory widening: InterleaveCost = " << InterleaveCost
-                 << ", GatherScatterCost = " << GatherScatterCost
-                 << ", ScalarizationCost = " << ScalarizationCost << '\n');
-
-      // If the instructions belongs to an interleave group, the whole group
-      // receives the same decision. The whole group receives the cost, but
-      // the cost will actually be assigned to one instruction.
-      if (const auto *Group = getInterleavedAccessGroup(&I)) {
-        if (Decision == CM_Scalarize) {
-          for (Instruction *I : Group->members())
-            setWideningDecision(I, VF, Decision,
-                                getMemInstScalarizationCost(I, VF));
-        } else {
-          setWideningDecision(Group, VF, Decision, Cost);
-        }
-      } else
-        setWideningDecision(&I, VF, Decision, Cost);
+      // Choose between Gather/Scatter or Scalarization. Interleave groups are
+      // formed by VPlan.
+      InstructionCost GatherScatterCost = isLegalGatherOrScatter(&I, VF)
+                                              ? getGatherScatterCost(&I, VF)
+                                              : InstructionCost::getInvalid();
+      InstructionCost ScalarizationCost = getMemInstScalarizationCost(&I, VF);
+      LLVM_DEBUG(dbgs() << "LV: Memory widening: GatherScatterCost = "
+                        << GatherScatterCost << ", ScalarizationCost = "
+                        << ScalarizationCost << '\n');
+      if (GatherScatterCost < ScalarizationCost)
+        setWideningDecision(&I, VF, CM_GatherScatter, GatherScatterCost);
+      else
+        setWideningDecision(&I, VF, CM_Scalarize, ScalarizationCost);
     }
   }
 
@@ -4876,8 +4686,6 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I,
       switch (getWideningDecision(I, VF)) {
       case LoopVectorizationCostModel::CM_GatherScatter:
         return TTI::CastContextHint::GatherScatter;
-      case LoopVectorizationCostModel::CM_Interleave:
-        return TTI::CastContextHint::Interleave;
       case LoopVectorizationCostModel::CM_Scalarize:
       case LoopVectorizationCostModel::CM_Widen:
         return isPredicatedInst(I) ? TTI::CastContextHint::Masked
@@ -5246,6 +5054,17 @@ bool VPCostContext::willBeScalarized(Instruction *I, ElementCount VF) const {
 
 bool VPCostContext::isMaskRequired(Instruction *I) const {
   return CM.isMaskRequired(I);
+}
+
+bool VPCostContext::useMaskedInterleavedAccesses() const {
+  return ::useMaskedInterleavedAccesses(Opts, TTI);
+}
+
+std::pair<InstructionCost, bool>
+VPCostContext::getLegacyMemOpCost(Instruction *I, ElementCount VF) const {
+  return {CM.getWideningCost(I, VF),
+          CM.getWideningDecision(I, VF) ==
+              LoopVectorizationCostModel::CM_GatherScatter};
 }
 
 bool VPCostContext::executesAtMostOnce(const VPlan &Plan, ElementCount VF) {
@@ -5800,6 +5619,10 @@ bool VPRecipeBuilder::prefersVectorizedAddressing() const {
   return CM.TTI.prefersVectorizedAddressing();
 }
 
+bool VPRecipeBuilder::isEpilogueAllowed() const {
+  return CM.isEpilogueAllowed();
+}
+
 VPRecipeBase *VPRecipeBuilder::tryToWidenMemory(VPInstruction *VPI,
                                                 VFRange &Range) {
   assert((VPI->getOpcode() == Instruction::Load ||
@@ -5812,8 +5635,6 @@ VPRecipeBase *VPRecipeBuilder::tryToWidenMemory(VPInstruction *VPI,
         CM.getWideningDecision(I, VF);
     assert(Decision != LoopVectorizationCostModel::CM_Unknown &&
            "CM decision should be taken at this point.");
-    if (Decision == LoopVectorizationCostModel::CM_Interleave)
-      return true;
     if (CM.isScalarAfterVectorization(I, VF) ||
         CM.isProfitableToScalarize(I, VF))
       return false;
@@ -6319,7 +6140,6 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
   }
 
   using namespace llvm::VPlanPatternMatch;
-  SmallPtrSet<const InterleaveGroup<Instruction> *, 1> InterleaveGroups;
 
   // ---------------------------------------------------------------------------
   // Build initial VPlan: Scan the body of the loop in a topological order to
@@ -6367,31 +6187,6 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
   }
 
   // ---------------------------------------------------------------------------
-  // Pre-construction: record ingredients whose recipes we'll need to further
-  // process after constructing the initial VPlan.
-  // ---------------------------------------------------------------------------
-
-  // For each interleave group which is relevant for this (possibly trimmed)
-  // Range, add it to the set of groups to be later applied to the VPlan and add
-  // placeholders for its members' Recipes which we'll be replacing with a
-  // single VPInterleaveRecipe.
-  for (InterleaveGroup<Instruction> *IG : IAI.getInterleaveGroups()) {
-    auto ApplyIG = [IG, this](ElementCount VF) -> bool {
-      bool Result = (VF.isVector() && // Query is illegal for VF == 1
-                     CM->getWideningDecision(IG->getInsertPos(), VF) ==
-                         LoopVectorizationCostModel::CM_Interleave);
-      // For scalable vectors, the interleave factors must be <= 8 since we
-      // require the (de)interleaveN intrinsics instead of shufflevectors.
-      assert((!Result || !VF.isScalable() || IG->getFactor() <= 8) &&
-             "Unsupported interleave factor for scalable vectors");
-      return Result;
-    };
-    if (!getDecisionAndClampRange(ApplyIG, Range))
-      continue;
-    InterleaveGroups.insert(IG);
-  }
-
-  // ---------------------------------------------------------------------------
   // Construct wide recipes and apply predication for original scalar
   // VPInstructions in the loop.
   // ---------------------------------------------------------------------------
@@ -6403,7 +6198,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
   VPCostContext CostCtx(*TLI, *Plan, *CM, Config);
 
   RUN_VPLAN_PASS(VPlanTransforms::makeMemOpWideningDecisions, *Plan, Range,
-                 RecipeBuilder, CostCtx);
+                 RecipeBuilder, CostCtx, IAI);
 
   RUN_VPLAN_PASS(VPlanTransforms::makeScalarizationDecisions, *Plan, Range);
 
@@ -6429,7 +6224,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
                     VPReplicateRecipe, VPWidenLoadRecipe, VPWidenStoreRecipe,
                     VPWidenCallRecipe, VPWidenIntrinsicRecipe,
                     VPVectorPointerRecipe, VPVectorEndPointerRecipe,
-                    VPHistogramRecipe, VPInstruction>) &&
+                    VPHistogramRecipe, VPInterleaveRecipe, VPInstruction>) &&
         "Unexpected recipe");
     for (VPInstruction &VPI :
          make_early_inc_range(make_isa_range<VPInstruction>(*VPBB))) {
@@ -6504,12 +6299,6 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
                  Range);
   RUN_VPLAN_PASS(VPlanTransforms::convertToAbstractRecipes, *Plan, CostCtx,
                  Range);
-
-  // Interleave memory: for each Interleave Group we marked earlier as relevant
-  // for this VPlan, replace the Recipes widening its memory instructions with a
-  // single VPInterleaveRecipe at its insertion point.
-  RUN_VPLAN_PASS(VPlanTransforms::createInterleaveGroups, *Plan,
-                 InterleaveGroups, CM->isEpilogueAllowed());
 
   // Convert memory recipes to strided access recipes if the strided access is
   // legal and profitable.

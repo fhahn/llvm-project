@@ -49,20 +49,22 @@ for.end:
 define void @interleaved_load(ptr noalias readonly %src, ptr noalias %dst, i64 %n) {
 ; FIXED-LABEL: 'interleaved_load'
 ; FIXED:  LV: Memory widening: calculating best strategy for %load.0 = load i16, ptr %gep.0, align 2
-; FIXED:  LV: Memory widening: InterleaveCost = 2, GatherScatterCost = Invalid, ScalarizationCost = 32
-; FIXED:  LV: Setting widening decision to Interleave for VF 4 and instruction: %load.0 = load i16, ptr %gep.0, align 2
-; FIXED:  LV: Setting widening decision to Interleave for VF 4 and instruction: %load.1 = load i16, ptr %gep.1, align 2
-; FIXED-NOT:  LV: Memory widening: calculating best strategy for %load.1 = load i16, ptr %gep.1, align 2
+; FIXED:  LV: Memory widening: GatherScatterCost = Invalid, ScalarizationCost = 16
+; FIXED:  LV: Setting widening decision to Scalarize for VF 4 and instruction: %load.0 = load i16, ptr %gep.0, align 2
+; FIXED:  LV: Memory widening: calculating best strategy for %load.1 = load i16, ptr %gep.1, align 2
+; FIXED:  LV: Memory widening: GatherScatterCost = Invalid, ScalarizationCost = 16
+; FIXED:  LV: Setting widening decision to Scalarize for VF 4 and instruction: %load.1 = load i16, ptr %gep.1, align 2
 ; FIXED:  LV: Memory widening: calculating best strategy for store i16 %add, ptr %dst.gep, align 2
 ; FIXED:  LV: Memory widening: can be widened normally with cost 1
 ; FIXED:  LV: Setting widening decision to Widen for VF 4 and instruction: store i16 %add, ptr %dst.gep, align 2
 ;
 ; SVE-LABEL: 'interleaved_load'
 ; SVE:  LV: Memory widening: calculating best strategy for %load.0 = load i16, ptr %gep.0, align 2
-; SVE:  LV: Memory widening: InterleaveCost = 5, GatherScatterCost = 42, ScalarizationCost = Invalid
-; SVE:  LV: Setting widening decision to Interleave for VF vscale x 2 and instruction: %load.0 = load i16, ptr %gep.0, align 2
-; SVE:  LV: Setting widening decision to Interleave for VF vscale x 2 and instruction: %load.1 = load i16, ptr %gep.1, align 2
-; SVE-NOT:  LV: Memory widening: calculating best strategy for %load.1 = load i16, ptr %gep.1, align 2
+; SVE:  LV: Memory widening: GatherScatterCost = 21, ScalarizationCost = Invalid
+; SVE:  LV: Setting widening decision to GatherScatter for VF vscale x 2 and instruction: %load.0 = load i16, ptr %gep.0, align 2
+; SVE:  LV: Memory widening: calculating best strategy for %load.1 = load i16, ptr %gep.1, align 2
+; SVE:  LV: Memory widening: GatherScatterCost = 21, ScalarizationCost = Invalid
+; SVE:  LV: Setting widening decision to GatherScatter for VF vscale x 2 and instruction: %load.1 = load i16, ptr %gep.1, align 2
 ; SVE:  LV: Memory widening: calculating best strategy for store i16 %add, ptr %dst.gep, align 2
 ; SVE:  LV: Memory widening: can be widened normally with cost 1
 ; SVE:  LV: Setting widening decision to Widen for VF vscale x 2 and instruction: store i16 %add, ptr %dst.gep, align 2
@@ -92,34 +94,34 @@ for.end:
 define void @interleave_member_update() {
 ; FIXED-LABEL: 'interleave_member_update'
 ; FIXED:  LV: Memory widening: calculating best strategy for %idx = load i32, ptr %arrayidx, align 8
-; FIXED:  LV: Memory widening: InterleaveCost = 2, GatherScatterCost = Invalid, ScalarizationCost = 16
-; FIXED:  LV: Setting widening decision to Interleave for VF 4 and instruction: %idx = load i32, ptr %arrayidx, align 8
+; FIXED:  LV: Memory widening: GatherScatterCost = Invalid, ScalarizationCost = 16
+; FIXED:  LV: Setting widening decision to Scalarize for VF 4 and instruction: %idx = load i32, ptr %arrayidx, align 8
 ; FIXED:  LV: Memory widening: calculating best strategy for %val = load i32, ptr %gather.ptr, align 4
-; FIXED:  LV: Memory widening: InterleaveCost = Invalid, GatherScatterCost = Invalid, ScalarizationCost = 52
+; FIXED:  LV: Memory widening: GatherScatterCost = Invalid, ScalarizationCost = 52
 ; FIXED:  LV: Setting widening decision to Scalarize for VF 4 and instruction: %val = load i32, ptr %gather.ptr, align 4
 ; FIXED:  LV: Memory widening: calculating best strategy for %addr.idx = load i32, ptr %addr.idx.ptr, align 4
 ; FIXED:  LV: Memory widening: can be widened normally with cost 1
 ; FIXED:  LV: Setting widening decision to Widen for VF 4 and instruction: %addr.idx = load i32, ptr %addr.idx.ptr, align 4
 ; FIXED:  LV: Memory widening: calculating best strategy for store i32 %val, ptr %scatter.ptr, align 4
-; FIXED:  LV: Memory widening: InterleaveCost = Invalid, GatherScatterCost = Invalid, ScalarizationCost = 52
+; FIXED:  LV: Memory widening: GatherScatterCost = Invalid, ScalarizationCost = 52
 ; FIXED:  LV: Setting widening decision to Scalarize for VF 4 and instruction: store i32 %val, ptr %scatter.ptr, align 4
 ; FIXED:  LV: Memory widening: updating decision for load %addr.idx = load i32, ptr %addr.idx.ptr, align 4
 ; FIXED:  LV: Setting widening decision to Scalarize for VF 4 and instruction: %addr.idx = load i32, ptr %addr.idx.ptr, align 4
-; FIXED:  LV: Memory widening: updating decision for interleave member %idx = load i32, ptr %arrayidx, align 8
+; FIXED:  LV: Memory widening: updating decision for load %idx = load i32, ptr %arrayidx, align 8
 ; FIXED:  LV: Setting widening decision to Scalarize for VF 4 and instruction: %idx = load i32, ptr %arrayidx, align 8
 ;
 ; SVE-LABEL: 'interleave_member_update'
 ; SVE:  LV: Memory widening: calculating best strategy for %idx = load i32, ptr %arrayidx, align 8
-; SVE:  LV: Memory widening: InterleaveCost = 5, GatherScatterCost = 21, ScalarizationCost = Invalid
-; SVE:  LV: Setting widening decision to Interleave for VF vscale x 2 and instruction: %idx = load i32, ptr %arrayidx, align 8
+; SVE:  LV: Memory widening: GatherScatterCost = 21, ScalarizationCost = Invalid
+; SVE:  LV: Setting widening decision to GatherScatter for VF vscale x 2 and instruction: %idx = load i32, ptr %arrayidx, align 8
 ; SVE:  LV: Memory widening: calculating best strategy for %val = load i32, ptr %gather.ptr, align 4
-; SVE:  LV: Memory widening: InterleaveCost = Invalid, GatherScatterCost = 21, ScalarizationCost = Invalid
+; SVE:  LV: Memory widening: GatherScatterCost = 21, ScalarizationCost = Invalid
 ; SVE:  LV: Setting widening decision to GatherScatter for VF vscale x 2 and instruction: %val = load i32, ptr %gather.ptr, align 4
 ; SVE:  LV: Memory widening: calculating best strategy for %addr.idx = load i32, ptr %addr.idx.ptr, align 4
 ; SVE:  LV: Memory widening: can be widened normally with cost 1
 ; SVE:  LV: Setting widening decision to Widen for VF vscale x 2 and instruction: %addr.idx = load i32, ptr %addr.idx.ptr, align 4
 ; SVE:  LV: Memory widening: calculating best strategy for store i32 %val, ptr %scatter.ptr, align 4
-; SVE:  LV: Memory widening: InterleaveCost = Invalid, GatherScatterCost = 21, ScalarizationCost = Invalid
+; SVE:  LV: Memory widening: GatherScatterCost = 21, ScalarizationCost = Invalid
 ; SVE:  LV: Setting widening decision to GatherScatter for VF vscale x 2 and instruction: store i32 %val, ptr %scatter.ptr, align 4
 ;
 entry:
@@ -153,7 +155,7 @@ define void @reverse_load_scatter(ptr noalias %src, ptr noalias %dst, i64 %n) {
 ; FIXED:  LV: Memory widening: can be widened normally with cost 4
 ; FIXED:  LV: Setting widening decision to Widen_Reverse for VF 4 and instruction: %val = load i64, ptr %src.ptr, align 8
 ; FIXED:  LV: Memory widening: calculating best strategy for store i64 %val, ptr %dst.ptr, align 8
-; FIXED:  LV: Memory widening: InterleaveCost = Invalid, GatherScatterCost = Invalid, ScalarizationCost = 60
+; FIXED:  LV: Memory widening: GatherScatterCost = Invalid, ScalarizationCost = 60
 ; FIXED:  LV: Setting widening decision to Scalarize for VF 4 and instruction: store i64 %val, ptr %dst.ptr, align 8
 ; FIXED:  LV: Memory widening: updating decision for load %val = load i64, ptr %src.ptr, align 8
 ; FIXED:  LV: Setting widening decision to Scalarize for VF 4 and instruction: %val = load i64, ptr %src.ptr, align 8
@@ -165,7 +167,7 @@ define void @reverse_load_scatter(ptr noalias %src, ptr noalias %dst, i64 %n) {
 ; SVE:  LV: Memory widening: can be widened normally with cost 2
 ; SVE:  LV: Setting widening decision to Widen_Reverse for VF vscale x 2 and instruction: %val = load i64, ptr %src.ptr, align 8
 ; SVE:  LV: Memory widening: calculating best strategy for store i64 %val, ptr %dst.ptr, align 8
-; SVE:  LV: Memory widening: InterleaveCost = Invalid, GatherScatterCost = 21, ScalarizationCost = Invalid
+; SVE:  LV: Memory widening: GatherScatterCost = 21, ScalarizationCost = Invalid
 ; SVE:  LV: Setting widening decision to GatherScatter for VF vscale x 2 and instruction: store i64 %val, ptr %dst.ptr, align 8
 ;
 entry:
@@ -191,7 +193,7 @@ define double @gather_load(ptr noalias readonly %data, ptr noalias readonly %off
 ; FIXED:  LV: Memory widening: can be widened normally with cost 1
 ; FIXED:  LV: Setting widening decision to Widen for VF 4 and instruction: %idx = load i32, ptr %idx.ptr, align 4
 ; FIXED:  LV: Memory widening: calculating best strategy for %val = load double, ptr %gather.ptr, align 8
-; FIXED:  LV: Memory widening: InterleaveCost = Invalid, GatherScatterCost = Invalid, ScalarizationCost = 48
+; FIXED:  LV: Memory widening: GatherScatterCost = Invalid, ScalarizationCost = 48
 ; FIXED:  LV: Setting widening decision to Scalarize for VF 4 and instruction: %val = load double, ptr %gather.ptr, align 8
 ; FIXED:  LV: Memory widening: updating decision for load %idx = load i32, ptr %idx.ptr, align 4
 ; FIXED:  LV: Setting widening decision to Scalarize for VF 4 and instruction: %idx = load i32, ptr %idx.ptr, align 4
@@ -201,7 +203,7 @@ define double @gather_load(ptr noalias readonly %data, ptr noalias readonly %off
 ; SVE:  LV: Memory widening: can be widened normally with cost 1
 ; SVE:  LV: Setting widening decision to Widen for VF vscale x 2 and instruction: %idx = load i32, ptr %idx.ptr, align 4
 ; SVE:  LV: Memory widening: calculating best strategy for %val = load double, ptr %gather.ptr, align 8
-; SVE:  LV: Memory widening: InterleaveCost = Invalid, GatherScatterCost = 21, ScalarizationCost = Invalid
+; SVE:  LV: Memory widening: GatherScatterCost = 21, ScalarizationCost = Invalid
 ; SVE:  LV: Setting widening decision to GatherScatter for VF vscale x 2 and instruction: %val = load double, ptr %gather.ptr, align 8
 ;
 entry:

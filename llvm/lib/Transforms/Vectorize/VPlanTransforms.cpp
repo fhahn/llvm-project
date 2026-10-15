@@ -2953,135 +2953,6 @@ void VPlanTransforms::dropPoisonGeneratingRecipes(VPlan &Plan) {
   }
 }
 
-void VPlanTransforms::createInterleaveGroups(
-    VPlan &Plan,
-    const SmallPtrSetImpl<const InterleaveGroup<Instruction> *>
-        &InterleaveGroups,
-    const bool &EpilogueAllowed) {
-  if (InterleaveGroups.empty())
-    return;
-
-  DenseMap<Instruction *, VPWidenMemoryRecipe *> IRMemberToRecipe;
-  for (VPBasicBlock *VPBB :
-       VPBlockUtils::blocksOnly<VPBasicBlock>(vp_depth_first_shallow(
-           Plan.getVectorLoopRegion()->getEntryBasicBlock())))
-    for (VPRecipeBase &R : make_filter_range(*VPBB, [](VPRecipeBase &R) {
-           return isa<VPWidenMemoryRecipe>(&R);
-         })) {
-      auto *MemR = cast<VPWidenMemoryRecipe>(&R);
-      IRMemberToRecipe[&MemR->getIngredient()] = MemR;
-    }
-
-  // Interleave memory: for each Interleave Group we marked earlier as relevant
-  // for this VPlan, replace the Recipes widening its memory instructions with a
-  // single VPInterleaveRecipe at its insertion point.
-  VPDominatorTree VPDT(Plan);
-  for (const auto *IG : InterleaveGroups) {
-    VPWidenMemoryRecipe *Start = nullptr;
-    Instruction *StartMember = nullptr;
-    for (auto *Member : IG->members())
-      if (VPWidenMemoryRecipe *R = IRMemberToRecipe.lookup(Member)) {
-        StartMember = Member;
-        Start = R;
-        break;
-      }
-    if (!StartMember) // All member recipes are dead, so the group is dead.
-      continue;
-    VPIRMetadata InterleaveMD(*Start);
-    SmallVector<VPValue *, 4> StoredValues;
-    for (unsigned I = 0; I < IG->getFactor(); ++I) {
-      Instruction *MemberI = IG->getMember(I);
-      if (!MemberI)
-        continue;
-      if (VPWidenMemoryRecipe *MemoryR = IRMemberToRecipe.lookup(MemberI)) {
-        if (auto *StoreR = dyn_cast<VPWidenStoreRecipe>(MemoryR->getAsRecipe()))
-          StoredValues.push_back(StoreR->getStoredValue());
-        InterleaveMD.intersect(*MemoryR);
-      } else {
-        InterleaveMD.intersect(VPIRMetadata(*MemberI));
-      }
-    }
-
-    bool NeedsMaskForGaps =
-        (IG->requiresScalarEpilogue() && !EpilogueAllowed) ||
-        (!StoredValues.empty() && !IG->isFull());
-
-    Instruction *IRInsertPos = IG->getInsertPos();
-    auto *InsertPos = IRMemberToRecipe.lookup(IRInsertPos);
-    if (!InsertPos) {
-      // InsertPos member is dead: find a new member that is alive.
-      assert(isa<VPWidenLoadRecipe>(Start->getAsRecipe()) &&
-             "Dead member in non-load group?");
-      InsertPos = Start;
-      for (Instruction *Member : IG->members())
-        if (VPWidenMemoryRecipe *MemberR = IRMemberToRecipe.lookup(Member))
-          if (VPDT.properlyDominates(MemberR->getAsRecipe(),
-                                     InsertPos->getAsRecipe()))
-            InsertPos = MemberR;
-      IRInsertPos = &InsertPos->getIngredient();
-    }
-    VPRecipeBase *InsertPosR = InsertPos->getAsRecipe();
-
-    GEPNoWrapFlags NW = GEPNoWrapFlags::none();
-    if (auto *Gep = dyn_cast<GetElementPtrInst>(
-            getLoadStorePointerOperand(IRInsertPos)->stripPointerCasts()))
-      NW = Gep->getNoWrapFlags().withoutNoUnsignedWrap();
-
-    // Get or create the start address for the interleave group.
-    VPValue *Addr = Start->getAddr();
-    VPRecipeBase *AddrDef = Addr->getDefiningRecipe();
-    if (IG->getIndex(StartMember) != 0 ||
-        (AddrDef && !VPDT.properlyDominates(AddrDef, InsertPosR))) {
-      // Either member zero's recipe is dead, or we cannot re-use the address of
-      // member zero because it does not dominate the insert position. Instead,
-      // use the address of the insert position and create a PtrAdd adjusting it
-      // to the address of member zero.
-      // TODO: Hoist Addr's defining recipe (and any operands as needed) to
-      // InsertPos or sink loads above zero members to join it.
-      assert(IG->getIndex(IRInsertPos) != 0 &&
-             "index of insert position shouldn't be zero");
-      auto &DL = IRInsertPos->getDataLayout();
-      APInt Offset(32,
-                   DL.getTypeAllocSize(getLoadStoreType(IRInsertPos)) *
-                       IG->getIndex(IRInsertPos),
-                   /*IsSigned=*/true);
-      VPValue *OffsetVPV = Plan.getConstantInt(-Offset);
-      VPBuilder B(InsertPosR);
-      Addr = B.createNoWrapPtrAdd(InsertPos->getAddr(), OffsetVPV, NW);
-    }
-    // If the group is reverse, adjust the index to refer to the last vector
-    // lane instead of the first. We adjust the index from the first vector
-    // lane, rather than directly getting the pointer for lane VF - 1, because
-    // the pointer operand of the interleaved access is supposed to be uniform.
-    if (IG->isReverse()) {
-      auto *ReversePtr = new VPVectorEndPointerRecipe(
-          Addr, &Plan.getVF(), getLoadStoreType(IRInsertPos),
-          -(int64_t)IG->getFactor(), NW, InsertPosR->getDebugLoc());
-      ReversePtr->insertBefore(InsertPosR);
-      Addr = ReversePtr;
-    }
-    auto *VPIG = new VPInterleaveRecipe(
-        IG, Addr, StoredValues, InsertPos->getMask(), NeedsMaskForGaps,
-        InterleaveMD, InsertPosR->getDebugLoc());
-    VPIG->insertBefore(InsertPosR);
-
-    unsigned J = 0;
-    for (unsigned i = 0; i < IG->getFactor(); ++i)
-      if (Instruction *Member = IG->getMember(i)) {
-        VPWidenMemoryRecipe *MemberR = IRMemberToRecipe.lookup(Member);
-        if (!Member->getType()->isVoidTy()) {
-          if (MemberR) {
-            VPValue *OriginalV = MemberR->getAsRecipe()->getVPSingleValue();
-            OriginalV->replaceAllUsesWith(VPIG->getVPValue(J));
-          }
-          J++;
-        }
-        if (MemberR)
-          MemberR->getAsRecipe()->eraseFromParent();
-      }
-  }
-}
-
 /// Matches an exit condition formed by comparing a value loaded from memory
 /// with a loop-invariant term. Binds the comparison for the condition.
 static auto m_Uncountable(VPValue *&Cond) {
@@ -5854,9 +5725,163 @@ void VPlanTransforms::createPartialReductions(VPlan &Plan,
   }
 }
 
-void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
-                                                 VPRecipeBuilder &RecipeBuilder,
-                                                 VPCostContext &CostCtx) {
+/// Try to replace the members of \p IG, with VPInstructions given by \p
+/// MemberToVPI, with a single VPInterleaveRecipe for \p Range. Returns false
+/// if the group is not legal or not cheaper than widening its members
+/// individually. On success, the member VPInstructions are left without users,
+/// to be erased by the caller.
+static bool tryToInterleaveGroup(
+    const InterleaveGroup<Instruction> &IG,
+    const DenseMap<Instruction *, VPInstruction *> &MemberToVPI, VPlan &Plan,
+    VFRange &Range, VPRecipeBuilder &RecipeBuilder, VPCostContext &CostCtx) {
+  Instruction *IRInsertPos = IG.getInsertPos();
+  bool IsLoad = isa<LoadInst>(IRInsertPos);
+  Type *ValTy = getLoadStoreType(IRInsertPos);
+  unsigned AS = getLoadStoreAddressSpace(IRInsertPos);
+
+  // Members with irregular types require padding and are scalarized. Don't
+  // coerce non-integral pointers to integers or vice versa.
+  const DataLayout &DL = Plan.getDataLayout();
+  bool IsNonIntegral = DL.isNonIntegralPointerType(ValTy);
+  if (any_of(IG.members(), [&](Instruction *Member) {
+        Type *Ty = getLoadStoreType(Member);
+        return hasIrregularType(Ty, DL) ||
+               DL.isNonIntegralPointerType(Ty) != IsNonIntegral ||
+               (IsNonIntegral && Ty->getPointerAddressSpace() !=
+                                     ValTy->getPointerAddressSpace());
+      }))
+    return false;
+
+  // Members are visited in index order, skipping dead loads.
+  SmallVector<VPInstruction *> Members;
+  for (Instruction *Member : IG.members())
+    if (VPInstruction *VPI = MemberToVPI.lookup(Member))
+      Members.push_back(VPI);
+
+  // Groups with loads used as addresses are scalarized if the target prefers
+  // scalar addressing, matching the legacy cost model.
+  if (IsLoad && !RecipeBuilder.prefersVectorizedAddressing() &&
+      any_of(Members, vputils::isUsedByLoadStoreAddress))
+    return false;
+
+  // A group needs a mask if any member is predicated or if gaps need to be
+  // masked: gaps in a store group, or gaps at the end of a load group that
+  // can't be handled by a scalar epilogue.
+  bool IsMasked = any_of(IG.members(), [&](Instruction *Member) {
+    return RecipeBuilder.isPredicatedInst(Member);
+  });
+  bool NeedsMaskForGaps =
+      IsLoad ? IG.requiresScalarEpilogue() && !RecipeBuilder.isEpilogueAllowed()
+             : !IG.isFull();
+  // TODO: Support masked reverse groups.
+  if ((IsMasked || NeedsMaskForGaps) &&
+      (!CostCtx.useMaskedInterleavedAccesses() || IG.isReverse() ||
+       !CostCtx.Config.isLegalMaskedLoadOrStore(
+           IsLoad, ValTy, getLoadStoreAlignment(IRInsertPos), AS)))
+    return false;
+
+  auto IsProfitable = [&](ElementCount VF) {
+    // Scalable VFs require the (de)interleaveN intrinsics, which support
+    // factors up to 8.
+    // TODO: Support gap masks for scalable VFs.
+    if (VF.isScalable() && (IG.getFactor() > 8 || NeedsMaskForGaps))
+      return false;
+    InstructionCost InterleaveCost = VPInterleaveBase::computeInterleaveCost(
+        IG, ValTy, AS, IsMasked, NeedsMaskForGaps, VF, CostCtx);
+    // Compare against the legacy cost model's decisions for the members,
+    // including dead ones. Prefer interleaving on ties with gather/scatter.
+    InstructionCost MembersCost = 0;
+    bool AllGatherScatter = true;
+    for (Instruction *Member : IG.members()) {
+      auto [Cost, IsGatherScatter] = CostCtx.getLegacyMemOpCost(Member, VF);
+      MembersCost += Cost;
+      AllGatherScatter &= IsGatherScatter;
+    }
+    return InterleaveCost < MembersCost ||
+           (InterleaveCost == MembersCost && AllGatherScatter);
+  };
+  if (!LoopVectorizationPlanner::getDecisionAndClampRange(IsProfitable, Range))
+    return false;
+
+  VPDominatorTree VPDT(Plan);
+  VPInstruction *Start = Members.front();
+  VPInstruction *InsertPos = MemberToVPI.lookup(IRInsertPos);
+  if (!InsertPos) {
+    // The insert position is dead, use the first live member instead.
+    assert(IsLoad && "Dead member in non-load group?");
+    InsertPos = Start;
+    for (VPInstruction *Member : Members)
+      if (VPDT.properlyDominates(Member, InsertPos))
+        InsertPos = Member;
+    IRInsertPos = InsertPos->getUnderlyingInstr();
+  }
+
+  VPIRMetadata InterleaveMD(*Start);
+  SmallVector<VPValue *, 4> StoredValues;
+  for (Instruction *Member : IG.members()) {
+    if (VPInstruction *VPI = MemberToVPI.lookup(Member)) {
+      if (!IsLoad)
+        StoredValues.push_back(VPI->getOperand(0));
+      InterleaveMD.intersect(*VPI);
+    } else {
+      InterleaveMD.intersect(VPIRMetadata(*Member));
+    }
+  }
+
+  GEPNoWrapFlags NW = GEPNoWrapFlags::none();
+  if (auto *Gep = dyn_cast<GetElementPtrInst>(
+          getLoadStorePointerOperand(IRInsertPos)->stripPointerCasts()))
+    NW = Gep->getNoWrapFlags().withoutNoUnsignedWrap();
+
+  // Get or create the start address for the interleave group.
+  VPValue *Addr = Start->getOperand(!IsLoad);
+  VPRecipeBase *AddrDef = Addr->getDefiningRecipe();
+  if (IG.getIndex(Start->getUnderlyingInstr()) != 0 ||
+      (AddrDef && !VPDT.properlyDominates(AddrDef, InsertPos))) {
+    // Either member zero is dead, or we cannot re-use the address of member
+    // zero because it does not dominate the insert position. Instead, use the
+    // address of the insert position and create a PtrAdd adjusting it to the
+    // address of member zero.
+    // TODO: Hoist Addr's defining recipe (and any operands as needed) to
+    // InsertPos or sink loads above zero members to join it.
+    assert(IG.getIndex(IRInsertPos) != 0 &&
+           "index of insert position shouldn't be zero");
+    APInt Offset(32,
+                 DL.getTypeAllocSize(getLoadStoreType(IRInsertPos)) *
+                     IG.getIndex(IRInsertPos),
+                 /*IsSigned=*/true);
+    VPBuilder B(InsertPos);
+    Addr = B.createNoWrapPtrAdd(InsertPos->getOperand(!IsLoad),
+                                Plan.getConstantInt(-Offset), NW);
+  }
+  // If the group is reverse, adjust the index to refer to the last vector
+  // lane instead of the first. We adjust the index from the first vector
+  // lane, rather than directly getting the pointer for lane VF - 1, because
+  // the pointer operand of the interleaved access is supposed to be uniform.
+  if (IG.isReverse()) {
+    auto *ReversePtr = new VPVectorEndPointerRecipe(
+        Addr, &Plan.getVF(), getLoadStoreType(IRInsertPos),
+        -(int64_t)IG.getFactor(), NW, InsertPos->getDebugLoc());
+    ReversePtr->insertBefore(InsertPos);
+    Addr = ReversePtr;
+  }
+  auto *VPIG = new VPInterleaveRecipe(
+      &IG, Addr, StoredValues, IsMasked ? InsertPos->getMask() : nullptr,
+      NeedsMaskForGaps, InterleaveMD, InsertPos->getDebugLoc());
+  VPIG->insertBefore(InsertPos);
+
+  // The recipe defines a value for each member of a load group, including
+  // dead ones.
+  if (IsLoad)
+    for (auto [Idx, Member] : enumerate(IG.members()))
+      if (VPInstruction *VPI = MemberToVPI.lookup(Member))
+        VPI->replaceAllUsesWith(VPIG->getVPValue(Idx));
+  return true;
+}
+
+void VPlanTransforms::makeMemOpWideningDecisions(
+    VPlan &Plan, VFRange &Range, VPRecipeBuilder &RecipeBuilder,
+    VPCostContext &CostCtx, const InterleavedAccessInfo &IAI) {
   // Collect all loads/stores first. We will start with ones having simpler
   // decisions followed by more complex ones that are potentially
   // guided/dependent on the simpler ones.
@@ -5925,6 +5950,29 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
   if (LoopVectorizationPlanner::getDecisionAndClampRange(
           [](ElementCount VF) { return VF.isScalar(); }, Range))
     return;
+
+  // Replace the members of interleave groups with a single VPInterleaveRecipe,
+  // if legal and profitable. The decision for a group is made at its first
+  // member, when none of its members have been erased yet.
+  DenseMap<Instruction *, VPInstruction *> MemberToVPI;
+  for (VPInstruction *VPI : MemOps)
+    MemberToVPI[VPI->getUnderlyingInstr()] = VPI;
+  DenseMap<const InterleaveGroup<Instruction> *, bool> IsInterleaved;
+  VPlanTransforms::runPass(
+      "createInterleaveGroups", ProcessSubset, Plan, [&](VPInstruction *VPI) {
+        const InterleaveGroup<Instruction> *IG =
+            IAI.getInterleaveGroup(VPI->getUnderlyingInstr());
+        if (!IG)
+          return false;
+        auto [It, Inserted] = IsInterleaved.try_emplace(IG);
+        if (Inserted)
+          It->second = tryToInterleaveGroup(*IG, MemberToVPI, Plan, Range,
+                                            RecipeBuilder, CostCtx);
+        if (!It->second)
+          return false;
+        VPI->eraseFromParent();
+        return true;
+      });
 
   // If the instruction's allocated size doesn't equal it's type size, it
   // requires padding and will be scalarized.

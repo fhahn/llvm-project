@@ -3,60 +3,181 @@
 ; RUN: opt -S < %s -p loop-vectorize -force-vector-width=4 -enable-interleaved-mem-accesses -enable-masked-interleaved-mem-accesses -force-target-supports-masked-memory-ops -enable-early-exit-vectorization-with-side-effects | FileCheck %s --check-prefixes=CHECK,MASKED-IG
 
 define void @uncountable_exit_with_interleaved_store(ptr dereferenceable(160) noalias %array, ptr align 4 dereferenceable(80) readonly %pred) {
-; CHECK-LABEL: define void @uncountable_exit_with_interleaved_store(
-; CHECK-SAME: ptr noalias dereferenceable(160) [[ARRAY:%.*]], ptr readonly align 4 dereferenceable(80) [[PRED:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
-; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
-; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i32> [ <i32 0, i32 1, i32 2, i32 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i32, ptr [[PRED]], i64 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP0]], align 4
-; CHECK-NEXT:    [[TMP1:%.*]] = icmp sgt <4 x i32> [[WIDE_LOAD]], splat (i32 500)
-; CHECK-NEXT:    [[TMP2:%.*]] = freeze <4 x i1> [[TMP1]]
-; CHECK-NEXT:    [[TMP3:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP2]], i1 false)
-; CHECK-NEXT:    [[UNCOUNTABLE_EXIT_MASK:%.*]] = call <4 x i1> @llvm.get.active.lane.mask.v4i1.i64(i64 0, i64 [[TMP3]])
-; CHECK-NEXT:    [[TMP4:%.*]] = shl i64 [[INDEX]], 1
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i32, ptr [[ARRAY]], i64 [[TMP4]]
-; CHECK-NEXT:    [[TMP6:%.*]] = add <4 x i32> [[VEC_IND]], splat (i32 1)
-; CHECK-NEXT:    [[TMP7:%.*]] = shufflevector <4 x i32> [[VEC_IND]], <4 x i32> [[TMP6]], <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
-; CHECK-NEXT:    [[INTERLEAVED_VEC:%.*]] = shufflevector <8 x i32> [[TMP7]], <8 x i32> poison, <8 x i32> <i32 0, i32 4, i32 1, i32 5, i32 2, i32 6, i32 3, i32 7>
-; CHECK-NEXT:    [[INTERLEAVED_MASK:%.*]] = shufflevector <4 x i1> [[UNCOUNTABLE_EXIT_MASK]], <4 x i1> poison, <8 x i32> <i32 0, i32 0, i32 1, i32 1, i32 2, i32 2, i32 3, i32 3>
-; CHECK-NEXT:    call void @llvm.masked.store.v8i32.p0(<8 x i32> [[INTERLEAVED_VEC]], ptr align 4 [[TMP5]], <8 x i1> [[INTERLEAVED_MASK]])
-; CHECK-NEXT:    [[TMP8:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP2]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], 20
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
-; CHECK-NEXT:    [[TMP10:%.*]] = or i1 [[TMP8]], [[TMP9]]
-; CHECK-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
-; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP11:%.*]] = add i64 [[INDEX]], [[TMP3]]
-; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[TMP11]], 20
-; CHECK-NEXT:    br i1 [[TMP12]], label %[[EXIT:.*]], label %[[SCALAR_PH:.*]]
-; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    br label %[[FOR_BODY:.*]]
-; CHECK:       [[FOR_BODY]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[TMP11]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[FOR_INC:.*]] ]
-; CHECK-NEXT:    [[IV_TRUNC:%.*]] = trunc i64 [[IV]] to i32
-; CHECK-NEXT:    [[IDX_0:%.*]] = shl nuw nsw i64 [[IV]], 1
-; CHECK-NEXT:    [[ST_ADDR_0:%.*]] = getelementptr inbounds nuw i32, ptr [[ARRAY]], i64 [[IDX_0]]
-; CHECK-NEXT:    store i32 [[IV_TRUNC]], ptr [[ST_ADDR_0]], align 4
-; CHECK-NEXT:    [[IDX_1:%.*]] = or disjoint i64 [[IDX_0]], 1
-; CHECK-NEXT:    [[ST_ADDR_1:%.*]] = getelementptr inbounds nuw i32, ptr [[ARRAY]], i64 [[IDX_1]]
-; CHECK-NEXT:    [[INC:%.*]] = add i32 [[IV_TRUNC]], 1
-; CHECK-NEXT:    store i32 [[INC]], ptr [[ST_ADDR_1]], align 4
-; CHECK-NEXT:    [[EE_ADDR:%.*]] = getelementptr inbounds nuw i32, ptr [[PRED]], i64 [[IV]]
-; CHECK-NEXT:    [[EE_VAL:%.*]] = load i32, ptr [[EE_ADDR]], align 4
-; CHECK-NEXT:    [[EE_COND:%.*]] = icmp sgt i32 [[EE_VAL]], 500
-; CHECK-NEXT:    br i1 [[EE_COND]], label %[[EXIT]], label %[[FOR_INC]]
-; CHECK:       [[FOR_INC]]:
-; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
-; CHECK-NEXT:    [[COUNTED_COND:%.*]] = icmp eq i64 [[IV_NEXT]], 20
-; CHECK-NEXT:    br i1 [[COUNTED_COND]], label %[[EXIT]], label %[[FOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
-; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    ret void
+; NO-MASKED-IG-LABEL: define void @uncountable_exit_with_interleaved_store(
+; NO-MASKED-IG-SAME: ptr noalias dereferenceable(160) [[ARRAY:%.*]], ptr readonly align 4 dereferenceable(80) [[PRED:%.*]]) {
+; NO-MASKED-IG-NEXT:  [[ENTRY:.*:]]
+; NO-MASKED-IG-NEXT:    br label %[[VECTOR_PH:.*]]
+; NO-MASKED-IG:       [[VECTOR_PH]]:
+; NO-MASKED-IG-NEXT:    br label %[[VECTOR_BODY:.*]]
+; NO-MASKED-IG:       [[VECTOR_BODY]]:
+; NO-MASKED-IG-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE15:.*]] ]
+; NO-MASKED-IG-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_STORE_CONTINUE15]] ]
+; NO-MASKED-IG-NEXT:    [[VEC_IND1:%.*]] = phi <4 x i32> [ <i32 0, i32 1, i32 2, i32 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT16:%.*]], %[[PRED_STORE_CONTINUE15]] ]
+; NO-MASKED-IG-NEXT:    [[TMP0:%.*]] = trunc i64 [[INDEX]] to i32
+; NO-MASKED-IG-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw i32, ptr [[PRED]], i64 [[INDEX]]
+; NO-MASKED-IG-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP1]], align 4
+; NO-MASKED-IG-NEXT:    [[TMP2:%.*]] = icmp sgt <4 x i32> [[WIDE_LOAD]], splat (i32 500)
+; NO-MASKED-IG-NEXT:    [[TMP3:%.*]] = freeze <4 x i1> [[TMP2]]
+; NO-MASKED-IG-NEXT:    [[TMP4:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP3]], i1 false)
+; NO-MASKED-IG-NEXT:    [[UNCOUNTABLE_EXIT_MASK:%.*]] = call <4 x i1> @llvm.get.active.lane.mask.v4i1.i64(i64 0, i64 [[TMP4]])
+; NO-MASKED-IG-NEXT:    [[TMP5:%.*]] = shl nuw nsw <4 x i64> [[VEC_IND]], splat (i64 1)
+; NO-MASKED-IG-NEXT:    [[TMP6:%.*]] = extractelement <4 x i1> [[UNCOUNTABLE_EXIT_MASK]], i64 0
+; NO-MASKED-IG-NEXT:    br i1 [[TMP6]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
+; NO-MASKED-IG:       [[PRED_STORE_IF]]:
+; NO-MASKED-IG-NEXT:    [[TMP7:%.*]] = extractelement <4 x i64> [[TMP5]], i64 0
+; NO-MASKED-IG-NEXT:    [[TMP8:%.*]] = getelementptr inbounds nuw i32, ptr [[ARRAY]], i64 [[TMP7]]
+; NO-MASKED-IG-NEXT:    store i32 [[TMP0]], ptr [[TMP8]], align 4
+; NO-MASKED-IG-NEXT:    br label %[[PRED_STORE_CONTINUE]]
+; NO-MASKED-IG:       [[PRED_STORE_CONTINUE]]:
+; NO-MASKED-IG-NEXT:    [[TMP9:%.*]] = extractelement <4 x i1> [[UNCOUNTABLE_EXIT_MASK]], i64 1
+; NO-MASKED-IG-NEXT:    br i1 [[TMP9]], label %[[PRED_STORE_IF2:.*]], label %[[PRED_STORE_CONTINUE3:.*]]
+; NO-MASKED-IG:       [[PRED_STORE_IF2]]:
+; NO-MASKED-IG-NEXT:    [[TMP10:%.*]] = extractelement <4 x i64> [[TMP5]], i64 1
+; NO-MASKED-IG-NEXT:    [[TMP11:%.*]] = getelementptr inbounds nuw i32, ptr [[ARRAY]], i64 [[TMP10]]
+; NO-MASKED-IG-NEXT:    [[TMP12:%.*]] = add i32 [[TMP0]], 1
+; NO-MASKED-IG-NEXT:    store i32 [[TMP12]], ptr [[TMP11]], align 4
+; NO-MASKED-IG-NEXT:    br label %[[PRED_STORE_CONTINUE3]]
+; NO-MASKED-IG:       [[PRED_STORE_CONTINUE3]]:
+; NO-MASKED-IG-NEXT:    [[TMP13:%.*]] = extractelement <4 x i1> [[UNCOUNTABLE_EXIT_MASK]], i64 2
+; NO-MASKED-IG-NEXT:    br i1 [[TMP13]], label %[[PRED_STORE_IF4:.*]], label %[[PRED_STORE_CONTINUE5:.*]]
+; NO-MASKED-IG:       [[PRED_STORE_IF4]]:
+; NO-MASKED-IG-NEXT:    [[TMP14:%.*]] = extractelement <4 x i64> [[TMP5]], i64 2
+; NO-MASKED-IG-NEXT:    [[TMP15:%.*]] = getelementptr inbounds nuw i32, ptr [[ARRAY]], i64 [[TMP14]]
+; NO-MASKED-IG-NEXT:    [[TMP16:%.*]] = add i32 [[TMP0]], 2
+; NO-MASKED-IG-NEXT:    store i32 [[TMP16]], ptr [[TMP15]], align 4
+; NO-MASKED-IG-NEXT:    br label %[[PRED_STORE_CONTINUE5]]
+; NO-MASKED-IG:       [[PRED_STORE_CONTINUE5]]:
+; NO-MASKED-IG-NEXT:    [[TMP17:%.*]] = extractelement <4 x i1> [[UNCOUNTABLE_EXIT_MASK]], i64 3
+; NO-MASKED-IG-NEXT:    br i1 [[TMP17]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7:.*]]
+; NO-MASKED-IG:       [[PRED_STORE_IF6]]:
+; NO-MASKED-IG-NEXT:    [[TMP18:%.*]] = extractelement <4 x i64> [[TMP5]], i64 3
+; NO-MASKED-IG-NEXT:    [[TMP19:%.*]] = getelementptr inbounds nuw i32, ptr [[ARRAY]], i64 [[TMP18]]
+; NO-MASKED-IG-NEXT:    [[TMP20:%.*]] = add i32 [[TMP0]], 3
+; NO-MASKED-IG-NEXT:    store i32 [[TMP20]], ptr [[TMP19]], align 4
+; NO-MASKED-IG-NEXT:    br label %[[PRED_STORE_CONTINUE7]]
+; NO-MASKED-IG:       [[PRED_STORE_CONTINUE7]]:
+; NO-MASKED-IG-NEXT:    [[TMP21:%.*]] = or disjoint <4 x i64> [[TMP5]], splat (i64 1)
+; NO-MASKED-IG-NEXT:    [[TMP22:%.*]] = add <4 x i32> [[VEC_IND1]], splat (i32 1)
+; NO-MASKED-IG-NEXT:    br i1 [[TMP6]], label %[[PRED_STORE_IF8:.*]], label %[[PRED_STORE_CONTINUE9:.*]]
+; NO-MASKED-IG:       [[PRED_STORE_IF8]]:
+; NO-MASKED-IG-NEXT:    [[TMP23:%.*]] = extractelement <4 x i64> [[TMP21]], i64 0
+; NO-MASKED-IG-NEXT:    [[TMP24:%.*]] = getelementptr inbounds nuw i32, ptr [[ARRAY]], i64 [[TMP23]]
+; NO-MASKED-IG-NEXT:    [[TMP25:%.*]] = extractelement <4 x i32> [[TMP22]], i64 0
+; NO-MASKED-IG-NEXT:    store i32 [[TMP25]], ptr [[TMP24]], align 4
+; NO-MASKED-IG-NEXT:    br label %[[PRED_STORE_CONTINUE9]]
+; NO-MASKED-IG:       [[PRED_STORE_CONTINUE9]]:
+; NO-MASKED-IG-NEXT:    br i1 [[TMP9]], label %[[PRED_STORE_IF10:.*]], label %[[PRED_STORE_CONTINUE11:.*]]
+; NO-MASKED-IG:       [[PRED_STORE_IF10]]:
+; NO-MASKED-IG-NEXT:    [[TMP26:%.*]] = extractelement <4 x i64> [[TMP21]], i64 1
+; NO-MASKED-IG-NEXT:    [[TMP27:%.*]] = getelementptr inbounds nuw i32, ptr [[ARRAY]], i64 [[TMP26]]
+; NO-MASKED-IG-NEXT:    [[TMP28:%.*]] = extractelement <4 x i32> [[TMP22]], i64 1
+; NO-MASKED-IG-NEXT:    store i32 [[TMP28]], ptr [[TMP27]], align 4
+; NO-MASKED-IG-NEXT:    br label %[[PRED_STORE_CONTINUE11]]
+; NO-MASKED-IG:       [[PRED_STORE_CONTINUE11]]:
+; NO-MASKED-IG-NEXT:    br i1 [[TMP13]], label %[[PRED_STORE_IF12:.*]], label %[[PRED_STORE_CONTINUE13:.*]]
+; NO-MASKED-IG:       [[PRED_STORE_IF12]]:
+; NO-MASKED-IG-NEXT:    [[TMP29:%.*]] = extractelement <4 x i64> [[TMP21]], i64 2
+; NO-MASKED-IG-NEXT:    [[TMP30:%.*]] = getelementptr inbounds nuw i32, ptr [[ARRAY]], i64 [[TMP29]]
+; NO-MASKED-IG-NEXT:    [[TMP31:%.*]] = extractelement <4 x i32> [[TMP22]], i64 2
+; NO-MASKED-IG-NEXT:    store i32 [[TMP31]], ptr [[TMP30]], align 4
+; NO-MASKED-IG-NEXT:    br label %[[PRED_STORE_CONTINUE13]]
+; NO-MASKED-IG:       [[PRED_STORE_CONTINUE13]]:
+; NO-MASKED-IG-NEXT:    br i1 [[TMP17]], label %[[PRED_STORE_IF14:.*]], label %[[PRED_STORE_CONTINUE15]]
+; NO-MASKED-IG:       [[PRED_STORE_IF14]]:
+; NO-MASKED-IG-NEXT:    [[TMP32:%.*]] = extractelement <4 x i64> [[TMP21]], i64 3
+; NO-MASKED-IG-NEXT:    [[TMP33:%.*]] = getelementptr inbounds nuw i32, ptr [[ARRAY]], i64 [[TMP32]]
+; NO-MASKED-IG-NEXT:    [[TMP34:%.*]] = extractelement <4 x i32> [[TMP22]], i64 3
+; NO-MASKED-IG-NEXT:    store i32 [[TMP34]], ptr [[TMP33]], align 4
+; NO-MASKED-IG-NEXT:    br label %[[PRED_STORE_CONTINUE15]]
+; NO-MASKED-IG:       [[PRED_STORE_CONTINUE15]]:
+; NO-MASKED-IG-NEXT:    [[TMP35:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP3]])
+; NO-MASKED-IG-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; NO-MASKED-IG-NEXT:    [[TMP36:%.*]] = icmp eq i64 [[INDEX_NEXT]], 20
+; NO-MASKED-IG-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; NO-MASKED-IG-NEXT:    [[VEC_IND_NEXT16]] = add <4 x i32> [[VEC_IND1]], splat (i32 4)
+; NO-MASKED-IG-NEXT:    [[TMP37:%.*]] = or i1 [[TMP35]], [[TMP36]]
+; NO-MASKED-IG-NEXT:    br i1 [[TMP37]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; NO-MASKED-IG:       [[MIDDLE_BLOCK]]:
+; NO-MASKED-IG-NEXT:    [[TMP38:%.*]] = add i64 [[INDEX]], [[TMP4]]
+; NO-MASKED-IG-NEXT:    [[TMP39:%.*]] = icmp eq i64 [[TMP38]], 20
+; NO-MASKED-IG-NEXT:    br i1 [[TMP39]], label %[[EXIT:.*]], label %[[SCALAR_PH:.*]]
+; NO-MASKED-IG:       [[SCALAR_PH]]:
+; NO-MASKED-IG-NEXT:    br label %[[FOR_BODY:.*]]
+; NO-MASKED-IG:       [[FOR_BODY]]:
+; NO-MASKED-IG-NEXT:    [[IV:%.*]] = phi i64 [ [[TMP38]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[FOR_INC:.*]] ]
+; NO-MASKED-IG-NEXT:    [[IV_TRUNC:%.*]] = trunc i64 [[IV]] to i32
+; NO-MASKED-IG-NEXT:    [[IDX_0:%.*]] = shl nuw nsw i64 [[IV]], 1
+; NO-MASKED-IG-NEXT:    [[ST_ADDR_0:%.*]] = getelementptr inbounds nuw i32, ptr [[ARRAY]], i64 [[IDX_0]]
+; NO-MASKED-IG-NEXT:    store i32 [[IV_TRUNC]], ptr [[ST_ADDR_0]], align 4
+; NO-MASKED-IG-NEXT:    [[IDX_1:%.*]] = or disjoint i64 [[IDX_0]], 1
+; NO-MASKED-IG-NEXT:    [[ST_ADDR_1:%.*]] = getelementptr inbounds nuw i32, ptr [[ARRAY]], i64 [[IDX_1]]
+; NO-MASKED-IG-NEXT:    [[INC:%.*]] = add i32 [[IV_TRUNC]], 1
+; NO-MASKED-IG-NEXT:    store i32 [[INC]], ptr [[ST_ADDR_1]], align 4
+; NO-MASKED-IG-NEXT:    [[EE_ADDR:%.*]] = getelementptr inbounds nuw i32, ptr [[PRED]], i64 [[IV]]
+; NO-MASKED-IG-NEXT:    [[EE_VAL:%.*]] = load i32, ptr [[EE_ADDR]], align 4
+; NO-MASKED-IG-NEXT:    [[EE_COND:%.*]] = icmp sgt i32 [[EE_VAL]], 500
+; NO-MASKED-IG-NEXT:    br i1 [[EE_COND]], label %[[EXIT]], label %[[FOR_INC]]
+; NO-MASKED-IG:       [[FOR_INC]]:
+; NO-MASKED-IG-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; NO-MASKED-IG-NEXT:    [[COUNTED_COND:%.*]] = icmp eq i64 [[IV_NEXT]], 20
+; NO-MASKED-IG-NEXT:    br i1 [[COUNTED_COND]], label %[[EXIT]], label %[[FOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
+; NO-MASKED-IG:       [[EXIT]]:
+; NO-MASKED-IG-NEXT:    ret void
+;
+; MASKED-IG-LABEL: define void @uncountable_exit_with_interleaved_store(
+; MASKED-IG-SAME: ptr noalias dereferenceable(160) [[ARRAY:%.*]], ptr readonly align 4 dereferenceable(80) [[PRED:%.*]]) {
+; MASKED-IG-NEXT:  [[ENTRY:.*:]]
+; MASKED-IG-NEXT:    br label %[[VECTOR_PH:.*]]
+; MASKED-IG:       [[VECTOR_PH]]:
+; MASKED-IG-NEXT:    br label %[[VECTOR_BODY:.*]]
+; MASKED-IG:       [[VECTOR_BODY]]:
+; MASKED-IG-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; MASKED-IG-NEXT:    [[VEC_IND:%.*]] = phi <4 x i32> [ <i32 0, i32 1, i32 2, i32 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; MASKED-IG-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i32, ptr [[PRED]], i64 [[INDEX]]
+; MASKED-IG-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP0]], align 4
+; MASKED-IG-NEXT:    [[TMP1:%.*]] = icmp sgt <4 x i32> [[WIDE_LOAD]], splat (i32 500)
+; MASKED-IG-NEXT:    [[TMP2:%.*]] = freeze <4 x i1> [[TMP1]]
+; MASKED-IG-NEXT:    [[TMP3:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP2]], i1 false)
+; MASKED-IG-NEXT:    [[UNCOUNTABLE_EXIT_MASK:%.*]] = call <4 x i1> @llvm.get.active.lane.mask.v4i1.i64(i64 0, i64 [[TMP3]])
+; MASKED-IG-NEXT:    [[TMP4:%.*]] = shl i64 [[INDEX]], 1
+; MASKED-IG-NEXT:    [[TMP5:%.*]] = getelementptr i32, ptr [[ARRAY]], i64 [[TMP4]]
+; MASKED-IG-NEXT:    [[TMP6:%.*]] = add <4 x i32> [[VEC_IND]], splat (i32 1)
+; MASKED-IG-NEXT:    [[TMP7:%.*]] = shufflevector <4 x i32> [[VEC_IND]], <4 x i32> [[TMP6]], <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
+; MASKED-IG-NEXT:    [[INTERLEAVED_VEC:%.*]] = shufflevector <8 x i32> [[TMP7]], <8 x i32> poison, <8 x i32> <i32 0, i32 4, i32 1, i32 5, i32 2, i32 6, i32 3, i32 7>
+; MASKED-IG-NEXT:    [[INTERLEAVED_MASK:%.*]] = shufflevector <4 x i1> [[UNCOUNTABLE_EXIT_MASK]], <4 x i1> poison, <8 x i32> <i32 0, i32 0, i32 1, i32 1, i32 2, i32 2, i32 3, i32 3>
+; MASKED-IG-NEXT:    call void @llvm.masked.store.v8i32.p0(<8 x i32> [[INTERLEAVED_VEC]], ptr align 4 [[TMP5]], <8 x i1> [[INTERLEAVED_MASK]])
+; MASKED-IG-NEXT:    [[TMP8:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP2]])
+; MASKED-IG-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; MASKED-IG-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], 20
+; MASKED-IG-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; MASKED-IG-NEXT:    [[TMP10:%.*]] = or i1 [[TMP8]], [[TMP9]]
+; MASKED-IG-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; MASKED-IG:       [[MIDDLE_BLOCK]]:
+; MASKED-IG-NEXT:    [[TMP11:%.*]] = add i64 [[INDEX]], [[TMP3]]
+; MASKED-IG-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[TMP11]], 20
+; MASKED-IG-NEXT:    br i1 [[TMP12]], label %[[EXIT:.*]], label %[[SCALAR_PH:.*]]
+; MASKED-IG:       [[SCALAR_PH]]:
+; MASKED-IG-NEXT:    br label %[[FOR_BODY:.*]]
+; MASKED-IG:       [[FOR_BODY]]:
+; MASKED-IG-NEXT:    [[IV:%.*]] = phi i64 [ [[TMP11]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[FOR_INC:.*]] ]
+; MASKED-IG-NEXT:    [[IV_TRUNC:%.*]] = trunc i64 [[IV]] to i32
+; MASKED-IG-NEXT:    [[IDX_0:%.*]] = shl nuw nsw i64 [[IV]], 1
+; MASKED-IG-NEXT:    [[ST_ADDR_0:%.*]] = getelementptr inbounds nuw i32, ptr [[ARRAY]], i64 [[IDX_0]]
+; MASKED-IG-NEXT:    store i32 [[IV_TRUNC]], ptr [[ST_ADDR_0]], align 4
+; MASKED-IG-NEXT:    [[IDX_1:%.*]] = or disjoint i64 [[IDX_0]], 1
+; MASKED-IG-NEXT:    [[ST_ADDR_1:%.*]] = getelementptr inbounds nuw i32, ptr [[ARRAY]], i64 [[IDX_1]]
+; MASKED-IG-NEXT:    [[INC:%.*]] = add i32 [[IV_TRUNC]], 1
+; MASKED-IG-NEXT:    store i32 [[INC]], ptr [[ST_ADDR_1]], align 4
+; MASKED-IG-NEXT:    [[EE_ADDR:%.*]] = getelementptr inbounds nuw i32, ptr [[PRED]], i64 [[IV]]
+; MASKED-IG-NEXT:    [[EE_VAL:%.*]] = load i32, ptr [[EE_ADDR]], align 4
+; MASKED-IG-NEXT:    [[EE_COND:%.*]] = icmp sgt i32 [[EE_VAL]], 500
+; MASKED-IG-NEXT:    br i1 [[EE_COND]], label %[[EXIT]], label %[[FOR_INC]]
+; MASKED-IG:       [[FOR_INC]]:
+; MASKED-IG-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; MASKED-IG-NEXT:    [[COUNTED_COND:%.*]] = icmp eq i64 [[IV_NEXT]], 20
+; MASKED-IG-NEXT:    br i1 [[COUNTED_COND]], label %[[EXIT]], label %[[FOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
+; MASKED-IG:       [[EXIT]]:
+; MASKED-IG-NEXT:    ret void
 ;
 entry:
   br label %for.body
@@ -86,61 +207,191 @@ exit:
 }
 
 define void @uncountable_exit_with_interleaved_load(ptr dereferenceable(80) noalias %array, ptr align 4 dereferenceable(160) noalias readonly %src, ptr align 4 dereferenceable(80) readonly %pred) {
-; CHECK-LABEL: define void @uncountable_exit_with_interleaved_load(
-; CHECK-SAME: ptr noalias dereferenceable(80) [[ARRAY:%.*]], ptr noalias readonly align 4 dereferenceable(160) [[SRC:%.*]], ptr readonly align 4 dereferenceable(80) [[PRED:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
-; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
-; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i32, ptr [[PRED]], i64 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP0]], align 4
-; CHECK-NEXT:    [[TMP1:%.*]] = icmp sgt <4 x i32> [[WIDE_LOAD]], splat (i32 500)
-; CHECK-NEXT:    [[TMP2:%.*]] = freeze <4 x i1> [[TMP1]]
-; CHECK-NEXT:    [[TMP3:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP2]], i1 false)
-; CHECK-NEXT:    [[UNCOUNTABLE_EXIT_MASK:%.*]] = call <4 x i1> @llvm.get.active.lane.mask.v4i1.i64(i64 0, i64 [[TMP3]])
-; CHECK-NEXT:    [[TMP4:%.*]] = shl i64 [[INDEX]], 1
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[TMP4]]
-; CHECK-NEXT:    [[INTERLEAVED_MASK:%.*]] = shufflevector <4 x i1> [[UNCOUNTABLE_EXIT_MASK]], <4 x i1> poison, <8 x i32> <i32 0, i32 0, i32 1, i32 1, i32 2, i32 2, i32 3, i32 3>
-; CHECK-NEXT:    [[WIDE_MASKED_VEC:%.*]] = call <8 x i32> @llvm.masked.load.v8i32.p0(ptr align 4 [[TMP5]], <8 x i1> [[INTERLEAVED_MASK]], <8 x i32> poison)
-; CHECK-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <8 x i32> [[WIDE_MASKED_VEC]], <8 x i32> poison, <4 x i32> <i32 0, i32 2, i32 4, i32 6>
-; CHECK-NEXT:    [[STRIDED_VEC1:%.*]] = shufflevector <8 x i32> [[WIDE_MASKED_VEC]], <8 x i32> poison, <4 x i32> <i32 1, i32 3, i32 5, i32 7>
-; CHECK-NEXT:    [[TMP6:%.*]] = add <4 x i32> [[STRIDED_VEC]], [[STRIDED_VEC1]]
-; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i32, ptr [[ARRAY]], i64 [[INDEX]]
-; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[TMP6]], ptr align 4 [[TMP7]], <4 x i1> [[UNCOUNTABLE_EXIT_MASK]])
-; CHECK-NEXT:    [[TMP8:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP2]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], 20
-; CHECK-NEXT:    [[TMP10:%.*]] = or i1 [[TMP8]], [[TMP9]]
-; CHECK-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
-; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP11:%.*]] = add i64 [[INDEX]], [[TMP3]]
-; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[TMP11]], 20
-; CHECK-NEXT:    br i1 [[TMP12]], label %[[EXIT:.*]], label %[[SCALAR_PH:.*]]
-; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    br label %[[FOR_BODY:.*]]
-; CHECK:       [[FOR_BODY]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[TMP11]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[FOR_INC:.*]] ]
-; CHECK-NEXT:    [[IDX_0:%.*]] = shl nuw nsw i64 [[IV]], 1
-; CHECK-NEXT:    [[LD_ADDR_0:%.*]] = getelementptr inbounds nuw i32, ptr [[SRC]], i64 [[IDX_0]]
-; CHECK-NEXT:    [[LD_0:%.*]] = load i32, ptr [[LD_ADDR_0]], align 4
-; CHECK-NEXT:    [[IDX_1:%.*]] = or disjoint i64 [[IDX_0]], 1
-; CHECK-NEXT:    [[LD_ADDR_1:%.*]] = getelementptr inbounds nuw i32, ptr [[SRC]], i64 [[IDX_1]]
-; CHECK-NEXT:    [[LD_1:%.*]] = load i32, ptr [[LD_ADDR_1]], align 4
-; CHECK-NEXT:    [[ADD:%.*]] = add i32 [[LD_0]], [[LD_1]]
-; CHECK-NEXT:    [[ST_ADDR:%.*]] = getelementptr inbounds nuw i32, ptr [[ARRAY]], i64 [[IV]]
-; CHECK-NEXT:    store i32 [[ADD]], ptr [[ST_ADDR]], align 4
-; CHECK-NEXT:    [[EE_ADDR:%.*]] = getelementptr inbounds nuw i32, ptr [[PRED]], i64 [[IV]]
-; CHECK-NEXT:    [[EE_VAL:%.*]] = load i32, ptr [[EE_ADDR]], align 4
-; CHECK-NEXT:    [[EE_COND:%.*]] = icmp sgt i32 [[EE_VAL]], 500
-; CHECK-NEXT:    br i1 [[EE_COND]], label %[[EXIT]], label %[[FOR_INC]]
-; CHECK:       [[FOR_INC]]:
-; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
-; CHECK-NEXT:    [[COUNTED_COND:%.*]] = icmp eq i64 [[IV_NEXT]], 20
-; CHECK-NEXT:    br i1 [[COUNTED_COND]], label %[[EXIT]], label %[[FOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
-; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    ret void
+; NO-MASKED-IG-LABEL: define void @uncountable_exit_with_interleaved_load(
+; NO-MASKED-IG-SAME: ptr noalias dereferenceable(80) [[ARRAY:%.*]], ptr noalias readonly align 4 dereferenceable(160) [[SRC:%.*]], ptr readonly align 4 dereferenceable(80) [[PRED:%.*]]) {
+; NO-MASKED-IG-NEXT:  [[ENTRY:.*:]]
+; NO-MASKED-IG-NEXT:    br label %[[VECTOR_PH:.*]]
+; NO-MASKED-IG:       [[VECTOR_PH]]:
+; NO-MASKED-IG-NEXT:    br label %[[VECTOR_BODY:.*]]
+; NO-MASKED-IG:       [[VECTOR_BODY]]:
+; NO-MASKED-IG-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_LOAD_CONTINUE14:.*]] ]
+; NO-MASKED-IG-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_LOAD_CONTINUE14]] ]
+; NO-MASKED-IG-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i32, ptr [[PRED]], i64 [[INDEX]]
+; NO-MASKED-IG-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP0]], align 4
+; NO-MASKED-IG-NEXT:    [[TMP1:%.*]] = icmp sgt <4 x i32> [[WIDE_LOAD]], splat (i32 500)
+; NO-MASKED-IG-NEXT:    [[TMP2:%.*]] = freeze <4 x i1> [[TMP1]]
+; NO-MASKED-IG-NEXT:    [[TMP3:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP2]], i1 false)
+; NO-MASKED-IG-NEXT:    [[UNCOUNTABLE_EXIT_MASK:%.*]] = call <4 x i1> @llvm.get.active.lane.mask.v4i1.i64(i64 0, i64 [[TMP3]])
+; NO-MASKED-IG-NEXT:    [[TMP4:%.*]] = shl nuw nsw <4 x i64> [[VEC_IND]], splat (i64 1)
+; NO-MASKED-IG-NEXT:    [[TMP5:%.*]] = extractelement <4 x i1> [[UNCOUNTABLE_EXIT_MASK]], i64 0
+; NO-MASKED-IG-NEXT:    br i1 [[TMP5]], label %[[PRED_LOAD_IF:.*]], label %[[PRED_LOAD_CONTINUE:.*]]
+; NO-MASKED-IG:       [[PRED_LOAD_IF]]:
+; NO-MASKED-IG-NEXT:    [[TMP6:%.*]] = extractelement <4 x i64> [[TMP4]], i64 0
+; NO-MASKED-IG-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw i32, ptr [[SRC]], i64 [[TMP6]]
+; NO-MASKED-IG-NEXT:    [[TMP8:%.*]] = load i32, ptr [[TMP7]], align 4
+; NO-MASKED-IG-NEXT:    [[TMP9:%.*]] = insertelement <4 x i32> poison, i32 [[TMP8]], i64 0
+; NO-MASKED-IG-NEXT:    br label %[[PRED_LOAD_CONTINUE]]
+; NO-MASKED-IG:       [[PRED_LOAD_CONTINUE]]:
+; NO-MASKED-IG-NEXT:    [[TMP10:%.*]] = phi <4 x i32> [ poison, %[[VECTOR_BODY]] ], [ [[TMP9]], %[[PRED_LOAD_IF]] ]
+; NO-MASKED-IG-NEXT:    [[TMP11:%.*]] = extractelement <4 x i1> [[UNCOUNTABLE_EXIT_MASK]], i64 1
+; NO-MASKED-IG-NEXT:    br i1 [[TMP11]], label %[[PRED_LOAD_IF1:.*]], label %[[PRED_LOAD_CONTINUE2:.*]]
+; NO-MASKED-IG:       [[PRED_LOAD_IF1]]:
+; NO-MASKED-IG-NEXT:    [[TMP12:%.*]] = extractelement <4 x i64> [[TMP4]], i64 1
+; NO-MASKED-IG-NEXT:    [[TMP13:%.*]] = getelementptr inbounds nuw i32, ptr [[SRC]], i64 [[TMP12]]
+; NO-MASKED-IG-NEXT:    [[TMP14:%.*]] = load i32, ptr [[TMP13]], align 4
+; NO-MASKED-IG-NEXT:    [[TMP15:%.*]] = insertelement <4 x i32> [[TMP10]], i32 [[TMP14]], i64 1
+; NO-MASKED-IG-NEXT:    br label %[[PRED_LOAD_CONTINUE2]]
+; NO-MASKED-IG:       [[PRED_LOAD_CONTINUE2]]:
+; NO-MASKED-IG-NEXT:    [[TMP16:%.*]] = phi <4 x i32> [ [[TMP10]], %[[PRED_LOAD_CONTINUE]] ], [ [[TMP15]], %[[PRED_LOAD_IF1]] ]
+; NO-MASKED-IG-NEXT:    [[TMP17:%.*]] = extractelement <4 x i1> [[UNCOUNTABLE_EXIT_MASK]], i64 2
+; NO-MASKED-IG-NEXT:    br i1 [[TMP17]], label %[[PRED_LOAD_IF3:.*]], label %[[PRED_LOAD_CONTINUE4:.*]]
+; NO-MASKED-IG:       [[PRED_LOAD_IF3]]:
+; NO-MASKED-IG-NEXT:    [[TMP18:%.*]] = extractelement <4 x i64> [[TMP4]], i64 2
+; NO-MASKED-IG-NEXT:    [[TMP19:%.*]] = getelementptr inbounds nuw i32, ptr [[SRC]], i64 [[TMP18]]
+; NO-MASKED-IG-NEXT:    [[TMP20:%.*]] = load i32, ptr [[TMP19]], align 4
+; NO-MASKED-IG-NEXT:    [[TMP21:%.*]] = insertelement <4 x i32> [[TMP16]], i32 [[TMP20]], i64 2
+; NO-MASKED-IG-NEXT:    br label %[[PRED_LOAD_CONTINUE4]]
+; NO-MASKED-IG:       [[PRED_LOAD_CONTINUE4]]:
+; NO-MASKED-IG-NEXT:    [[TMP22:%.*]] = phi <4 x i32> [ [[TMP16]], %[[PRED_LOAD_CONTINUE2]] ], [ [[TMP21]], %[[PRED_LOAD_IF3]] ]
+; NO-MASKED-IG-NEXT:    [[TMP23:%.*]] = extractelement <4 x i1> [[UNCOUNTABLE_EXIT_MASK]], i64 3
+; NO-MASKED-IG-NEXT:    br i1 [[TMP23]], label %[[PRED_LOAD_IF5:.*]], label %[[PRED_LOAD_CONTINUE6:.*]]
+; NO-MASKED-IG:       [[PRED_LOAD_IF5]]:
+; NO-MASKED-IG-NEXT:    [[TMP24:%.*]] = extractelement <4 x i64> [[TMP4]], i64 3
+; NO-MASKED-IG-NEXT:    [[TMP25:%.*]] = getelementptr inbounds nuw i32, ptr [[SRC]], i64 [[TMP24]]
+; NO-MASKED-IG-NEXT:    [[TMP26:%.*]] = load i32, ptr [[TMP25]], align 4
+; NO-MASKED-IG-NEXT:    [[TMP27:%.*]] = insertelement <4 x i32> [[TMP22]], i32 [[TMP26]], i64 3
+; NO-MASKED-IG-NEXT:    br label %[[PRED_LOAD_CONTINUE6]]
+; NO-MASKED-IG:       [[PRED_LOAD_CONTINUE6]]:
+; NO-MASKED-IG-NEXT:    [[TMP28:%.*]] = phi <4 x i32> [ [[TMP22]], %[[PRED_LOAD_CONTINUE4]] ], [ [[TMP27]], %[[PRED_LOAD_IF5]] ]
+; NO-MASKED-IG-NEXT:    [[TMP29:%.*]] = or disjoint <4 x i64> [[TMP4]], splat (i64 1)
+; NO-MASKED-IG-NEXT:    br i1 [[TMP5]], label %[[PRED_LOAD_IF7:.*]], label %[[PRED_LOAD_CONTINUE8:.*]]
+; NO-MASKED-IG:       [[PRED_LOAD_IF7]]:
+; NO-MASKED-IG-NEXT:    [[TMP30:%.*]] = extractelement <4 x i64> [[TMP29]], i64 0
+; NO-MASKED-IG-NEXT:    [[TMP31:%.*]] = getelementptr inbounds nuw i32, ptr [[SRC]], i64 [[TMP30]]
+; NO-MASKED-IG-NEXT:    [[TMP32:%.*]] = load i32, ptr [[TMP31]], align 4
+; NO-MASKED-IG-NEXT:    [[TMP33:%.*]] = insertelement <4 x i32> poison, i32 [[TMP32]], i64 0
+; NO-MASKED-IG-NEXT:    br label %[[PRED_LOAD_CONTINUE8]]
+; NO-MASKED-IG:       [[PRED_LOAD_CONTINUE8]]:
+; NO-MASKED-IG-NEXT:    [[TMP34:%.*]] = phi <4 x i32> [ poison, %[[PRED_LOAD_CONTINUE6]] ], [ [[TMP33]], %[[PRED_LOAD_IF7]] ]
+; NO-MASKED-IG-NEXT:    br i1 [[TMP11]], label %[[PRED_LOAD_IF9:.*]], label %[[PRED_LOAD_CONTINUE10:.*]]
+; NO-MASKED-IG:       [[PRED_LOAD_IF9]]:
+; NO-MASKED-IG-NEXT:    [[TMP35:%.*]] = extractelement <4 x i64> [[TMP29]], i64 1
+; NO-MASKED-IG-NEXT:    [[TMP36:%.*]] = getelementptr inbounds nuw i32, ptr [[SRC]], i64 [[TMP35]]
+; NO-MASKED-IG-NEXT:    [[TMP37:%.*]] = load i32, ptr [[TMP36]], align 4
+; NO-MASKED-IG-NEXT:    [[TMP38:%.*]] = insertelement <4 x i32> [[TMP34]], i32 [[TMP37]], i64 1
+; NO-MASKED-IG-NEXT:    br label %[[PRED_LOAD_CONTINUE10]]
+; NO-MASKED-IG:       [[PRED_LOAD_CONTINUE10]]:
+; NO-MASKED-IG-NEXT:    [[TMP39:%.*]] = phi <4 x i32> [ [[TMP34]], %[[PRED_LOAD_CONTINUE8]] ], [ [[TMP38]], %[[PRED_LOAD_IF9]] ]
+; NO-MASKED-IG-NEXT:    br i1 [[TMP17]], label %[[PRED_LOAD_IF11:.*]], label %[[PRED_LOAD_CONTINUE12:.*]]
+; NO-MASKED-IG:       [[PRED_LOAD_IF11]]:
+; NO-MASKED-IG-NEXT:    [[TMP40:%.*]] = extractelement <4 x i64> [[TMP29]], i64 2
+; NO-MASKED-IG-NEXT:    [[TMP41:%.*]] = getelementptr inbounds nuw i32, ptr [[SRC]], i64 [[TMP40]]
+; NO-MASKED-IG-NEXT:    [[TMP42:%.*]] = load i32, ptr [[TMP41]], align 4
+; NO-MASKED-IG-NEXT:    [[TMP43:%.*]] = insertelement <4 x i32> [[TMP39]], i32 [[TMP42]], i64 2
+; NO-MASKED-IG-NEXT:    br label %[[PRED_LOAD_CONTINUE12]]
+; NO-MASKED-IG:       [[PRED_LOAD_CONTINUE12]]:
+; NO-MASKED-IG-NEXT:    [[TMP44:%.*]] = phi <4 x i32> [ [[TMP39]], %[[PRED_LOAD_CONTINUE10]] ], [ [[TMP43]], %[[PRED_LOAD_IF11]] ]
+; NO-MASKED-IG-NEXT:    br i1 [[TMP23]], label %[[PRED_LOAD_IF13:.*]], label %[[PRED_LOAD_CONTINUE14]]
+; NO-MASKED-IG:       [[PRED_LOAD_IF13]]:
+; NO-MASKED-IG-NEXT:    [[TMP45:%.*]] = extractelement <4 x i64> [[TMP29]], i64 3
+; NO-MASKED-IG-NEXT:    [[TMP46:%.*]] = getelementptr inbounds nuw i32, ptr [[SRC]], i64 [[TMP45]]
+; NO-MASKED-IG-NEXT:    [[TMP47:%.*]] = load i32, ptr [[TMP46]], align 4
+; NO-MASKED-IG-NEXT:    [[TMP48:%.*]] = insertelement <4 x i32> [[TMP44]], i32 [[TMP47]], i64 3
+; NO-MASKED-IG-NEXT:    br label %[[PRED_LOAD_CONTINUE14]]
+; NO-MASKED-IG:       [[PRED_LOAD_CONTINUE14]]:
+; NO-MASKED-IG-NEXT:    [[TMP49:%.*]] = phi <4 x i32> [ [[TMP44]], %[[PRED_LOAD_CONTINUE12]] ], [ [[TMP48]], %[[PRED_LOAD_IF13]] ]
+; NO-MASKED-IG-NEXT:    [[TMP50:%.*]] = add <4 x i32> [[TMP28]], [[TMP49]]
+; NO-MASKED-IG-NEXT:    [[TMP51:%.*]] = getelementptr i32, ptr [[ARRAY]], i64 [[INDEX]]
+; NO-MASKED-IG-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[TMP50]], ptr align 4 [[TMP51]], <4 x i1> [[UNCOUNTABLE_EXIT_MASK]])
+; NO-MASKED-IG-NEXT:    [[TMP52:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP2]])
+; NO-MASKED-IG-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; NO-MASKED-IG-NEXT:    [[TMP53:%.*]] = icmp eq i64 [[INDEX_NEXT]], 20
+; NO-MASKED-IG-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; NO-MASKED-IG-NEXT:    [[TMP54:%.*]] = or i1 [[TMP52]], [[TMP53]]
+; NO-MASKED-IG-NEXT:    br i1 [[TMP54]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
+; NO-MASKED-IG:       [[MIDDLE_BLOCK]]:
+; NO-MASKED-IG-NEXT:    [[TMP55:%.*]] = add i64 [[INDEX]], [[TMP3]]
+; NO-MASKED-IG-NEXT:    [[TMP56:%.*]] = icmp eq i64 [[TMP55]], 20
+; NO-MASKED-IG-NEXT:    br i1 [[TMP56]], label %[[EXIT:.*]], label %[[SCALAR_PH:.*]]
+; NO-MASKED-IG:       [[SCALAR_PH]]:
+; NO-MASKED-IG-NEXT:    br label %[[FOR_BODY:.*]]
+; NO-MASKED-IG:       [[FOR_BODY]]:
+; NO-MASKED-IG-NEXT:    [[IV:%.*]] = phi i64 [ [[TMP55]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[FOR_INC:.*]] ]
+; NO-MASKED-IG-NEXT:    [[IDX_0:%.*]] = shl nuw nsw i64 [[IV]], 1
+; NO-MASKED-IG-NEXT:    [[LD_ADDR_0:%.*]] = getelementptr inbounds nuw i32, ptr [[SRC]], i64 [[IDX_0]]
+; NO-MASKED-IG-NEXT:    [[LD_0:%.*]] = load i32, ptr [[LD_ADDR_0]], align 4
+; NO-MASKED-IG-NEXT:    [[IDX_1:%.*]] = or disjoint i64 [[IDX_0]], 1
+; NO-MASKED-IG-NEXT:    [[LD_ADDR_1:%.*]] = getelementptr inbounds nuw i32, ptr [[SRC]], i64 [[IDX_1]]
+; NO-MASKED-IG-NEXT:    [[LD_1:%.*]] = load i32, ptr [[LD_ADDR_1]], align 4
+; NO-MASKED-IG-NEXT:    [[ADD:%.*]] = add i32 [[LD_0]], [[LD_1]]
+; NO-MASKED-IG-NEXT:    [[ST_ADDR:%.*]] = getelementptr inbounds nuw i32, ptr [[ARRAY]], i64 [[IV]]
+; NO-MASKED-IG-NEXT:    store i32 [[ADD]], ptr [[ST_ADDR]], align 4
+; NO-MASKED-IG-NEXT:    [[EE_ADDR:%.*]] = getelementptr inbounds nuw i32, ptr [[PRED]], i64 [[IV]]
+; NO-MASKED-IG-NEXT:    [[EE_VAL:%.*]] = load i32, ptr [[EE_ADDR]], align 4
+; NO-MASKED-IG-NEXT:    [[EE_COND:%.*]] = icmp sgt i32 [[EE_VAL]], 500
+; NO-MASKED-IG-NEXT:    br i1 [[EE_COND]], label %[[EXIT]], label %[[FOR_INC]]
+; NO-MASKED-IG:       [[FOR_INC]]:
+; NO-MASKED-IG-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; NO-MASKED-IG-NEXT:    [[COUNTED_COND:%.*]] = icmp eq i64 [[IV_NEXT]], 20
+; NO-MASKED-IG-NEXT:    br i1 [[COUNTED_COND]], label %[[EXIT]], label %[[FOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
+; NO-MASKED-IG:       [[EXIT]]:
+; NO-MASKED-IG-NEXT:    ret void
+;
+; MASKED-IG-LABEL: define void @uncountable_exit_with_interleaved_load(
+; MASKED-IG-SAME: ptr noalias dereferenceable(80) [[ARRAY:%.*]], ptr noalias readonly align 4 dereferenceable(160) [[SRC:%.*]], ptr readonly align 4 dereferenceable(80) [[PRED:%.*]]) {
+; MASKED-IG-NEXT:  [[ENTRY:.*:]]
+; MASKED-IG-NEXT:    br label %[[VECTOR_PH:.*]]
+; MASKED-IG:       [[VECTOR_PH]]:
+; MASKED-IG-NEXT:    br label %[[VECTOR_BODY:.*]]
+; MASKED-IG:       [[VECTOR_BODY]]:
+; MASKED-IG-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; MASKED-IG-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i32, ptr [[PRED]], i64 [[INDEX]]
+; MASKED-IG-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP0]], align 4
+; MASKED-IG-NEXT:    [[TMP1:%.*]] = icmp sgt <4 x i32> [[WIDE_LOAD]], splat (i32 500)
+; MASKED-IG-NEXT:    [[TMP2:%.*]] = freeze <4 x i1> [[TMP1]]
+; MASKED-IG-NEXT:    [[TMP3:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP2]], i1 false)
+; MASKED-IG-NEXT:    [[UNCOUNTABLE_EXIT_MASK:%.*]] = call <4 x i1> @llvm.get.active.lane.mask.v4i1.i64(i64 0, i64 [[TMP3]])
+; MASKED-IG-NEXT:    [[TMP4:%.*]] = shl i64 [[INDEX]], 1
+; MASKED-IG-NEXT:    [[TMP5:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[TMP4]]
+; MASKED-IG-NEXT:    [[INTERLEAVED_MASK:%.*]] = shufflevector <4 x i1> [[UNCOUNTABLE_EXIT_MASK]], <4 x i1> poison, <8 x i32> <i32 0, i32 0, i32 1, i32 1, i32 2, i32 2, i32 3, i32 3>
+; MASKED-IG-NEXT:    [[WIDE_MASKED_VEC:%.*]] = call <8 x i32> @llvm.masked.load.v8i32.p0(ptr align 4 [[TMP5]], <8 x i1> [[INTERLEAVED_MASK]], <8 x i32> poison)
+; MASKED-IG-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <8 x i32> [[WIDE_MASKED_VEC]], <8 x i32> poison, <4 x i32> <i32 0, i32 2, i32 4, i32 6>
+; MASKED-IG-NEXT:    [[STRIDED_VEC1:%.*]] = shufflevector <8 x i32> [[WIDE_MASKED_VEC]], <8 x i32> poison, <4 x i32> <i32 1, i32 3, i32 5, i32 7>
+; MASKED-IG-NEXT:    [[TMP6:%.*]] = add <4 x i32> [[STRIDED_VEC]], [[STRIDED_VEC1]]
+; MASKED-IG-NEXT:    [[TMP7:%.*]] = getelementptr i32, ptr [[ARRAY]], i64 [[INDEX]]
+; MASKED-IG-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[TMP6]], ptr align 4 [[TMP7]], <4 x i1> [[UNCOUNTABLE_EXIT_MASK]])
+; MASKED-IG-NEXT:    [[TMP8:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP2]])
+; MASKED-IG-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; MASKED-IG-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], 20
+; MASKED-IG-NEXT:    [[TMP10:%.*]] = or i1 [[TMP8]], [[TMP9]]
+; MASKED-IG-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
+; MASKED-IG:       [[MIDDLE_BLOCK]]:
+; MASKED-IG-NEXT:    [[TMP11:%.*]] = add i64 [[INDEX]], [[TMP3]]
+; MASKED-IG-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[TMP11]], 20
+; MASKED-IG-NEXT:    br i1 [[TMP12]], label %[[EXIT:.*]], label %[[SCALAR_PH:.*]]
+; MASKED-IG:       [[SCALAR_PH]]:
+; MASKED-IG-NEXT:    br label %[[FOR_BODY:.*]]
+; MASKED-IG:       [[FOR_BODY]]:
+; MASKED-IG-NEXT:    [[IV:%.*]] = phi i64 [ [[TMP11]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[FOR_INC:.*]] ]
+; MASKED-IG-NEXT:    [[IDX_0:%.*]] = shl nuw nsw i64 [[IV]], 1
+; MASKED-IG-NEXT:    [[LD_ADDR_0:%.*]] = getelementptr inbounds nuw i32, ptr [[SRC]], i64 [[IDX_0]]
+; MASKED-IG-NEXT:    [[LD_0:%.*]] = load i32, ptr [[LD_ADDR_0]], align 4
+; MASKED-IG-NEXT:    [[IDX_1:%.*]] = or disjoint i64 [[IDX_0]], 1
+; MASKED-IG-NEXT:    [[LD_ADDR_1:%.*]] = getelementptr inbounds nuw i32, ptr [[SRC]], i64 [[IDX_1]]
+; MASKED-IG-NEXT:    [[LD_1:%.*]] = load i32, ptr [[LD_ADDR_1]], align 4
+; MASKED-IG-NEXT:    [[ADD:%.*]] = add i32 [[LD_0]], [[LD_1]]
+; MASKED-IG-NEXT:    [[ST_ADDR:%.*]] = getelementptr inbounds nuw i32, ptr [[ARRAY]], i64 [[IV]]
+; MASKED-IG-NEXT:    store i32 [[ADD]], ptr [[ST_ADDR]], align 4
+; MASKED-IG-NEXT:    [[EE_ADDR:%.*]] = getelementptr inbounds nuw i32, ptr [[PRED]], i64 [[IV]]
+; MASKED-IG-NEXT:    [[EE_VAL:%.*]] = load i32, ptr [[EE_ADDR]], align 4
+; MASKED-IG-NEXT:    [[EE_COND:%.*]] = icmp sgt i32 [[EE_VAL]], 500
+; MASKED-IG-NEXT:    br i1 [[EE_COND]], label %[[EXIT]], label %[[FOR_INC]]
+; MASKED-IG:       [[FOR_INC]]:
+; MASKED-IG-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; MASKED-IG-NEXT:    [[COUNTED_COND:%.*]] = icmp eq i64 [[IV_NEXT]], 20
+; MASKED-IG-NEXT:    br i1 [[COUNTED_COND]], label %[[EXIT]], label %[[FOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
+; MASKED-IG:       [[EXIT]]:
+; MASKED-IG-NEXT:    ret void
 ;
 entry:
   br label %for.body
@@ -170,13 +421,19 @@ exit:
   ret void
 }
 ;.
-; CHECK: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]], [[META2:![0-9]+]]}
-; CHECK: [[META1]] = !{!"llvm.loop.isvectorized", i32 1}
-; CHECK: [[META2]] = !{!"llvm.loop.unroll.runtime.disable"}
-; CHECK: [[LOOP3]] = distinct !{[[LOOP3]], [[META2]], [[META1]]}
-; CHECK: [[LOOP4]] = distinct !{[[LOOP4]], [[META1]], [[META2]]}
-; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META2]], [[META1]]}
+; NO-MASKED-IG: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]], [[META2:![0-9]+]]}
+; NO-MASKED-IG: [[META1]] = !{!"llvm.loop.isvectorized", i32 1}
+; NO-MASKED-IG: [[META2]] = !{!"llvm.loop.unroll.runtime.disable"}
+; NO-MASKED-IG: [[LOOP3]] = distinct !{[[LOOP3]], [[META2]], [[META1]]}
+; NO-MASKED-IG: [[LOOP4]] = distinct !{[[LOOP4]], [[META1]], [[META2]]}
+; NO-MASKED-IG: [[LOOP5]] = distinct !{[[LOOP5]], [[META2]], [[META1]]}
+;.
+; MASKED-IG: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]], [[META2:![0-9]+]]}
+; MASKED-IG: [[META1]] = !{!"llvm.loop.isvectorized", i32 1}
+; MASKED-IG: [[META2]] = !{!"llvm.loop.unroll.runtime.disable"}
+; MASKED-IG: [[LOOP3]] = distinct !{[[LOOP3]], [[META2]], [[META1]]}
+; MASKED-IG: [[LOOP4]] = distinct !{[[LOOP4]], [[META1]], [[META2]]}
+; MASKED-IG: [[LOOP5]] = distinct !{[[LOOP5]], [[META2]], [[META1]]}
 ;.
 ;; NOTE: These prefixes are unused and the list is autogenerated. Do not add tests below this line:
-; MASKED-IG: {{.*}}
-; NO-MASKED-IG: {{.*}}
+; CHECK: {{.*}}
