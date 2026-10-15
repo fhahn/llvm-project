@@ -4314,7 +4314,7 @@ void VPReplicateRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
     });
     O << ")";
   } else {
-    O << Instruction::getOpcodeName(getUnderlyingInstr()->getOpcode());
+    O << Instruction::getOpcodeName(getOpcode());
     printFlags(O);
     printOperands(O, SlotTracker);
   }

@@ -3683,8 +3683,8 @@ LoopVectorizationPlanner::selectInterleaveCount(VPlan &Plan, ElementCount VF,
           continue;
         }
         if (auto *RepR = dyn_cast<VPReplicateRecipe>(&R)) {
-          NumLoads += isa<LoadInst>(RepR->getUnderlyingInstr());
-          NumStores += isa<StoreInst>(RepR->getUnderlyingInstr());
+          NumLoads += RepR->getOpcode() == Instruction::Load;
+          NumStores += RepR->getOpcode() == Instruction::Store;
           continue;
         }
         if (isa<VPHistogramRecipe>(&R)) {
@@ -6065,9 +6065,9 @@ VPRecipeBuilder::tryToCreateWidenNonPhiRecipe(VPSingleDefRecipe *R,
 
   if (Instruction::isCast(VPI->getOpcode())) {
     auto *CI = cast<CastInst>(Instr);
-    return new VPWidenCastRecipe(CI->getOpcode(), VPI->getOperand(0),
-                                 VPI->getScalarType(), CI, *VPI, *VPI,
-                                 VPI->getDebugLoc());
+    return new VPWidenCastRecipe(Instruction::CastOps(VPI->getOpcode()),
+                                 VPI->getOperand(0), VPI->getScalarType(), CI,
+                                 *VPI, *VPI, VPI->getDebugLoc());
   }
 
   return tryToWiden(VPI);
