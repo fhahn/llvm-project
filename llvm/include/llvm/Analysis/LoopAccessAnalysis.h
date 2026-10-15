@@ -533,16 +533,30 @@ struct RuntimeCheckingPtrGroup {
 using RuntimePointerCheck =
     std::pair<const RuntimeCheckingPtrGroup *, const RuntimeCheckingPtrGroup *>;
 
+/// A check of the distance D = SinkStart - SrcStart between the lowest start
+/// addresses of two groups of accesses with a common step of +/-AccessSize
+/// bytes, whose members access Span bytes in a single iteration. With
+/// T = (VF * IC - 1) * AccessSize + Span, the groups conflict if 0 < D < T, or
+/// if |D| < T for symmetric checks.
 struct PointerDiffInfo {
   const SCEV *SrcStart;
   const SCEV *SinkStart;
   unsigned AccessSize;
+  unsigned Span;
   bool NeedsFreeze;
+  /// Symmetric checks allow any order of the accesses within a vector
+  /// iteration, one-sided checks require the accesses through SrcStart to
+  /// precede the accesses through SinkStart they may conflict with.
+  bool IsSymmetric;
 
   PointerDiffInfo(const SCEV *SrcStart, const SCEV *SinkStart,
-                  unsigned AccessSize, bool NeedsFreeze)
+                  unsigned AccessSize, unsigned Span, bool NeedsFreeze,
+                  bool IsSymmetric)
       : SrcStart(SrcStart), SinkStart(SinkStart), AccessSize(AccessSize),
-        NeedsFreeze(NeedsFreeze) {}
+        Span(Span), NeedsFreeze(NeedsFreeze), IsSymmetric(IsSymmetric) {
+    assert((IsSymmetric || Span == AccessSize) &&
+           "One-sided checks require accesses covering the step");
+  }
 };
 
 /// Holds information about the memory runtime legality checks to verify
@@ -618,11 +632,9 @@ public:
     return Checks;
   }
 
-  // Returns an optional list of (pointer-difference expressions, access size)
-  // pairs that can be used to prove that there are no vectorization-preventing
-  // dependencies at runtime. There are is a vectorization-preventing dependency
-  // if any pointer-difference is <u VF * InterleaveCount * access size. Returns
-  // std::nullopt if pointer-difference checks cannot be used.
+  /// Returns the pointer-difference checks that can be used instead of the
+  /// checks of getChecks() to prove that there are no vectorization-preventing
+  /// dependences at runtime, or std::nullopt if they cannot be used.
   std::optional<ArrayRef<PointerDiffInfo>> getDiffChecks() const {
     if (!CanUseDiffCheck)
       return std::nullopt;

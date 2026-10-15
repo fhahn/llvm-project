@@ -1610,29 +1610,24 @@ static VPValue *createDiffRuntimeChecks(VPlan &Plan, VPBuilder &Builder,
   // re-using redundant compares.
   SmallDenseSet<std::pair<const SCEV *, const SCEV *>, 8> SeenCompares;
   VPValue *Cond = Plan.getFalse();
-  for (const auto &[SrcStart, SinkStart, AccessSize, NeedsFreeze] : Checks) {
-    assert(UF * AccessSize > 0 &&
-           "Threshold must be non-zero to use diff-check");
-    Type *Ty = SinkStart->getType();
-    const SCEV *TotalAccessSize = SE.getElementCount(Ty, VF * UF * AccessSize);
-    const SCEV *ThresholdMinusOneSCEV =
-        SE.getMinusSCEV(TotalAccessSize, SE.getOne(Ty));
-    const SCEV *DiffSCEV = SE.getMinusSCEV(SinkStart, SrcStart);
-
+  for (const PointerDiffInfo &C : Checks) {
+    auto Ops = getDiffCheckOperands(C, SE, VF, UF);
+    if (!Ops)
+      return Plan.getTrue();
     // If the same compare has already been created earlier, there is no need to
     // check it again.
-    if (!SeenCompares.insert({DiffSCEV, ThresholdMinusOneSCEV}).second)
+    if (!SeenCompares.insert(*Ops).second)
       continue;
 
-    VPValue *ThresholdMinusOne = Expander.expand(ThresholdMinusOneSCEV);
-    VPValue *Diff = Expander.expand(DiffSCEV);
-    // Use (Diff - 1) <u (Threshold - 1), equivalent to 0 <u Diff <u Threshold,
-    // to exclude Diff == 0 (equal pointers are safe).
+    Type *Ty = C.SinkStart->getType();
+    VPValue *ThresholdMinusOne = Expander.expand(Ops->second);
+    VPValue *Diff = Expander.expand(Ops->first);
+    // Use (Diff - 1) <u (Threshold - 1), equivalent to 0 <u Diff <u Threshold.
     VPValue *DiffMinusOne =
         Builder.createSub(Diff, Plan.getConstantInt(Ty, 1), DL);
     VPValue *IsConflict = Builder.createICmp(
         CmpInst::ICMP_ULT, DiffMinusOne, ThresholdMinusOne, DL, "diff.check");
-    if (NeedsFreeze)
+    if (C.NeedsFreeze)
       IsConflict = Builder.createFreeze(IsConflict, DL, "diff.check.fr");
     Cond = Builder.createOr(Cond, IsConflict, DL, "conflict.rdx");
   }

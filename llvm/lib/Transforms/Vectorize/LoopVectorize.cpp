@@ -885,6 +885,11 @@ public:
     auto DiffChecks = Checks->getDiffChecks();
     if (!DiffChecks || DiffChecks->empty())
       return;
+    // The alias mask cannot express symmetric checks, which allow dependences
+    // in both directions.
+    if (any_of(*DiffChecks,
+               [](const PointerDiffInfo &C) { return C.IsSymmetric; }))
+      return;
 
     [[maybe_unused]] auto HasPointerArgs = [](CallBase *CB) {
       return any_of(CB->args(), [](Value const *Arg) {

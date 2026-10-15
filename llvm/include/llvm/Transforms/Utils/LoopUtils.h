@@ -664,6 +664,13 @@ addRuntimeChecks(Instruction *Loc, Loop *TheLoop,
                  const SmallVectorImpl<RuntimePointerCheck> &PointerChecks,
                  SCEVExpander &Expander, bool HoistRuntimeChecks = false);
 
+/// Returns the operands (Diff, Threshold - 1) of the compare
+/// (Diff - 1) <u (Threshold - 1) of the diff check \p C for \p VF and \p IC,
+/// or std::nullopt if the check is known to conflict.
+LLVM_ABI std::optional<std::pair<const SCEV *, const SCEV *>>
+getDiffCheckOperands(const PointerDiffInfo &C, ScalarEvolution &SE,
+                     ElementCount VF, unsigned IC);
+
 LLVM_ABI Value *addDiffRuntimeChecks(Instruction *Loc,
                                      ArrayRef<PointerDiffInfo> Checks,
                                      SCEVExpander &Expander, ElementCount VF,

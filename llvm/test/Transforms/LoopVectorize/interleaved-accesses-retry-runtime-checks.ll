@@ -69,56 +69,23 @@ exit:
 define void @dep_between_interleaved_store_and_load_with_unknown_dep_same_object(ptr %a, i64 %off) {
 ; CHECK-LABEL: define void @dep_between_interleaved_store_and_load_with_unknown_dep_same_object(
 ; CHECK-SAME: ptr [[A:%.*]], i64 [[OFF:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[A_OFF:%.*]] = getelementptr i8, ptr [[A]], i64 [[OFF]]
-; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
-; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr i8, ptr [[A]], i64 796
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr nuw i8, ptr [[A]], i64 4
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[A]], i64 800
-; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[OFF]], 796
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP3]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[TMP2]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[TMP1]], [[TMP0]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    [[BOUND011:%.*]] = icmp ult ptr [[A]], [[TMP4]]
-; CHECK-NEXT:    [[BOUND112:%.*]] = icmp ult ptr [[A_OFF]], [[TMP0]]
-; CHECK-NEXT:    [[FOUND_CONFLICT13:%.*]] = and i1 [[BOUND011]], [[BOUND112]]
-; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT13]]
-; CHECK-NEXT:    [[BOUND014:%.*]] = icmp ult ptr [[TMP1]], [[TMP4]]
-; CHECK-NEXT:    [[BOUND115:%.*]] = icmp ult ptr [[A_OFF]], [[TMP2]]
-; CHECK-NEXT:    [[FOUND_CONFLICT16:%.*]] = and i1 [[BOUND014]], [[BOUND115]]
-; CHECK-NEXT:    [[CONFLICT_RDX17:%.*]] = or i1 [[CONFLICT_RDX]], [[FOUND_CONFLICT16]]
-; CHECK-NEXT:    br i1 [[CONFLICT_RDX17]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
-; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
-; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[INDEX]], 1
-; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[INDEX]], 2
-; CHECK-NEXT:    [[TMP7:%.*]] = add i64 [[INDEX]], 3
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [2 x i32], ptr [[A]], i64 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <8 x i32>, ptr [[TMP8]], align 4, !alias.scope [[META12:![0-9]+]], !noalias [[META15:![0-9]+]]
-; CHECK-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <8 x i32> [[WIDE_VEC]], <8 x i32> poison, <4 x i32> <i32 0, i32 2, i32 4, i32 6>
-; CHECK-NEXT:    store <8 x i32> <i32 1, i32 3, i32 1, i32 3, i32 1, i32 3, i32 1, i32 3>, ptr [[TMP8]], align 4
-; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds [2 x i32], ptr [[A_OFF]], i64 [[INDEX]]
-; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds [2 x i32], ptr [[A_OFF]], i64 [[TMP5]]
-; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [2 x i32], ptr [[A_OFF]], i64 [[TMP6]]
-; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds [2 x i32], ptr [[A_OFF]], i64 [[TMP7]]
-; CHECK-NEXT:    [[TMP20:%.*]] = extractelement <4 x i32> [[STRIDED_VEC]], i64 0
-; CHECK-NEXT:    store i32 [[TMP20]], ptr [[TMP16]], align 4, !alias.scope [[META18:![0-9]+]]
-; CHECK-NEXT:    [[TMP21:%.*]] = extractelement <4 x i32> [[STRIDED_VEC]], i64 1
-; CHECK-NEXT:    store i32 [[TMP21]], ptr [[TMP17]], align 4, !alias.scope [[META18]]
-; CHECK-NEXT:    [[TMP22:%.*]] = extractelement <4 x i32> [[STRIDED_VEC]], i64 2
-; CHECK-NEXT:    store i32 [[TMP22]], ptr [[TMP18]], align 4, !alias.scope [[META18]]
-; CHECK-NEXT:    [[TMP23:%.*]] = extractelement <4 x i32> [[STRIDED_VEC]], i64 3
-; CHECK-NEXT:    store i32 [[TMP23]], ptr [[TMP19]], align 4, !alias.scope [[META18]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; CHECK-NEXT:    [[TMP24:%.*]] = icmp eq i64 [[INDEX_NEXT]], 96
-; CHECK-NEXT:    br i1 [[TMP24]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP19:![0-9]+]]
-; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    br label %[[SCALAR_PH]]
-; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[GEP_A_0:%.*]] = getelementptr inbounds [2 x i32], ptr [[A]], i64 [[IV]]
+; CHECK-NEXT:    store i32 1, ptr [[GEP_A_0]], align 4
+; CHECK-NEXT:    [[L_A_0:%.*]] = load i32, ptr [[GEP_A_0]], align 4
+; CHECK-NEXT:    [[GEP_A_1:%.*]] = getelementptr inbounds [2 x i32], ptr [[A]], i64 [[IV]], i64 1
+; CHECK-NEXT:    store i32 3, ptr [[GEP_A_1]], align 4
+; CHECK-NEXT:    [[GEP_A_OFF:%.*]] = getelementptr inbounds [2 x i32], ptr [[A_OFF]], i64 [[IV]]
+; CHECK-NEXT:    store i32 [[L_A_0]], ptr [[GEP_A_OFF]], align 4
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 100
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
 ;
 entry:
   %a.off = getelementptr i8, ptr %a, i64 %off

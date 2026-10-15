@@ -575,58 +575,78 @@ static bool hasConflictingAccessBefore(const MemoryDepChecker &DC, Value *A,
 
 bool RuntimePointerChecking::tryToCreateDiffCheck(
     const RuntimeCheckingPtrGroup &CGI, const RuntimeCheckingPtrGroup &CGJ) {
-  // If either group contains multiple different pointers, bail out.
-  // TODO: Support multiple pointers by using the minimum or maximum pointer,
-  // depending on src & sink.
-  if (CGI.Members.size() != 1 || CGJ.Members.size() != 1)
-    return false;
-
-  const PointerInfo *Src = &Pointers[CGI.Members[0]];
-  const PointerInfo *Sink = &Pointers[CGJ.Members[0]];
-
-  const SCEVConstant *Step;
-  const SCEV *SrcStart;
-  const SCEV *SinkStart;
   const Loop *InnerLoop = DC.getInnermostLoop();
-  if (!match(Src->Expr,
-             m_scev_AffineAddRec(m_SCEV(SrcStart), m_SCEVConstant(Step),
-                                 m_SpecificLoop(InnerLoop))) ||
-      !match(Sink->Expr,
-             m_scev_AffineAddRec(m_SCEV(SinkStart), m_scev_Specific(Step),
-                                 m_SpecificLoop(InnerLoop))))
+  const SCEVConstant *Step;
+  if (!match(Pointers[CGI.Members[0]].Expr,
+             m_scev_AffineAddRec(m_SCEV(), m_SCEVConstant(Step))))
     return false;
-
-  // Diff checks assume Src and Sink stay in program order, which LV only
-  // guarantees for consecutive accesses, i.e. if all alloc sizes match |Step|.
   // The access size of the check is unsigned.
   uint64_t AbsStep = Step->getAPInt().abs().getLimitedValue();
   if (!isUInt<32>(AbsStep))
     return false;
+
+  struct GroupExtent {
+    const SCEV *Start;
+    uint64_t Span;
+    bool IsConsecutive;
+  };
   const DataLayout &DL = InnerLoop->getHeader()->getDataLayout();
-  for (const PointerInfo *P : {Src, Sink})
-    for (bool IsWrite : {false, true})
+  // Returns the lowest start address of the members of CG, which must all have
+  // step Step, the number of bytes they access in a single iteration from it,
+  // and whether CG has a single member whose accesses all cover the step.
+  auto GetExtent =
+      [&](const RuntimeCheckingPtrGroup &CG) -> std::optional<GroupExtent> {
+    if (CG.Members.size() != 1)
+      return std::nullopt;
+    const PointerInfo &P = Pointers[CG.Members[0]];
+    const SCEV *Start;
+    if (!match(P.Expr,
+               m_scev_AffineAddRec(m_SCEV(Start), m_scev_Specific(Step),
+                                   m_SpecificLoop(InnerLoop))))
+      return std::nullopt;
+    GroupExtent Extent = {Start, 0, true};
+    for (bool IsWrite : {false, true}) {
       for (Instruction *I :
-           DC.getInstructionsForAccess(P->PointerValue, IsWrite))
-        if (DL.getTypeAllocSize(getLoadStoreType(I)) !=
-            TypeSize::getFixed(AbsStep))
-          return false;
+           DC.getInstructionsForAccess(P.PointerValue, IsWrite)) {
+        TypeSize Size = DL.getTypeAllocSize(getLoadStoreType(I));
+        if (Size.isScalable())
+          return std::nullopt;
+        Extent.Span = std::max(Extent.Span, Size.getFixedValue());
+        Extent.IsConsecutive &= Size.getFixedValue() == AbsStep;
+      }
+    }
+    return Extent;
+  };
 
-  // All accesses through Src must precede the accesses through Sink they may
-  // conflict with. Bail out if there are conflicting accesses in both orders.
-  bool SrcFirst =
-      hasConflictingAccessBefore(DC, Src->PointerValue, Sink->PointerValue);
-  bool SinkFirst =
-      hasConflictingAccessBefore(DC, Sink->PointerValue, Src->PointerValue);
-  if (SrcFirst && SinkFirst)
+  std::optional<GroupExtent> Src = GetExtent(CGI);
+  std::optional<GroupExtent> Sink = GetExtent(CGJ);
+  if (!Src || !Sink)
     return false;
-  if (SinkFirst)
-    std::swap(SrcStart, SinkStart);
-  // When counting down, the dependence distance needs to be swapped.
-  if (Step->getValue()->isNegative())
-    std::swap(SinkStart, SrcStart);
+  uint64_t Span = std::max(Src->Span, Sink->Span);
+  if (!isUInt<32>(Span))
+    return false;
 
-  const SCEV *SinkStartInt = SE->getPtrToAddrExpr(SinkStart);
-  const SCEV *SrcStartInt = SE->getPtrToAddrExpr(SrcStart);
+  // A one-sided check allows equal starts, so all accesses through Src must
+  // precede those through Sink they may conflict with, an order LV only keeps
+  // for consecutive accesses. Otherwise, use a symmetric check.
+  bool IsSymmetric = true;
+  if (Src->IsConsecutive && Sink->IsConsecutive) {
+    Value *SrcPtr = Pointers[CGI.Members[0]].PointerValue;
+    Value *SinkPtr = Pointers[CGJ.Members[0]].PointerValue;
+    bool SrcFirst = hasConflictingAccessBefore(DC, SrcPtr, SinkPtr);
+    bool SinkFirst = hasConflictingAccessBefore(DC, SinkPtr, SrcPtr);
+    // Bail out if there are conflicting accesses in both orders.
+    if (SrcFirst && SinkFirst)
+      return false;
+    IsSymmetric = false;
+    // Swap if Sink is accessed first, and again when counting down, which
+    // swaps the dependence distance.
+    if (SinkFirst != Step->getValue()->isNegative())
+      std::swap(Src, Sink);
+  }
+
+  const SCEV *SinkStartInt = SE->getPtrToAddrExpr(Sink->Start);
+  const SCEV *SrcStartInt = SE->getPtrToAddrExpr(Src->Start);
   if (isa<SCEVCouldNotCompute>(SinkStartInt) ||
       isa<SCEVCouldNotCompute>(SrcStartInt))
     return false;
@@ -656,8 +676,8 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
   LLVM_DEBUG(dbgs() << "LAA: Creating diff runtime check for:\n"
                     << "SrcStart: " << *SrcStartInt << '\n'
                     << "SinkStartInt: " << *SinkStartInt << '\n');
-  DiffChecks.emplace_back(SrcStartInt, SinkStartInt, AbsStep,
-                          Src->NeedsFreeze || Sink->NeedsFreeze);
+  DiffChecks.emplace_back(SrcStartInt, SinkStartInt, AbsStep, Span,
+                          CGI.NeedsFreeze || CGJ.NeedsFreeze, IsSymmetric);
   return true;
 }
 
