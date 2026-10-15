@@ -2170,9 +2170,8 @@ static bool handleFirstArgMinOrMax(
   // original IV scale before the final select.
   if (!WideIV->isCanonical()) {
     auto *DerivedIVRecipe = new VPDerivedIVRecipe(
-        InductionDescriptor::IK_IntInduction,
-        nullptr, // No FPBinOp for integer induction
-        WideIV->getStartValue(), FinalCanIV, WideIV->getStepValue());
+        /*FPBinOp=*/nullptr, WideIV->getStartValue(), FinalCanIV,
+        WideIV->getStepValue());
     DerivedIVRecipe->insertBefore(Builder.getRecipeAtInsertPoint());
     FinalCanIV = DerivedIVRecipe;
   }

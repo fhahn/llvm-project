@@ -3146,15 +3146,12 @@ InstructionCost VPDerivedIVRecipe::computeCost(ElementCount VF,
   // VPlanTransforms.cpp. In order to avoid overly pessimistic costs that can
   // negatively affect vectorization it takes into account any expected
   // simplifications that happen in simplifyRecipe.
-  switch (getInductionKind()) {
-  default:
-    // TODO: Compute cost for remaining kinds.
-    break;
-  case InductionDescriptor::IK_IntInduction: {
+  Type *StartTy = getStartValue()->getScalarType();
+  if (StartTy->isIntegerTy()) {
     // There are currently no tests that expose a path where all lanes are
     // used, so it's better to bail out for now.
     if (!vputils::onlyFirstLaneUsed(this))
-      break;
+      return 0;
 
     // Start off by assuming we need both mul and add, then refine this.
     bool NeedsMul = true, NeedsAdd = true, NeedsShl = false;
@@ -3212,11 +3209,12 @@ InstructionCost VPDerivedIVRecipe::computeCost(ElementCount VF,
                                              Ctx.CostKind);
     return Cost;
   }
-  case InductionDescriptor::IK_FpInduction: {
+
+  if (StartTy->isFloatingPointTy()) {
     // There are currently no tests that expose a path where all lanes are
     // used, so it's better to bail out for now.
     if (!vputils::onlyFirstLaneUsed(this))
-      break;
+      return 0;
 
     // Unlike the integer case, converting the index to the FP step type is
     // unavoidable: the index is always the integer canonical IV, so this
@@ -3249,8 +3247,8 @@ InstructionCost VPDerivedIVRecipe::computeCost(ElementCount VF,
                                              Ctx.CostKind);
     return Cost;
   }
-  }
 
+  // TODO: Compute cost for pointer inductions.
   return 0;
 }
 

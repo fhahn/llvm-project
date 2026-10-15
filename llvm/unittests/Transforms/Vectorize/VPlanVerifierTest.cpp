@@ -451,8 +451,8 @@ TEST_F(VPVerifierTest, DerivedIVWithStartInLoopRegions) {
 
   VPBuilder Builder(Latch);
   VPValue *Start = Builder.createNot(Plan.getPoison(I32Ty));
-  Builder.createDerivedIV(InductionDescriptor::IK_IntInduction, nullptr, Start,
-                          Plan.getPoison(I32Ty), Plan.getPoison(I32Ty));
+  Builder.createDerivedIV(nullptr, Start, Plan.getPoison(I32Ty),
+                          Plan.getPoison(I32Ty));
   Builder.createNaryOp(VPInstruction::BranchOnCond, Plan.getTrue());
 
   VPRegionBlock *LoopR = Plan.createLoopRegion(I32Ty, DebugLoc::getUnknown(),

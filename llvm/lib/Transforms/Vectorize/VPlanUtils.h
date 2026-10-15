@@ -185,12 +185,10 @@ SmallVector<std::pair<VPBasicBlock *, VPIRBasicBlock *>>
 getEarlyExits(const VPlan &Plan, const VPBlockBase *MiddleVPBB);
 
 /// Create a scalar-iv-steps recipe over \p Plan's canonical IV for an
-/// induction of \p Kind with \p InductionOpcode / \p FPBinOp, start value \p
-/// StartV and step \p Step, truncated to \p ResultTy, inserting recipes via \p
-/// Builder.
+/// induction with \p InductionOpcode / \p FPBinOp, start value \p StartV and
+/// step \p Step, truncated to \p ResultTy, inserting recipes via \p Builder.
 VPScalarIVStepsRecipe *
-createScalarIVSteps(VPlan &Plan, InductionDescriptor::InductionKind Kind,
-                    Instruction::BinaryOps InductionOpcode,
+createScalarIVSteps(VPlan &Plan, Instruction::BinaryOps InductionOpcode,
                     FPMathOperator *FPBinOp, Type *ResultTy, VPValue *StartV,
                     VPValue *Step, DebugLoc DL, VPBuilder &Builder,
                     const VPIRFlags::WrapFlagsTy &Flags = {});

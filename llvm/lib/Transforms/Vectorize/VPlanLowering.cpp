@@ -57,9 +57,8 @@ void VPlanTransforms::replaceWideCanonicalIVWithWideIV(
   if (Plan.hasScalarVFOnly() || vputils::onlyFirstLaneUsed(WideCanIV)) {
     VPBuilder Builder(WideCanIV);
     WideCanIV->replaceAllUsesWith(vputils::createScalarIVSteps(
-        Plan, InductionDescriptor::IK_IntInduction, Instruction::Add, nullptr,
-        CanIVTy, Plan.getZero(CanIVTy), Plan.getConstantInt(CanIVTy, 1),
-        WideCanIV->getDebugLoc(), Builder,
+        Plan, Instruction::Add, nullptr, CanIVTy, Plan.getZero(CanIVTy),
+        Plan.getConstantInt(CanIVTy, 1), WideCanIV->getDebugLoc(), Builder,
         WideCanIV->getNoWrapFlags().withoutNoSignedWrap()));
     WideCanIV->eraseFromParent();
     return;
@@ -409,21 +408,8 @@ static void expandVPDerivedIV(VPDerivedIVRecipe *R) {
                     Index, StepTy, DebugLoc::getCompilerGenerated())
               : Builder.createScalarCast(Instruction::SIToFP, Index, StepTy,
                                          DebugLoc::getCompilerGenerated());
-  VPIRFlags::WrapFlagsTy Flags = R->getNoWrapFlags();
-  switch (R->getInductionKind()) {
-  case InductionDescriptor::IK_IntInduction: {
-    assert(Index->getScalarType() == Start->getScalarType() &&
-           "Index type does not match StartValue type");
-    return R->replaceAllUsesWith(Builder.createAdd(
-        Start,
-        Builder.createOverflowingOp(Instruction::Mul, {Index, Step}, Flags),
-        DebugLoc::getUnknown(), "", Flags));
-  }
-  case InductionDescriptor::IK_PtrInduction:
-    return R->replaceAllUsesWith(Builder.createPtrAdd(
-        Start,
-        Builder.createOverflowingOp(Instruction::Mul, {Index, Step}, Flags)));
-  case InductionDescriptor::IK_FpInduction: {
+  Type *StartTy = Start->getScalarType();
+  if (StartTy->isFloatingPointTy()) {
     assert(StepTy->isFloatingPointTy() && "Expected FP Step value");
     const FPMathOperator *FPBinOp = R->getFPBinOp();
     assert(FPBinOp &&
@@ -435,10 +421,17 @@ static void expandVPDerivedIV(VPDerivedIVRecipe *R) {
     return R->replaceAllUsesWith(
         Builder.createNaryOp(FPBinOp->getOpcode(), {Start, FMul}, FMF));
   }
-  case InductionDescriptor::IK_NoInduction:
-    return;
-  }
-  llvm_unreachable("Unhandled induction kind");
+
+  VPIRFlags::WrapFlagsTy Flags = R->getNoWrapFlags();
+  VPValue *Mul =
+      Builder.createOverflowingOp(Instruction::Mul, {Index, Step}, Flags);
+  if (StartTy->isPointerTy())
+    return R->replaceAllUsesWith(Builder.createPtrAdd(Start, Mul));
+
+  assert(Index->getScalarType() == StartTy &&
+         "Index type does not match StartValue type");
+  R->replaceAllUsesWith(
+      Builder.createAdd(Start, Mul, DebugLoc::getUnknown(), "", Flags));
 }
 
 void VPlanTransforms::dissolveLoopRegions(VPlan &Plan) {
