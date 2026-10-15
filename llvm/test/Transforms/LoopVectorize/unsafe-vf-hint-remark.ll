@@ -48,9 +48,8 @@ exit:
 
 ; The dependence distance is 3 iterations with types whose alloc size is larger
 ; than their type size.
-; FIXME: User VF 4 is unsafe, should be clamped to 2.
 ; CHECK-LABEL: @foo_i24
-; CHECK: <4 x i64>
+; CHECK: <2 x i64>
 define void @foo_i24(ptr %a) {
 entry:
   br label %loop
@@ -72,7 +71,7 @@ exit:
 }
 
 ; CHECK-LABEL: @foo_x86_fp80
-; CHECK: <4 x i64>
+; CHECK: <2 x i64>
 define void @foo_x86_fp80(ptr %a) {
 entry:
   br label %loop

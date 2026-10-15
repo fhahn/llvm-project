@@ -3296,7 +3296,9 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
   LLVM_DEBUG(dbgs() << "LAA: Positive min distance " << MinDistance
                     << " with max VF = " << MaxVF << '\n');
 
-  uint64_t MaxVFInBits = MaxVF * TypeByteSize * 8;
+  // Use the type size, which may be smaller than the alloc size.
+  uint64_t MaxVFInBits =
+      MaxVF * DL.getTypeSizeInBits(getLoadStoreType(InstMap[BIdx]));
   if (!ConstDist && MaxVFInBits < MaxTargetVectorWidthInBits) {
     // For non-constant distances, we checked the lower bound of the dependence
     // distance and the distance may be larger at runtime (and safe for
