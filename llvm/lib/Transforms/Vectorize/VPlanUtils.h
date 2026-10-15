@@ -430,11 +430,11 @@ public:
         Range, [](BaseTy *Block) -> BlockTy * { return cast<BlockTy>(Block); });
   }
 
-  /// Returns the blocks between \p FirstBB and \p LastBB, where FirstBB
-  /// to LastBB forms a single-sucessor chain.
-  static SmallVector<VPBasicBlock *>
-  blocksInSingleSuccessorChainBetween(VPBasicBlock *FirstBB,
-                                      VPBasicBlock *LastBB);
+  /// Returns the blocks from \p FirstBB to \p LastBB in reverse post-order.
+  /// They include all blocks on paths from FirstBB to LastBB, but may also
+  /// include blocks not on such paths.
+  static SmallVector<VPBasicBlock *> blocksBetween(VPBasicBlock *FirstBB,
+                                                   VPBasicBlock *LastBB);
 
   /// Inserts \p BlockPtr on the edge between \p From and \p To. That is, update
   /// \p From's successor to \p To to point to \p BlockPtr and \p To's

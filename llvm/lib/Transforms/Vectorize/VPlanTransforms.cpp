@@ -273,18 +273,17 @@ public:
 };
 
 /// Check if a memory operation doesn't alias with memory operations using
-/// scoped noalias metadata, in blocks in the single-successor chain between \p
-/// FirstBB and \p LastBB. If \p SinkInfo is std::nullopt, only recipes that may
-/// write to memory are checked (for load hoisting). Otherwise recipes that both
-/// read and write memory are checked, and SCEV is used to prove no-alias
-/// between the group leader and other replicate recipes (for store sinking).
+/// scoped noalias metadata, in blocks between \p FirstBB and \p LastBB. If \p
+/// SinkInfo is std::nullopt, only recipes that may write to memory are checked
+/// (for load hoisting). Otherwise recipes that both read and write memory are
+/// checked, and SCEV is used to prove no-alias between the group leader and
+/// other replicate recipes (for store sinking).
 static bool
 canHoistOrSinkWithNoAliasCheck(const MemoryLocation &MemLoc,
                                VPBasicBlock *FirstBB, VPBasicBlock *LastBB,
                                std::optional<SinkStoreInfo> SinkInfo = {}) {
   bool CheckReads = SinkInfo.has_value();
-  for (VPBasicBlock *VPBB :
-       VPBlockUtils::blocksInSingleSuccessorChainBetween(FirstBB, LastBB)) {
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksBetween(FirstBB, LastBB)) {
     for (VPRecipeBase &R : *VPBB) {
       if (SinkInfo && SinkInfo->shouldSkip(R))
         continue;
@@ -2515,11 +2514,14 @@ static void licm(VPlan &Plan) {
   }
 
   // Sink recipes with no users inside the vector loop region if all users are
-  // in the same exit block of the region.
+  // in the same exit block of the region. Only sink from blocks dominating the
+  // exiting block, which execute on every iteration.
   // TODO: Extend to sink recipes from inner loops.
   PostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> POT(
       LoopRegion->getEntry());
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(POT)) {
+    if (!VPDT.dominates(VPBB, ExitingVPBB))
+      continue;
     for (VPRecipeBase &R : make_early_inc_range(reverse(*VPBB))) {
       // TODO: Use R.definedValues() instead of casting to VPSingleDefRecipe to
       // support recipes with multiple defined values (e.g., interleaved loads).
@@ -2577,8 +2579,6 @@ static void licm(VPlan &Plan) {
       if (!SinkBB)
         SinkBB = cast<VPBasicBlock>(LoopRegion->getSingleSuccessor());
 
-      // TODO: This will need to be a check instead of a assert after
-      // conditional branches in vectorized loops are supported.
       assert(VPDT.properlyDominates(VPBB, SinkBB) &&
              "Defining block must dominate sink block");
       // TODO: Clone the recipe if users are on multiple exit paths, instead of
