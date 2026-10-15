@@ -12,20 +12,26 @@ target triple = "aarch64-unknown-linux-gnu"
 define void @narrow_load_no_vscale_range(ptr %a, ptr %b, i64 %n) {
 ; CHECK-LABEL: define void @narrow_load_no_vscale_range(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) #[[ATTR0:[0-9]+]] {
-; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    br label %[[LOOP:.*]]
-; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[IV]]
-; CHECK-NEXT:    [[L:%.*]] = load i32, ptr [[GEP_A]], align 4
-; CHECK-NEXT:    [[EXT:%.*]] = sext i32 [[L]] to i64
-; CHECK-NEXT:    [[GEP_B:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[IV]]
-; CHECK-NEXT:    store i64 [[EXT]], ptr [[GEP_B]], align 8
-; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
-; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]]
-; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    ret void
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[B2:%.*]] = ptrtoaddr ptr [[B]] to i64
+; CHECK-NEXT:    [[A1:%.*]] = ptrtoaddr ptr [[A]] to i64
+; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
+; CHECK-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 1
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 [[N]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
+; CHECK-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP2]], 5
+; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[TMP3]], -1
+; CHECK-NEXT:    [[TMP5:%.*]] = shl i64 [[TMP2]], 4
+; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[A1]], [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = sub i64 [[TMP6]], [[B2]]
+; CHECK-NEXT:    [[TMP8:%.*]] = sub i64 [[TMP7]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP8]], [[TMP4]]
+; CHECK-NEXT:    [[DIFF_CHECK_WRAP:%.*]] = icmp ugt i64 [[TMP2]], 576460752303423488
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = or i1 [[DIFF_CHECK]], [[DIFF_CHECK_WRAP]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
 ;
 entry:
   br label %loop
@@ -50,20 +56,24 @@ exit:
 define void @narrow_load_32_bit_pointers_max_vscale_2_to_27(ptr addrspace(270) %a, ptr addrspace(270) %b, i64 %n) vscale_range(1, 134217728) {
 ; CHECK-LABEL: define void @narrow_load_32_bit_pointers_max_vscale_2_to_27(
 ; CHECK-SAME: ptr addrspace(270) [[A:%.*]], ptr addrspace(270) [[B:%.*]], i64 [[N:%.*]]) #[[ATTR1:[0-9]+]] {
-; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    br label %[[LOOP:.*]]
-; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i64, ptr addrspace(270) [[A]], i64 [[IV]]
-; CHECK-NEXT:    [[L:%.*]] = load i32, ptr addrspace(270) [[GEP_A]], align 4
-; CHECK-NEXT:    [[EXT:%.*]] = sext i32 [[L]] to i64
-; CHECK-NEXT:    [[GEP_B:%.*]] = getelementptr inbounds i64, ptr addrspace(270) [[B]], i64 [[IV]]
-; CHECK-NEXT:    store i64 [[EXT]], ptr addrspace(270) [[GEP_B]], align 8
-; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
-; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]]
-; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    ret void
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[B2:%.*]] = ptrtoaddr ptr addrspace(270) [[B]] to i32
+; CHECK-NEXT:    [[A1:%.*]] = ptrtoaddr ptr addrspace(270) [[A]] to i32
+; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
+; CHECK-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 1
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 [[N]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP2:%.*]] = call i32 @llvm.vscale.i32()
+; CHECK-NEXT:    [[TMP3:%.*]] = shl i32 [[TMP2]], 5
+; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], -1
+; CHECK-NEXT:    [[TMP5:%.*]] = shl nuw i32 [[TMP2]], 4
+; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[A1]], [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[TMP6]], [[B2]]
+; CHECK-NEXT:    [[TMP8:%.*]] = sub i32 [[TMP7]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i32 [[TMP8]], [[TMP4]]
+; CHECK-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
 ;
 entry:
   br label %loop
@@ -86,20 +96,26 @@ exit:
 define void @narrow_load_32_bit_pointers_max_vscale_2_to_28(ptr addrspace(270) %a, ptr addrspace(270) %b, i64 %n) vscale_range(1, 268435456) {
 ; CHECK-LABEL: define void @narrow_load_32_bit_pointers_max_vscale_2_to_28(
 ; CHECK-SAME: ptr addrspace(270) [[A:%.*]], ptr addrspace(270) [[B:%.*]], i64 [[N:%.*]]) #[[ATTR2:[0-9]+]] {
-; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    br label %[[LOOP:.*]]
-; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i64, ptr addrspace(270) [[A]], i64 [[IV]]
-; CHECK-NEXT:    [[L:%.*]] = load i32, ptr addrspace(270) [[GEP_A]], align 4
-; CHECK-NEXT:    [[EXT:%.*]] = sext i32 [[L]] to i64
-; CHECK-NEXT:    [[GEP_B:%.*]] = getelementptr inbounds i64, ptr addrspace(270) [[B]], i64 [[IV]]
-; CHECK-NEXT:    store i64 [[EXT]], ptr addrspace(270) [[GEP_B]], align 8
-; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
-; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]]
-; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    ret void
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[B2:%.*]] = ptrtoaddr ptr addrspace(270) [[B]] to i32
+; CHECK-NEXT:    [[A1:%.*]] = ptrtoaddr ptr addrspace(270) [[A]] to i32
+; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
+; CHECK-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 1
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 [[N]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP2:%.*]] = call i32 @llvm.vscale.i32()
+; CHECK-NEXT:    [[TMP3:%.*]] = shl i32 [[TMP2]], 5
+; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], -1
+; CHECK-NEXT:    [[TMP5:%.*]] = shl i32 [[TMP2]], 4
+; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[A1]], [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[TMP6]], [[B2]]
+; CHECK-NEXT:    [[TMP8:%.*]] = sub i32 [[TMP7]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i32 [[TMP8]], [[TMP4]]
+; CHECK-NEXT:    [[DIFF_CHECK_WRAP:%.*]] = icmp ugt i32 [[TMP2]], 134217728
+; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[DIFF_CHECK]], [[DIFF_CHECK_WRAP]]
+; CHECK-NEXT:    br i1 [[TMP9]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
 ;
 entry:
   br label %loop
