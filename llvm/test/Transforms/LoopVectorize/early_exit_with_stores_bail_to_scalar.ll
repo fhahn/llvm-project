@@ -781,14 +781,9 @@ define void @invariant_load(ptr noalias %a, ptr %src, ptr align 2 dereferenceabl
 ; CHECK-NEXT:    [[TMP3:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP2]])
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[LOOP_LATCH1]], label %[[VECTOR_BODY_SKIPPABLE:.*]]
 ; CHECK:       [[VECTOR_BODY_SKIPPABLE]]:
-; CHECK-NEXT:    [[TMP4:%.*]] = load i16, ptr [[SRC]], align 2
-; CHECK-NEXT:    [[TMP5:%.*]] = load i16, ptr [[SRC]], align 2
-; CHECK-NEXT:    [[TMP6:%.*]] = load i16, ptr [[SRC]], align 2
 ; CHECK-NEXT:    [[TMP7:%.*]] = load i16, ptr [[SRC]], align 2
-; CHECK-NEXT:    [[TMP8:%.*]] = insertelement <4 x i16> poison, i16 [[TMP4]], i64 0
-; CHECK-NEXT:    [[TMP9:%.*]] = insertelement <4 x i16> [[TMP8]], i16 [[TMP5]], i64 1
-; CHECK-NEXT:    [[TMP10:%.*]] = insertelement <4 x i16> [[TMP9]], i16 [[TMP6]], i64 2
-; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i16> [[TMP10]], i16 [[TMP7]], i64 3
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i16> poison, i16 [[TMP7]], i64 0
+; CHECK-NEXT:    [[TMP11:%.*]] = shufflevector <4 x i16> [[BROADCAST_SPLATINSERT]], <4 x i16> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds nuw i16, ptr [[A]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <4 x i16> [[TMP11]], ptr [[TMP12]], align 2
 ; CHECK-NEXT:    br label %[[LOOP_LATCH1]]
