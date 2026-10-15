@@ -5942,8 +5942,8 @@ VPSingleDefRecipe *VPRecipeBuilder::handleReplication(VPInstruction *VPI,
   // intrinsic calls that can be effectively treated as such, so we check for
   // them here. Conservatively, we only do this for scalable vectors, since
   // for fixed-width VFs we can always fall back on full scalarization.
-  if (!IsUniform && Range.Start.isScalable() && isa<IntrinsicInst>(I)) {
-    switch (cast<IntrinsicInst>(I)->getIntrinsicID()) {
+  if (!IsUniform && Range.Start.isScalable()) {
+    switch (vputils::getIntrinsicID(VPI)) {
     case Intrinsic::assume:
     case Intrinsic::lifetime_start:
     case Intrinsic::lifetime_end:
@@ -5985,7 +5985,8 @@ VPSingleDefRecipe *VPRecipeBuilder::handleReplication(VPInstruction *VPI,
   // manually above for scalable vectors, which this assert needs to account for
   // as well.
   assert((Range.Start.isScalar() || !IsUniform || !IsPredicated ||
-          (Range.Start.isScalable() && isa<IntrinsicInst>(I))) &&
+          (Range.Start.isScalable() &&
+           vputils::getIntrinsicID(VPI) != Intrinsic::not_intrinsic)) &&
          "Should not predicate a uniform recipe");
   if (IsUniform) {
     return VPBuilder::createSingleScalarOp(
