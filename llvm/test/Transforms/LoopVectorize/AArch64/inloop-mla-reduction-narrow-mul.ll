@@ -211,3 +211,201 @@ loop:
 exit:
   ret i32 %add
 }
+
+; The i12 mul can wrap, e.g. -128 * -128.
+define i32 @sext_i8_mul_i12_sext_i32(ptr %a, ptr %b, i64 %n) {
+; CHECK-LABEL: define i32 @sext_i8_mul_i12_sext_i32(
+; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) #[[ATTR0]] {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 16
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = and i64 [[N]], 15
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP0]]
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[TMP7:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <16 x i8>, ptr [[TMP1]], align 1
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[B]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD1:%.*]] = load <16 x i8>, ptr [[TMP2]], align 1
+; CHECK-NEXT:    [[TMP3:%.*]] = sext <16 x i8> [[WIDE_LOAD]] to <16 x i32>
+; CHECK-NEXT:    [[TMP4:%.*]] = sext <16 x i8> [[WIDE_LOAD1]] to <16 x i32>
+; CHECK-NEXT:    [[TMP5:%.*]] = mul <16 x i32> [[TMP3]], [[TMP4]]
+; CHECK-NEXT:    [[TMP6:%.*]] = call i32 @llvm.vector.reduce.add.v16i32(<16 x i32> [[TMP5]])
+; CHECK-NEXT:    [[TMP7]] = add i32 [[VEC_PHI]], [[TMP6]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
+; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %acc = phi i32 [ 0, %entry ], [ %add, %loop ]
+  %gep.a = getelementptr i8, ptr %a, i64 %iv
+  %load.a = load i8, ptr %gep.a, align 1
+  %ext.a = sext i8 %load.a to i12
+  %gep.b = getelementptr i8, ptr %b, i64 %iv
+  %load.b = load i8, ptr %gep.b, align 1
+  %ext.b = sext i8 %load.b to i12
+  %mul = mul i12 %ext.a, %ext.b
+  %mul.ext = sext i12 %mul to i32
+  %add = add i32 %acc, %mul.ext
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret i32 %add
+}
+
+; The i12 square of a sign-extended i8 can wrap, e.g. -128 * -128.
+define i32 @sext_i8_square_i12_zext_i32(ptr %a, i64 %n) {
+; CHECK-LABEL: define i32 @sext_i8_square_i12_zext_i32(
+; CHECK-SAME: ptr [[A:%.*]], i64 [[N:%.*]]) #[[ATTR0]] {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 16
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = and i64 [[N]], 15
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP0]]
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[TMP5:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <16 x i8>, ptr [[TMP1]], align 1
+; CHECK-NEXT:    [[TMP2:%.*]] = sext <16 x i8> [[WIDE_LOAD]] to <16 x i32>
+; CHECK-NEXT:    [[TMP3:%.*]] = mul <16 x i32> [[TMP2]], [[TMP2]]
+; CHECK-NEXT:    [[TMP4:%.*]] = call i32 @llvm.vector.reduce.add.v16i32(<16 x i32> [[TMP3]])
+; CHECK-NEXT:    [[TMP5]] = add i32 [[VEC_PHI]], [[TMP4]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %acc = phi i32 [ 0, %entry ], [ %add, %loop ]
+  %gep.a = getelementptr i8, ptr %a, i64 %iv
+  %load.a = load i8, ptr %gep.a, align 1
+  %ext.a = sext i8 %load.a to i12
+  %mul = mul i12 %ext.a, %ext.a
+  %mul.ext = zext i12 %mul to i32
+  %add = add i32 %acc, %mul.ext
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret i32 %add
+}
+
+; The i12 mul by 255 can wrap, e.g. 255 * 255.
+define i32 @zext_i8_mul_const_i12_zext_i32(ptr %a, i64 %n) {
+; CHECK-LABEL: define i32 @zext_i8_mul_const_i12_zext_i32(
+; CHECK-SAME: ptr [[A:%.*]], i64 [[N:%.*]]) #[[ATTR0]] {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 16
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = and i64 [[N]], 15
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP0]]
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[TMP5:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <16 x i8>, ptr [[TMP1]], align 1
+; CHECK-NEXT:    [[TMP2:%.*]] = zext <16 x i8> [[WIDE_LOAD]] to <16 x i32>
+; CHECK-NEXT:    [[TMP3:%.*]] = mul <16 x i32> [[TMP2]], splat (i32 255)
+; CHECK-NEXT:    [[TMP4:%.*]] = call i32 @llvm.vector.reduce.add.v16i32(<16 x i32> [[TMP3]])
+; CHECK-NEXT:    [[TMP5]] = add i32 [[VEC_PHI]], [[TMP4]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP14:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %acc = phi i32 [ 0, %entry ], [ %add, %loop ]
+  %gep.a = getelementptr i8, ptr %a, i64 %iv
+  %load.a = load i8, ptr %gep.a, align 1
+  %ext.a = zext i8 %load.a to i12
+  %mul = mul i12 %ext.a, 255
+  %mul.ext = zext i12 %mul to i32
+  %add = add i32 %acc, %mul.ext
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret i32 %add
+}
+
+; The nuw i12 mul by 255 cannot wrap.
+define i32 @zext_i8_mul_nuw_const_i12_zext_i32(ptr %a, i64 %n) {
+; CHECK-LABEL: define i32 @zext_i8_mul_nuw_const_i12_zext_i32(
+; CHECK-SAME: ptr [[A:%.*]], i64 [[N:%.*]]) #[[ATTR0]] {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 16
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = and i64 [[N]], 15
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP0]]
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[TMP5:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <16 x i8>, ptr [[TMP1]], align 1
+; CHECK-NEXT:    [[TMP2:%.*]] = zext <16 x i8> [[WIDE_LOAD]] to <16 x i32>
+; CHECK-NEXT:    [[TMP3:%.*]] = mul nuw <16 x i32> [[TMP2]], splat (i32 255)
+; CHECK-NEXT:    [[TMP4:%.*]] = call i32 @llvm.vector.reduce.add.v16i32(<16 x i32> [[TMP3]])
+; CHECK-NEXT:    [[TMP5]] = add i32 [[VEC_PHI]], [[TMP4]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %acc = phi i32 [ 0, %entry ], [ %add, %loop ]
+  %gep.a = getelementptr i8, ptr %a, i64 %iv
+  %load.a = load i8, ptr %gep.a, align 1
+  %ext.a = zext i8 %load.a to i12
+  %mul = mul nuw i12 %ext.a, 255
+  %mul.ext = zext i12 %mul to i32
+  %add = add i32 %acc, %mul.ext
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret i32 %add
+}
