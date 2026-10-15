@@ -3998,11 +3998,14 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
     // The inner extends must either have the same opcode as the outer extend or
     // be the same sext, in which case the multiply cannot result in a negative
     // value and the outer extend can be folded away by doing wider
-    // extends for the operands of the mul.
+    // extends for the operands of the mul. The narrow mul must not wrap.
     if (Ext0 && Ext1 &&
         (Ext->getOpcode() == Ext0->getOpcode() ||
          (Ext0 == Ext1 && Ext0->getOpcode() == Instruction::SExt)) &&
         Ext0->getOpcode() == Ext1->getOpcode() &&
+        canFoldOuterExtendIntoMul(getPartialReductionExtendKind(Ext), Mul,
+                                  Ext0->getOperand(0)->getScalarType(),
+                                  Ext1->getOperand(0)->getScalarType()) &&
         IsMulAccValidAndClampRange(Mul, Ext0, Ext1, Ext) && Mul->hasOneUse()) {
       auto *NewExt0 = new VPWidenCastRecipe(
           Ext0->getOpcode(), Ext0->getOperand(0), Ext->getScalarType(), nullptr,
