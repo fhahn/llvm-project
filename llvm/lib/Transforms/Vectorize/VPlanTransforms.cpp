@@ -3837,6 +3837,36 @@ static ExtendKind getPartialReductionExtendKind(VPWidenCastRecipe *Cast) {
   return TTI::getPartialReductionExtendKind(Cast->getOpcode());
 }
 
+/// Returns true if \p V can be extended like the extend \p Ext, i.e. \p V is a
+/// constant that fits into the source type of \p Ext.
+static bool canExtendLike(VPValue *V, VPWidenCastRecipe *Ext) {
+  const APInt *C;
+  return match(V, m_APInt(C)) &&
+         canConstantBeExtended(C, Ext->getOperand(0)->getScalarType(),
+                               getPartialReductionExtendKind(Ext));
+}
+
+/// Replace the operands of \p Mul that can be extended like its other operand
+/// with extends in the loop, so they are folded into reductions together.
+static void extendInvariantOperands(VPWidenRecipe *Mul) {
+  for (unsigned Idx : {0u, 1u}) {
+    VPValue *Op = Mul->getOperand(Idx);
+    VPValue *Other = Mul->getOperand(1 - Idx);
+    if (!match(Other, m_WidenAnyExtend(m_VPValue())))
+      continue;
+    auto *Ext = cast<VPWidenCastRecipe>(Other);
+    if (!canExtendLike(Op, Ext))
+      continue;
+    VPBuilder Builder(Mul);
+    // Constants are truncated to the source type of the extend; the truncate
+    // is elided later.
+    VPValue *Src = Builder.createWidenCast(Instruction::Trunc, Op,
+                                           Ext->getOperand(0)->getScalarType());
+    Mul->setOperand(Idx, Builder.createWidenCast(Ext->getOpcode(), Src,
+                                                 Ext->getScalarType()));
+  }
+}
+
 /// Returns true if the narrow \p Mul in ext(mul(ext(A), ext(B))) or
 /// ext(mul(ext(A), C)) cannot wrap.
 static bool canFoldOuterExtendIntoMul(ExtendKind ExtKind, VPWidenRecipe *Mul,
@@ -3913,7 +3943,6 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
 
   VPValue *VecOp = Red->getVecOp();
   VPRecipeBase *Sub = nullptr;
-  VPValue *A, *B;
   VPValue *Tmp = nullptr;
 
   if (RedTy->isFloatingPointTy())
@@ -3925,49 +3954,32 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
     VecOp = Tmp;
   }
 
-  // If ValB is a constant and can be safely extended, truncate it to the same
-  // type as ExtA's operand, then extend it to the same type as ExtA. This
-  // creates two uniform extends that can more easily be matched by the rest of
-  // the bundling code. The ExtB reference, ValB and operand 1 of Mul are all
-  // replaced with the new extend of the constant.
-  auto ExtendAndReplaceConstantOp = [](VPWidenCastRecipe *ExtA,
-                                       VPWidenCastRecipe *&ExtB, VPValue *&ValB,
-                                       VPWidenRecipe *Mul) {
-    if (!ExtA || ExtB || !isa<VPIRValue>(ValB))
-      return;
-    Type *NarrowTy = ExtA->getOperand(0)->getScalarType();
-    Instruction::CastOps ExtOpc = ExtA->getOpcode();
-    const APInt *Const;
-    if (!match(ValB, m_APInt(Const)) ||
-        !llvm::canConstantBeExtended(
-            Const, NarrowTy, TTI::getPartialReductionExtendKind(ExtOpc)))
-      return;
-    // The truncate ensures that the type of each extended operand is the
-    // same, and it's been proven that the constant can be extended from
-    // NarrowTy safely. Necessary since ExtA's extended operand would be
-    // e.g. an i8, while the const will likely be an i32. This will be
-    // elided by later optimisations.
-    VPBuilder Builder(Mul);
-    auto *Trunc =
-        Builder.createWidenCast(Instruction::CastOps::Trunc, ValB, NarrowTy);
-    Type *WideTy = ExtA->getScalarType();
-    ValB = ExtB = Builder.createWidenCast(ExtOpc, Trunc, WideTy);
-    Mul->setOperand(1, ExtB);
+  // Returns the extends of Mul's operands. Loop-invariant operands that can be
+  // extended like the other operand are represented by its extend, as their
+  // extends are only created together with the expression.
+  auto GetExtends = [](VPWidenRecipe *Mul) {
+    auto *ExtA = dyn_cast<VPWidenCastRecipe>(Mul->getOperand(0));
+    auto *ExtB = dyn_cast<VPWidenCastRecipe>(Mul->getOperand(1));
+    if (ExtA && canExtendLike(Mul->getOperand(1), ExtA))
+      ExtB = ExtA;
+    else if (ExtB && canExtendLike(Mul->getOperand(0), ExtB))
+      ExtA = ExtB;
+    return std::make_pair(ExtA, ExtB);
   };
 
   // Try to match reduce.add(mul(...)).
-  if (match(VecOp, m_Mul(m_VPValue(A), m_VPValue(B)))) {
-    auto *RecipeA = dyn_cast<VPWidenCastRecipe>(A);
-    auto *RecipeB = dyn_cast<VPWidenCastRecipe>(B);
+  if (match(VecOp, m_Mul(m_VPValue(), m_VPValue()))) {
     auto *Mul = cast<VPWidenRecipe>(VecOp);
-
-    // Convert reduce.add(mul(ext, const)) to reduce.add(mul(ext, ext(const)))
-    ExtendAndReplaceConstantOp(RecipeA, RecipeB, B, Mul);
+    auto [RecipeA, RecipeB] = GetExtends(Mul);
 
     // Match reduce.add/sub(mul(ext, ext)).
     if (RecipeA && RecipeB && match(RecipeA, m_ZExtOrSExt(m_VPValue())) &&
         match(RecipeB, m_ZExtOrSExt(m_VPValue())) &&
         IsMulAccValidAndClampRange(Mul, RecipeA, RecipeB, nullptr)) {
+      // Convert reduce.add(mul(ext, inv)) to reduce.add(mul(ext, ext(inv)))
+      extendInvariantOperands(Mul);
+      RecipeA = cast<VPWidenCastRecipe>(Mul->getOperand(0));
+      RecipeB = cast<VPWidenCastRecipe>(Mul->getOperand(1));
       if (Sub)
         return new VPExpressionRecipe(RecipeA, RecipeB, Mul,
                                       cast<VPWidenRecipe>(Sub), Red);
@@ -3983,15 +3995,10 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
     return nullptr;
 
   // Match reduce.add(ext(mul(A, B))).
-  if (match(VecOp, m_ZExtOrSExt(m_Mul(m_VPValue(A), m_VPValue(B))))) {
+  if (match(VecOp, m_ZExtOrSExt(m_Mul(m_VPValue(), m_VPValue())))) {
     auto *Ext = cast<VPWidenCastRecipe>(VecOp);
     auto *Mul = cast<VPWidenRecipe>(Ext->getOperand(0));
-    auto *Ext0 = dyn_cast<VPWidenCastRecipe>(A);
-    auto *Ext1 = dyn_cast<VPWidenCastRecipe>(B);
-
-    // reduce.add(ext(mul(ext, const)))
-    // -> reduce.add(ext(mul(ext, ext(const))))
-    ExtendAndReplaceConstantOp(Ext0, Ext1, B, Mul);
+    auto [Ext0, Ext1] = GetExtends(Mul);
 
     // reduce.add(ext(mul(ext(A), ext(B))))
     // -> reduce.add(mul(wider_ext(A), wider_ext(B)))
@@ -4001,12 +4008,18 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
     // extends for the operands of the mul. The narrow mul must not wrap.
     if (Ext0 && Ext1 &&
         (Ext->getOpcode() == Ext0->getOpcode() ||
-         (Ext0 == Ext1 && Ext0->getOpcode() == Instruction::SExt)) &&
+         (Mul->getOperand(0) == Mul->getOperand(1) &&
+          Ext0->getOpcode() == Instruction::SExt)) &&
         Ext0->getOpcode() == Ext1->getOpcode() &&
         canFoldOuterExtendIntoMul(getPartialReductionExtendKind(Ext), Mul,
                                   Ext0->getOperand(0)->getScalarType(),
                                   Ext1->getOperand(0)->getScalarType()) &&
         IsMulAccValidAndClampRange(Mul, Ext0, Ext1, Ext) && Mul->hasOneUse()) {
+      // reduce.add(ext(mul(ext, inv)))
+      // -> reduce.add(ext(mul(ext, ext(inv))))
+      extendInvariantOperands(Mul);
+      Ext0 = cast<VPWidenCastRecipe>(Mul->getOperand(0));
+      Ext1 = cast<VPWidenCastRecipe>(Mul->getOperand(1));
       auto *NewExt0 = new VPWidenCastRecipe(
           Ext0->getOpcode(), Ext0->getOperand(0), Ext->getScalarType(), nullptr,
           *Ext0, *Ext0, Ext0->getDebugLoc());
@@ -5157,26 +5170,6 @@ getBlendReductionUpdateValueIdx(VPBlendRecipe *Blend) {
 
 static VPSingleDefRecipe *
 optimizeExtendsForPartialReduction(VPSingleDefRecipe *Op) {
-  // reduce.add(mul(ext(A), C))
-  // -> reduce.add(mul(ext(A), ext(trunc(C))))
-  const APInt *Const;
-  if (match(Op, m_Mul(m_ZExtOrSExt(m_VPValue()), m_APInt(Const)))) {
-    auto *ExtA = cast<VPWidenCastRecipe>(Op->getOperand(0));
-    Instruction::CastOps ExtOpc = ExtA->getOpcode();
-    Type *NarrowTy = ExtA->getOperand(0)->getScalarType();
-    if (!Op->hasOneUse() ||
-        !llvm::canConstantBeExtended(
-            Const, NarrowTy, TTI::getPartialReductionExtendKind(ExtOpc)))
-      return Op;
-
-    VPBuilder Builder(Op);
-    auto *Trunc = Builder.createWidenCast(Instruction::CastOps::Trunc,
-                                          Op->getOperand(1), NarrowTy);
-    Type *WideTy = ExtA->getScalarType();
-    Op->setOperand(1, Builder.createWidenCast(ExtOpc, Trunc, WideTy));
-    return Op;
-  }
-
   // reduce.add(abs(sub(ext(A), ext(B))))
   // -> reduce.add(ext(absolute-difference(A, B)))
   VPValue *X, *Y;
@@ -5301,6 +5294,9 @@ static void transformToPartialReduction(const PartialReductionDescriptor &Link,
   assert(WidenRecipe->getNumOperands() == 2 && "Expected binary operation");
 
   VPValue *Accumulator = WidenRecipe->getOperand(Link.AccumulatorOpIdx);
+  // reduce.add(mul(ext(A), inv)) -> reduce.add(mul(ext(A), ext(inv)))
+  if (Link.ExtendedOp.ExtendB.Kind != ExtendKind::PR_None)
+    extendInvariantOperands(Link.ExtendedOp.ExtendsUser);
   auto *ExtendedOp = cast<VPSingleDefRecipe>(
       WidenRecipe->getOperand(1 - Link.AccumulatorOpIdx));
 
@@ -5517,7 +5513,10 @@ matchExtendedReductionOperand(VPWidenRecipe *UpdateR, VPValue *Op) {
   VPValue *LHS = MulOp->getOperand(0);
   VPValue *RHS = MulOp->getOperand(1);
 
-  // The LHS of the operation must always be an extend.
+  // The LHS of the operation must always be an extend; swap the operands if
+  // needed.
+  if (!match(LHS, m_WidenAnyExtend(m_VPValue())))
+    std::swap(LHS, RHS);
   if (!match(LHS, m_WidenAnyExtend(m_VPValue())))
     return std::nullopt;
 
@@ -5525,13 +5524,12 @@ matchExtendedReductionOperand(VPWidenRecipe *UpdateR, VPValue *Op) {
   Type *LHSInputType = LHSCast->getOperand(0)->getScalarType();
   ExtendKind LHSExtendKind = getPartialReductionExtendKind(LHSCast);
 
-  // The RHS of the operation can be an extend or a constant integer.
-  const APInt *RHSConst = nullptr;
+  // The RHS of the operation can be an extend or a loop-invariant value that
+  // can be extended like the LHS.
   VPWidenCastRecipe *RHSCast = nullptr;
   if (match(RHS, m_WidenAnyExtend(m_VPValue())))
     RHSCast = cast<VPWidenCastRecipe>(RHS);
-  else if (!match(RHS, m_APInt(RHSConst)) ||
-           !canConstantBeExtended(RHSConst, LHSInputType, LHSExtendKind))
+  else if (!canExtendLike(RHS, LHSCast))
     return std::nullopt;
 
   // The outer extend kind must match the inner extends for folding.
