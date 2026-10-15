@@ -89,17 +89,13 @@ template <typename Pred, unsigned BitWidth = 0> struct int_pred_ty {
   }
 };
 
-/// Match a specified signed or unsigned integer value.
+/// Match a specified integer value.
 struct is_specific_int {
   APInt Val;
-  bool IsSigned;
 
-  is_specific_int(APInt Val, bool IsSigned = false)
-      : Val(std::move(Val)), IsSigned(IsSigned) {}
+  is_specific_int(APInt Val) : Val(std::move(Val)) {}
 
-  bool isValue(const APInt &C) const {
-    return APInt::isSameValue(Val, C, IsSigned);
-  }
+  bool isValue(const APInt &C) const { return APInt::isSameValue(Val, C); }
 };
 
 template <unsigned Bitwidth = 0>
@@ -107,11 +103,6 @@ using specific_intval = int_pred_ty<is_specific_int, Bitwidth>;
 
 inline specific_intval<0> m_SpecificInt(uint64_t V) {
   return specific_intval<0>(is_specific_int(APInt(64, V)));
-}
-
-inline specific_intval<0> m_SpecificSInt(int64_t V) {
-  return specific_intval<0>(
-      is_specific_int(APInt(64, V, /*isSigned=*/true), /*IsSigned=*/true));
 }
 
 struct is_all_ones {
@@ -658,12 +649,6 @@ template <typename Op0_t, typename Op1_t>
 inline AllRecipe_match<Instruction::FMul, Op0_t, Op1_t>
 m_FMul(const Op0_t &Op0, const Op1_t &Op1) {
   return m_Binary<Instruction::FMul, Op0_t, Op1_t>(Op0, Op1);
-}
-
-template <typename Op0_t, typename Op1_t>
-inline AllRecipe_match<Instruction::FAdd, Op0_t, Op1_t>
-m_FAdd(const Op0_t &Op0, const Op1_t &Op1) {
-  return m_Binary<Instruction::FAdd, Op0_t, Op1_t>(Op0, Op1);
 }
 
 template <typename Op0_t, typename Op1_t>
@@ -1227,11 +1212,6 @@ template <typename SubPattern_t> struct OneUse_match {
 
 template <typename T> inline OneUse_match<T> m_OneUse(const T &SubPattern) {
   return SubPattern;
-}
-
-inline match_bind<VPReductionPHIRecipe>
-m_ReductionPhi(VPReductionPHIRecipe *&V) {
-  return V;
 }
 
 template <typename Op0_t, typename Op1_t>
