@@ -8,10 +8,10 @@ define void @test(ptr %p, i64 %a, i8 %b) {
 ; CHECK-NEXT:    br label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[A]], 48
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <vscale x 8 x i64> poison, i64 [[TMP0]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <vscale x 8 x i64> [[BROADCAST_SPLATINSERT1]], <vscale x 8 x i64> poison, <vscale x 8 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP1:%.*]] = ashr <vscale x 8 x i64> [[BROADCAST_SPLAT2]], splat (i64 52)
-; CHECK-NEXT:    [[TMP2:%.*]] = trunc <vscale x 8 x i64> [[TMP1]] to <vscale x 8 x i32>
+; CHECK-NEXT:    [[TMP1:%.*]] = ashr i64 [[TMP0]], 52
+; CHECK-NEXT:    [[TMP9:%.*]] = trunc i64 [[TMP1]] to i32
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT7:%.*]] = insertelement <vscale x 8 x i32> poison, i32 [[TMP9]], i64 0
+; CHECK-NEXT:    [[TMP2:%.*]] = shufflevector <vscale x 8 x i32> [[BROADCAST_SPLATINSERT7]], <vscale x 8 x i32> poison, <vscale x 8 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP5:%.*]] = zext i8 [[B]] to i32
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT6:%.*]] = insertelement <vscale x 8 x i32> poison, i32 [[TMP5]], i64 0
 ; CHECK-NEXT:    [[TMP3:%.*]] = shufflevector <vscale x 8 x i32> [[BROADCAST_SPLATINSERT6]], <vscale x 8 x i32> poison, <vscale x 8 x i32> zeroinitializer

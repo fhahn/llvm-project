@@ -680,7 +680,6 @@ define float @struct_return_2xf32_replicate_live_out(ptr noalias %in, ptr noalia
 ; VF4-NEXT:    [[TMP14:%.*]] = insertelement <4 x float> [[TMP13]], float [[TMP10]], i64 1
 ; VF4-NEXT:    [[TMP15:%.*]] = insertelement <4 x float> [[TMP14]], float [[TMP11]], i64 2
 ; VF4-NEXT:    [[TMP16:%.*]] = insertelement <4 x float> [[TMP15]], float [[TMP12]], i64 3
-; VF4-NEXT:    [[TMP17:%.*]] = extractvalue { float, float } [[TMP8]], 1
 ; VF4-NEXT:    [[TMP18:%.*]] = getelementptr inbounds float, ptr [[OUT_A]], i64 [[INDEX]]
 ; VF4-NEXT:    store <4 x float> [[TMP16]], ptr [[TMP18]], align 4
 ; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
@@ -716,7 +715,6 @@ define float @struct_return_2xf32_replicate_live_out(ptr noalias %in, ptr noalia
 ; VF2IC2-NEXT:    [[TMP15:%.*]] = extractvalue { float, float } [[TMP9]], 0
 ; VF2IC2-NEXT:    [[TMP16:%.*]] = insertelement <2 x float> poison, float [[TMP14]], i64 0
 ; VF2IC2-NEXT:    [[TMP17:%.*]] = insertelement <2 x float> [[TMP16]], float [[TMP15]], i64 1
-; VF2IC2-NEXT:    [[TMP18:%.*]] = extractvalue { float, float } [[TMP9]], 1
 ; VF2IC2-NEXT:    [[TMP19:%.*]] = getelementptr inbounds float, ptr [[OUT_A]], i64 [[INDEX]]
 ; VF2IC2-NEXT:    [[TMP20:%.*]] = getelementptr inbounds float, ptr [[TMP19]], i64 2
 ; VF2IC2-NEXT:    store <2 x float> [[TMP13]], ptr [[TMP19]], align 4

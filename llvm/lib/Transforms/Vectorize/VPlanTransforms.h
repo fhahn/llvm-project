@@ -443,6 +443,9 @@ struct VPlanTransforms {
   /// Perform common-subexpression-elimination on \p Plan.
   static void cse(VPlan &Plan);
 
+  /// Move loop-invariant recipes out of the vector loop region in \p Plan.
+  static void licm(VPlan &Plan);
+
   /// Replace each VPExpandSCEVRecipe in \p Plan's entry block with an earlier
   /// VPExpandSCEVRecipe there expanding the same SCEV, if any.
   static void removeRedundantExpandSCEVRecipes(VPlan &Plan);

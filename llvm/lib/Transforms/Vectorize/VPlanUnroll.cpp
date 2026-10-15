@@ -952,13 +952,15 @@ void VPlanTransforms::replicateByVF(VPlan &Plan, ElementCount VF) {
   }
 
   // Visit all VPBBs outside the loop region and directly inside the top-level
-  // loop region.
-  auto VPBBsOutsideLoopRegion = VPBlockUtils::blocksOnly<VPBasicBlock>(
-      vp_depth_first_shallow(Plan.getEntry()));
-  auto VPBBsInsideLoopRegion = VPBlockUtils::blocksOnly<VPBasicBlock>(
-      vp_depth_first_shallow(Plan.getVectorLoopRegion()->getEntry()));
-  auto VPBBsToUnroll =
-      concat<VPBasicBlock *>(VPBBsOutsideLoopRegion, VPBBsInsideLoopRegion);
+  // loop region, in RPO so definitions are visited before their users.
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  ReversePostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> RPOT(
+      Plan.getEntry());
+  auto VPBBsToUnroll = make_filter_range(
+      VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT),
+      [LoopRegion](VPBasicBlock *VPBB) {
+        return !VPBB->getParent() || VPBB->getParent() == LoopRegion;
+      });
   // A mapping of current VPValue definitions to collections of new VPValues
   // defined per lane. Serves to hook-up potential users of current VPValue
   // definition that are replicated-per-VF later.

@@ -78,23 +78,21 @@ define i40 @partial_reduce_not_known_factor(i32 %a, i32 %b, i16 %N) {
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP1]], [[N_MOD_VF]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = trunc i32 [[N_VEC]] to i16
 ; CHECK-NEXT:    [[TMP12:%.*]] = sext i32 [[A]] to i40
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <2 x i40> poison, i40 [[TMP12]], i64 0
-; CHECK-NEXT:    [[TMP3:%.*]] = shufflevector <2 x i40> [[BROADCAST_SPLATINSERT1]], <2 x i40> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP13:%.*]] = sext i32 [[B]] to i40
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i40> poison, i40 [[TMP13]], i64 0
+; CHECK-NEXT:    [[TMP14:%.*]] = or i40 [[TMP13]], [[TMP12]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i40> poison, i40 [[TMP14]], i64 0
 ; CHECK-NEXT:    [[TMP4:%.*]] = shufflevector <2 x i40> [[BROADCAST_SPLATINSERT]], <2 x i40> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP5:%.*]] = or <2 x i40> [[TMP4]], [[TMP3]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <2 x i40> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP6:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_PHI3:%.*]] = phi <2 x i40> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP8:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_PHI4:%.*]] = phi <2 x i40> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP10:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_PHI5:%.*]] = phi <2 x i40> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP9:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP6]] = or <2 x i40> [[VEC_PHI]], [[TMP5]]
-; CHECK-NEXT:    [[TMP8]] = or <2 x i40> [[VEC_PHI3]], [[TMP5]]
-; CHECK-NEXT:    [[TMP10]] = or <2 x i40> [[VEC_PHI4]], [[TMP5]]
-; CHECK-NEXT:    [[TMP9]] = or <2 x i40> [[VEC_PHI5]], [[TMP5]]
+; CHECK-NEXT:    [[VEC_PHI1:%.*]] = phi <2 x i40> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP8:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI2:%.*]] = phi <2 x i40> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP10:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI3:%.*]] = phi <2 x i40> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP9:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP6]] = or <2 x i40> [[VEC_PHI]], [[TMP4]]
+; CHECK-NEXT:    [[TMP8]] = or <2 x i40> [[VEC_PHI1]], [[TMP4]]
+; CHECK-NEXT:    [[TMP10]] = or <2 x i40> [[VEC_PHI2]], [[TMP4]]
+; CHECK-NEXT:    [[TMP9]] = or <2 x i40> [[VEC_PHI3]], [[TMP4]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]

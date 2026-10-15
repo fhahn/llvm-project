@@ -5873,7 +5873,7 @@ VPRecipeWithIRFlags *VPRecipeBuilder::tryToWiden(VPInstruction *VPI) {
   case Instruction::SRem:
   case Instruction::URem:
     // If not provably safe, use a masked intrinsic.
-    if (CM.isPredicatedInst(I))
+    if (VPI->getRegion() && CM.isPredicatedInst(I))
       return new VPWidenIntrinsicRecipe(
           getMaskedDivRemIntrinsic(VPI->getOpcode()), VPI->operands(),
           I->getType(), {}, {}, VPI->getDebugLoc());
@@ -5961,11 +5961,16 @@ bool VPRecipeBuilder::replaceWithFinalIfReductionStore(
 VPSingleDefRecipe *VPRecipeBuilder::handleReplication(VPInstruction *VPI,
                                                       VFRange &Range) {
   auto *I = VPI->getUnderlyingInstr();
+  // The legacy cost model only describes instructions in the loop region.
+  // Recipes outside are narrowed later for vector VFs.
+  bool InLoop = VPI->getRegion();
   bool IsUniform = LoopVectorizationPlanner::getDecisionAndClampRange(
-      [&](ElementCount VF) { return CM.isUniformAfterVectorization(I, VF); },
+      [&](ElementCount VF) {
+        return InLoop ? CM.isUniformAfterVectorization(I, VF) : VF.isScalar();
+      },
       Range);
 
-  bool IsPredicated = CM.isPredicatedInst(I);
+  bool IsPredicated = InLoop && CM.isPredicatedInst(I);
 
   // Even if the instruction is not marked as uniform, there are certain
   // intrinsic calls that can be effectively treated as such, so we check for
@@ -6058,7 +6063,8 @@ VPRecipeBuilder::tryToCreateWidenNonPhiRecipe(VPSingleDefRecipe *R,
                                  /*Mask=*/nullptr, *VPI, *VPI,
                                  VPI->getDebugLoc());
 
-  if (!shouldWiden(Instr, Range))
+  // The legacy cost model only describes instructions in the loop region.
+  if (VPI->getRegion() && !shouldWiden(Instr, Range))
     return nullptr;
 
   if (VPI->getOpcode() == Instruction::GetElementPtr) {
@@ -6234,6 +6240,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
 
   RUN_VPLAN_PASS(VPlanTransforms::createLoopRegions, *VPlan0,
                  getDebugLocFromInstOrOperands(Legal->getPrimaryInduction()));
+  RUN_VPLAN_PASS(VPlanTransforms::licm, *VPlan0);
   if (CM->foldTailByMasking())
     RUN_VPLAN_PASS(VPlanTransforms::foldTailByMasking, *VPlan0);
 
@@ -6399,21 +6406,22 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
   RUN_VPLAN_PASS(VPlanTransforms::narrowInductionTruncates, *Plan, Range, TTI,
                  PSE);
 
-  // Convert remaining VPInstructions to widen or replicate recipes.
+  // Convert remaining VPInstructions to widen or replicate recipes, including
+  // those licm moved out of the loop region.
   // TODO: This legacy code should eventually be migrated to VPlan.
-  VPBasicBlock *HeaderVPBB = LoopRegion->getEntryBasicBlock();
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
-           vp_depth_first_shallow(HeaderVPBB))) {
-    // All types but VPInstructions are already widened and don't need extra
-    // processing. We process VPInstructions below.
+           vp_depth_first_deep(Plan->getEntry()))) {
+    // Inside loop regions, all types but VPInstructions are already widened
+    // and don't need extra processing. We process VPInstructions below.
     assert(
-        all_of(
-            make_range(VPBB->getFirstNonPhi(), VPBB->end()),
-            IsaPred<VPWidenCanonicalIVRecipe, VPBlendRecipe, VPReductionRecipe,
-                    VPReplicateRecipe, VPWidenLoadRecipe, VPWidenStoreRecipe,
-                    VPWidenCallRecipe, VPWidenIntrinsicRecipe,
-                    VPVectorPointerRecipe, VPVectorEndPointerRecipe,
-                    VPHistogramRecipe, VPInstruction>) &&
+        (!VPBB->getParent() ||
+         all_of(
+             make_range(VPBB->getFirstNonPhi(), VPBB->end()),
+             IsaPred<VPWidenCanonicalIVRecipe, VPBlendRecipe, VPReductionRecipe,
+                     VPReplicateRecipe, VPWidenLoadRecipe, VPWidenStoreRecipe,
+                     VPWidenCallRecipe, VPWidenIntrinsicRecipe,
+                     VPVectorPointerRecipe, VPVectorEndPointerRecipe,
+                     VPHistogramRecipe, VPInstruction>)) &&
         "Unexpected recipe");
     for (VPInstruction &VPI :
          make_early_inc_range(make_isa_range<VPInstruction>(*VPBB))) {
@@ -6425,6 +6433,8 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
       // Only VPInstrutions with an underlying value need to be processed.
       if (!VPI.getUnderlyingValue())
         continue;
+      assert((VPI.getRegion() || !VPI.isMasked()) &&
+             "VPInstructions outside loop regions must not be masked");
 
       Builder.setInsertPoint(&VPI);
 

@@ -102,12 +102,12 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
            vputils::getConstantStride(Addr, AccessTy, PSE, OuterLoop) == 1;
   };
 
+  // Also convert the VPInstructions licm moved out of the loop region.
   ReversePostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> RPOT(
-      Plan.getVectorLoopRegion());
+      Plan.getEntry());
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
-    // Skip blocks outside region
-    if (!VPBB->getParent())
-      break;
+    if (isa<VPIRBasicBlock>(VPBB))
+      continue;
     VPRecipeBase *Term = VPBB->getTerminator();
     auto EndIter = Term ? Term->getIterator() : VPBB->end();
     // Introduce each ingredient into VPlan.
@@ -1944,7 +1944,9 @@ static void narrowToSingleScalarRecipes(VPlan &Plan) {
         };
       };
 
-      if (any_of(RepOrWidenR->users(), IntroducesBCastOf(RepOrWidenR)) &&
+      // Recipes outside loop regions execute once, so always narrow them.
+      if (RepOrWidenR->getRegion() &&
+          any_of(RepOrWidenR->users(), IntroducesBCastOf(RepOrWidenR)) &&
           none_of(RepOrWidenR->operands(), [&](VPValue *Op) {
             if (any_of(
                     make_filter_range(Op->users(), not_equal_to(RepOrWidenR)),
@@ -2467,6 +2469,10 @@ void VPlanTransforms::cse(VPlan &Plan) {
 static bool cannotHoistOrSinkRecipe(VPRecipeBase &R, VPBasicBlock *FirstBB,
                                     VPBasicBlock *LastBB,
                                     bool Sinking = false) {
+  // Widening decisions for calls are only made in the loop region.
+  if (match(&R, m_VPInstruction<Instruction::Call>()))
+    return true;
+
   if (!isa<VPReplicateRecipe>(R) || !R.mayReadOrWriteMemory() ||
       match(&R, m_Intrinsic<Intrinsic::assume>()))
     return vputils::cannotHoistOrSinkRecipe(R, Sinking);
@@ -2484,35 +2490,35 @@ static bool cannotHoistOrSinkRecipe(VPRecipeBase &R, VPBasicBlock *FirstBB,
          !canHoistOrSinkWithNoAliasCheck(*MemLoc, FirstBB, LastBB, SinkInfo);
 }
 
-/// Move loop-invariant recipes out of the vector loop region in \p Plan.
-static void licm(VPlan &Plan) {
+void VPlanTransforms::licm(VPlan &Plan) {
   VPBasicBlock *Preheader = Plan.getVectorPreheader();
+  VPDominatorTree VPDT(Plan);
 
   // Hoist any loop invariant recipes from the vector loop region to the
-  // preheader. Preform a shallow traversal of the vector loop region, to
+  // preheader. Perform a shallow traversal of the vector loop region, to
   // exclude recipes in replicate regions. Since the top-level blocks in the
-  // vector loop region are guaranteed to execute if the vector pre-header is,
-  // we don't need to check speculation safety.
+  // vector loop region dominating its exiting block are guaranteed to execute
+  // if the vector pre-header is, we don't need to check speculation safety.
   VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  VPBasicBlock *ExitingVPBB = LoopRegion->getExitingBasicBlock();
   assert(Preheader->getSingleSuccessor() == LoopRegion &&
-         "Expected vector prehader's successor to be the vector loop region");
+         "Expected vector preheader's successor to be the vector loop region");
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_shallow(LoopRegion->getEntry()))) {
+    if (!VPDT.dominates(VPBB, ExitingVPBB))
+      continue;
     for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
       if (any_of(R.operands(), [](VPValue *Op) {
             return !Op->isDefinedOutsideLoopRegions();
           }))
         continue;
       if (cannotHoistOrSinkRecipe(R, LoopRegion->getEntryBasicBlock(),
-                                  LoopRegion->getExitingBasicBlock()))
+                                  ExitingVPBB))
         continue;
       R.moveBefore(*Preheader, Preheader->end());
     }
   }
 
-#ifndef NDEBUG
-  VPDominatorTree VPDT(Plan);
-#endif
   // Sink recipes with no users inside the vector loop region if all users are
   // in the same exit block of the region.
   // TODO: Extend to sink recipes from inner loops.
@@ -2562,8 +2568,12 @@ static void licm(VPlan &Plan) {
         continue;
 
       if (cannotHoistOrSinkRecipe(R, LoopRegion->getEntryBasicBlock(),
-                                  LoopRegion->getExitingBasicBlock(),
-                                  /*Sinking=*/true))
+                                  ExitingVPBB, /*Sinking=*/true))
+        continue;
+
+      // VPInstructions are only masked later, e.g. when folding the tail, so
+      // only sink those that are safe to execute speculatively.
+      if (isa<VPInstruction>(Def) && !Def->isSafeToSpeculativelyExecute())
         continue;
 
       [[maybe_unused]] auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
@@ -2573,8 +2583,12 @@ static void licm(VPlan &Plan) {
              "The only recipes that may write to memory are expected to be "
              "stores with invariant pointer-operand");
 
+      // Recipes without users are sunk to the single successor, if any.
       if (!SinkBB)
-        SinkBB = cast<VPBasicBlock>(LoopRegion->getSingleSuccessor());
+        SinkBB = dyn_cast_if_present<VPBasicBlock>(
+            LoopRegion->getSingleSuccessor());
+      if (!SinkBB)
+        continue;
 
       // TODO: This will need to be a check instead of a assert after
       // conditional branches in vectorized loops are supported.
@@ -4035,8 +4049,10 @@ static void tryToCreateAbstractReductionRecipe(VPReductionRecipe *Red,
                                                VPCostContext &Ctx,
                                                VFRange &Range) {
   // Creation of VPExpressions for partial reductions is entirely handled in
-  // transformToPartialReduction.
-  if (Red->isPartialReduction())
+  // transformToPartialReduction. Reduced values defined outside loop regions
+  // are not bundled back into the loop.
+  if (Red->isPartialReduction() ||
+      Red->getVecOp()->isDefinedOutsideLoopRegions())
     return;
 
   VPExpressionRecipe *AbstractR = nullptr;

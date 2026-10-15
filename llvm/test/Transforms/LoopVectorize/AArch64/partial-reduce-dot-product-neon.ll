@@ -1894,8 +1894,6 @@ define i32 @dotp_ext_mul(i64 %n, ptr %a, ptr %b) {
 ; CHECK-INTERLEAVE1-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 15
 ; CHECK-INTERLEAVE1-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
 ; CHECK-INTERLEAVE1-NEXT:    [[TMP1:%.*]] = load i16, ptr [[A]], align 2
-; CHECK-INTERLEAVE1-NEXT:    [[TMP3:%.*]] = sext i16 [[TMP1]] to i32
-; CHECK-INTERLEAVE1-NEXT:    [[TMP4:%.*]] = sext i32 [[TMP3]] to i64
 ; CHECK-INTERLEAVE1-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK-INTERLEAVE1:       vector.body:
 ; CHECK-INTERLEAVE1-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
@@ -1910,6 +1908,8 @@ define i32 @dotp_ext_mul(i64 %n, ptr %a, ptr %b) {
 ; CHECK-INTERLEAVE1-NEXT:    br i1 [[TMP6]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
 ; CHECK-INTERLEAVE1:       middle.block:
 ; CHECK-INTERLEAVE1-NEXT:    [[TMP9:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE]])
+; CHECK-INTERLEAVE1-NEXT:    [[TMP10:%.*]] = sext i16 [[TMP1]] to i32
+; CHECK-INTERLEAVE1-NEXT:    [[TMP11:%.*]] = sext i32 [[TMP10]] to i64
 ; CHECK-INTERLEAVE1-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-INTERLEAVE1-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-INTERLEAVE1:       scalar.ph:
@@ -1924,8 +1924,6 @@ define i32 @dotp_ext_mul(i64 %n, ptr %a, ptr %b) {
 ; CHECK-INTERLEAVED-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 31
 ; CHECK-INTERLEAVED-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
 ; CHECK-INTERLEAVED-NEXT:    [[TMP1:%.*]] = load i16, ptr [[A]], align 2
-; CHECK-INTERLEAVED-NEXT:    [[TMP3:%.*]] = sext i16 [[TMP1]] to i32
-; CHECK-INTERLEAVED-NEXT:    [[TMP4:%.*]] = sext i32 [[TMP3]] to i64
 ; CHECK-INTERLEAVED-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK-INTERLEAVED:       vector.body:
 ; CHECK-INTERLEAVED-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
@@ -1947,6 +1945,8 @@ define i32 @dotp_ext_mul(i64 %n, ptr %a, ptr %b) {
 ; CHECK-INTERLEAVED:       middle.block:
 ; CHECK-INTERLEAVED-NEXT:    [[BIN_RDX:%.*]] = add <4 x i32> [[PARTIAL_REDUCE3]], [[PARTIAL_REDUCE]]
 ; CHECK-INTERLEAVED-NEXT:    [[TMP12:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX]])
+; CHECK-INTERLEAVED-NEXT:    [[TMP13:%.*]] = sext i16 [[TMP1]] to i32
+; CHECK-INTERLEAVED-NEXT:    [[TMP14:%.*]] = sext i32 [[TMP13]] to i64
 ; CHECK-INTERLEAVED-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-INTERLEAVED-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-INTERLEAVED:       scalar.ph:
@@ -1961,8 +1961,6 @@ define i32 @dotp_ext_mul(i64 %n, ptr %a, ptr %b) {
 ; CHECK-MAXBW-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 15
 ; CHECK-MAXBW-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
 ; CHECK-MAXBW-NEXT:    [[TMP1:%.*]] = load i16, ptr [[A]], align 2
-; CHECK-MAXBW-NEXT:    [[TMP3:%.*]] = sext i16 [[TMP1]] to i32
-; CHECK-MAXBW-NEXT:    [[TMP4:%.*]] = sext i32 [[TMP3]] to i64
 ; CHECK-MAXBW-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK-MAXBW:       vector.body:
 ; CHECK-MAXBW-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
@@ -1977,6 +1975,8 @@ define i32 @dotp_ext_mul(i64 %n, ptr %a, ptr %b) {
 ; CHECK-MAXBW-NEXT:    br i1 [[TMP6]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
 ; CHECK-MAXBW:       middle.block:
 ; CHECK-MAXBW-NEXT:    [[TMP9:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE]])
+; CHECK-MAXBW-NEXT:    [[TMP10:%.*]] = sext i16 [[TMP1]] to i32
+; CHECK-MAXBW-NEXT:    [[TMP11:%.*]] = sext i32 [[TMP10]] to i64
 ; CHECK-MAXBW-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-MAXBW-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-MAXBW:       scalar.ph:
@@ -2016,8 +2016,6 @@ define i64 @not_dotp_ext_mul_8to64(i64 %n, ptr %a, ptr %b) {
 ; CHECK-INTERLEAVE1-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 15
 ; CHECK-INTERLEAVE1-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
 ; CHECK-INTERLEAVE1-NEXT:    [[TMP4:%.*]] = load i16, ptr [[A]], align 2
-; CHECK-INTERLEAVE1-NEXT:    [[TMP3:%.*]] = sext i16 [[TMP4]] to i32
-; CHECK-INTERLEAVE1-NEXT:    [[TMP10:%.*]] = sext i32 [[TMP3]] to i64
 ; CHECK-INTERLEAVE1-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK-INTERLEAVE1:       vector.body:
 ; CHECK-INTERLEAVE1-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
@@ -2033,6 +2031,8 @@ define i64 @not_dotp_ext_mul_8to64(i64 %n, ptr %a, ptr %b) {
 ; CHECK-INTERLEAVE1-NEXT:    br i1 [[TMP8]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
 ; CHECK-INTERLEAVE1:       middle.block:
 ; CHECK-INTERLEAVE1-NEXT:    [[TMP11:%.*]] = call i64 @llvm.vector.reduce.add.v16i64(<16 x i64> [[TMP9]])
+; CHECK-INTERLEAVE1-NEXT:    [[TMP10:%.*]] = sext i16 [[TMP4]] to i32
+; CHECK-INTERLEAVE1-NEXT:    [[TMP12:%.*]] = sext i32 [[TMP10]] to i64
 ; CHECK-INTERLEAVE1-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-INTERLEAVE1-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-INTERLEAVE1:       scalar.ph:
@@ -2047,8 +2047,6 @@ define i64 @not_dotp_ext_mul_8to64(i64 %n, ptr %a, ptr %b) {
 ; CHECK-INTERLEAVED-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 31
 ; CHECK-INTERLEAVED-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
 ; CHECK-INTERLEAVED-NEXT:    [[TMP4:%.*]] = load i16, ptr [[A]], align 2
-; CHECK-INTERLEAVED-NEXT:    [[TMP3:%.*]] = sext i16 [[TMP4]] to i32
-; CHECK-INTERLEAVED-NEXT:    [[TMP15:%.*]] = sext i32 [[TMP3]] to i64
 ; CHECK-INTERLEAVED-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK-INTERLEAVED:       vector.body:
 ; CHECK-INTERLEAVED-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
@@ -2072,6 +2070,8 @@ define i64 @not_dotp_ext_mul_8to64(i64 %n, ptr %a, ptr %b) {
 ; CHECK-INTERLEAVED:       middle.block:
 ; CHECK-INTERLEAVED-NEXT:    [[BIN_RDX:%.*]] = add <16 x i64> [[TMP14]], [[TMP13]]
 ; CHECK-INTERLEAVED-NEXT:    [[TMP16:%.*]] = call i64 @llvm.vector.reduce.add.v16i64(<16 x i64> [[BIN_RDX]])
+; CHECK-INTERLEAVED-NEXT:    [[TMP15:%.*]] = sext i16 [[TMP4]] to i32
+; CHECK-INTERLEAVED-NEXT:    [[TMP17:%.*]] = sext i32 [[TMP15]] to i64
 ; CHECK-INTERLEAVED-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-INTERLEAVED-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-INTERLEAVED:       scalar.ph:
@@ -2086,8 +2086,6 @@ define i64 @not_dotp_ext_mul_8to64(i64 %n, ptr %a, ptr %b) {
 ; CHECK-MAXBW-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 15
 ; CHECK-MAXBW-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
 ; CHECK-MAXBW-NEXT:    [[TMP4:%.*]] = load i16, ptr [[A]], align 2
-; CHECK-MAXBW-NEXT:    [[TMP3:%.*]] = sext i16 [[TMP4]] to i32
-; CHECK-MAXBW-NEXT:    [[TMP10:%.*]] = sext i32 [[TMP3]] to i64
 ; CHECK-MAXBW-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK-MAXBW:       vector.body:
 ; CHECK-MAXBW-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
@@ -2103,6 +2101,8 @@ define i64 @not_dotp_ext_mul_8to64(i64 %n, ptr %a, ptr %b) {
 ; CHECK-MAXBW-NEXT:    br i1 [[TMP8]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
 ; CHECK-MAXBW:       middle.block:
 ; CHECK-MAXBW-NEXT:    [[TMP11:%.*]] = call i64 @llvm.vector.reduce.add.v16i64(<16 x i64> [[TMP9]])
+; CHECK-MAXBW-NEXT:    [[TMP10:%.*]] = sext i16 [[TMP4]] to i32
+; CHECK-MAXBW-NEXT:    [[TMP12:%.*]] = sext i32 [[TMP10]] to i64
 ; CHECK-MAXBW-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-MAXBW-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-MAXBW:       scalar.ph:
@@ -2142,8 +2142,6 @@ define i32 @not_dotp_sext_mul_zext(i64 %n, ptr %a, ptr %b) {
 ; CHECK-INTERLEAVE1-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 15
 ; CHECK-INTERLEAVE1-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
 ; CHECK-INTERLEAVE1-NEXT:    [[TMP4:%.*]] = load i16, ptr [[A]], align 2
-; CHECK-INTERLEAVE1-NEXT:    [[TMP3:%.*]] = sext i16 [[TMP4]] to i32
-; CHECK-INTERLEAVE1-NEXT:    [[TMP10:%.*]] = sext i32 [[TMP3]] to i64
 ; CHECK-INTERLEAVE1-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK-INTERLEAVE1:       vector.body:
 ; CHECK-INTERLEAVE1-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
@@ -2159,6 +2157,8 @@ define i32 @not_dotp_sext_mul_zext(i64 %n, ptr %a, ptr %b) {
 ; CHECK-INTERLEAVE1-NEXT:    br i1 [[TMP8]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP15:![0-9]+]]
 ; CHECK-INTERLEAVE1:       middle.block:
 ; CHECK-INTERLEAVE1-NEXT:    [[TMP11:%.*]] = call i32 @llvm.vector.reduce.add.v16i32(<16 x i32> [[TMP9]])
+; CHECK-INTERLEAVE1-NEXT:    [[TMP10:%.*]] = sext i16 [[TMP4]] to i32
+; CHECK-INTERLEAVE1-NEXT:    [[TMP12:%.*]] = sext i32 [[TMP10]] to i64
 ; CHECK-INTERLEAVE1-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-INTERLEAVE1-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-INTERLEAVE1:       scalar.ph:
@@ -2173,8 +2173,6 @@ define i32 @not_dotp_sext_mul_zext(i64 %n, ptr %a, ptr %b) {
 ; CHECK-INTERLEAVED-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 31
 ; CHECK-INTERLEAVED-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
 ; CHECK-INTERLEAVED-NEXT:    [[TMP4:%.*]] = load i16, ptr [[A]], align 2
-; CHECK-INTERLEAVED-NEXT:    [[TMP3:%.*]] = sext i16 [[TMP4]] to i32
-; CHECK-INTERLEAVED-NEXT:    [[TMP15:%.*]] = sext i32 [[TMP3]] to i64
 ; CHECK-INTERLEAVED-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK-INTERLEAVED:       vector.body:
 ; CHECK-INTERLEAVED-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
@@ -2198,6 +2196,8 @@ define i32 @not_dotp_sext_mul_zext(i64 %n, ptr %a, ptr %b) {
 ; CHECK-INTERLEAVED:       middle.block:
 ; CHECK-INTERLEAVED-NEXT:    [[BIN_RDX:%.*]] = add <16 x i32> [[TMP14]], [[TMP13]]
 ; CHECK-INTERLEAVED-NEXT:    [[TMP16:%.*]] = call i32 @llvm.vector.reduce.add.v16i32(<16 x i32> [[BIN_RDX]])
+; CHECK-INTERLEAVED-NEXT:    [[TMP15:%.*]] = sext i16 [[TMP4]] to i32
+; CHECK-INTERLEAVED-NEXT:    [[TMP17:%.*]] = sext i32 [[TMP15]] to i64
 ; CHECK-INTERLEAVED-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-INTERLEAVED-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-INTERLEAVED:       scalar.ph:
@@ -2212,8 +2212,6 @@ define i32 @not_dotp_sext_mul_zext(i64 %n, ptr %a, ptr %b) {
 ; CHECK-MAXBW-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 15
 ; CHECK-MAXBW-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
 ; CHECK-MAXBW-NEXT:    [[TMP4:%.*]] = load i16, ptr [[A]], align 2
-; CHECK-MAXBW-NEXT:    [[TMP3:%.*]] = sext i16 [[TMP4]] to i32
-; CHECK-MAXBW-NEXT:    [[TMP10:%.*]] = sext i32 [[TMP3]] to i64
 ; CHECK-MAXBW-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK-MAXBW:       vector.body:
 ; CHECK-MAXBW-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
@@ -2229,6 +2227,8 @@ define i32 @not_dotp_sext_mul_zext(i64 %n, ptr %a, ptr %b) {
 ; CHECK-MAXBW-NEXT:    br i1 [[TMP8]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP15:![0-9]+]]
 ; CHECK-MAXBW:       middle.block:
 ; CHECK-MAXBW-NEXT:    [[TMP11:%.*]] = call i32 @llvm.vector.reduce.add.v16i32(<16 x i32> [[TMP9]])
+; CHECK-MAXBW-NEXT:    [[TMP10:%.*]] = sext i16 [[TMP4]] to i32
+; CHECK-MAXBW-NEXT:    [[TMP12:%.*]] = sext i32 [[TMP10]] to i64
 ; CHECK-MAXBW-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-MAXBW-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-MAXBW:       scalar.ph:
@@ -2268,8 +2268,6 @@ define i32 @not_dotp_zext_mul_sext(i64 %n, ptr %a, ptr %b) {
 ; CHECK-INTERLEAVE1-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 15
 ; CHECK-INTERLEAVE1-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
 ; CHECK-INTERLEAVE1-NEXT:    [[TMP4:%.*]] = load i16, ptr [[A]], align 2
-; CHECK-INTERLEAVE1-NEXT:    [[TMP3:%.*]] = sext i16 [[TMP4]] to i32
-; CHECK-INTERLEAVE1-NEXT:    [[TMP10:%.*]] = sext i32 [[TMP3]] to i64
 ; CHECK-INTERLEAVE1-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK-INTERLEAVE1:       vector.body:
 ; CHECK-INTERLEAVE1-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
@@ -2285,6 +2283,8 @@ define i32 @not_dotp_zext_mul_sext(i64 %n, ptr %a, ptr %b) {
 ; CHECK-INTERLEAVE1-NEXT:    br i1 [[TMP8]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP17:![0-9]+]]
 ; CHECK-INTERLEAVE1:       middle.block:
 ; CHECK-INTERLEAVE1-NEXT:    [[TMP11:%.*]] = call i32 @llvm.vector.reduce.add.v16i32(<16 x i32> [[TMP9]])
+; CHECK-INTERLEAVE1-NEXT:    [[TMP10:%.*]] = sext i16 [[TMP4]] to i32
+; CHECK-INTERLEAVE1-NEXT:    [[TMP12:%.*]] = sext i32 [[TMP10]] to i64
 ; CHECK-INTERLEAVE1-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-INTERLEAVE1-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-INTERLEAVE1:       scalar.ph:
@@ -2299,8 +2299,6 @@ define i32 @not_dotp_zext_mul_sext(i64 %n, ptr %a, ptr %b) {
 ; CHECK-INTERLEAVED-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 31
 ; CHECK-INTERLEAVED-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
 ; CHECK-INTERLEAVED-NEXT:    [[TMP4:%.*]] = load i16, ptr [[A]], align 2
-; CHECK-INTERLEAVED-NEXT:    [[TMP3:%.*]] = sext i16 [[TMP4]] to i32
-; CHECK-INTERLEAVED-NEXT:    [[TMP15:%.*]] = sext i32 [[TMP3]] to i64
 ; CHECK-INTERLEAVED-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK-INTERLEAVED:       vector.body:
 ; CHECK-INTERLEAVED-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
@@ -2324,6 +2322,8 @@ define i32 @not_dotp_zext_mul_sext(i64 %n, ptr %a, ptr %b) {
 ; CHECK-INTERLEAVED:       middle.block:
 ; CHECK-INTERLEAVED-NEXT:    [[BIN_RDX:%.*]] = add <16 x i32> [[TMP14]], [[TMP13]]
 ; CHECK-INTERLEAVED-NEXT:    [[TMP16:%.*]] = call i32 @llvm.vector.reduce.add.v16i32(<16 x i32> [[BIN_RDX]])
+; CHECK-INTERLEAVED-NEXT:    [[TMP15:%.*]] = sext i16 [[TMP4]] to i32
+; CHECK-INTERLEAVED-NEXT:    [[TMP17:%.*]] = sext i32 [[TMP15]] to i64
 ; CHECK-INTERLEAVED-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-INTERLEAVED-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-INTERLEAVED:       scalar.ph:
@@ -2338,8 +2338,6 @@ define i32 @not_dotp_zext_mul_sext(i64 %n, ptr %a, ptr %b) {
 ; CHECK-MAXBW-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 15
 ; CHECK-MAXBW-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
 ; CHECK-MAXBW-NEXT:    [[TMP4:%.*]] = load i16, ptr [[A]], align 2
-; CHECK-MAXBW-NEXT:    [[TMP3:%.*]] = sext i16 [[TMP4]] to i32
-; CHECK-MAXBW-NEXT:    [[TMP10:%.*]] = sext i32 [[TMP3]] to i64
 ; CHECK-MAXBW-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK-MAXBW:       vector.body:
 ; CHECK-MAXBW-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
@@ -2355,6 +2353,8 @@ define i32 @not_dotp_zext_mul_sext(i64 %n, ptr %a, ptr %b) {
 ; CHECK-MAXBW-NEXT:    br i1 [[TMP8]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP17:![0-9]+]]
 ; CHECK-MAXBW:       middle.block:
 ; CHECK-MAXBW-NEXT:    [[TMP11:%.*]] = call i32 @llvm.vector.reduce.add.v16i32(<16 x i32> [[TMP9]])
+; CHECK-MAXBW-NEXT:    [[TMP10:%.*]] = sext i16 [[TMP4]] to i32
+; CHECK-MAXBW-NEXT:    [[TMP12:%.*]] = sext i32 [[TMP10]] to i64
 ; CHECK-MAXBW-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-MAXBW-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-MAXBW:       scalar.ph:

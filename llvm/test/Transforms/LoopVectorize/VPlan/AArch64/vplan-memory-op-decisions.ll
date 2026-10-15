@@ -87,7 +87,6 @@ define void @load_feeding_only_mask_not_scalarized(ptr noalias %A, ptr noalias %
 ; CHECK-NEXT:    Successor(s): latch
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    latch:
-; CHECK-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
@@ -518,7 +517,6 @@ define void @or_disjoint_address(ptr noalias %A) {
 ; CHECK-NEXT:      EMIT ir<%add> = add ir<%lv>, ir<1>
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<%add>
-; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
@@ -574,7 +572,6 @@ define void @sdiv_with_nonnegative_operands_address(ptr noalias %A) {
 ; CHECK-NEXT:      EMIT ir<%add> = add ir<%lv>, ir<1>
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<%add>
-; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
@@ -629,7 +626,6 @@ define void @ashr_of_shl_address(ptr noalias %A) {
 ; CHECK-NEXT:      EMIT-SCALAR ir<%lv> = load ir<%gep>
 ; CHECK-NEXT:      EMIT ir<%add> = add ir<%lv>, ir<1>
 ; CHECK-NEXT:      EMIT store ir<%add>, ir<%gep>
-; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
@@ -685,7 +681,6 @@ define void @extractvalue_of_with_overflow_address(ptr noalias %A) {
 ; CHECK-NEXT:      EMIT-SCALAR ir<%lv> = load ir<%gep>
 ; CHECK-NEXT:      EMIT ir<%add> = add ir<%lv>, ir<1>
 ; CHECK-NEXT:      EMIT store ir<%add>, ir<%gep>
-; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
@@ -750,7 +745,6 @@ define void @blend_with_identical_incoming_values_address(ptr noalias %A, i1 %c)
 ; CHECK-NEXT:      EMIT-SCALAR ir<%lv> = load ir<%gep>
 ; CHECK-NEXT:      EMIT ir<%add> = add ir<%lv>, ir<1>
 ; CHECK-NEXT:      EMIT store ir<%add>, ir<%gep>
-; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
@@ -815,7 +809,6 @@ define void @or_without_disjoint_address(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:      EMIT ir<%gep.A> = getelementptr inbounds ir<%A>, ir<%iv>
 ; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep.A>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP4]]>, ir<%lv>
-; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
@@ -869,7 +862,6 @@ define void @sdiv_with_negative_operand_address(ptr noalias %A, ptr noalias %B) 
 ; CHECK-NEXT:      EMIT ir<%gep.A> = getelementptr inbounds ir<%A>, ir<%iv>
 ; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep.A>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP4]]>, ir<%lv>
-; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
@@ -924,7 +916,6 @@ define void @ashr_amount_larger_than_shl_address(ptr noalias %A, ptr noalias %B)
 ; CHECK-NEXT:      EMIT ir<%gep.A> = getelementptr inbounds ir<%A>, ir<%iv>
 ; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep.A>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP4]]>, ir<%lv>
-; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
@@ -990,7 +981,6 @@ define void @blend_with_different_incoming_values_address(ptr noalias %A, ptr no
 ; CHECK-NEXT:      EMIT ir<%gep.A> = getelementptr inbounds ir<%A>, ir<%iv>
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep.A>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<%lv>
-; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
