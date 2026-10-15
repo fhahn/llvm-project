@@ -628,20 +628,18 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
 
   // A one-sided check allows equal starts, so all accesses through Src must
   // precede those through Sink they may conflict with, an order LV only keeps
-  // for consecutive accesses. Otherwise, use a symmetric check.
+  // for consecutive accesses. Otherwise, or if there are conflicting accesses
+  // in both orders, use a symmetric check.
   bool IsSymmetric = true;
   if (Src->IsConsecutive && Sink->IsConsecutive) {
     Value *SrcPtr = Pointers[CGI.Members[0]].PointerValue;
     Value *SinkPtr = Pointers[CGJ.Members[0]].PointerValue;
     bool SrcFirst = hasConflictingAccessBefore(DC, SrcPtr, SinkPtr);
     bool SinkFirst = hasConflictingAccessBefore(DC, SinkPtr, SrcPtr);
-    // Bail out if there are conflicting accesses in both orders.
-    if (SrcFirst && SinkFirst)
-      return false;
-    IsSymmetric = false;
+    IsSymmetric = SrcFirst && SinkFirst;
     // Swap if Sink is accessed first, and again when counting down, which
     // swaps the dependence distance.
-    if (SinkFirst != Step->getValue()->isNegative())
+    if (!IsSymmetric && SinkFirst != Step->getValue()->isNegative())
       std::swap(Src, Sink);
   }
 
