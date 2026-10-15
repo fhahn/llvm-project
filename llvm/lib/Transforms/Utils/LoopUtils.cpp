@@ -2178,13 +2178,15 @@ static PointerBounds expandBounds(const RuntimeCheckingPtrGroup *CG,
 
   Start = Exp.expandCodeFor(Low, PtrArithTy, Loc);
   End = Exp.expandCodeFor(High, PtrArithTy, Loc);
+  Value *StrideVal =
+      Stride ? Exp.expandCodeFor(Stride, Stride->getType(), Loc) : nullptr;
   if (CG->NeedsFreeze) {
     IRBuilder<> Builder(Loc);
     Start = Builder.CreateFreeze(Start, Start->getName() + ".fr");
     End = Builder.CreateFreeze(End, End->getName() + ".fr");
+    if (StrideVal)
+      StrideVal = Builder.CreateFreeze(StrideVal, StrideVal->getName() + ".fr");
   }
-  Value *StrideVal =
-      Stride ? Exp.expandCodeFor(Stride, Stride->getType(), Loc) : nullptr;
   LLVM_DEBUG(dbgs() << "Start: " << *Low << " End: " << *High << "\n");
   return {Start, End, StrideVal};
 }

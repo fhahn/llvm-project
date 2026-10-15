@@ -1898,6 +1898,20 @@ llvm::getStrideFromAddRec(const SCEVAddRecExpr *AR, const Loop *Lp,
   return *StepVal % Size ? std::nullopt : std::make_optional(*StepVal / Size);
 }
 
+/// Returns true if \p Ptr, which is accessed in \p L, is dereferenced in every
+/// iteration of \p L.
+static bool isDereferencedInEveryIteration(Value *Ptr, const Loop *L,
+                                           const DominatorTree &DT) {
+  return L->getHeader() == L->getLoopLatch() ||
+         any_of(Ptr->users(), [L, &DT, Ptr](User *U) {
+           if (getLoadStorePointerOperand(U) != Ptr)
+             return false;
+           BasicBlock *UserBB = cast<Instruction>(U)->getParent();
+           return L->contains(UserBB) &&
+                  !LoopAccessInfo::blockNeedsPredication(UserBB, L, &DT);
+         });
+}
+
 /// Check whether \p AR is a non-wrapping AddRec. If \p Ptr is not nullptr, use
 /// information from the IR pointer value to determine no-wrap. If \p Predicates
 /// is not nullptr add no-wrap assumptions if needed.
@@ -1919,15 +1933,7 @@ isNoWrap(PredicatedScalarEvolution &PSE, const SCEVAddRecExpr *AR, Value *Ptr,
       GEP && GEP->hasNoUnsignedSignedWrap()) {
     // For the above reasoning to apply, the pointer must be dereferenced in
     // every iteration.
-    if (L->getHeader() == L->getLoopLatch() ||
-        any_of(GEP->users(), [L, &DT, GEP](User *U) {
-          if (getLoadStorePointerOperand(U) != GEP)
-            return false;
-          BasicBlock *UserBB = cast<Instruction>(U)->getParent();
-          if (!L->contains(UserBB))
-            return false;
-          return !LoopAccessInfo::blockNeedsPredication(UserBB, L, &DT);
-        }))
+    if (isDereferencedInEveryIteration(GEP, L, DT))
       return true;
   }
 
@@ -2176,8 +2182,18 @@ bool AccessAnalysis::createCheckForAccess(RuntimePointerChecking &RtCheck,
                for (const auto &[Idx, Q] : enumerate(RTCheckPtrs)) dbgs()
                << "\t(" << Idx << ") " << *Q.getPointer() << "\n");
   } else {
-    RTCheckPtrs = {
-        {replaceSymbolicStrideSCEV(PSE, TheLoop, StridesMap, Ptr), false}};
+    const SCEV *PtrExpr =
+        replaceSymbolicStrideSCEV(PSE, TheLoop, StridesMap, Ptr);
+    // If Ptr is not dereferenced in every iteration, it may be undef or poison
+    // without UB. Freeze its bounds then, unless all values it is computed
+    // from are known not to be undef or poison.
+    auto MayBeUndefOrPoison = [](const SCEV *S) {
+      auto *U = dyn_cast<SCEVUnknown>(S);
+      return U && !isGuaranteedNotToBeUndefOrPoison(U->getValue());
+    };
+    bool NeedsFreeze = !isDereferencedInEveryIteration(Ptr, TheLoop, DT) &&
+                       SCEVExprContains(PtrExpr, MayBeUndefOrPoison);
+    RTCheckPtrs = {{PtrExpr, NeedsFreeze}};
   }
 
   /// Check whether all pointers can participate in a runtime bounds check. They

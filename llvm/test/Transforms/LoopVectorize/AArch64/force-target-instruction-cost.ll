@@ -173,9 +173,13 @@ define void @test_exit_branch_cost(ptr %dst, ptr noalias %x.ptr, ptr noalias %y.
 ; COMMON-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; COMMON:       [[VECTOR_MEMCHECK]]:
 ; COMMON-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 8
+; COMMON-NEXT:    [[TMP28:%.*]] = freeze ptr [[DST]]
+; COMMON-NEXT:    [[TMP2:%.*]] = freeze ptr [[SCEVGEP]]
 ; COMMON-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[SRC]], i64 8
-; COMMON-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP1]]
-; COMMON-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC]], [[SCEVGEP]]
+; COMMON-NEXT:    [[TMP4:%.*]] = freeze ptr [[SRC]]
+; COMMON-NEXT:    [[TMP30:%.*]] = freeze ptr [[SCEVGEP1]]
+; COMMON-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP28]], [[TMP30]]
+; COMMON-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[TMP4]], [[TMP2]]
 ; COMMON-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; COMMON-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; COMMON:       [[VECTOR_PH]]:

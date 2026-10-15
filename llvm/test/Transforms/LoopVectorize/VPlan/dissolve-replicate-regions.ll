@@ -21,7 +21,8 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; SCALAR-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = sub vp<[[VP4]]>, vp<[[VP3]]>
 ; SCALAR-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = sub vp<[[VP8]]>, ir<1>
 ; SCALAR-NEXT:    EMIT vp<%diff.check> = icmp ult vp<[[VP12]]>, ir<1>
-; SCALAR-NEXT:    EMIT vp<%conflict.rdx> = or ir<false>, vp<%diff.check>
+; SCALAR-NEXT:    EMIT vp<%diff.check.fr> = freeze vp<%diff.check>
+; SCALAR-NEXT:    EMIT vp<%conflict.rdx> = or ir<false>, vp<%diff.check.fr>
 ; SCALAR-NEXT:    EMIT branch-on-cond vp<%conflict.rdx>
 ; SCALAR-NEXT:  Successor(s): scalar.ph, vector.ph
 ; SCALAR-EMPTY:
@@ -101,7 +102,8 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; VECTOR-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = sub vp<[[VP4]]>, vp<[[VP3]]>
 ; VECTOR-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = sub vp<[[VP8]]>, ir<1>
 ; VECTOR-NEXT:    EMIT vp<%diff.check> = icmp ult vp<[[VP12]]>, ir<3>
-; VECTOR-NEXT:    EMIT vp<%conflict.rdx> = or ir<false>, vp<%diff.check>
+; VECTOR-NEXT:    EMIT vp<%diff.check.fr> = freeze vp<%diff.check>
+; VECTOR-NEXT:    EMIT vp<%conflict.rdx> = or ir<false>, vp<%diff.check.fr>
 ; VECTOR-NEXT:    EMIT branch-on-cond vp<%conflict.rdx>
 ; VECTOR-NEXT:  Successor(s): scalar.ph, vector.ph
 ; VECTOR-EMPTY:
