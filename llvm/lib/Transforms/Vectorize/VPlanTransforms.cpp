@@ -1925,8 +1925,13 @@ static void narrowToSingleScalarRecipes(VPlan &Plan) {
         continue;
       }
 
-      // Skip recipes that aren't single scalars.
-      if (!vputils::isSingleScalar(RepOrWidenR))
+      // Skip recipes that aren't single scalars. Loads without side effects
+      // from single-scalar addresses are single scalars, as all lanes load the
+      // same value.
+      if (!vputils::isSingleScalar(RepOrWidenR) &&
+          !(RepR && RepR->getOpcode() == Instruction::Load &&
+            !RepR->mayHaveSideEffects() &&
+            vputils::isSingleScalar(RepR->getOperand(0))))
         continue;
 
       // Predicate to check if a user of Op introduces extra broadcasts.
