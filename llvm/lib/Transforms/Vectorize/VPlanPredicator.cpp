@@ -400,31 +400,65 @@ void VPPredicator::convertPhisToBlends(VPBasicBlock *VPBB) {
   }
 }
 
+/// Returns the block skipped by a branch of \p Header on a condition uniform
+/// across VFs and UFs, if it is non-empty and falls through to the header's
+/// other successor, which has no phis. All lanes take the same edge of such a
+/// branch, so it can be kept with both successors unmasked.
+static VPBasicBlock *getSkippedBlock(VPBasicBlock *Header) {
+  VPValue *Cond;
+  if (Header->getNumSuccessors() != 2 ||
+      !match(Header->getTerminator(), m_BranchOnCond(m_VPValue(Cond))))
+    return nullptr;
+  // AnyOf combines all lanes and parts.
+  bool IsAnyOf = match(Cond, m_AnyOf());
+  if (!IsAnyOf && !vputils::isUniformAcrossVFsAndUFs(Cond))
+    return nullptr;
+  auto *Then = cast<VPBasicBlock>(Header->getSuccessors()[0]);
+  auto *Merge = cast<VPBasicBlock>(Header->getSuccessors()[1]);
+  if (Then->getSingleSuccessor() != Merge)
+    std::swap(Then, Merge);
+  if (Then->getSingleSuccessor() == Merge && !Then->empty() &&
+      Merge->phis().empty())
+    return Then;
+  assert(!IsAnyOf && "Header branch on AnyOf must be kept");
+  return nullptr;
+}
+
 void VPPredicator::run() {
-  VPBasicBlock *Header = Plan.getVectorLoopRegion()->getEntryBasicBlock();
-  // If the header branches on an AnyOf, all lanes take the same edge, so keep
-  // the branch and leave its successors unmasked.
-  bool KeepBranch = Header->getNumSuccessors() == 2 &&
-                    match(Header->getTerminator(), m_BranchOnCond(m_AnyOf()));
-  // Both edges of a kept branch are unmasked, so they must not reach a phi.
-  [[maybe_unused]] auto IsMergeWithoutPhis = [&](VPBlockBase *Succ) {
-    return VPPDT.dominates(Succ, Header) &&
-           cast<VPBasicBlock>(Succ)->phis().empty();
-  };
-  assert((!KeepBranch || any_of(Header->getSuccessors(), IsMergeWithoutPhis)) &&
-         "Kept branch must skip to a merge block without phis");
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  VPBasicBlock *Header = LoopRegion->getEntryBasicBlock();
+  VPBasicBlock *Skipped = getSkippedBlock(Header);
+  VPRecipeBase *Br = Header->getTerminator();
+  if (Skipped && Br->getOperand(0)->isDefinedOutsideLoopRegions()) {
+    // Mask loop-invariant recipes of the skipped block and move them to the
+    // header, as linearizing would, so licm can hoist them.
+    Builder.setInsertPoint(Header, Br->getIterator());
+    SmallPtrSet<VPValue *, 4> Moved;
+    for (VPInstruction &VPI :
+         make_early_inc_range(make_isa_range<VPInstruction>(*Skipped))) {
+      if (VPI.isPhi() || VPI.mayReadOrWriteMemory() ||
+          any_of(VPI.operands(), [&Moved](VPValue *Op) {
+            return !Op->isDefinedOutsideLoopRegions() && !Moved.contains(Op);
+          }))
+        continue;
+      VPI.addMask(createEdgeMask(Header, Skipped));
+      VPI.moveBefore(*Header, Br->getIterator());
+      Moved.insert(&VPI);
+    }
+  }
   // Scan the body of the loop in a topological order to visit each basic
   // block after having visited its predecessor basic blocks.
   ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
       Header);
   // Non-outer regions with VPBBs only are supported at the moment.
   auto Blocks = to_vector(VPBlockUtils::blocksAs<VPBasicBlock>(RPOT));
+  VPBasicBlock *Exiting = LoopRegion->getExitingBasicBlock();
 
   for (VPBasicBlock *VPBB : Blocks) {
     // Introduce the mask for VPBB, which may introduce needed edge masks,
     // unless VPBB is the header or a successor of a kept header branch.
     if (VPBB != Header &&
-        !(KeepBranch && is_contained(Header->getSuccessors(), VPBB)))
+        !(Skipped && is_contained(Header->getSuccessors(), VPBB)))
       createBlockInMask(VPBB);
 
     VPValue *BlockMask = getBlockInMask(VPBB);
@@ -433,9 +467,9 @@ void VPPredicator::run() {
       if (BlockMask)
         VPI.addMask(BlockMask);
 
-      // Drop the execution frequency of unmasked VPInstructions, as they
-      // always execute.
-      if (!VPI.isMasked())
+      // Drop the execution frequency of unmasked VPInstructions in blocks
+      // executing on every iteration.
+      if (!VPI.isMasked() && VPDT.dominates(VPBB, Exiting))
         VPI.clearExecutionFrequency();
     }
   }
@@ -447,7 +481,7 @@ void VPPredicator::run() {
   // Linearize the blocks of the loop into one serial chain, after the header
   // if its branch is kept.
   VPBlockBase *PrevVPBB = nullptr;
-  for (VPBasicBlock *VPBB : drop_begin(Blocks, KeepBranch ? 1 : 0)) {
+  for (VPBasicBlock *VPBB : drop_begin(Blocks, Skipped ? 1 : 0)) {
     auto Successors = to_vector(VPBB->getSuccessors());
     if (Successors.size() > 1)
       VPBB->getTerminator()->eraseFromParent();

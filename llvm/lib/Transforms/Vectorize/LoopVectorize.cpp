@@ -6445,8 +6445,9 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
           vputils::onlyFirstLaneUsed(&VPI))
         continue;
 
-      // Only VPInstrutions with an underlying value need to be processed.
-      if (!VPI.getUnderlyingValue())
+      // Only VPInstrutions with an underlying value need to be processed,
+      // except for branches kept by predication.
+      if (!VPI.getUnderlyingValue() || match(&VPI, m_BranchOnCond()))
         continue;
 
       Builder.setInsertPoint(&VPI);
