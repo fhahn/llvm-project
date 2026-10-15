@@ -123,6 +123,9 @@ template <typename Ty> Intrinsic::ID getIntrinsicID(const Ty *R) {
 /// unsupported recipes and VPValues not defined by a recipe.
 unsigned getOpcode(const VPValue *V);
 
+/// Return the type of the value loaded or stored by the load or store \p R.
+Type *getLoadStoreType(const VPSingleDefRecipe *R);
+
 /// Get the instruction opcode or intrinsic ID for the recipe defining \p V.
 /// Returns an optional pair, where the first element indicates whether it is an
 /// intrinsic ID.

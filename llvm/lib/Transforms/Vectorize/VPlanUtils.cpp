@@ -410,6 +410,13 @@ unsigned vputils::getOpcode(const VPValue *V) {
       .Default([](auto *) { return 0; });
 }
 
+Type *vputils::getLoadStoreType(const VPSingleDefRecipe *R) {
+  unsigned Opcode = getOpcode(R);
+  assert((Opcode == Instruction::Load || Opcode == Instruction::Store) &&
+         "expected a load or store");
+  return (Opcode == Instruction::Load ? R : R->getOperand(0))->getScalarType();
+}
+
 std::optional<std::pair<bool, unsigned>>
 vputils::getOpcodeOrIntrinsicID(const VPValue *V) {
   if (Intrinsic::ID IID = vputils::getIntrinsicID(V))
