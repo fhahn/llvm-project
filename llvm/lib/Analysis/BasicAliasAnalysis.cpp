@@ -1476,6 +1476,7 @@ static bool areDistinctObjectsNoAlias(const Value *O1, const Value *O2,
 /// time by visiting at most MaxVisited values and giving up on phis with more
 /// incoming values.
 static bool allUnderlyingObjectsNoAlias(const Value *V, const Value *Obj,
+                                        const Function &F,
                                         const AAQueryInfo &AAQI) {
   constexpr unsigned MaxVisited = 8;
   SmallPtrSet<const Value *, 8> Visited;
@@ -1496,6 +1497,9 @@ static bool allUnderlyingObjectsNoAlias(const Value *V, const Value *Obj,
       append_range(Worklist, PN->incoming_values());
       continue;
     }
+    // Undef and invalid null pointers point to no object.
+    if (isa<UndefValue>(P) || isInvalidNullPointer(P, F))
+      continue;
     if (!areDistinctObjectsNoAlias(P, Obj, AAQI))
       return false;
   } while (!Worklist.empty());
@@ -1565,7 +1569,7 @@ AliasResult BasicAAResult::aliasPHI(const PHINode *PN, LocationSize PNSize,
   // handling) simple pointer induction variables. Otherwise, check the
   // underlying objects of the phi instead.
   if (V1Srcs.size() > 1 && any_of(V1Srcs, IsaPred<PHINode>))
-    return allUnderlyingObjectsNoAlias(PN, getUnderlyingObject(V2), AAQI)
+    return allUnderlyingObjectsNoAlias(PN, getUnderlyingObject(V2), F, AAQI)
                ? AliasResult::NoAlias
                : AliasResult::MayAlias;
 
