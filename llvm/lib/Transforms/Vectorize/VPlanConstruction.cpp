@@ -1169,7 +1169,7 @@ void VPlanTransforms::createInLoopReductionRecipes(VPlan &Plan,
         auto *FMulRecipe = new VPInstruction(
             Instruction::FMul,
             {CurrentLink->getOperand(0), CurrentLink->getOperand(1)},
-            CurrentLinkI->getFastMathFlags());
+            cast<VPRecipeWithIRFlags>(CurrentLink)->getFastMathFlagsOrNone());
         LinkVPBB->insert(FMulRecipe, CurrentLink->getIterator());
         VecOp = FMulRecipe;
       } else if (Kind == RecurKind::AddChainWithSubs &&
@@ -1178,7 +1178,7 @@ void VPlanTransforms::createInLoopReductionRecipes(VPlan &Plan,
         auto *Zero = Plan.getConstantInt(PhiTy, 0);
         VPBuilder Builder(LinkVPBB, CurrentLink->getIterator());
         auto *Sub = Builder.createSub(Zero, CurrentLink->getOperand(1),
-                                      CurrentLinkI->getDebugLoc());
+                                      CurrentLink->getDebugLoc());
         Sub->setUnderlyingValue(CurrentLinkI);
         VecOp = Sub;
       } else {
@@ -1213,7 +1213,7 @@ void VPlanTransforms::createInLoopReductionRecipes(VPlan &Plan,
       auto *RedRecipe = new VPReductionRecipe(
           Kind, FMFs, CurrentLinkI, PreviousLink, VecOp, CondOp,
           getReductionStyle(/*IsInLoop=*/true, PhiR->isOrdered(), 1),
-          CurrentLinkI->getDebugLoc());
+          CurrentLink->getDebugLoc());
       // Append the recipe to the end of the VPBasicBlock because we need to
       // ensure that it comes after all of it's inputs, including CondOp.
       // Delete CurrentLink as it will be invalid if its operand is replaced
