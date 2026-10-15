@@ -5937,7 +5937,7 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         return false;
       });
 
-  if (!RecipeBuilder.prefersVectorizedAddressing()) {
+  if (!CostCtx.TTI.prefersVectorizedAddressing()) {
     VPlanTransforms::runPass(
         "makeVPlanMemOpDecision", ProcessSubset, Plan, [&](VPInstruction *VPI) {
           Instruction *I = VPI->getUnderlyingInstr();
