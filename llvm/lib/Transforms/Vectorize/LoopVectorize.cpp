@@ -5707,8 +5707,8 @@ VPRecipeBase *VPRecipeBuilder::tryToWidenMemory(VPInstruction *VPI,
                                                        : VPI->getOperand(1);
   Builder.setInsertPoint(VPI);
   if (Consecutive) {
-    Ptr = Builder.createConsecutiveVectorPointer(Ptr, getLoadStoreType(I),
-                                                 Reverse, VPI->getDebugLoc());
+    Ptr = Builder.createConsecutiveVectorPointer(
+        Ptr, vputils::getLoadStoreType(VPI), Reverse, VPI->getDebugLoc());
   }
 
   if (Reverse && Mask)

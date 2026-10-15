@@ -305,12 +305,6 @@ canHoistOrSinkWithNoAliasCheck(const MemoryLocation &MemLoc,
   return true;
 }
 
-/// Get the value type of a VPInstruction or VPReplicateRecipe load or store.
-static Type *getLoadStoreValueType(VPSingleDefRecipe *R) {
-  bool IsLoad = vputils::getOpcode(R) == Instruction::Load;
-  return (IsLoad ? R : R->getOperand(0))->getScalarType();
-}
-
 /// Collect either replicated Loads or Stores grouped by their address SCEV and
 /// their load-store type, in a deep-traversal of the vector loop region in \p
 /// Plan.
@@ -333,7 +327,7 @@ collectGroupedReplicateMemOps(
 
       // For loads, operand 0 is address; for stores, operand 1 is address.
       VPValue *Addr = RepR.getOperand(IsLoad ? 0 : 1);
-      const Type *LoadStoreTy = getLoadStoreValueType(&RepR);
+      const Type *LoadStoreTy = vputils::getLoadStoreType(&RepR);
       const SCEV *AddrSCEV = vputils::getSCEVExprForVPValue(Addr, PSE, L);
       if (!isa<SCEVCouldNotCompute>(AddrSCEV))
         RecipesByAddressAndType[{AddrSCEV, LoadStoreTy}].push_back(&RepR);
@@ -5896,8 +5890,8 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
   VPlanTransforms::runPass(
       "scalarizeMemOpsWithIrregularTypes", ProcessSubset, Plan,
       [&](VPInstruction *VPI) {
-        Instruction *I = VPI->getUnderlyingInstr();
-        if (hasIrregularType(getLoadStoreType(I), I->getDataLayout()))
+        if (hasIrregularType(vputils::getLoadStoreType(VPI),
+                             Plan.getDataLayout()))
           return Scalarize(VPI);
 
         return false;
@@ -5938,8 +5932,7 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         Instruction *I = VPI->getUnderlyingInstr();
         bool IsLoad = VPI->getOpcode() == Instruction::Load;
         VPValue *Ptr = VPI->getOperand(!IsLoad);
-        Type *ScalarTy =
-            IsLoad ? VPI->getScalarType() : VPI->getOperand(0)->getScalarType();
+        Type *ScalarTy = vputils::getLoadStoreType(VPI);
         std::optional<int64_t> Stride =
             vputils::getConstantStride(Ptr, ScalarTy, CostCtx.PSE, CostCtx.L);
         if (Stride != 1 && Stride != -1)
