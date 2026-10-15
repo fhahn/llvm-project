@@ -5070,7 +5070,7 @@ void VPWidenCanonicalIVRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
 void VPFirstOrderRecurrencePHIRecipe::execute(VPTransformState &State) {
   auto &Builder = State.Builder;
   // Create a vector from the initial value.
-  auto *VectorInit = getStartValue()->getLiveInIRValue();
+  Value *VectorInit = State.get(getStartValue(), /*NeedsSingleScalar=*/true);
 
   Type *VecTy = State.VF.isScalar()
                     ? VectorInit->getType()
