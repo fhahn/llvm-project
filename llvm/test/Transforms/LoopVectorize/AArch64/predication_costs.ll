@@ -319,10 +319,10 @@ exit:
 ;
 ; CHECK-NOT: profitable to scalarize
 ; CHECK: Precomputed costs for VF 2: 4
-; CHECK: Cost of 2 for VF 2: REPLICATE ir<%add> = add vp<{{.+}}>, ir<%x>
-; CHECK: Cost of 0 for VF 2: REPLICATE ir<%add.trunc> = trunc ir<%add>
-; CHECK: Cost of 12 for VF 2: REPLICATE store ir<%add.trunc>, ir<%gep.dst>
-; CHECK: Cost for VF 2: 26
+; CHECK: Cost of 1 for VF 2: WIDEN ir<%add> = add ir<%iv>, ir<%x>
+; CHECK: Cost of 1 for VF 2: WIDEN-CAST ir<%add.trunc> = trunc ir<%add> to i16
+; CHECK: Cost of 4 for VF 2: WIDEN store vp<{{.+}}>, ir<%add.trunc>
+; CHECK: Cost for VF 2: 17
 ;
 define void @early_exit_store_trunc(ptr noalias %dst, ptr align 4 dereferenceable(4000) %src, i64 %x) {
 entry:

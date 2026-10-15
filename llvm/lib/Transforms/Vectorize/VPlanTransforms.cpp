@@ -6032,6 +6032,9 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         "makeVPlanMemOpDecision", ProcessSubset, Plan, [&](VPInstruction *VPI) {
           Instruction *I = VPI->getUnderlyingInstr();
           bool IsLoad = VPI->getOpcode() == Instruction::Load;
+          // TODO: Use the plan's mask instead. Not possible yet, as the legacy
+          // cost model makes the address GEP of loads it treats as predicated
+          // uniform, so all lanes would use lane 0's address.
           if (RecipeBuilder.isPredicatedInst(I) || !IsLoad ||
               !vputils::isUsedByLoadStoreAddress(VPI))
             return false;
@@ -6071,9 +6074,12 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         bool Reverse = Stride == -1;
 
         // A predicated access can only be widened (rather than scalarized) if
-        // the target supports a masked load/store for it.
-        // TODO: Determine if a load/store needs predication directly in VPlan.
-        bool IsPredicated = RecipeBuilder.isPredicatedInst(I);
+        // the target supports a masked load/store for it. Accesses without a
+        // mask are not predicated.
+        // TODO: Determine in VPlan if masked accesses are safe to execute
+        // unconditionally, instead of using isPredicatedInst.
+        bool IsPredicated =
+            VPI->isMasked() && RecipeBuilder.isPredicatedInst(I);
         if (IsPredicated && !CostCtx.Config.isLegalMaskedLoadOrStore(
                                 IsLoad, ScalarTy, getLoadStoreAlignment(I),
                                 getLoadStoreAddressSpace(I)))
