@@ -330,3 +330,30 @@ loop:
 exit:
   ret void
 }
+
+; Test where the store-load forwarding safe distance is not a power-of-2 multiple
+; of the size of i17.
+; CHECK-LABEL: @maxvf_store_load_forward_i17(
+; CHECK: %index.next = add nuw i64 %index, 2
+
+; WIDTH-LABEL: @maxvf_store_load_forward_i17(
+; WIDTH: %index.next = add nuw i64 %index, 2
+
+define void @maxvf_store_load_forward_i17(ptr %A, i64 %n) {
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.src = getelementptr inbounds i17, ptr %A, i64 %iv
+  %l = load i17, ptr %gep.src, align 4
+  %iv.6 = add nuw nsw i64 %iv, 6
+  %gep.dst = getelementptr inbounds i17, ptr %A, i64 %iv.6
+  store i17 %l, ptr %gep.dst, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}

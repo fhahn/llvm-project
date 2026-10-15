@@ -366,7 +366,7 @@ FixedScalableVFPair VFSelectionContext::computeFeasibleMaxVF(
   if (!Legal->isSafeForAnyStoreLoadForwardDistances()) {
     unsigned SLDist = Legal->getMaxStoreLoadForwardSafeDistanceInBits();
     MaxSafeElementsPowerOf2 =
-        std::min(MaxSafeElementsPowerOf2, SLDist / WidestType);
+        std::min(MaxSafeElementsPowerOf2, llvm::bit_floor(SLDist / WidestType));
   }
 
   auto MaxSafeFixedVF = ElementCount::getFixed(MaxSafeElementsPowerOf2);
