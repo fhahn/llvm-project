@@ -353,7 +353,8 @@ define void @sdiv_power_of_2_divisor_in_replicate_region(i32 %x, ptr %dst, i64 %
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[DIV:%.*]] = sdiv i32 99, [[X]]
+; CHECK-NEXT:    [[IV_TRUNC:%.*]] = trunc i64 [[IV]] to i32
+; CHECK-NEXT:    [[DIV:%.*]] = sdiv i32 [[IV_TRUNC]], [[X]]
 ; CHECK-NEXT:    [[DIV2:%.*]] = sdiv i32 [[DIV]], 2
 ; CHECK-NEXT:    [[GEP:%.*]] = getelementptr i32, ptr [[DST]], i64 [[IV]]
 ; CHECK-NEXT:    store i32 [[DIV2]], ptr [[GEP]], align 4
@@ -372,7 +373,8 @@ entry:
 
 loop:
   %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
-  %div = sdiv i32 99, %x
+  %iv.trunc = trunc i64 %iv to i32
+  %div = sdiv i32 %iv.trunc, %x
   %div2 = sdiv i32 %div, 2
   %gep = getelementptr i32, ptr %dst, i64 %iv
   store i32 %div2, ptr %gep, align 4

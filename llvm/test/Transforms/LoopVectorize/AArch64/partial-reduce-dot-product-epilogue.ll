@@ -55,9 +55,9 @@ for.exit:
   ret i32 %add
 }
 
-define void @dotp_small_epilogue_vf(i64 %idx.neg, i8 %a) #1 {
+define void @dotp_small_epilogue_vf(i64 %idx.neg, ptr %a) #1 {
 ; CHECK-LABEL: define void @dotp_small_epilogue_vf(
-; CHECK-SAME: i64 [[IDX_NEG:%.*]], i8 [[A:%.*]]) #[[ATTR1:[0-9]+]] {
+; CHECK-SAME: i64 [[IDX_NEG:%.*]], ptr [[A:%.*]]) #[[ATTR1:[0-9]+]] {
 ; CHECK-NEXT:  [[ITER_CHECK:.*]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 1, [[IDX_NEG]]
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 2
@@ -69,17 +69,18 @@ define void @dotp_small_epilogue_vf(i64 %idx.neg, i8 %a) #1 {
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 15
 ; CHECK-NEXT:    [[IV_NEXT:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
 ; CHECK-NEXT:    [[IND_END6:%.*]] = add i64 [[IDX_NEG]], [[IV_NEXT]]
-; CHECK-NEXT:    [[TMP2:%.*]] = load i8, ptr null, align 1
+; CHECK-NEXT:    [[TMP2:%.*]] = load i8, ptr [[A]], align 1
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <16 x i8> poison, i8 [[TMP2]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT3:%.*]] = shufflevector <16 x i8> [[BROADCAST_SPLATINSERT2]], <16 x i8> poison, <16 x i32> zeroinitializer
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i8> poison, i8 [[A]], i64 0
+; CHECK-NEXT:    [[TMP7:%.*]] = load i8, ptr null, align 1
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i8> poison, i8 [[TMP7]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <16 x i8> [[BROADCAST_SPLATINSERT]], <16 x i8> poison, <16 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP3:%.*]] = sext <16 x i8> [[BROADCAST_SPLAT3]] to <16 x i32>
-; CHECK-NEXT:    [[TMP1:%.*]] = sext <16 x i8> [[BROADCAST_SPLAT]] to <16 x i32>
+; CHECK-NEXT:    [[TMP3:%.*]] = sext <16 x i8> [[BROADCAST_SPLAT]] to <16 x i32>
+; CHECK-NEXT:    [[TMP1:%.*]] = sext <16 x i8> [[BROADCAST_SPLAT3]] to <16 x i32>
 ; CHECK-NEXT:    [[TMP4:%.*]] = mul <16 x i32> [[TMP3]], [[TMP1]]
 ; CHECK-NEXT:    [[PARTIAL_REDUCE]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI]], <16 x i32> [[TMP4]])
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
@@ -97,10 +98,11 @@ define void @dotp_small_epilogue_vf(i64 %idx.neg, i8 %a) #1 {
 ; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i32 [ [[TMP6]], %[[WHILE_BODY]] ], [ 0, %[[ENTRY]] ]
 ; CHECK-NEXT:    [[N_MOD_VF4:%.*]] = and i64 [[TMP0]], 1
 ; CHECK-NEXT:    [[N_VEC5:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF4]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT6:%.*]] = insertelement <2 x i8> poison, i8 [[A]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT7:%.*]] = shufflevector <2 x i8> [[BROADCAST_SPLATINSERT6]], <2 x i8> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    [[IND_END:%.*]] = add i64 [[IDX_NEG]], [[N_VEC5]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = insertelement <2 x i32> zeroinitializer, i32 [[BC_MERGE_RDX]], i64 0
+; CHECK-NEXT:    [[TMP17:%.*]] = load i8, ptr [[A]], align 1
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT5:%.*]] = insertelement <2 x i8> poison, i8 [[TMP17]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT7:%.*]] = shufflevector <2 x i8> [[BROADCAST_SPLATINSERT5]], <2 x i8> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP10:%.*]] = sext <2 x i8> [[BROADCAST_SPLAT7]] to <2 x i32>
 ; CHECK-NEXT:    [[TMP11:%.*]] = load i8, ptr null, align 1
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT8:%.*]] = insertelement <2 x i8> poison, i8 [[TMP11]], i64 0
@@ -129,7 +131,8 @@ define void @dotp_small_epilogue_vf(i64 %idx.neg, i8 %a) #1 {
 ; CHECK-NEXT:    [[ACCUM1:%.*]] = phi i64 [ [[ADD1:%.*]], %[[WHILE_BODY1]] ], [ [[BC_RESUME_VAL14]], %[[VEC_EPILOG_SCALAR_PH]] ]
 ; CHECK-NEXT:    [[ACCUM:%.*]] = phi i32 [ [[ADD:%.*]], %[[WHILE_BODY1]] ], [ [[BC_MERGE_RDX15]], %[[VEC_EPILOG_SCALAR_PH]] ]
 ; CHECK-NEXT:    [[IV_NEG_NEXT]] = add i64 [[IV_NEG]], 1
-; CHECK-NEXT:    [[EXT_A:%.*]] = sext i8 [[A]] to i32
+; CHECK-NEXT:    [[L_A:%.*]] = load i8, ptr [[A]], align 1
+; CHECK-NEXT:    [[EXT_A:%.*]] = sext i8 [[L_A]] to i32
 ; CHECK-NEXT:    [[ADD1]] = add i64 [[ACCUM1]], 1
 ; CHECK-NEXT:    [[B:%.*]] = load i8, ptr null, align 1
 ; CHECK-NEXT:    [[EXT_B:%.*]] = sext i8 [[B]] to i32
@@ -151,7 +154,8 @@ while.body:
   %iv = phi i64 [ %iv.next, %while.body ], [ 0, %entry ]
   %accum = phi i32 [ %add, %while.body ], [ 0, %entry ]
   %iv.neg.next = add i64 %iv.neg, 1
-  %ext.a = sext i8 %a to i32
+  %l.a = load i8, ptr %a, align 1
+  %ext.a = sext i8 %l.a to i32
   %iv.next = add i64 %iv, 1
   %b = load i8, ptr null, align 1
   %ext.b = sext i8 %b to i32

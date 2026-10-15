@@ -829,7 +829,7 @@ exit:
 ; ExtMulAccReduction VPExpressionRecipe since the mul has two users.
 ; It can however be turned into an ExtendedReduction since that one doesn't
 ; modify the mul's operands.
-define i64 @print_ext_mul_two_uses(i64 %n, ptr %a, i16 %b, i32 %c) vscale_range(2, 1024) {
+define i64 @print_ext_mul_two_uses(i64 %n, ptr %a, ptr %b, i32 %c) vscale_range(2, 1024) {
 ; CHECK-LABEL: VPlan for loop in 'print_ext_mul_two_uses'
 ; CHECK:  VPlan 'Initial VPlan for VF={vscale x 4},UF={1}' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF * UF
@@ -842,8 +842,6 @@ define i64 @print_ext_mul_two_uses(i64 %n, ptr %a, i16 %b, i32 %c) vscale_range(
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
 ; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = reduction-start-vector ir<0>, ir<0>, ir<1>
-; CHECK-NEXT:    WIDEN-CAST ir<%conv> = sext ir<%b> to i32
-; CHECK-NEXT:    WIDEN ir<%mul> = mul ir<%conv>, ir<%conv>
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
@@ -851,13 +849,20 @@ define i64 @print_ext_mul_two_uses(i64 %n, ptr %a, i16 %b, i32 %c) vscale_range(
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      CURRENT-ITERATION-PHI vp<[[VP6:%[0-9]+]]> = phi ir<0>, vp<%current.iteration.next>
-; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%res2> = phi (add) vp<[[VP3]]>, vp<[[VP7:%[0-9]+]]>
+; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%res2> = phi (add) vp<[[VP3]]>, vp<[[VP10:%[0-9]+]]>
 ; CHECK-NEXT:      EMIT-SCALAR vp<%avl> = phi [ vp<[[VP2]]>, vector.ph ], [ vp<%avl.next>, vector.body ]
 ; CHECK-NEXT:      EMIT-SCALAR vp<%evl> = EXPLICIT-VECTOR-LENGTH vp<%avl>
-; CHECK-NEXT:      EXPRESSION vp<[[VP7]]> = vp<%evl> + reduce.add (ir<%mul> zext to i64, vp<%evl>)
-; CHECK-NEXT:      EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = zext vp<%evl> to i64
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP8]]>, vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP8]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP7:%[0-9]+]]> = zext vp<%evl> to i64
+; CHECK-NEXT:      vp<[[VP8:%[0-9]+]]> = SCALAR-STEPS vp<[[VP6]]>, ir<1>, vp<[[VP7]]>
+; CHECK-NEXT:      CLONE ir<%gep.b> = getelementptr ir<%b>, vp<[[VP8]]>
+; CHECK-NEXT:      vp<[[VP9:%[0-9]+]]> = vector-pointer i16, ir<%gep.b>, ir<1>
+; CHECK-NEXT:      WIDEN ir<%l.b> = vp.load vp<[[VP9]]>, vp<%evl>
+; CHECK-NEXT:      WIDEN-CAST ir<%conv> = sext ir<%l.b> to i32
+; CHECK-NEXT:      WIDEN ir<%mul> = mul ir<%conv>, ir<%conv>
+; CHECK-NEXT:      EXPRESSION vp<[[VP10]]> = vp<%evl> + reduce.add (ir<%mul> zext to i64, vp<%evl>)
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP11:%[0-9]+]]> = zext vp<%evl> to i64
+; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP11]]>, vp<[[VP6]]>
+; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP11]]>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP4]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
@@ -865,7 +870,7 @@ define i64 @print_ext_mul_two_uses(i64 %n, ptr %a, i16 %b, i32 %c) vscale_range(
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = compute-reduction-result (add, in-loop) vp<[[VP7]]>
+; CHECK-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = compute-reduction-result (add, in-loop) vp<[[VP10]]>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>
 ;
 entry:
@@ -877,7 +882,9 @@ loop:
   %res2 = phi i64 [ 0, %entry ], [ %add, %loop ]
   %load = load i16, ptr %a, align 2
   %iv.next = add i64 %iv, 1
-  %conv = sext i16 %b to i32
+  %gep.b = getelementptr i16, ptr %b, i64 %iv
+  %l.b = load i16, ptr %gep.b, align 2
+  %conv = sext i16 %l.b to i32
   %mul = mul i32 %conv, %conv
   %mul.ext = zext i32 %mul to i64
   %add = add i64 %res2, %mul.ext
