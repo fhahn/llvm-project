@@ -5249,9 +5249,8 @@ bool VPCostContext::isMaskRequired(Instruction *I) const {
 }
 
 bool VPCostContext::executesAtMostOnce(const VPlan &Plan, ElementCount VF) {
-  auto *TC = dyn_cast_if_present<ConstantInt>(
-      Plan.getTripCount()->getUnderlyingValue());
-  return TC && TC->getValue().ule(VF.getKnownMinValue());
+  auto *TC = dyn_cast<VPConstantInt>(Plan.getTripCount());
+  return TC && TC->getAPInt().ule(VF.getKnownMinValue());
 }
 
 InstructionCost
