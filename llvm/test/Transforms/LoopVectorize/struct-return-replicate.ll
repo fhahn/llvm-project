@@ -653,6 +653,99 @@ exit:
   ret void
 }
 
+define float @struct_return_2xf32_replicate_live_out(ptr noalias %in, ptr noalias writeonly %out_a) {
+; VF4-LABEL: define float @struct_return_2xf32_replicate_live_out(
+; VF4-SAME: ptr noalias [[IN:%.*]], ptr noalias writeonly [[OUT_A:%.*]]) {
+; VF4-NEXT:  [[ENTRY:.*:]]
+; VF4-NEXT:    br label %[[VECTOR_PH:.*]]
+; VF4:       [[VECTOR_PH]]:
+; VF4-NEXT:    br label %[[VECTOR_BODY:.*]]
+; VF4:       [[VECTOR_BODY]]:
+; VF4-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; VF4-NEXT:    [[TMP0:%.*]] = getelementptr inbounds float, ptr [[IN]], i64 [[INDEX]]
+; VF4-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP0]], align 4
+; VF4-NEXT:    [[TMP1:%.*]] = extractelement <4 x float> [[WIDE_LOAD]], i64 0
+; VF4-NEXT:    [[TMP2:%.*]] = tail call { float, float } @fn2(float [[TMP1]]) #[[ATTR1]]
+; VF4-NEXT:    [[TMP3:%.*]] = extractelement <4 x float> [[WIDE_LOAD]], i64 1
+; VF4-NEXT:    [[TMP4:%.*]] = tail call { float, float } @fn2(float [[TMP3]]) #[[ATTR1]]
+; VF4-NEXT:    [[TMP5:%.*]] = extractelement <4 x float> [[WIDE_LOAD]], i64 2
+; VF4-NEXT:    [[TMP6:%.*]] = tail call { float, float } @fn2(float [[TMP5]]) #[[ATTR1]]
+; VF4-NEXT:    [[TMP7:%.*]] = extractelement <4 x float> [[WIDE_LOAD]], i64 3
+; VF4-NEXT:    [[TMP8:%.*]] = tail call { float, float } @fn2(float [[TMP7]]) #[[ATTR1]]
+; VF4-NEXT:    [[TMP9:%.*]] = extractvalue { float, float } [[TMP2]], 0
+; VF4-NEXT:    [[TMP10:%.*]] = extractvalue { float, float } [[TMP4]], 0
+; VF4-NEXT:    [[TMP11:%.*]] = extractvalue { float, float } [[TMP6]], 0
+; VF4-NEXT:    [[TMP12:%.*]] = extractvalue { float, float } [[TMP8]], 0
+; VF4-NEXT:    [[TMP13:%.*]] = insertelement <4 x float> poison, float [[TMP9]], i64 0
+; VF4-NEXT:    [[TMP14:%.*]] = insertelement <4 x float> [[TMP13]], float [[TMP10]], i64 1
+; VF4-NEXT:    [[TMP15:%.*]] = insertelement <4 x float> [[TMP14]], float [[TMP11]], i64 2
+; VF4-NEXT:    [[TMP16:%.*]] = insertelement <4 x float> [[TMP15]], float [[TMP12]], i64 3
+; VF4-NEXT:    [[TMP17:%.*]] = extractvalue { float, float } [[TMP8]], 1
+; VF4-NEXT:    [[TMP18:%.*]] = getelementptr inbounds float, ptr [[OUT_A]], i64 [[INDEX]]
+; VF4-NEXT:    store <4 x float> [[TMP16]], ptr [[TMP18]], align 4
+; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; VF4-NEXT:    [[TMP19:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
+; VF4-NEXT:    br i1 [[TMP19]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
+; VF4:       [[MIDDLE_BLOCK]]:
+;
+; VF2IC2-LABEL: define float @struct_return_2xf32_replicate_live_out(
+; VF2IC2-SAME: ptr noalias [[IN:%.*]], ptr noalias writeonly [[OUT_A:%.*]]) {
+; VF2IC2-NEXT:  [[ENTRY:.*:]]
+; VF2IC2-NEXT:    br label %[[VECTOR_PH:.*]]
+; VF2IC2:       [[VECTOR_PH]]:
+; VF2IC2-NEXT:    br label %[[VECTOR_BODY:.*]]
+; VF2IC2:       [[VECTOR_BODY]]:
+; VF2IC2-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; VF2IC2-NEXT:    [[TMP0:%.*]] = getelementptr inbounds float, ptr [[IN]], i64 [[INDEX]]
+; VF2IC2-NEXT:    [[TMP1:%.*]] = getelementptr inbounds float, ptr [[TMP0]], i64 2
+; VF2IC2-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x float>, ptr [[TMP0]], align 4
+; VF2IC2-NEXT:    [[WIDE_LOAD1:%.*]] = load <2 x float>, ptr [[TMP1]], align 4
+; VF2IC2-NEXT:    [[TMP2:%.*]] = extractelement <2 x float> [[WIDE_LOAD]], i64 0
+; VF2IC2-NEXT:    [[TMP3:%.*]] = tail call { float, float } @fn2(float [[TMP2]]) #[[ATTR1]]
+; VF2IC2-NEXT:    [[TMP4:%.*]] = extractelement <2 x float> [[WIDE_LOAD]], i64 1
+; VF2IC2-NEXT:    [[TMP5:%.*]] = tail call { float, float } @fn2(float [[TMP4]]) #[[ATTR1]]
+; VF2IC2-NEXT:    [[TMP6:%.*]] = extractelement <2 x float> [[WIDE_LOAD1]], i64 0
+; VF2IC2-NEXT:    [[TMP7:%.*]] = tail call { float, float } @fn2(float [[TMP6]]) #[[ATTR1]]
+; VF2IC2-NEXT:    [[TMP8:%.*]] = extractelement <2 x float> [[WIDE_LOAD1]], i64 1
+; VF2IC2-NEXT:    [[TMP9:%.*]] = tail call { float, float } @fn2(float [[TMP8]]) #[[ATTR1]]
+; VF2IC2-NEXT:    [[TMP10:%.*]] = extractvalue { float, float } [[TMP3]], 0
+; VF2IC2-NEXT:    [[TMP11:%.*]] = extractvalue { float, float } [[TMP5]], 0
+; VF2IC2-NEXT:    [[TMP12:%.*]] = insertelement <2 x float> poison, float [[TMP10]], i64 0
+; VF2IC2-NEXT:    [[TMP13:%.*]] = insertelement <2 x float> [[TMP12]], float [[TMP11]], i64 1
+; VF2IC2-NEXT:    [[TMP14:%.*]] = extractvalue { float, float } [[TMP7]], 0
+; VF2IC2-NEXT:    [[TMP15:%.*]] = extractvalue { float, float } [[TMP9]], 0
+; VF2IC2-NEXT:    [[TMP16:%.*]] = insertelement <2 x float> poison, float [[TMP14]], i64 0
+; VF2IC2-NEXT:    [[TMP17:%.*]] = insertelement <2 x float> [[TMP16]], float [[TMP15]], i64 1
+; VF2IC2-NEXT:    [[TMP18:%.*]] = extractvalue { float, float } [[TMP9]], 1
+; VF2IC2-NEXT:    [[TMP19:%.*]] = getelementptr inbounds float, ptr [[OUT_A]], i64 [[INDEX]]
+; VF2IC2-NEXT:    [[TMP20:%.*]] = getelementptr inbounds float, ptr [[TMP19]], i64 2
+; VF2IC2-NEXT:    store <2 x float> [[TMP13]], ptr [[TMP19]], align 4
+; VF2IC2-NEXT:    store <2 x float> [[TMP17]], ptr [[TMP20]], align 4
+; VF2IC2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; VF2IC2-NEXT:    [[TMP21:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
+; VF2IC2-NEXT:    br i1 [[TMP21]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
+; VF2IC2:       [[MIDDLE_BLOCK]]:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %arrayidx = getelementptr inbounds float, ptr %in, i64 %iv
+  %in_val = load float, ptr %arrayidx, align 4
+  %call = tail call { float, float } @fn2(float %in_val) #1
+  %extract_a = extractvalue { float, float } %call, 0
+  %extract_b = extractvalue { float, float } %call, 1
+  %arrayidx2 = getelementptr inbounds float, ptr %out_a, i64 %iv
+  store float %extract_a, ptr %arrayidx2, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %exitcond.not = icmp eq i64 %iv.next, 1024
+  br i1 %exitcond.not, label %exit, label %loop
+
+exit:
+  ret float %extract_b
+}
+
 declare { i64 } @fn1(float)
 declare { float, float } @fn2(float)
 declare { i32, i32, i32 } @fn3(i32)
