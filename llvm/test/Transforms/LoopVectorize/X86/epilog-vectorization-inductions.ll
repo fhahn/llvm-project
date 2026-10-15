@@ -254,11 +254,16 @@ define i8 @multiple_inductions_start_at_0() {
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[STEP_ADD_3:%.*]] = phi <32 x i8> [ zeroinitializer, [[VECTOR_PH]] ], [ [[STEP_ADD_3]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <32 x i32> [ <i32 0, i32 -16777216, i32 -33554432, i32 -50331648, i32 -67108864, i32 -83886080, i32 -100663296, i32 -117440512, i32 -134217728, i32 -150994944, i32 -167772160, i32 -184549376, i32 -201326592, i32 -218103808, i32 -234881024, i32 -251658240, i32 -268435456, i32 -285212672, i32 -301989888, i32 -318767104, i32 -335544320, i32 -352321536, i32 -369098752, i32 -385875968, i32 -402653184, i32 -419430400, i32 -436207616, i32 -452984832, i32 -469762048, i32 -486539264, i32 -503316480, i32 -520093696>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[STEP_ADD:%.*]] = add <32 x i32> [[VEC_IND]], splat (i32 -536870912)
+; CHECK-NEXT:    [[STEP_ADD_2:%.*]] = add <32 x i32> [[STEP_ADD]], splat (i32 -536870912)
+; CHECK-NEXT:    [[STEP_ADD_4:%.*]] = add <32 x i32> [[STEP_ADD_2]], splat (i32 -536870912)
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 128
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <32 x i32> [[STEP_ADD_4]], splat (i32 -536870912)
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp eq i32 [[INDEX_NEXT]], 1024
 ; CHECK-NEXT:    br i1 [[TMP0]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
 ; CHECK:       middle.block:
+; CHECK-NEXT:    [[STEP_ADD_3:%.*]] = trunc <32 x i32> [[STEP_ADD_4]] to <32 x i8>
 ; CHECK-NEXT:    [[TMP1:%.*]] = extractelement <32 x i8> [[STEP_ADD_3]], i64 31
 ; CHECK-NEXT:    br i1 false, label [[EXIT:%.*]], label [[VEC_EPILOG_ITER_CHECK:%.*]]
 ; CHECK:       vec.epilog.iter.check:
@@ -268,11 +273,13 @@ define i8 @multiple_inductions_start_at_0() {
 ; CHECK-NEXT:    br label [[VEC_EPILOG_VECTOR_BODY:%.*]]
 ; CHECK:       vec.epilog.vector.body:
 ; CHECK-NEXT:    [[INDEX1:%.*]] = phi i32 [ [[VEC_EPILOG_RESUME_VAL]], [[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT3:%.*]], [[VEC_EPILOG_VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_IND2:%.*]] = phi <4 x i8> [ zeroinitializer, [[VEC_EPILOG_PH]] ], [ [[VEC_IND2]], [[VEC_EPILOG_VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_IND3:%.*]] = phi <4 x i32> [ <i32 0, i32 -16777216, i32 -33554432, i32 -50331648>, [[VEC_EPILOG_PH]] ], [ [[VEC_IND_NEXT4:%.*]], [[VEC_EPILOG_VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[INDEX_NEXT3]] = add nuw i32 [[INDEX1]], 4
+; CHECK-NEXT:    [[VEC_IND_NEXT4]] = add <4 x i32> [[VEC_IND3]], splat (i32 -67108864)
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i32 [[INDEX_NEXT3]], 1052
 ; CHECK-NEXT:    br i1 [[TMP3]], label [[VEC_EPILOG_MIDDLE_BLOCK:%.*]], label [[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
 ; CHECK:       vec.epilog.middle.block:
+; CHECK-NEXT:    [[VEC_IND2:%.*]] = trunc <4 x i32> [[VEC_IND3]] to <4 x i8>
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <4 x i8> [[VEC_IND2]], i64 3
 ; CHECK-NEXT:    br i1 true, label [[EXIT]], label [[VEC_EPILOG_SCALAR_PH]]
 ; CHECK:       vec.epilog.scalar.ph:

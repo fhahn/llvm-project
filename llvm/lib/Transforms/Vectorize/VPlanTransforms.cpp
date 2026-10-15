@@ -98,12 +98,12 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
            vputils::getConstantStride(Addr, AccessTy, PSE, OuterLoop) == 1;
   };
 
+  // Also convert the VPInstructions licm moved out of the loop region.
   ReversePostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> RPOT(
-      Plan.getVectorLoopRegion());
+      Plan.getEntry());
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
-    // Skip blocks outside region
-    if (!VPBB->getParent())
-      break;
+    if (isa<VPIRBasicBlock>(VPBB))
+      continue;
     VPRecipeBase *Term = VPBB->getTerminator();
     auto EndIter = Term ? Term->getIterator() : VPBB->end();
     // Introduce each ingredient into VPlan.
@@ -123,8 +123,13 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
                                          Phi->getName());
       } else if (auto *VPI = dyn_cast<VPInstruction>(&Ingredient)) {
         assert(!isa<PHINode>(Inst) && "phis should be handled above");
-        // Create VPWidenMemoryRecipe for loads and stores.
-        if (LoadInst *Load = dyn_cast<LoadInst>(Inst)) {
+        if (!VPBB->getParent() &&
+            all_of(VPI->operands(), vputils::isSingleScalar)) {
+          NewRecipe = VPBuilder::createSingleScalarOp(
+              VPI->getOpcode(), VPI->operands(), /*Mask=*/nullptr, *VPI, *VPI,
+              VPI->getDebugLoc(), VPI->getScalarType(), Inst);
+        } else if (LoadInst *Load = dyn_cast<LoadInst>(Inst)) {
+          // Create VPWidenMemoryRecipe for loads and stores.
           bool IsConsecutive =
               IsConsecutiveAccess(VPI->getOperand(0), VPI->getScalarType());
           NewRecipe = new VPWidenLoadRecipe(*Load, Ingredient.getOperand(0),
@@ -2465,6 +2470,10 @@ void VPlanTransforms::cse(VPlan &Plan) {
 static bool cannotHoistOrSinkRecipe(VPRecipeBase &R, VPBasicBlock *FirstBB,
                                     VPBasicBlock *LastBB,
                                     bool Sinking = false) {
+  // VPInstruction calls do not model call-site attributes and operand bundles.
+  if (match(&R, m_VPInstruction<Instruction::Call>()))
+    return true;
+
   if (!isa<VPReplicateRecipe>(R) || !R.mayReadOrWriteMemory() ||
       match(&R, m_Intrinsic<Intrinsic::assume>()))
     return vputils::cannotHoistOrSinkRecipe(R, Sinking);
@@ -2482,35 +2491,35 @@ static bool cannotHoistOrSinkRecipe(VPRecipeBase &R, VPBasicBlock *FirstBB,
          !canHoistOrSinkWithNoAliasCheck(*MemLoc, FirstBB, LastBB, SinkInfo);
 }
 
-/// Move loop-invariant recipes out of the vector loop region in \p Plan.
-static void licm(VPlan &Plan) {
+void VPlanTransforms::licm(VPlan &Plan) {
   VPBasicBlock *Preheader = Plan.getVectorPreheader();
+  VPDominatorTree VPDT(Plan);
 
   // Hoist any loop invariant recipes from the vector loop region to the
-  // preheader. Preform a shallow traversal of the vector loop region, to
+  // preheader. Perform a shallow traversal of the vector loop region, to
   // exclude recipes in replicate regions. Since the top-level blocks in the
-  // vector loop region are guaranteed to execute if the vector pre-header is,
-  // we don't need to check speculation safety.
+  // vector loop region dominating its exiting block are guaranteed to execute
+  // if the vector pre-header is, we don't need to check speculation safety.
   VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  VPBasicBlock *ExitingVPBB = LoopRegion->getExitingBasicBlock();
   assert(Preheader->getSingleSuccessor() == LoopRegion &&
-         "Expected vector prehader's successor to be the vector loop region");
+         "Expected vector preheader's successor to be the vector loop region");
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_shallow(LoopRegion->getEntry()))) {
+    if (!VPDT.dominates(VPBB, ExitingVPBB))
+      continue;
     for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
       if (any_of(R.operands(), [](VPValue *Op) {
             return !Op->isDefinedOutsideLoopRegions();
           }))
         continue;
       if (cannotHoistOrSinkRecipe(R, LoopRegion->getEntryBasicBlock(),
-                                  LoopRegion->getExitingBasicBlock()))
+                                  ExitingVPBB))
         continue;
       R.moveBefore(*Preheader, Preheader->end());
     }
   }
 
-#ifndef NDEBUG
-  VPDominatorTree VPDT(Plan);
-#endif
   // Sink recipes with no users inside the vector loop region if all users are
   // in the same exit block of the region.
   // TODO: Extend to sink recipes from inner loops.
@@ -2521,7 +2530,8 @@ static void licm(VPlan &Plan) {
       // TODO: Use R.definedValues() instead of casting to VPSingleDefRecipe to
       // support recipes with multiple defined values (e.g., interleaved loads).
       auto *Def = dyn_cast<VPSingleDefRecipe>(&R);
-      if (!Def)
+      // Skip dead recipes: they are removed later and have no user to sink to.
+      if (!Def || (Def->user_empty() && !R.mayHaveSideEffects()))
         continue;
 
       if (auto *RepR = dyn_cast<VPReplicateRecipe>(&R)) {
@@ -2560,8 +2570,12 @@ static void licm(VPlan &Plan) {
         continue;
 
       if (cannotHoistOrSinkRecipe(R, LoopRegion->getEntryBasicBlock(),
-                                  LoopRegion->getExitingBasicBlock(),
-                                  /*Sinking=*/true))
+                                  ExitingVPBB, /*Sinking=*/true))
+        continue;
+
+      // VPInstructions are only masked later, e.g. when folding the tail, so
+      // only sink those that are safe to execute speculatively.
+      if (isa<VPInstruction>(Def) && !Def->isSafeToSpeculativelyExecute())
         continue;
 
       [[maybe_unused]] auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
@@ -3837,13 +3851,19 @@ static ExtendKind getPartialReductionExtendKind(VPWidenCastRecipe *Cast) {
   return TTI::getPartialReductionExtendKind(Cast->getOpcode());
 }
 
-/// Returns true if \p V can be extended like the extend \p Ext, i.e. \p V is a
-/// constant that fits into the source type of \p Ext.
+/// Returns true if \p V is defined outside loop regions and can be extended
+/// like the extend \p Ext, i.e. \p V is a constant that fits into the source
+/// type of \p Ext or the same extend of a value of that type.
 static bool canExtendLike(VPValue *V, VPWidenCastRecipe *Ext) {
+  if (!V->isDefinedOutsideLoopRegions())
+    return false;
+  Type *NarrowTy = Ext->getOperand(0)->getScalarType();
   const APInt *C;
-  return match(V, m_APInt(C)) &&
-         canConstantBeExtended(C, Ext->getOperand(0)->getScalarType(),
-                               getPartialReductionExtendKind(Ext));
+  if (match(V, m_APInt(C)))
+    return canConstantBeExtended(C, NarrowTy,
+                                 getPartialReductionExtendKind(Ext));
+  return vputils::getOpcode(V) == Ext->getOpcode() &&
+         V->getDefiningRecipe()->getOperand(0)->getScalarType() == NarrowTy;
 }
 
 /// Replace the operands of \p Mul that can be extended like its other operand
@@ -3860,8 +3880,12 @@ static void extendInvariantOperands(VPWidenRecipe *Mul) {
     VPBuilder Builder(Mul);
     // Constants are truncated to the source type of the extend; the truncate
     // is elided later.
-    VPValue *Src = Builder.createWidenCast(Instruction::Trunc, Op,
-                                           Ext->getOperand(0)->getScalarType());
+    const APInt *C;
+    VPValue *Src =
+        match(Op, m_APInt(C))
+            ? Builder.createWidenCast(Instruction::Trunc, Op,
+                                      Ext->getOperand(0)->getScalarType())
+            : Op->getDefiningRecipe()->getOperand(0);
     Mul->setOperand(Idx, Builder.createWidenCast(Ext->getOpcode(), Src,
                                                  Ext->getScalarType()));
   }
@@ -3968,7 +3992,7 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
   };
 
   // Try to match reduce.add(mul(...)).
-  if (match(VecOp, m_Mul(m_VPValue(), m_VPValue()))) {
+  if (match(VecOp, m_Isa<VPWidenRecipe>(m_Mul(m_VPValue(), m_VPValue())))) {
     auto *Mul = cast<VPWidenRecipe>(VecOp);
     auto [RecipeA, RecipeB] = GetExtends(Mul);
 
@@ -3995,7 +4019,8 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
     return nullptr;
 
   // Match reduce.add(ext(mul(A, B))).
-  if (match(VecOp, m_ZExtOrSExt(m_Mul(m_VPValue(), m_VPValue())))) {
+  if (match(VecOp, m_ZExtOrSExt(m_Isa<VPWidenRecipe>(
+                       m_Mul(m_VPValue(), m_VPValue()))))) {
     auto *Ext = cast<VPWidenCastRecipe>(VecOp);
     auto *Mul = cast<VPWidenRecipe>(Ext->getOperand(0));
     auto [Ext0, Ext1] = GetExtends(Mul);

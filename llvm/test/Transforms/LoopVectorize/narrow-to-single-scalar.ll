@@ -157,7 +157,9 @@ define void @narrow_widen_store_user(i32 %x, ptr noalias %A, ptr noalias %B) {
 ; VF4IC1-NEXT:    [[TMP0:%.*]] = add i32 [[X]], 1
 ; VF4IC1-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i32> poison, i32 [[TMP0]], i64 0
 ; VF4IC1-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT1]], <4 x i32> poison, <4 x i32> zeroinitializer
-; VF4IC1-NEXT:    [[TMP5:%.*]] = mul <4 x i32> [[TMP1]], splat (i32 3)
+; VF4IC1-NEXT:    [[TMP6:%.*]] = mul i32 [[TMP0]], 3
+; VF4IC1-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <4 x i32> poison, i32 [[TMP6]], i64 0
+; VF4IC1-NEXT:    [[TMP5:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT2]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; VF4IC1-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; VF4IC1:       [[VECTOR_BODY]]:
 ; VF4IC1-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -181,7 +183,9 @@ define void @narrow_widen_store_user(i32 %x, ptr noalias %A, ptr noalias %B) {
 ; VF2IC2-NEXT:    [[TMP0:%.*]] = add i32 [[X]], 1
 ; VF2IC2-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <2 x i32> poison, i32 [[TMP0]], i64 0
 ; VF2IC2-NEXT:    [[TMP1:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT1]], <2 x i32> poison, <2 x i32> zeroinitializer
-; VF2IC2-NEXT:    [[TMP7:%.*]] = mul <2 x i32> [[TMP1]], splat (i32 3)
+; VF2IC2-NEXT:    [[TMP8:%.*]] = mul i32 [[TMP0]], 3
+; VF2IC2-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <2 x i32> poison, i32 [[TMP8]], i64 0
+; VF2IC2-NEXT:    [[TMP7:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT2]], <2 x i32> poison, <2 x i32> zeroinitializer
 ; VF2IC2-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; VF2IC2:       [[VECTOR_BODY]]:
 ; VF2IC2-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -402,13 +406,12 @@ define i32 @narrow_select_used_by_extract_lane(ptr noalias %src) {
 ; VF4IC1-NEXT:    br label %[[VECTOR_PH:.*]]
 ; VF4IC1:       [[VECTOR_PH]]:
 ; VF4IC1-NEXT:    [[TMP0:%.*]] = load i32, ptr [[SRC]], align 4
-; VF4IC1-NEXT:    [[TMP1:%.*]] = icmp eq i32 [[TMP0]], 0
-; VF4IC1-NEXT:    [[TMP2:%.*]] = select i1 [[TMP1]], <4 x i32> zeroinitializer, <4 x i32> splat (i32 2)
 ; VF4IC1-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; VF4IC1:       [[VECTOR_BODY]]:
 ; VF4IC1-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
 ; VF4IC1:       [[MIDDLE_BLOCK]]:
-; VF4IC1-NEXT:    [[TMP3:%.*]] = extractelement <4 x i32> [[TMP2]], i64 0
+; VF4IC1-NEXT:    [[TMP1:%.*]] = icmp eq i32 [[TMP0]], 0
+; VF4IC1-NEXT:    [[TMP3:%.*]] = select i1 [[TMP1]], i32 0, i32 2
 ; VF4IC1-NEXT:    br label %[[EXIT:.*]]
 ; VF4IC1:       [[EXIT]]:
 ; VF4IC1-NEXT:    ret i32 [[TMP3]]
@@ -419,13 +422,12 @@ define i32 @narrow_select_used_by_extract_lane(ptr noalias %src) {
 ; VF2IC2-NEXT:    br label %[[VECTOR_PH:.*]]
 ; VF2IC2:       [[VECTOR_PH]]:
 ; VF2IC2-NEXT:    [[TMP0:%.*]] = load i32, ptr [[SRC]], align 4
-; VF2IC2-NEXT:    [[TMP1:%.*]] = icmp eq i32 [[TMP0]], 0
-; VF2IC2-NEXT:    [[TMP2:%.*]] = select i1 [[TMP1]], <2 x i32> zeroinitializer, <2 x i32> splat (i32 2)
 ; VF2IC2-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; VF2IC2:       [[VECTOR_BODY]]:
 ; VF2IC2-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
 ; VF2IC2:       [[MIDDLE_BLOCK]]:
-; VF2IC2-NEXT:    [[TMP3:%.*]] = extractelement <2 x i32> [[TMP2]], i64 0
+; VF2IC2-NEXT:    [[TMP1:%.*]] = icmp eq i32 [[TMP0]], 0
+; VF2IC2-NEXT:    [[TMP3:%.*]] = select i1 [[TMP1]], i32 0, i32 2
 ; VF2IC2-NEXT:    br label %[[EXIT:.*]]
 ; VF2IC2:       [[EXIT]]:
 ; VF2IC2-NEXT:    ret i32 [[TMP3]]

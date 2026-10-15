@@ -6052,7 +6052,8 @@ VPRecipeBuilder::tryToCreateWidenNonPhiRecipe(VPSingleDefRecipe *R,
                                  /*Mask=*/nullptr, *VPI, *VPI,
                                  VPI->getDebugLoc());
 
-  if (!shouldWiden(Instr, Range))
+  // The legacy cost model only describes instructions in the loop region.
+  if (VPI->getRegion() && !shouldWiden(Instr, Range))
     return nullptr;
 
   if (VPI->getOpcode() == Instruction::GetElementPtr) {
@@ -6228,6 +6229,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
 
   RUN_VPLAN_PASS(VPlanTransforms::createLoopRegions, *VPlan0,
                  getDebugLocFromInstOrOperands(Legal->getPrimaryInduction()));
+  RUN_VPLAN_PASS(VPlanTransforms::licm, *VPlan0);
   if (CM->foldTailByMasking())
     RUN_VPLAN_PASS(VPlanTransforms::foldTailByMasking, *VPlan0);
 
@@ -6393,21 +6395,22 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
   RUN_VPLAN_PASS(VPlanTransforms::narrowInductionTruncates, *Plan, Range, TTI,
                  PSE);
 
-  // Convert remaining VPInstructions to widen or replicate recipes.
+  // Convert remaining VPInstructions to widen or replicate recipes, including
+  // those licm moved out of the loop region.
   // TODO: This legacy code should eventually be migrated to VPlan.
-  VPBasicBlock *HeaderVPBB = LoopRegion->getEntryBasicBlock();
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
-           vp_depth_first_shallow(HeaderVPBB))) {
+           vp_depth_first_deep(Plan->getEntry()))) {
     // All types but VPInstructions are already widened and don't need extra
     // processing. We process VPInstructions below.
     assert(
-        all_of(
-            make_range(VPBB->getFirstNonPhi(), VPBB->end()),
-            IsaPred<VPWidenCanonicalIVRecipe, VPBlendRecipe, VPReductionRecipe,
-                    VPReplicateRecipe, VPWidenLoadRecipe, VPWidenStoreRecipe,
-                    VPWidenCallRecipe, VPWidenIntrinsicRecipe,
-                    VPVectorPointerRecipe, VPVectorEndPointerRecipe,
-                    VPHistogramRecipe, VPInstruction>) &&
+        (!VPBB->getParent() ||
+         all_of(
+             make_range(VPBB->getFirstNonPhi(), VPBB->end()),
+             IsaPred<VPWidenCanonicalIVRecipe, VPBlendRecipe, VPReductionRecipe,
+                     VPReplicateRecipe, VPWidenLoadRecipe, VPWidenStoreRecipe,
+                     VPWidenCallRecipe, VPWidenIntrinsicRecipe,
+                     VPVectorPointerRecipe, VPVectorEndPointerRecipe,
+                     VPHistogramRecipe, VPInstruction>)) &&
         "Unexpected recipe");
     for (VPInstruction &VPI :
          make_early_inc_range(make_isa_range<VPInstruction>(*VPBB))) {
@@ -6422,10 +6425,25 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
 
       Builder.setInsertPoint(&VPI);
 
-      VPRecipeBase *Recipe =
-          RecipeBuilder.tryToCreateWidenNonPhiRecipe(&VPI, Range);
-      if (!Recipe)
-        Recipe = RecipeBuilder.handleReplication(&VPI, Range);
+      VPRecipeBase *Recipe;
+      // VPIs moved out of the loop region by licm are single-scalars if all
+      // their operands are, or for scalar VFs, which
+      // tryToCreateWidenNonPhiRecipe doesn't widen.
+      if (!VPBB->getParent() &&
+          (all_of(VPI.operands(), vputils::isSingleScalar) ||
+           LoopVectorizationPlanner::getDecisionAndClampRange(
+               [](ElementCount VF) { return VF.isScalar(); }, Range))) {
+        Recipe = VPBuilder::createSingleScalarOp(
+            VPI.getOpcode(), VPI.operands(), /*Mask=*/nullptr, VPI, VPI,
+            VPI.getDebugLoc(), VPI.getScalarType(), VPI.getUnderlyingInstr());
+      } else {
+        Recipe = RecipeBuilder.tryToCreateWidenNonPhiRecipe(&VPI, Range);
+        if (!Recipe) {
+          assert(VPBB->getParent() &&
+                 "VPInstructions sunk by licm must be widened");
+          Recipe = RecipeBuilder.handleReplication(&VPI, Range);
+        }
+      }
       Builder.insert(Recipe);
 
       if (Recipe->getNumDefinedValues() == 1) {
