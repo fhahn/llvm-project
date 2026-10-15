@@ -3130,6 +3130,14 @@ public:
   InstructionCost computeCost(ElementCount VF,
                               VPCostContext &Ctx) const override;
 
+  /// Return the cost of interleave group \p IG accessing values of type \p
+  /// ValTy in address space \p AS, with a mask if \p IsMasked and with gaps
+  /// masked if \p NeedsMaskForGaps.
+  static InstructionCost
+  computeInterleaveCost(const InterleaveGroup<Instruction> &IG, Type *ValTy,
+                        unsigned AS, bool IsMasked, bool NeedsMaskForGaps,
+                        ElementCount VF, VPCostContext &Ctx);
+
   /// Returns true if the recipe only uses the first lane of operand \p Op.
   bool usesFirstLaneOnly(const VPValue *Op) const override = 0;
 
