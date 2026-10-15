@@ -109,17 +109,23 @@ define void @both_orders_max_vscale_2_to_27(ptr %a, ptr %b, i32 %n) vscale_range
 ; CHECK-LABEL: define void @both_orders_max_vscale_2_to_27(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i32 [[N:%.*]]) #[[ATTR2:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[B2:%.*]] = ptrtoaddr ptr [[B]] to i32
+; CHECK-NEXT:    [[A1:%.*]] = ptrtoaddr ptr [[A]] to i32
 ; CHECK-NEXT:    [[TMP0:%.*]] = call i32 @llvm.vscale.i32()
 ; CHECK-NEXT:    [[TMP1:%.*]] = shl nuw i32 [[TMP0]], 3
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[N]], [[TMP1]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP2:%.*]] = shl i32 [[N]], 2
-; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[B]], i32 [[TMP2]]
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[A]], i32 [[TMP2]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[TMP4]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[TMP3]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[TMP2:%.*]] = call i32 @llvm.vscale.i32()
+; CHECK-NEXT:    [[TMP3:%.*]] = shl i32 [[TMP2]], 6
+; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], -1
+; CHECK-NEXT:    [[TMP5:%.*]] = shl i32 [[TMP2]], 5
+; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[A1]], [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[TMP6]], [[B2]]
+; CHECK-NEXT:    [[TMP8:%.*]] = sub i32 [[TMP7]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i32 [[TMP8]], [[TMP4]]
+; CHECK-NEXT:    [[DIFF_CHECK_WRAP:%.*]] = icmp ugt i32 [[TMP2]], 67108864
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = or i1 [[DIFF_CHECK]], [[DIFF_CHECK_WRAP]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ;
