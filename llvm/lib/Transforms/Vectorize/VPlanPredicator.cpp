@@ -400,8 +400,56 @@ void VPPredicator::convertPhisToBlends(VPBasicBlock *VPBB) {
   }
 }
 
+/// Returns the block skipped by a branch of \p Header on a condition uniform
+/// across VFs and UFs, if it is non-empty, falls through to the header's other
+/// successor, which has no phis, and its values are only used inside it. All
+/// lanes take the same edge of such a branch, so it can be kept with both
+/// successors unmasked.
+static VPBasicBlock *getSkippedBlock(VPBasicBlock *Header) {
+  VPValue *Cond;
+  if (Header->getNumSuccessors() != 2 ||
+      !match(Header->getTerminator(), m_BranchOnCond(m_VPValue(Cond))) ||
+      !vputils::isUniformAcrossVFsAndUFs(Cond))
+    return nullptr;
+  auto *Then = cast<VPBasicBlock>(Header->getSuccessors()[0]);
+  auto *Merge = cast<VPBasicBlock>(Header->getSuccessors()[1]);
+  if (Then->getSingleSuccessor() != Merge)
+    std::swap(Then, Merge);
+  if (Then->getSingleSuccessor() != Merge || Then->empty() ||
+      !Merge->phis().empty())
+    return nullptr;
+  // Without phis in Merge, values of Then can only be used outside of it by
+  // early exits, which require linearizing.
+  for (VPRecipeBase &R : *Then)
+    for (VPValue *V : R.definedValues())
+      if (any_of(V->users(), [Then](VPUser *U) {
+            return cast<VPRecipeBase>(U)->getParent() != Then;
+          }))
+        return nullptr;
+  return Then;
+}
+
 void VPPredicator::run() {
   VPBasicBlock *Header = Plan.getVectorLoopRegion()->getEntryBasicBlock();
+  VPBasicBlock *Skipped = getSkippedBlock(Header);
+  VPRecipeBase *Br = Header->getTerminator();
+  if (Skipped && Br->getOperand(0)->isDefinedOutsideLoopRegions()) {
+    // Mask loop-invariant recipes of the skipped block and move them to the
+    // header, as linearizing would, so licm can hoist them.
+    Builder.setInsertPoint(Header, Br->getIterator());
+    SmallPtrSet<VPValue *, 4> Moved;
+    for (VPInstruction &VPI :
+         make_early_inc_range(make_isa_range<VPInstruction>(*Skipped))) {
+      if (VPI.isPhi() || VPI.mayReadOrWriteMemory() ||
+          any_of(VPI.operands(), [&Moved](VPValue *Op) {
+            return !Op->isDefinedOutsideLoopRegions() && !Moved.contains(Op);
+          }))
+        continue;
+      VPI.addMask(createEdgeMask(Header, Skipped));
+      VPI.moveBefore(*Header, Br->getIterator());
+      Moved.insert(&VPI);
+    }
+  }
   // Scan the body of the loop in a topological order to visit each basic
   // block after having visited its predecessor basic blocks.
   ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
@@ -410,10 +458,10 @@ void VPPredicator::run() {
   auto Blocks = to_vector(VPBlockUtils::blocksAs<VPBasicBlock>(RPOT));
 
   for (VPBasicBlock *VPBB : Blocks) {
-    // Introduce the mask for VPBB, which may introduce needed edge masks, and
-    // convert all phi recipes of VPBB to blend recipes unless VPBB is the
-    // header.
-    if (VPBB != Header)
+    // Introduce the mask for VPBB, which may introduce needed edge masks,
+    // unless VPBB is the header or a successor of a kept header branch.
+    if (VPBB != Header &&
+        !(Skipped && is_contained(Header->getSuccessors(), VPBB)))
       createBlockInMask(VPBB);
 
     VPValue *BlockMask = getBlockInMask(VPBB);
@@ -422,8 +470,8 @@ void VPPredicator::run() {
       if (BlockMask)
         VPI.addMask(BlockMask);
 
-      // Drop the execution frequency of unmasked VPInstructions, as they
-      // always execute.
+      // Drop the execution frequency of unmasked VPInstructions, which is only
+      // needed for masked ones.
       if (!VPI.isMasked())
         VPI.clearExecutionFrequency();
     }
@@ -433,9 +481,10 @@ void VPPredicator::run() {
     if (VPBB != Header)
       convertPhisToBlends(VPBB);
 
-  // Linearize the blocks of the loop into one serial chain.
+  // Linearize the blocks of the loop into one serial chain, after the header
+  // if its branch is kept.
   VPBlockBase *PrevVPBB = nullptr;
-  for (VPBasicBlock *VPBB : Blocks) {
+  for (VPBasicBlock *VPBB : drop_begin(Blocks, Skipped ? 1 : 0)) {
     auto Successors = to_vector(VPBB->getSuccessors());
     if (Successors.size() > 1)
       VPBB->getTerminator()->eraseFromParent();
