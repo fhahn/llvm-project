@@ -65,7 +65,7 @@ for.end:
 ; CHECK: Cost of 4 for VF 2: profitable to scalarize   store i32 %tmp2, ptr %tmp0, align 4
 ; CHECK: Precomputed costs for VF 2: 8
 ;
-define void @predicated_store(ptr %a, i1 %c, i32 %x, i64 %n) {
+define void @predicated_store(ptr %a, i32 %x, i64 %n) {
 entry:
   br label %for.body
 
@@ -74,6 +74,7 @@ for.body:
   %tmp0 = getelementptr inbounds i32, ptr %a, i64 %i
   %tmp1 = load i32, ptr %tmp0, align 4
   %tmp2 = add nsw i32 %tmp1, %x
+  %c = trunc i64 %i to i1
   br i1 %c, label %if.then, label %for.inc
 
 if.then:
@@ -100,7 +101,7 @@ for.end:
 ; CHECK: Cost of 4 for VF 2: profitable to scalarize   store i32 %tmp2, ptr %addr, align 4
 ; CHECK: Precomputed costs for VF 2: 8
 ;
-define void @predicated_store_phi(ptr %a, i1 %c, i32 %x, i64 %n) {
+define void @predicated_store_phi(ptr %a, i32 %x, i64 %n) {
 entry:
   br label %for.body
 
@@ -109,6 +110,7 @@ for.body:
   %addr = phi ptr [ %a, %entry ], [ %addr.next, %for.inc ]
   %tmp1 = load i32, ptr %addr, align 4
   %tmp2 = add nsw i32 %tmp1, %x
+  %c = trunc i64 %i to i1
   br i1 %c, label %if.then, label %for.inc
 
 if.then:
@@ -190,7 +192,7 @@ for.end:
 ; CHECK: Cost of 3 for VF 2: profitable to scalarize   %tmp2 = add nsw i32 %tmp1, %x
 ; CHECK: Precomputed costs for VF 2: 9
 ;
-define void @predicated_store_scalarized_operand(ptr %a, i1 %c, i32 %x, i64 %n) {
+define void @predicated_store_scalarized_operand(ptr %a, i32 %x, i64 %n) {
 entry:
   br label %for.body
 
@@ -198,6 +200,7 @@ for.body:
   %i = phi i64 [ 0, %entry ], [ %i.next, %for.inc ]
   %tmp0 = getelementptr inbounds i32, ptr %a, i64 %i
   %tmp1 = load i32, ptr %tmp0, align 4
+  %c = trunc i64 %i to i1
   br i1 %c, label %if.then, label %for.inc
 
 if.then:
@@ -247,7 +250,7 @@ for.end:
 ; CHECK: Cost of 5 for VF 2: REPLICATE ir<%tmp4> = udiv ir<%tmp3>, ir<%tmp2>
 ; CHECK: Precomputed costs for VF 2: 9
 ;
-define void @predication_multi_context(ptr %a, i1 %c, i32 %x, i64 %n) {
+define void @predication_multi_context(ptr %a, i32 %x, i64 %n) {
 entry:
   br label %for.body
 
@@ -255,6 +258,7 @@ for.body:
   %i = phi i64 [ 0, %entry ], [ %i.next, %for.inc ]
   %tmp0 = getelementptr inbounds i32, ptr %a, i64 %i
   %tmp1 = load i32, ptr %tmp0, align 4
+  %c = trunc i64 %i to i1
   br i1 %c, label %if.then, label %for.inc
 
 if.then:
@@ -282,19 +286,21 @@ for.end:
 ; CHECK: Cost of 2 for VF 2: profitable to scalarize   store i8 %iv.trunc, ptr %gep.dst, align 1
 ; CHECK-NOT: profitable to scalarize   %iv.trunc = trunc i64 %iv to i8
 ; CHECK: Precomputed costs for VF 2: 6
+; CHECK: Cost of 1 for VF 2: vp<{{.+}}> = SCALAR-STEPS vp<{{.+}}>, ir<true>, vp<{{.+}}>
 ; CHECK: Cost of 0 for VF 2: EMIT-SCALAR vp<[[IV_TRUNC:%[0-9]+]]> = trunc vp<{{.+}}> to i8
 ; CHECK: Cost of 0.5 for VF 2: vp<{{.+}}> = SCALAR-STEPS vp<{{.+}}>, ir<1>, vp<{{.+}}>
 ; CHECK: Cost of 0.5 for VF 2: vp<{{.+}}> = SCALAR-STEPS vp<[[IV_TRUNC]]>, ir<1>, vp<{{.+}}>
 ; CHECK: Cost of 1 for VF 2: EMIT branch-on-count
 ; CHECK: Cost of 1 for VF 2: canonical IV increment
-; CHECK: Cost for VF 2: 9
+; CHECK: Cost for VF 2: 10
 ;
-define void @predicated_store_trunc_iv(ptr %dst, i1 %c, i64 %n) {
+define void @predicated_store_trunc_iv(ptr %dst, i64 %n) {
 entry:
   br label %loop.header
 
 loop.header:
   %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  %c = trunc i64 %iv to i1
   br i1 %c, label %then, label %loop.latch
 
 then:

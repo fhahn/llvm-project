@@ -6,8 +6,8 @@ target triple = "x86_64-unknown-linux-gnu"
 @p = external global [3952 x i8], align 8
 @q = external global [3952 x i8], align 8
 
-define void @narrow_store_user_mask_operand(i32 %x) {
-; CHECK-LABEL: define void @narrow_store_user_mask_operand(
+define i64 @narrow_store_user_mask_operand(i32 %x) {
+; CHECK-LABEL: define i64 @narrow_store_user_mask_operand(
 ; CHECK-SAME: i32 [[X:%.*]]) #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[LOOP_PH:.*]]
@@ -22,11 +22,13 @@ define void @narrow_store_user_mask_operand(i32 %x) {
 ; CHECK-NEXT:    store double [[LD_P]], ptr [[GEP_Q_IV_8]], align 8
 ; CHECK-NEXT:    br label %[[LOOP_TAIL]]
 ; CHECK:       [[LOOP_TAIL]]:
+; CHECK-NEXT:    [[P:%.*]] = phi i64 [ 1, %[[LOOP_BODY]] ], [ 0, %[[LOOP_PH]] ]
 ; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV]], 1
 ; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP_PH]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    ret void
+; CHECK-NEXT:    [[P_LCSSA:%.*]] = phi i64 [ [[P]], %[[LOOP_TAIL]] ]
+; CHECK-NEXT:    ret i64 [[P_LCSSA]]
 ;
 entry:
   br label %loop.ph
@@ -44,10 +46,11 @@ loop.body:
   br label %loop.tail
 
 loop.tail:
+  %p = phi i64 [ 1, %loop.body ], [ 0, %loop.ph ]
   %iv.next = add i64 %iv, 1
   %ec = icmp eq i64 %iv, 1
   br i1 %ec, label %exit, label %loop.ph
 
 exit:
-  ret void
+  ret i64 %p
 }

@@ -270,9 +270,9 @@ for.end:
 
 ; This test ensures that a GEP feeding the value of a predicated store is
 ; scalarized and sunk together with the store.
-define void @scalarize_and_sink_gep(ptr %src, ptr %dst, i1 %c, i64 %n) {
+define void @scalarize_and_sink_gep(ptr %src, ptr %dst, i64 %n) {
 ; CHECK-LABEL: define void @scalarize_and_sink_gep(
-; CHECK-SAME: ptr [[SRC:%.*]], ptr [[DST:%.*]], i1 [[C:%.*]], i64 [[N:%.*]]) #[[ATTR0]] {
+; CHECK-SAME: ptr [[SRC:%.*]], ptr [[DST:%.*]], i64 [[N:%.*]]) #[[ATTR0]] {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 2
@@ -283,28 +283,30 @@ define void @scalarize_and_sink_gep(ptr %src, ptr %dst, i1 %c, i64 %n) {
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE2:.*]] ]
-; CHECK-NEXT:    br i1 [[C]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
+; CHECK-NEXT:    [[TMP2:%.*]] = trunc i64 [[INDEX]] to i1
+; CHECK-NEXT:    [[TMP3:%.*]] = add i1 [[TMP2]], true
+; CHECK-NEXT:    br i1 [[TMP2]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; CHECK:       [[PRED_STORE_IF]]:
-; CHECK-NEXT:    [[TMP2:%.*]] = mul i64 [[INDEX]], 3
-; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[TMP2]]
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i64, ptr [[DST]], i64 [[TMP2]]
-; CHECK-NEXT:    [[TMP5:%.*]] = ptrtoint ptr [[TMP3]] to i64
-; CHECK-NEXT:    store i64 [[TMP5]], ptr [[TMP4]], align 8
+; CHECK-NEXT:    [[TMP4:%.*]] = mul i64 [[INDEX]], 3
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[TMP4]]
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i64, ptr [[DST]], i64 [[TMP4]]
+; CHECK-NEXT:    [[TMP7:%.*]] = ptrtoint ptr [[TMP5]] to i64
+; CHECK-NEXT:    store i64 [[TMP7]], ptr [[TMP6]], align 8
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; CHECK:       [[PRED_STORE_CONTINUE]]:
-; CHECK-NEXT:    br i1 [[C]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2]]
+; CHECK-NEXT:    br i1 [[TMP3]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2]]
 ; CHECK:       [[PRED_STORE_IF1]]:
-; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[INDEX]], 1
-; CHECK-NEXT:    [[TMP7:%.*]] = mul i64 [[TMP6]], 3
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[TMP7]]
-; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr i64, ptr [[DST]], i64 [[TMP7]]
-; CHECK-NEXT:    [[TMP10:%.*]] = ptrtoint ptr [[TMP8]] to i64
-; CHECK-NEXT:    store i64 [[TMP10]], ptr [[TMP9]], align 8
+; CHECK-NEXT:    [[TMP8:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP9:%.*]] = mul i64 [[TMP8]], 3
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[TMP9]]
+; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i64, ptr [[DST]], i64 [[TMP9]]
+; CHECK-NEXT:    [[TMP12:%.*]] = ptrtoint ptr [[TMP10]] to i64
+; CHECK-NEXT:    store i64 [[TMP12]], ptr [[TMP11]], align 8
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
 ; CHECK:       [[PRED_STORE_CONTINUE2]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
-; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP11]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
+; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[FOR_END:.*]], label %[[SCALAR_PH]]
@@ -313,6 +315,7 @@ define void @scalarize_and_sink_gep(ptr %src, ptr %dst, i1 %c, i64 %n) {
 ; CHECK-NEXT:    br label %[[FOR_BODY:.*]]
 ; CHECK:       [[FOR_BODY]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[FOR_INC:.*]] ]
+; CHECK-NEXT:    [[C:%.*]] = trunc i64 [[IV]] to i1
 ; CHECK-NEXT:    br i1 [[C]], label %[[IF_THEN:.*]], label %[[FOR_INC]]
 ; CHECK:       [[IF_THEN]]:
 ; CHECK-NEXT:    [[OFF:%.*]] = mul i64 [[IV]], 3
@@ -329,7 +332,7 @@ define void @scalarize_and_sink_gep(ptr %src, ptr %dst, i1 %c, i64 %n) {
 ; CHECK-NEXT:    ret void
 ;
 ; SINK-GATHER-LABEL: define void @scalarize_and_sink_gep(
-; SINK-GATHER-SAME: ptr [[SRC:%.*]], ptr [[DST:%.*]], i1 [[C:%.*]], i64 [[N:%.*]]) #[[ATTR0]] {
+; SINK-GATHER-SAME: ptr [[SRC:%.*]], ptr [[DST:%.*]], i64 [[N:%.*]]) #[[ATTR0]] {
 ; SINK-GATHER-NEXT:  [[ENTRY:.*]]:
 ; SINK-GATHER-NEXT:    [[TMP0:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
 ; SINK-GATHER-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 8
@@ -337,17 +340,16 @@ define void @scalarize_and_sink_gep(ptr %src, ptr %dst, i1 %c, i64 %n) {
 ; SINK-GATHER:       [[VECTOR_PH]]:
 ; SINK-GATHER-NEXT:    [[TMP1:%.*]] = and i64 [[TMP0]], 7
 ; SINK-GATHER-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[TMP1]]
-; SINK-GATHER-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <8 x i1> poison, i1 [[C]], i64 0
-; SINK-GATHER-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <8 x i1> [[BROADCAST_SPLATINSERT]], <8 x i1> poison, <8 x i32> zeroinitializer
 ; SINK-GATHER-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; SINK-GATHER:       [[VECTOR_BODY]]:
 ; SINK-GATHER-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; SINK-GATHER-NEXT:    [[VEC_IND:%.*]] = phi <8 x i64> [ <i64 0, i64 1, i64 2, i64 3, i64 4, i64 5, i64 6, i64 7>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; SINK-GATHER-NEXT:    [[VEC_IND1:%.*]] = phi <8 x i1> [ <i1 false, i1 true, i1 false, i1 true, i1 false, i1 true, i1 false, i1 true>, %[[VECTOR_PH]] ], [ [[VEC_IND1]], %[[VECTOR_BODY]] ]
 ; SINK-GATHER-NEXT:    [[TMP2:%.*]] = mul <8 x i64> [[VEC_IND]], splat (i64 3)
 ; SINK-GATHER-NEXT:    [[WIDE_GEP:%.*]] = getelementptr i32, ptr [[SRC]], <8 x i64> [[TMP2]]
 ; SINK-GATHER-NEXT:    [[TMP3:%.*]] = ptrtoint <8 x ptr> [[WIDE_GEP]] to <8 x i64>
-; SINK-GATHER-NEXT:    [[WIDE_GEP1:%.*]] = getelementptr i64, ptr [[DST]], <8 x i64> [[TMP2]]
-; SINK-GATHER-NEXT:    call void @llvm.masked.scatter.v8i64.v8p0(<8 x i64> [[TMP3]], <8 x ptr> align 8 [[WIDE_GEP1]], <8 x i1> [[BROADCAST_SPLAT]])
+; SINK-GATHER-NEXT:    [[WIDE_GEP2:%.*]] = getelementptr i64, ptr [[DST]], <8 x i64> [[TMP2]]
+; SINK-GATHER-NEXT:    call void @llvm.masked.scatter.v8i64.v8p0(<8 x i64> [[TMP3]], <8 x ptr> align 8 [[WIDE_GEP2]], <8 x i1> [[VEC_IND1]])
 ; SINK-GATHER-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; SINK-GATHER-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <8 x i64> [[VEC_IND]], splat (i64 8)
 ; SINK-GATHER-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
@@ -360,6 +362,7 @@ define void @scalarize_and_sink_gep(ptr %src, ptr %dst, i1 %c, i64 %n) {
 ; SINK-GATHER-NEXT:    br label %[[FOR_BODY:.*]]
 ; SINK-GATHER:       [[FOR_BODY]]:
 ; SINK-GATHER-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[FOR_INC:.*]] ]
+; SINK-GATHER-NEXT:    [[C:%.*]] = trunc i64 [[IV]] to i1
 ; SINK-GATHER-NEXT:    br i1 [[C]], label %[[IF_THEN:.*]], label %[[FOR_INC]]
 ; SINK-GATHER:       [[IF_THEN]]:
 ; SINK-GATHER-NEXT:    [[OFF:%.*]] = mul i64 [[IV]], 3
@@ -380,6 +383,7 @@ entry:
 
 for.body:
   %iv = phi i64 [ 0, %entry ], [ %iv.next, %for.inc ]
+  %c = trunc i64 %iv to i1
   br i1 %c, label %if.then, label %for.inc
 
 if.then:
