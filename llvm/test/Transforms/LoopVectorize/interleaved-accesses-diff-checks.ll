@@ -5,7 +5,6 @@
 ; in separate runtime check groups and diff checks are used. Diff checks only
 ; rule out conflicts in lane order, so the store to %gep.a.0 cannot be sunk
 ; past the load of %gep.b to form a store group.
-; FIXME: Currently forms the store group.
 define void @diff_checks_no_store_group_sinking_past_load(ptr %a, ptr %b, ptr noalias %c, i64 %n) {
 ; CHECK-LABEL: define void @diff_checks_no_store_group_sinking_past_load(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], ptr noalias [[C:%.*]], i64 [[N:%.*]]) {
@@ -30,18 +29,37 @@ define void @diff_checks_no_store_group_sinking_past_load(ptr %a, ptr %b, ptr no
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP15:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP16:%.*]] = add i64 [[INDEX]], 2
+; CHECK-NEXT:    [[TMP17:%.*]] = add i64 [[INDEX]], 3
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[C]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i64 1
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP7]], align 4
 ; CHECK-NEXT:    store <4 x i32> [[WIDE_LOAD]], ptr [[TMP6]], align 4
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [2 x i32], ptr [[A]], i64 [[INDEX]]
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [2 x i32], ptr [[A]], i64 [[TMP15]]
+; CHECK-NEXT:    [[TMP26:%.*]] = getelementptr inbounds [2 x i32], ptr [[A]], i64 [[TMP16]]
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [2 x i32], ptr [[A]], i64 [[TMP17]]
+; CHECK-NEXT:    store i32 0, ptr [[TMP8]], align 4
+; CHECK-NEXT:    store i32 0, ptr [[TMP12]], align 4
+; CHECK-NEXT:    store i32 0, ptr [[TMP26]], align 4
+; CHECK-NEXT:    store i32 0, ptr [[TMP14]], align 4
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD4:%.*]] = load <4 x i64>, ptr [[TMP9]], align 4
 ; CHECK-NEXT:    [[TMP10:%.*]] = lshr <4 x i64> [[WIDE_LOAD4]], splat (i64 32)
 ; CHECK-NEXT:    [[TMP11:%.*]] = trunc <4 x i64> [[TMP10]] to <4 x i32>
-; CHECK-NEXT:    [[TMP12:%.*]] = shufflevector <4 x i32> zeroinitializer, <4 x i32> [[TMP11]], <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
-; CHECK-NEXT:    [[INTERLEAVED_VEC:%.*]] = shufflevector <8 x i32> [[TMP12]], <8 x i32> poison, <8 x i32> <i32 0, i32 4, i32 1, i32 5, i32 2, i32 6, i32 3, i32 7>
-; CHECK-NEXT:    store <8 x i32> [[INTERLEAVED_VEC]], ptr [[TMP8]], align 4
+; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [2 x i32], ptr [[A]], i64 [[INDEX]], i64 1
+; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds [2 x i32], ptr [[A]], i64 [[TMP15]], i64 1
+; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr inbounds [2 x i32], ptr [[A]], i64 [[TMP16]], i64 1
+; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr inbounds [2 x i32], ptr [[A]], i64 [[TMP17]], i64 1
+; CHECK-NEXT:    [[TMP22:%.*]] = extractelement <4 x i32> [[TMP11]], i64 0
+; CHECK-NEXT:    store i32 [[TMP22]], ptr [[TMP18]], align 4
+; CHECK-NEXT:    [[TMP23:%.*]] = extractelement <4 x i32> [[TMP11]], i64 1
+; CHECK-NEXT:    store i32 [[TMP23]], ptr [[TMP19]], align 4
+; CHECK-NEXT:    [[TMP24:%.*]] = extractelement <4 x i32> [[TMP11]], i64 2
+; CHECK-NEXT:    store i32 [[TMP24]], ptr [[TMP20]], align 4
+; CHECK-NEXT:    [[TMP25:%.*]] = extractelement <4 x i32> [[TMP11]], i64 3
+; CHECK-NEXT:    store i32 [[TMP25]], ptr [[TMP21]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]

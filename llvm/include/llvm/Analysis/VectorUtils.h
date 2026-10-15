@@ -913,6 +913,20 @@ private:
     for (auto Dep : *Deps)
       Dependences[Dep.getSource(DepChecker)].insert(
           Dep.getDestination(DepChecker));
+
+    // Diff checks only rule out conflicts in lane order, so treat accesses
+    // checked by them as dependent.
+    const RuntimePointerChecking *RtChecking = LAI->getRuntimePointerChecking();
+    if (!RtChecking->Need || !RtChecking->getDiffChecks())
+      return;
+    for (const auto &[I, PI] : enumerate(RtChecking->Pointers))
+      for (const auto &[J, PJ] : enumerate(RtChecking->Pointers))
+        if (RtChecking->needsChecking(I, J))
+          for (Instruction *Src :
+               DepChecker.getInstructionsForAccess(PI.PointerValue,
+                                                   PI.IsWritePtr))
+            Dependences[Src].insert_range(DepChecker.getInstructionsForAccess(
+                PJ.PointerValue, PJ.IsWritePtr));
   }
 };
 
