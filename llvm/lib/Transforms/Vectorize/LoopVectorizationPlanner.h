@@ -499,16 +499,18 @@ public:
   }
 
   /// Create a single-scalar recipe with \p Opcode and \p Operands without
-  /// inserting it.
+  /// inserting it. \p UV may only be null for casts.
   static VPSingleDefRecipe *
   createSingleScalarOp(unsigned Opcode, ArrayRef<VPValue *> Operands,
                        VPValue *Mask, const VPIRFlags &Flags,
                        const VPIRMetadata &Metadata, DebugLoc DL,
                        Type *ResultTy, Instruction *UV) {
+    assert((UV || Instruction::isCast(Opcode)) &&
+           "only casts may have no underlying instruction");
     if (Instruction::isCast(Opcode)) {
       assert(!Mask && "Cast cannot be predicated");
       auto *VPI = new VPInstruction(Opcode, Operands, Flags, Metadata, DL,
-                                    UV->getName(), ResultTy);
+                                    UV ? UV->getName() : "", ResultTy);
       VPI->setUnderlyingValue(UV);
       return VPI;
     }

@@ -65,10 +65,9 @@ define void @test_predicated_load_cast_hint(ptr %dst.1, ptr %dst.2, ptr %src, i8
 ; CHECK-NEXT:    [[CONFLICT_RDX15:%.*]] = or i1 [[CONFLICT_RDX]], [[FOUND_CONFLICT14]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX15]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[TMP25:%.*]] = load i8, ptr [[SRC]], align 1, !alias.scope [[META0:![0-9]+]], !noalias [[META3:![0-9]+]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i8> poison, i8 [[TMP25]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i8> [[BROADCAST_SPLATINSERT]], <4 x i8> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP26:%.*]] = zext <4 x i8> [[BROADCAST_SPLAT]] to <4 x i64>
+; CHECK-NEXT:    [[TMP29:%.*]] = load i8, ptr [[SRC]], align 1, !alias.scope [[META0:![0-9]+]], !noalias [[META3:![0-9]+]]
+; CHECK-NEXT:    [[TMP30:%.*]] = zext i8 [[TMP29]] to i64
+; CHECK-NEXT:    [[TMP31:%.*]] = or i64 [[TMP30]], 1
 ; CHECK-NEXT:    [[ACTIVE_LANE_MASK_ENTRY:%.*]] = call <4 x i1> @llvm.get.active.lane.mask.v4i1.i32(i32 0, i32 [[TMP2]])
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
@@ -81,9 +80,7 @@ define void @test_predicated_load_cast_hint(ptr %dst.1, ptr %dst.2, ptr %src, i8
 ; CHECK:       [[PRED_STORE_IF19]]:
 ; CHECK-NEXT:    [[TMP114:%.*]] = extractelement <4 x i64> [[TMP27]], i64 0
 ; CHECK-NEXT:    [[TMP115:%.*]] = getelementptr [16 x i64], ptr [[DST_1]], i64 [[TMP114]], i64 [[OFF]]
-; CHECK-NEXT:    [[TMP116:%.*]] = extractelement <4 x i64> [[TMP26]], i64 0
-; CHECK-NEXT:    [[TMP117:%.*]] = or i64 [[TMP116]], 1
-; CHECK-NEXT:    store i64 [[TMP117]], ptr [[TMP115]], align 8, !alias.scope [[META3]]
+; CHECK-NEXT:    store i64 [[TMP31]], ptr [[TMP115]], align 8, !alias.scope [[META3]]
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE20]]
 ; CHECK:       [[PRED_STORE_CONTINUE20]]:
 ; CHECK-NEXT:    [[TMP42:%.*]] = extractelement <4 x i1> [[ACTIVE_LANE_MASK]], i64 1
@@ -91,9 +88,7 @@ define void @test_predicated_load_cast_hint(ptr %dst.1, ptr %dst.2, ptr %src, i8
 ; CHECK:       [[PRED_STORE_IF21]]:
 ; CHECK-NEXT:    [[TMP120:%.*]] = extractelement <4 x i64> [[TMP27]], i64 1
 ; CHECK-NEXT:    [[TMP121:%.*]] = getelementptr [16 x i64], ptr [[DST_1]], i64 [[TMP120]], i64 [[OFF]]
-; CHECK-NEXT:    [[TMP122:%.*]] = extractelement <4 x i64> [[TMP26]], i64 1
-; CHECK-NEXT:    [[TMP123:%.*]] = or i64 [[TMP122]], 1
-; CHECK-NEXT:    store i64 [[TMP123]], ptr [[TMP121]], align 8, !alias.scope [[META3]]
+; CHECK-NEXT:    store i64 [[TMP31]], ptr [[TMP121]], align 8, !alias.scope [[META3]]
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE22]]
 ; CHECK:       [[PRED_STORE_CONTINUE22]]:
 ; CHECK-NEXT:    [[TMP38:%.*]] = extractelement <4 x i1> [[ACTIVE_LANE_MASK]], i64 2
@@ -101,9 +96,7 @@ define void @test_predicated_load_cast_hint(ptr %dst.1, ptr %dst.2, ptr %src, i8
 ; CHECK:       [[PRED_STORE_IF18]]:
 ; CHECK-NEXT:    [[TMP39:%.*]] = extractelement <4 x i64> [[TMP27]], i64 2
 ; CHECK-NEXT:    [[TMP40:%.*]] = getelementptr [16 x i64], ptr [[DST_1]], i64 [[TMP39]], i64 [[OFF]]
-; CHECK-NEXT:    [[TMP41:%.*]] = extractelement <4 x i64> [[TMP26]], i64 2
-; CHECK-NEXT:    [[TMP49:%.*]] = or i64 [[TMP41]], 1
-; CHECK-NEXT:    store i64 [[TMP49]], ptr [[TMP40]], align 8, !alias.scope [[META3]]
+; CHECK-NEXT:    store i64 [[TMP31]], ptr [[TMP40]], align 8, !alias.scope [[META3]]
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE19]]
 ; CHECK:       [[PRED_STORE_CONTINUE19]]:
 ; CHECK-NEXT:    [[TMP43:%.*]] = extractelement <4 x i1> [[ACTIVE_LANE_MASK]], i64 3
@@ -111,9 +104,7 @@ define void @test_predicated_load_cast_hint(ptr %dst.1, ptr %dst.2, ptr %src, i8
 ; CHECK:       [[PRED_STORE_IF20]]:
 ; CHECK-NEXT:    [[TMP44:%.*]] = extractelement <4 x i64> [[TMP27]], i64 3
 ; CHECK-NEXT:    [[TMP45:%.*]] = getelementptr [16 x i64], ptr [[DST_1]], i64 [[TMP44]], i64 [[OFF]]
-; CHECK-NEXT:    [[TMP46:%.*]] = extractelement <4 x i64> [[TMP26]], i64 3
-; CHECK-NEXT:    [[TMP50:%.*]] = or i64 [[TMP46]], 1
-; CHECK-NEXT:    store i64 [[TMP50]], ptr [[TMP45]], align 8, !alias.scope [[META3]]
+; CHECK-NEXT:    store i64 [[TMP31]], ptr [[TMP45]], align 8, !alias.scope [[META3]]
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE21]]
 ; CHECK:       [[PRED_STORE_CONTINUE21]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4

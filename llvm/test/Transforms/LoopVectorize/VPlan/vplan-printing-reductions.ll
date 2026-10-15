@@ -1412,8 +1412,8 @@ define i64 @print_ext_mul_two_uses(i64 %n, ptr %a, ptr %b, i32 %c) {
 ; CHECK-NEXT:  vector.ph:
 ; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = reduction-start-vector ir<0>, ir<0>, ir<1>
 ; CHECK-NEXT:    CLONE ir<%load> = load ir<%a>
-; CHECK-NEXT:    WIDEN-CAST ir<%load.ext> = sext ir<%load> to i32
-; CHECK-NEXT:    WIDEN-CAST ir<%load.ext.ext> = sext ir<%load.ext> to i64
+; CHECK-NEXT:    EMIT-SCALAR ir<%load.ext> = sext ir<%load> to i32
+; CHECK-NEXT:    EMIT-SCALAR ir<%load.ext.ext> = sext ir<%load.ext> to i64
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {

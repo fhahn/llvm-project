@@ -271,9 +271,9 @@ define void @trunc_invariant_sdiv_result(i32 %a, i32 %b, ptr noalias %src, ptr %
 ; CHECK:       [[VECTOR_MAIN_LOOP_ITER_CHECK]]:
 ; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i32> poison, i32 [[INVAR_DIV]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <16 x i32> [[BROADCAST_SPLATINSERT]], <16 x i32> poison, <16 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP0:%.*]] = trunc <16 x i32> [[BROADCAST_SPLAT]] to <16 x i16>
+; CHECK-NEXT:    [[TMP16:%.*]] = trunc i32 [[INVAR_DIV]] to i16
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i16> poison, i16 [[TMP16]], i64 0
+; CHECK-NEXT:    [[TMP0:%.*]] = shufflevector <16 x i16> [[BROADCAST_SPLATINSERT]], <16 x i16> poison, <16 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -298,9 +298,9 @@ define void @trunc_invariant_sdiv_result(i32 %a, i32 %b, ptr noalias %src, ptr %
 ; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF15:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_PH]]:
 ; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ 96, %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <4 x i32> poison, i32 [[INVAR_DIV]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT3:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT2]], <4 x i32> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP10:%.*]] = trunc <4 x i32> [[BROADCAST_SPLAT3]] to <4 x i16>
+; CHECK-NEXT:    [[TMP17:%.*]] = trunc i32 [[INVAR_DIV]] to i16
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT4:%.*]] = insertelement <4 x i16> poison, i16 [[TMP17]], i64 0
+; CHECK-NEXT:    [[TMP10:%.*]] = shufflevector <4 x i16> [[BROADCAST_SPLATINSERT4]], <4 x i16> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX4:%.*]] = phi i64 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT6:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]

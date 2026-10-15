@@ -44,9 +44,9 @@ define i32 @mul_used_outside_vpexpression(ptr %src.0, ptr %src.1) {
 ; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr i8, ptr [[SRC_0]], i64 100
 ; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr [[SRC_1]], i64 1
 ; CHECK-NEXT:    [[TMP12:%.*]] = load i8, ptr [[TMP11]], align 1
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT8:%.*]] = insertelement <4 x i8> poison, i8 [[TMP12]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT9:%.*]] = shufflevector <4 x i8> [[BROADCAST_SPLATINSERT8]], <4 x i8> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP14:%.*]] = zext <4 x i8> [[BROADCAST_SPLAT9]] to <4 x i32>
+; CHECK-NEXT:    [[TMP21:%.*]] = zext i8 [[TMP12]] to i32
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT9:%.*]] = insertelement <4 x i32> poison, i32 [[TMP21]], i64 0
+; CHECK-NEXT:    [[TMP14:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT9]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX3:%.*]] = phi i64 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT10:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]

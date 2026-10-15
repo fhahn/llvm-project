@@ -53,21 +53,18 @@ define void @truncate_i16_to_i8_cse(ptr noalias %src, ptr noalias %dst) vscale_r
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 3
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 1 x ptr> poison, ptr [[DST]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 1 x ptr> [[BROADCAST_SPLATINSERT]], <vscale x 1 x ptr> poison, <vscale x 1 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP5:%.*]] = load i16, ptr [[SRC]], align 2
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 8 x i16> poison, i16 [[TMP5]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 8 x i16> [[BROADCAST_SPLATINSERT]], <vscale x 8 x i16> poison, <vscale x 8 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP6:%.*]] = trunc <vscale x 8 x i16> [[BROADCAST_SPLAT]] to <vscale x 8 x i8>
-; CHECK-NEXT:    [[TMP7:%.*]] = call i32 @llvm.vscale.i32()
-; CHECK-NEXT:    [[TMP8:%.*]] = mul nuw i32 [[TMP7]], 8
-; CHECK-NEXT:    [[TMP9:%.*]] = sub i32 [[TMP8]], 1
-; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <vscale x 8 x i8> [[TMP6]], i32 [[TMP9]]
-; CHECK-NEXT:    store i8 [[TMP10]], ptr null, align 1
-; CHECK-NEXT:    store i8 [[TMP10]], ptr [[DST]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP1]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <vscale x 1 x i16> poison, i16 [[TMP5]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <vscale x 1 x i16> [[BROADCAST_SPLATINSERT1]], <vscale x 1 x i16> poison, <vscale x 1 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP2:%.*]] = trunc <vscale x 1 x i16> [[BROADCAST_SPLAT2]] to <vscale x 1 x i8>
+; CHECK-NEXT:    call void @llvm.masked.scatter.nxv1i8.nxv1p0(<vscale x 1 x i8> [[TMP2]], <vscale x 1 x ptr> align 1 splat (ptr null), <vscale x 1 x i1> splat (i1 true))
+; CHECK-NEXT:    call void @llvm.masked.scatter.nxv1i8.nxv1p0(<vscale x 1 x i8> [[TMP2]], <vscale x 1 x ptr> align 1 [[BROADCAST_SPLAT]], <vscale x 1 x i1> splat (i1 true))
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP0]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], 4294967296
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[SCALAR_PH:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       [[SCALAR_PH]]:

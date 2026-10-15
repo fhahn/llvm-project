@@ -1880,8 +1880,8 @@ static void narrowToSingleScalarRecipes(VPlan &Plan) {
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_deep(Plan.getEntry()))) {
     for (VPRecipeBase &R : make_early_inc_range(reverse(*VPBB))) {
-      if (!isa<VPWidenRecipe, VPWidenGEPRecipe, VPReplicateRecipe,
-               VPWidenIntrinsicRecipe>(&R))
+      if (!isa<VPWidenRecipe, VPWidenCastRecipe, VPWidenGEPRecipe,
+               VPReplicateRecipe, VPWidenIntrinsicRecipe>(&R))
         continue;
       auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
       if (RepR && (RepR->isSingleScalar() || RepR->isPredicated()))
@@ -1963,7 +1963,7 @@ static void narrowToSingleScalarRecipes(VPlan &Plan) {
           vputils::getOpcode(RepOrWidenR), RepOrWidenR->operands(),
           /*Mask=*/nullptr, *RepOrWidenR, getMetadataOf(RepOrWidenR),
           DebugLoc::getUnknown(), RepOrWidenR->getScalarType(),
-          RepOrWidenR->getUnderlyingInstr());
+          cast_if_present<Instruction>(RepOrWidenR->getUnderlyingValue()));
       Clone->insertBefore(RepOrWidenR);
       RepOrWidenR->replaceAllUsesWith(Clone);
       if (vputils::isDeadRecipe(*RepOrWidenR))
