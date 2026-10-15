@@ -198,16 +198,15 @@ define void @fixed_vf_step_306783378(ptr %a, ptr %b, i32 %n) {
 ; CHECK-LABEL: define void @fixed_vf_step_306783378(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i32 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[B2:%.*]] = ptrtoaddr ptr [[B]] to i32
+; CHECK-NEXT:    [[A1:%.*]] = ptrtoaddr ptr [[A]] to i32
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[N]], 8
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 [[N]], 306783378
-; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[TMP0]], -306783376
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[B]], i32 [[TMP1]]
-; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[A]], i32 [[TMP1]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[TMP3]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[TMP2]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[A1]], -2147483648
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i32 [[TMP0]], [[B2]]
+; CHECK-NEXT:    [[TMP2:%.*]] = sub i32 [[TMP1]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i32 [[TMP2]], -1
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ;
@@ -233,19 +232,21 @@ exit:
 define void @fixed_vf_step_306783379(ptr %a, ptr %b, i32 %n) {
 ; CHECK-LABEL: define void @fixed_vf_step_306783379(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i32 [[N:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[N]], 8
-; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
-; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 [[N]], 306783379
-; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[TMP0]], -306783377
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[B]], i32 [[TMP1]]
-; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[A]], i32 [[TMP1]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[TMP3]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[TMP2]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
-; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[OFF:%.*]] = mul nuw nsw i32 [[IV]], 306783379
+; CHECK-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i8, ptr [[A]], i32 [[OFF]]
+; CHECK-NEXT:    [[L:%.*]] = load i16, ptr [[GEP_A]], align 2
+; CHECK-NEXT:    [[ADD:%.*]] = add i16 [[L]], 1
+; CHECK-NEXT:    [[GEP_B:%.*]] = getelementptr inbounds i8, ptr [[B]], i32 [[OFF]]
+; CHECK-NEXT:    store i16 [[ADD]], ptr [[GEP_B]], align 2
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i32 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i32 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
 ;
 entry:
   br label %loop
@@ -272,16 +273,15 @@ define void @step_2_to_31_64_bit_pointers(ptr addrspace(1) %a, ptr addrspace(1) 
 ; CHECK-LABEL: define void @step_2_to_31_64_bit_pointers(
 ; CHECK-SAME: ptr addrspace(1) [[A:%.*]], ptr addrspace(1) [[B:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[B2:%.*]] = ptrtoaddr ptr addrspace(1) [[B]] to i64
+; CHECK-NEXT:    [[A1:%.*]] = ptrtoaddr ptr addrspace(1) [[A]] to i64
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 8
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 31
-; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], -2147483647
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr addrspace(1) [[B]], i64 [[TMP1]]
-; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr addrspace(1) [[A]], i64 [[TMP1]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr addrspace(1) [[B]], [[TMP3]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr addrspace(1) [[A]], [[TMP2]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[A1]], 15032385537
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[B2]]
+; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP2]], 30064771073
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ;

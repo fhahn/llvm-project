@@ -143,15 +143,14 @@ define void @accesses_narrower_than_step(ptr %a, ptr %b, i64 %n) {
 ; CHECK-LABEL: define void @accesses_narrower_than_step(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A]] to i64
+; CHECK-NEXT:    [[B1:%.*]] = ptrtoaddr ptr [[B]] to i64
 ; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 3
-; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], -4
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP1]]
-; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP1]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[TMP3]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[TMP2]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[B1]], 28
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[A2]]
+; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP2]], 55
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_RND_UP:%.*]] = add i64 [[N]], 3
@@ -171,7 +170,7 @@ define void @accesses_narrower_than_step(ptr %a, ptr %b, i64 %n) {
 ; CHECK:       [[PRED_LOAD_IF]]:
 ; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x i64> [[TMP6]], i64 0
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds nuw i32, ptr [[B]], i64 [[TMP8]]
-; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr [[TMP9]], align 4, !alias.scope [[META11:![0-9]+]]
+; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr [[TMP9]], align 4
 ; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i32> poison, i32 [[TMP10]], i64 0
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE]]
 ; CHECK:       [[PRED_LOAD_CONTINUE]]:
@@ -181,7 +180,7 @@ define void @accesses_narrower_than_step(ptr %a, ptr %b, i64 %n) {
 ; CHECK:       [[PRED_LOAD_IF2]]:
 ; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <4 x i64> [[TMP6]], i64 1
 ; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr inbounds nuw i32, ptr [[B]], i64 [[TMP14]]
-; CHECK-NEXT:    [[TMP16:%.*]] = load i32, ptr [[TMP15]], align 4, !alias.scope [[META11]]
+; CHECK-NEXT:    [[TMP16:%.*]] = load i32, ptr [[TMP15]], align 4
 ; CHECK-NEXT:    [[TMP17:%.*]] = insertelement <4 x i32> [[TMP12]], i32 [[TMP16]], i64 1
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE3]]
 ; CHECK:       [[PRED_LOAD_CONTINUE3]]:
@@ -191,7 +190,7 @@ define void @accesses_narrower_than_step(ptr %a, ptr %b, i64 %n) {
 ; CHECK:       [[PRED_LOAD_IF4]]:
 ; CHECK-NEXT:    [[TMP20:%.*]] = extractelement <4 x i64> [[TMP6]], i64 2
 ; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr inbounds nuw i32, ptr [[B]], i64 [[TMP20]]
-; CHECK-NEXT:    [[TMP22:%.*]] = load i32, ptr [[TMP21]], align 4, !alias.scope [[META11]]
+; CHECK-NEXT:    [[TMP22:%.*]] = load i32, ptr [[TMP21]], align 4
 ; CHECK-NEXT:    [[TMP23:%.*]] = insertelement <4 x i32> [[TMP18]], i32 [[TMP22]], i64 2
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE5]]
 ; CHECK:       [[PRED_LOAD_CONTINUE5]]:
@@ -201,7 +200,7 @@ define void @accesses_narrower_than_step(ptr %a, ptr %b, i64 %n) {
 ; CHECK:       [[PRED_LOAD_IF6]]:
 ; CHECK-NEXT:    [[TMP26:%.*]] = extractelement <4 x i64> [[TMP6]], i64 3
 ; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr inbounds nuw i32, ptr [[B]], i64 [[TMP26]]
-; CHECK-NEXT:    [[TMP28:%.*]] = load i32, ptr [[TMP27]], align 4, !alias.scope [[META11]]
+; CHECK-NEXT:    [[TMP28:%.*]] = load i32, ptr [[TMP27]], align 4
 ; CHECK-NEXT:    [[TMP29:%.*]] = insertelement <4 x i32> [[TMP24]], i32 [[TMP28]], i64 3
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE7]]
 ; CHECK:       [[PRED_LOAD_CONTINUE7]]:
@@ -212,7 +211,7 @@ define void @accesses_narrower_than_step(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    [[TMP32:%.*]] = extractelement <4 x i64> [[TMP6]], i64 0
 ; CHECK-NEXT:    [[TMP33:%.*]] = getelementptr inbounds nuw i32, ptr [[A]], i64 [[TMP32]]
 ; CHECK-NEXT:    [[TMP34:%.*]] = extractelement <4 x i32> [[TMP31]], i64 0
-; CHECK-NEXT:    store i32 [[TMP34]], ptr [[TMP33]], align 4, !alias.scope [[META14:![0-9]+]], !noalias [[META11]]
+; CHECK-NEXT:    store i32 [[TMP34]], ptr [[TMP33]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; CHECK:       [[PRED_STORE_CONTINUE]]:
 ; CHECK-NEXT:    br i1 [[TMP13]], label %[[PRED_STORE_IF8:.*]], label %[[PRED_STORE_CONTINUE9:.*]]
@@ -220,7 +219,7 @@ define void @accesses_narrower_than_step(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    [[TMP35:%.*]] = extractelement <4 x i64> [[TMP6]], i64 1
 ; CHECK-NEXT:    [[TMP36:%.*]] = getelementptr inbounds nuw i32, ptr [[A]], i64 [[TMP35]]
 ; CHECK-NEXT:    [[TMP37:%.*]] = extractelement <4 x i32> [[TMP31]], i64 1
-; CHECK-NEXT:    store i32 [[TMP37]], ptr [[TMP36]], align 4, !alias.scope [[META14]], !noalias [[META11]]
+; CHECK-NEXT:    store i32 [[TMP37]], ptr [[TMP36]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE9]]
 ; CHECK:       [[PRED_STORE_CONTINUE9]]:
 ; CHECK-NEXT:    br i1 [[TMP19]], label %[[PRED_STORE_IF10:.*]], label %[[PRED_STORE_CONTINUE11:.*]]
@@ -228,7 +227,7 @@ define void @accesses_narrower_than_step(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    [[TMP38:%.*]] = extractelement <4 x i64> [[TMP6]], i64 2
 ; CHECK-NEXT:    [[TMP39:%.*]] = getelementptr inbounds nuw i32, ptr [[A]], i64 [[TMP38]]
 ; CHECK-NEXT:    [[TMP40:%.*]] = extractelement <4 x i32> [[TMP31]], i64 2
-; CHECK-NEXT:    store i32 [[TMP40]], ptr [[TMP39]], align 4, !alias.scope [[META14]], !noalias [[META11]]
+; CHECK-NEXT:    store i32 [[TMP40]], ptr [[TMP39]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE11]]
 ; CHECK:       [[PRED_STORE_CONTINUE11]]:
 ; CHECK-NEXT:    br i1 [[TMP25]], label %[[PRED_STORE_IF12:.*]], label %[[PRED_STORE_CONTINUE13]]
@@ -236,7 +235,7 @@ define void @accesses_narrower_than_step(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    [[TMP41:%.*]] = extractelement <4 x i64> [[TMP6]], i64 3
 ; CHECK-NEXT:    [[TMP42:%.*]] = getelementptr inbounds nuw i32, ptr [[A]], i64 [[TMP41]]
 ; CHECK-NEXT:    [[TMP43:%.*]] = extractelement <4 x i32> [[TMP31]], i64 3
-; CHECK-NEXT:    store i32 [[TMP43]], ptr [[TMP42]], align 4, !alias.scope [[META14]], !noalias [[META11]]
+; CHECK-NEXT:    store i32 [[TMP43]], ptr [[TMP42]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE13]]
 ; CHECK:       [[PRED_STORE_CONTINUE13]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4

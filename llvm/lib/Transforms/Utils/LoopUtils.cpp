@@ -2280,15 +2280,34 @@ Value *llvm::addDiffRuntimeChecks(Instruction *Loc,
   // Map to keep track of created compares, The key is the pair of operands for
   // the compare, to allow detecting and re-using redundant compares.
   DenseMap<std::pair<Value *, Value *>, Value *> SeenCompares;
-  for (const auto &[SrcStart, SinkStart, AccessSize, NeedsFreeze] : Checks) {
-    assert(IC * AccessSize > 0 &&
+  for (const PointerDiffInfo &C : Checks) {
+    assert(IC > 0 && C.AccessSize > 0 &&
            "Threshold must be non-zero to use diff-check");
-    Type *Ty = SinkStart->getType();
-    const SCEV *TotalAccessSize = SE.getElementCount(Ty, VF * IC * AccessSize);
+    Type *Ty = C.SinkStart->getType();
+    // T = (VF * IC - 1) * AccessSize + Span, see PointerDiffInfo.
+    const SCEV *T = SE.getAddExpr(
+        SE.getMulExpr(SE.getElementCount(Ty, VF * IC),
+                      SE.getConstant(Ty, C.AccessSize)),
+        SE.getConstant(Ty, int64_t(C.Span) - C.AccessSize, /*isSigned=*/true));
+    const SCEV *DiffSCEV = SE.getMinusSCEV(C.SinkStart, C.SrcStart);
+    const SCEV *Threshold = T;
+    if (C.IsSymmetric) {
+      // The compare below is exact iff T <= 2^(BW - 1), so treat larger T as a
+      // conflict, and conservatively all scalable VFs. T fits in BW + 96 bits,
+      // as VF, IC, AccessSize and Span are 32-bit.
+      unsigned BW = SE.getTypeSizeInBits(Ty);
+      if (VF.isScalable() ||
+          (APInt(BW + 96, VF.getFixedValue()) * IC * C.AccessSize + C.Span -
+           C.AccessSize)
+              .ugt(APInt::getOneBitSet(BW + 96, BW - 1)))
+        return ChkBuilder.getTrue();
+      // |Diff| < T iff 0 < Diff + T < 2 * T.
+      DiffSCEV = SE.getAddExpr(DiffSCEV, T);
+      Threshold = SE.getMulExpr(T, SE.getConstant(Ty, 2));
+    }
     Value *ThresholdMinusOne = Expander.expandCodeFor(
-        SE.getMinusSCEV(TotalAccessSize, SE.getConstant(Ty, 1)), Ty, Loc);
-    Value *Diff =
-        Expander.expandCodeFor(SE.getMinusSCEV(SinkStart, SrcStart), Ty, Loc);
+        SE.getMinusSCEV(Threshold, SE.getConstant(Ty, 1)), Ty, Loc);
+    Value *Diff = Expander.expandCodeFor(DiffSCEV, Ty, Loc);
 
     // Check if the same compare has already been created earlier. In that case,
     // there is no need to check it again.
@@ -2296,13 +2315,12 @@ Value *llvm::addDiffRuntimeChecks(Instruction *Loc,
     if (IsConflict)
       continue;
 
-    // Use (Diff - 1) <u (Threshold - 1), equivalent to 0 < Diff <u Threshold,
-    // to exclude Diff == 0 (equal pointers are safe).
+    // Use (Diff - 1) <u (Threshold - 1), equivalent to 0 < Diff <u Threshold.
     IsConflict = ChkBuilder.CreateICmpULT(
         ChkBuilder.CreateSub(Diff, ConstantInt::get(Ty, 1)), ThresholdMinusOne,
         "diff.check");
     SeenCompares.insert({{Diff, ThresholdMinusOne}, IsConflict});
-    if (NeedsFreeze)
+    if (C.NeedsFreeze)
       IsConflict =
           ChkBuilder.CreateFreeze(IsConflict, IsConflict->getName() + ".fr");
     if (MemoryRuntimeCheck) {

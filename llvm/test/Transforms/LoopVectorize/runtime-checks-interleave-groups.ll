@@ -211,36 +211,29 @@ define void @symbolic_offsets(ptr %a, ptr %b, i64 %k, i64 %n) {
 ; NOMERGE-LABEL: define void @symbolic_offsets(
 ; NOMERGE-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[K:%.*]], i64 [[N:%.*]]) {
 ; NOMERGE-NEXT:  [[ENTRY:.*:]]
+; NOMERGE-NEXT:    [[B2:%.*]] = ptrtoaddr ptr [[B]] to i64
+; NOMERGE-NEXT:    [[TMP0:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; NOMERGE-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 [[N]], 4
 ; NOMERGE-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; NOMERGE:       [[VECTOR_MEMCHECK]]:
-; NOMERGE-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 3
-; NOMERGE-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], -4
-; NOMERGE-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP1]]
 ; NOMERGE-NEXT:    [[TMP3:%.*]] = shl i64 [[K]], 3
-; NOMERGE-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP3]]
 ; NOMERGE-NEXT:    [[TMP5:%.*]] = add i64 [[TMP0]], [[TMP3]]
-; NOMERGE-NEXT:    [[TMP6:%.*]] = add i64 [[TMP5]], -4
-; NOMERGE-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP6]]
+; NOMERGE-NEXT:    [[TMP2:%.*]] = add i64 [[TMP5]], 28
+; NOMERGE-NEXT:    [[TMP6:%.*]] = sub i64 [[TMP2]], [[B2]]
+; NOMERGE-NEXT:    [[TMP4:%.*]] = sub i64 [[TMP6]], 1
+; NOMERGE-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP4]], 55
 ; NOMERGE-NEXT:    [[TMP8:%.*]] = shl i64 [[K]], 2
-; NOMERGE-NEXT:    [[TMP9:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP8]]
 ; NOMERGE-NEXT:    [[TMP10:%.*]] = add i64 [[TMP0]], [[TMP8]]
-; NOMERGE-NEXT:    [[TMP11:%.*]] = add i64 [[TMP10]], -4
-; NOMERGE-NEXT:    [[TMP12:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP11]]
-; NOMERGE-NEXT:    [[TMP13:%.*]] = mul i64 [[K]], -4
-; NOMERGE-NEXT:    [[TMP14:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP13]]
-; NOMERGE-NEXT:    [[TMP15:%.*]] = sub i64 [[TMP1]], [[TMP8]]
-; NOMERGE-NEXT:    [[TMP16:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP15]]
-; NOMERGE-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[TMP7]]
-; NOMERGE-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[TMP4]], [[TMP2]]
-; NOMERGE-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; NOMERGE-NEXT:    [[BOUND014:%.*]] = icmp ult ptr [[B]], [[TMP12]]
-; NOMERGE-NEXT:    [[BOUND115:%.*]] = icmp ult ptr [[TMP9]], [[TMP2]]
-; NOMERGE-NEXT:    [[FOUND_CONFLICT16:%.*]] = and i1 [[BOUND014]], [[BOUND115]]
+; NOMERGE-NEXT:    [[TMP7:%.*]] = add i64 [[TMP10]], 28
+; NOMERGE-NEXT:    [[TMP14:%.*]] = sub i64 [[TMP7]], [[B2]]
+; NOMERGE-NEXT:    [[TMP9:%.*]] = sub i64 [[TMP14]], 1
+; NOMERGE-NEXT:    [[FOUND_CONFLICT16:%.*]] = icmp ult i64 [[TMP9]], 55
 ; NOMERGE-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT16]]
-; NOMERGE-NEXT:    [[BOUND017:%.*]] = icmp ult ptr [[B]], [[TMP16]]
-; NOMERGE-NEXT:    [[BOUND118:%.*]] = icmp ult ptr [[TMP14]], [[TMP2]]
-; NOMERGE-NEXT:    [[FOUND_CONFLICT19:%.*]] = and i1 [[BOUND017]], [[BOUND118]]
+; NOMERGE-NEXT:    [[TMP15:%.*]] = add i64 [[TMP0]], 28
+; NOMERGE-NEXT:    [[TMP11:%.*]] = sub i64 [[TMP15]], [[B2]]
+; NOMERGE-NEXT:    [[TMP12:%.*]] = sub i64 [[TMP11]], [[TMP8]]
+; NOMERGE-NEXT:    [[TMP13:%.*]] = sub i64 [[TMP12]], 1
+; NOMERGE-NEXT:    [[FOUND_CONFLICT19:%.*]] = icmp ult i64 [[TMP13]], 55
 ; NOMERGE-NEXT:    [[CONFLICT_RDX20:%.*]] = or i1 [[CONFLICT_RDX]], [[FOUND_CONFLICT19]]
 ; NOMERGE-NEXT:    br i1 [[CONFLICT_RDX20]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; NOMERGE:       [[VECTOR_PH]]:
@@ -392,33 +385,25 @@ exit:
 define void @store_pair_check_always_fails(ptr %a, i64 %k, i64 %n) {
 ; CHECK-LABEL: define void @store_pair_check_always_fails(
 ; CHECK-SAME: ptr [[A:%.*]], i64 [[K:%.*]], i64 [[N:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[A_K:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[K]]
-; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 [[N]], 4
-; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
-; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 3
-; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], -4
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP1]]
-; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr nuw i8, ptr [[A]], i64 4
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP0]]
-; CHECK-NEXT:    [[TMP5:%.*]] = shl nsw i64 [[K]], 2
-; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[TMP0]], [[TMP5]]
-; CHECK-NEXT:    [[TMP7:%.*]] = add i64 [[TMP6]], -4
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP7]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[TMP4]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[TMP3]], [[TMP2]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    [[BOUND011:%.*]] = icmp ult ptr [[A]], [[TMP8]]
-; CHECK-NEXT:    [[BOUND112:%.*]] = icmp ult ptr [[A_K]], [[TMP2]]
-; CHECK-NEXT:    [[FOUND_CONFLICT13:%.*]] = and i1 [[BOUND011]], [[BOUND112]]
-; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT13]]
-; CHECK-NEXT:    [[BOUND014:%.*]] = icmp ult ptr [[TMP3]], [[TMP8]]
-; CHECK-NEXT:    [[BOUND115:%.*]] = icmp ult ptr [[A_K]], [[TMP4]]
-; CHECK-NEXT:    [[FOUND_CONFLICT16:%.*]] = and i1 [[BOUND014]], [[BOUND115]]
-; CHECK-NEXT:    [[CONFLICT_RDX17:%.*]] = or i1 [[CONFLICT_RDX]], [[FOUND_CONFLICT16]]
-; CHECK-NEXT:    br i1 [[CONFLICT_RDX17]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
-; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IDX_0:%.*]] = shl nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[IDX_1:%.*]] = or disjoint i64 [[IDX_0]], 1
+; CHECK-NEXT:    [[GEP_A_K:%.*]] = getelementptr inbounds i32, ptr [[A_K]], i64 [[IDX_0]]
+; CHECK-NEXT:    [[X:%.*]] = load i32, ptr [[GEP_A_K]], align 4
+; CHECK-NEXT:    [[GEP_A_0:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IDX_0]]
+; CHECK-NEXT:    store i32 [[X]], ptr [[GEP_A_0]], align 4
+; CHECK-NEXT:    [[ADD:%.*]] = add i32 [[X]], 1
+; CHECK-NEXT:    [[GEP_A_1:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IDX_1]]
+; CHECK-NEXT:    store i32 [[ADD]], ptr [[GEP_A_1]], align 4
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
 ;
 entry:
   %a.k = getelementptr inbounds i32, ptr %a, i64 %k
