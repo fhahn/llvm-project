@@ -923,13 +923,6 @@ public:
   /// if it's needed.
   InstructionCost getVectorCallCost(CallInst *CI, ElementCount VF) const;
 
-  /// Invalidates decisions already taken by the cost model.
-  void invalidateCostModelingDecisions() {
-    WideningDecisions.clear();
-    Uniforms.clear();
-    Scalars.clear();
-  }
-
   /// Returns the expected execution cost. The unit of the cost does
   /// not matter because we use the 'cost' units to compare different
   /// vector widths. The cost that is returned is *not* normalized by
@@ -3720,15 +3713,9 @@ bool LoopVectorizationCostModel::useEmulatedMaskMemRefHack(
 }
 
 void LoopVectorizationCostModel::collectInstsToScalarize(ElementCount VF) {
-  assert(VF.isVector() && "Expected VF >= 2");
-
-  // If we've already collected the instructions to scalarize or the predicated
-  // BBs after vectorization, there's nothing to do. Collection may already have
-  // occurred if we have a user-selected VF and are now computing the expected
-  // cost for interleaving.
-  if (InstsToScalarize.contains(VF) ||
-      PredicatedBBsAfterVectorization.contains(VF))
-    return;
+  assert(VF.isVector() && !InstsToScalarize.contains(VF) &&
+         !PredicatedBBsAfterVectorization.contains(VF) &&
+         "This function should not be visited twice for the same VF");
 
   // Initialize a mapping for VF in InstsToScalalarize. If we find that it's
   // not profitable to scalarize any instructions, the presence of VF in the
@@ -5073,11 +5060,9 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
         dbgs()
         << "LV: Invalidate all interleaved groups due to fold-tail by masking "
            "which requires masked-interleaved support.\n");
-    if (CM->InterleaveInfo.invalidateGroups())
-      // Invalidating interleave groups also requires invalidating all decisions
-      // based on them, which includes widening decisions and uniform and scalar
-      // values.
-      CM->invalidateCostModelingDecisions();
+    // Note: There is no need to invalidate any cost modeling decisions here, as
+    // none were taken so far (see assertion in computeMaxVF).
+    CM->InterleaveInfo.invalidateGroups();
   }
 
   if (CM->foldTailByMasking())
