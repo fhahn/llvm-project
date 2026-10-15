@@ -5687,10 +5687,6 @@ bool VPRecipeBuilder::isPredicatedInst(Instruction *I) const {
   return CM.isPredicatedInst(I);
 }
 
-bool VPRecipeBuilder::prefersVectorizedAddressing() const {
-  return CM.TTI.prefersVectorizedAddressing();
-}
-
 VPRecipeBase *VPRecipeBuilder::tryToWidenMemory(VPInstruction *VPI,
                                                 VFRange &Range) {
   assert((VPI->getOpcode() == Instruction::Load ||
