@@ -116,9 +116,9 @@ exit:
 }
 
 
-define void @test_shrink_zext_in_preheader(ptr noalias %src, ptr noalias %dst, i32 %A, i16 %B) {
+define void @test_shrink_zext_in_preheader(ptr noalias %src, ptr noalias %dst, i16 %B) {
 ; CHECK-LABEL: define void @test_shrink_zext_in_preheader(
-; CHECK-SAME: ptr noalias [[SRC:%.*]], ptr noalias [[DST:%.*]], i32 [[A:%.*]], i16 [[B:%.*]]) {
+; CHECK-SAME: ptr noalias [[SRC:%.*]], ptr noalias [[DST:%.*]], i16 [[B:%.*]]) {
 ; CHECK-NEXT:  [[ITER_CHECK:.*:]]
 ; CHECK-NEXT:    [[CONV10:%.*]] = zext i16 [[B]] to i32
 ; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH:.*]], label %[[VECTOR_MAIN_LOOP_ITER_CHECK:.*]]
@@ -127,19 +127,23 @@ define void @test_shrink_zext_in_preheader(ptr noalias %src, ptr noalias %dst, i
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i16> poison, i16 [[B]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <16 x i16> [[BROADCAST_SPLATINSERT]], <16 x i16> poison, <16 x i32> zeroinitializer
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <16 x i32> poison, i32 [[A]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <16 x i32> [[BROADCAST_SPLATINSERT1]], <16 x i32> poison, <16 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP0:%.*]] = trunc <16 x i32> [[BROADCAST_SPLAT2]] to <16 x i16>
-; CHECK-NEXT:    [[TMP1:%.*]] = mul <16 x i16> [[TMP0]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP2:%.*]] = lshr <16 x i16> [[TMP1]], splat (i16 8)
-; CHECK-NEXT:    [[TMP3:%.*]] = trunc <16 x i16> [[TMP2]] to <16 x i8>
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i16, ptr [[SRC]], i32 [[INDEX]]
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i16, ptr [[TMP13]], i64 16
+; CHECK-NEXT:    [[TMP0:%.*]] = load <16 x i16>, ptr [[TMP13]], align 2
+; CHECK-NEXT:    [[WIDE_LOAD1:%.*]] = load <16 x i16>, ptr [[TMP14]], align 2
+; CHECK-NEXT:    [[TMP1:%.*]] = mul <16 x i16> [[TMP0]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[TMP15:%.*]] = mul <16 x i16> [[WIDE_LOAD1]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[TMP2:%.*]] = lshr <16 x i16> [[TMP1]], splat (i16 8)
+; CHECK-NEXT:    [[TMP16:%.*]] = lshr <16 x i16> [[TMP15]], splat (i16 8)
+; CHECK-NEXT:    [[TMP3:%.*]] = trunc <16 x i16> [[TMP2]] to <16 x i8>
+; CHECK-NEXT:    [[TMP17:%.*]] = trunc <16 x i16> [[TMP16]] to <16 x i8>
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i8, ptr [[DST]], i32 [[INDEX]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i8, ptr [[TMP4]], i64 16
 ; CHECK-NEXT:    store <16 x i8> [[TMP3]], ptr [[TMP4]], align 1
-; CHECK-NEXT:    store <16 x i8> [[TMP3]], ptr [[TMP5]], align 1
+; CHECK-NEXT:    store <16 x i8> [[TMP17]], ptr [[TMP5]], align 1
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 32
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], 992
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
@@ -151,15 +155,14 @@ define void @test_shrink_zext_in_preheader(ptr noalias %src, ptr noalias %dst, i
 ; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i32 [ 992, %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <8 x i16> poison, i16 [[B]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <8 x i16> [[BROADCAST_SPLATINSERT3]], <8 x i16> poison, <8 x i32> zeroinitializer
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT5:%.*]] = insertelement <8 x i32> poison, i32 [[A]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT6:%.*]] = shufflevector <8 x i32> [[BROADCAST_SPLATINSERT5]], <8 x i32> poison, <8 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP7:%.*]] = trunc <8 x i32> [[BROADCAST_SPLAT6]] to <8 x i16>
-; CHECK-NEXT:    [[TMP8:%.*]] = mul <8 x i16> [[TMP7]], [[BROADCAST_SPLAT4]]
-; CHECK-NEXT:    [[TMP9:%.*]] = lshr <8 x i16> [[TMP8]], splat (i16 8)
-; CHECK-NEXT:    [[TMP10:%.*]] = trunc <8 x i16> [[TMP9]] to <8 x i8>
 ; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX7:%.*]] = phi i32 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT8:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i16, ptr [[SRC]], i32 [[INDEX7]]
+; CHECK-NEXT:    [[TMP7:%.*]] = load <8 x i16>, ptr [[TMP18]], align 2
+; CHECK-NEXT:    [[TMP8:%.*]] = mul <8 x i16> [[TMP7]], [[BROADCAST_SPLAT4]]
+; CHECK-NEXT:    [[TMP9:%.*]] = lshr <8 x i16> [[TMP8]], splat (i16 8)
+; CHECK-NEXT:    [[TMP10:%.*]] = trunc <8 x i16> [[TMP9]] to <8 x i8>
 ; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i8, ptr [[DST]], i32 [[INDEX7]]
 ; CHECK-NEXT:    store <8 x i8> [[TMP10]], ptr [[TMP11]], align 1
 ; CHECK-NEXT:    [[INDEX_NEXT8]] = add nuw i32 [[INDEX7]], 8
@@ -178,7 +181,7 @@ loop:
   %gep.src = getelementptr inbounds i16, ptr %src, i32 %iv
   %l = load i16, ptr %gep.src
   %conv4111 = zext i16 %l to i32
-  %mul = mul i32 %A, %conv10
+  %mul = mul i32 %conv4111, %conv10
   %0 = lshr i32 %mul, 8
   %conv5 = trunc i32 %0 to i8
   %gep.dst = getelementptr inbounds i8, ptr %dst, i32 %iv
@@ -191,52 +194,48 @@ exit:
   ret void
 }
 
-define void @test_shrink_select(ptr noalias %src, ptr noalias %dst, i32 %A, i1 %c) {
+define void @test_shrink_select(ptr noalias %src, ptr noalias %dst, i1 %c) {
 ; CHECK-LABEL: define void @test_shrink_select(
-; CHECK-SAME: ptr noalias [[SRC:%.*]], ptr noalias [[DST:%.*]], i32 [[A:%.*]], i1 [[C:%.*]]) {
+; CHECK-SAME: ptr noalias [[SRC:%.*]], ptr noalias [[DST:%.*]], i1 [[C:%.*]]) {
 ; CHECK-NEXT:  [[ITER_CHECK:.*:]]
 ; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH:.*]], label %[[VECTOR_MAIN_LOOP_ITER_CHECK:.*]]
 ; CHECK:       [[VECTOR_MAIN_LOOP_ITER_CHECK]]:
 ; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i32> poison, i32 [[A]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <16 x i32> [[BROADCAST_SPLATINSERT]], <16 x i32> poison, <16 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP0:%.*]] = trunc <16 x i32> [[BROADCAST_SPLAT]] to <16 x i16>
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i16, ptr [[SRC]], i32 [[INDEX]]
+; CHECK-NEXT:    [[TMP0:%.*]] = load <16 x i16>, ptr [[TMP6]], align 2
 ; CHECK-NEXT:    [[TMP1:%.*]] = mul <16 x i16> [[TMP0]], splat (i16 99)
 ; CHECK-NEXT:    [[TMP2:%.*]] = lshr <16 x i16> [[TMP1]], splat (i16 8)
 ; CHECK-NEXT:    [[TMP3:%.*]] = select i1 [[C]], <16 x i16> [[TMP2]], <16 x i16> [[TMP1]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = trunc <16 x i16> [[TMP3]] to <16 x i8>
-; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
-; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i8, ptr [[DST]], i32 [[INDEX]]
-; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i8, ptr [[TMP5]], i64 16
 ; CHECK-NEXT:    store <16 x i8> [[TMP4]], ptr [[TMP5]], align 1
-; CHECK-NEXT:    store <16 x i8> [[TMP4]], ptr [[TMP6]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 32
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 16
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i32 [[INDEX_NEXT]], 992
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br i1 false, [[EXIT:label %.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
 ; CHECK:       [[VEC_EPILOG_ITER_CHECK]]:
-; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF7]]
+; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF11:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_PH]]:
 ; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i32 [ 992, %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <8 x i32> poison, i32 [[A]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <8 x i32> [[BROADCAST_SPLATINSERT1]], <8 x i32> poison, <8 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP8:%.*]] = trunc <8 x i32> [[BROADCAST_SPLAT2]] to <8 x i16>
+; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
+; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX3:%.*]] = phi i32 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT4:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i16, ptr [[SRC]], i32 [[INDEX3]]
+; CHECK-NEXT:    [[TMP8:%.*]] = load <8 x i16>, ptr [[TMP15]], align 2
 ; CHECK-NEXT:    [[TMP9:%.*]] = mul <8 x i16> [[TMP8]], splat (i16 99)
 ; CHECK-NEXT:    [[TMP10:%.*]] = lshr <8 x i16> [[TMP9]], splat (i16 8)
 ; CHECK-NEXT:    [[TMP11:%.*]] = select i1 [[C]], <8 x i16> [[TMP10]], <8 x i16> [[TMP9]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = trunc <8 x i16> [[TMP11]] to <8 x i8>
-; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
-; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX3:%.*]] = phi i32 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT4:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i8, ptr [[DST]], i32 [[INDEX3]]
 ; CHECK-NEXT:    store <8 x i8> [[TMP12]], ptr [[TMP13]], align 1
 ; CHECK-NEXT:    [[INDEX_NEXT4]] = add nuw i32 [[INDEX3]], 8
 ; CHECK-NEXT:    [[TMP14:%.*]] = icmp eq i32 [[INDEX_NEXT4]], 1000
-; CHECK-NEXT:    br i1 [[TMP14]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP14]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br i1 true, [[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]]
 ; CHECK:       [[VEC_EPILOG_SCALAR_PH]]:
@@ -249,7 +248,7 @@ loop:
   %gep.src = getelementptr inbounds i16, ptr %src, i32 %iv
   %l = load i16, ptr %gep.src
   %conv4111 = zext i16 %l to i32
-  %mul = mul i32 %A, 99
+  %mul = mul i32 %conv4111, 99
   %shr = lshr i32 %mul, 8
   %sel = select i1 %c, i32 %shr, i32 %mul
   %conv5 = trunc i32 %sel to i8
@@ -292,11 +291,11 @@ define void @trunc_invariant_sdiv_result(i32 %a, i32 %b, ptr noalias %src, ptr %
 ; CHECK-NEXT:    store <16 x i16> [[TMP6]], ptr [[TMP8]], align 2
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 32
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], 96
-; CHECK-NEXT:    br i1 [[TMP9]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP9]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP14:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br i1 false, [[EXIT:label %.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
 ; CHECK:       [[VEC_EPILOG_ITER_CHECK]]:
-; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF14:![0-9]+]]
+; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF15:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_PH]]:
 ; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ 96, %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <4 x i32> poison, i32 [[INVAR_DIV]], i64 0
@@ -313,7 +312,7 @@ define void @trunc_invariant_sdiv_result(i32 %a, i32 %b, ptr noalias %src, ptr %
 ; CHECK-NEXT:    store <4 x i16> [[TMP13]], ptr [[TMP14]], align 2
 ; CHECK-NEXT:    [[INDEX_NEXT6]] = add nuw i64 [[INDEX4]], 4
 ; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq i64 [[INDEX_NEXT6]], 100
-; CHECK-NEXT:    br i1 [[TMP15]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP15:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP15]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br i1 true, [[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]]
 ; CHECK:       [[VEC_EPILOG_SCALAR_PH]]:
@@ -432,7 +431,7 @@ define void @old_and_new_size_equalko(ptr noalias %src, ptr noalias %dst) {
 ; CHECK-NEXT:    store <4 x i32> [[TMP11]], ptr [[TMP13]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP14:%.*]] = icmp eq i32 [[INDEX_NEXT]], 1000
-; CHECK-NEXT:    br i1 [[TMP14]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP17:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP14]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP18:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
