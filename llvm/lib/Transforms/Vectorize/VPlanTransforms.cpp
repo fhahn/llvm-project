@@ -849,7 +849,7 @@ static void legalizeAndOptimizeInductions(VPlan &Plan) {
         continue;
 
       auto *Clone = VPBuilder::createSingleScalarOp(
-          Def->getUnderlyingInstr()->getOpcode(), Def->operands(),
+          vputils::getOpcode(Def), Def->operands(),
           /*Mask=*/nullptr, *Def, getMetadataOf(Def), DebugLoc::getUnknown(),
           Def->getScalarType(), Def->getUnderlyingInstr());
       Clone->insertAfter(Def);

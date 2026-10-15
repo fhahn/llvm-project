@@ -1878,10 +1878,10 @@ InstructionCost VPCostContext::getScalarizationOverhead(
 
 bool VPCostContext::useEmulatedMaskMemRefHack(const VPReplicateRecipe *R,
                                               ElementCount VF) {
-  const Instruction *UI = R->getUnderlyingInstr();
-  if (isa<LoadInst>(UI))
+  if (R->getOpcode() == Instruction::Load)
     return true;
-  assert(isa<StoreInst>(UI) && "R must either be a load or store");
+  assert(R->getOpcode() == Instruction::Store &&
+         "R must either be a load or store");
 
   if (!NumPredStores) {
     // Count the number of predicated stores in the VPlan, caching the result.
@@ -1898,7 +1898,7 @@ bool VPCostContext::useEmulatedMaskMemRefHack(const VPReplicateRecipe *R,
                vp_depth_first_shallow(VPRB->getEntry()))) {
         for (const VPReplicateRecipe &RepR :
              make_isa_range<VPReplicateRecipe>(*VPBB)) {
-          if (!isa<StoreInst>(RepR.getUnderlyingInstr()))
+          if (RepR.getOpcode() != Instruction::Store)
             continue;
           // Check if scatter is legal for this store. If so, don't count it.
           Type *Ty = RepR.getOperand(0)->getScalarType();
