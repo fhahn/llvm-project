@@ -46,6 +46,55 @@ exit:
   ret void
 }
 
+; The dependence distance is 3 iterations with types whose alloc size is larger
+; than their type size.
+; FIXME: User VF 4 is unsafe, should be clamped to 2.
+; CHECK-LABEL: @foo_i24
+; CHECK: <4 x i64>
+define void @foo_i24(ptr %a) {
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep = getelementptr inbounds i24, ptr %a, i64 %iv
+  %t = trunc i64 %iv to i24
+  store i24 %t, ptr %gep, align 4
+  %iv.3 = add nuw nsw i64 %iv, 3
+  %gep.3 = getelementptr inbounds i24, ptr %a, i64 %iv.3
+  store i24 %t, ptr %gep.3, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %exitcond.not = icmp eq i64 %iv.next, 1024
+  br i1 %exitcond.not, label %exit, label %loop, !llvm.loop !3
+
+exit:
+  ret void
+}
+
+; CHECK-LABEL: @foo_x86_fp80
+; CHECK: <4 x i64>
+define void @foo_x86_fp80(ptr %a) {
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep = getelementptr inbounds x86_fp80, ptr %a, i64 %iv
+  %t = uitofp i64 %iv to x86_fp80
+  store x86_fp80 %t, ptr %gep, align 16
+  %iv.3 = add nuw nsw i64 %iv, 3
+  %gep.3 = getelementptr inbounds x86_fp80, ptr %a, i64 %iv.3
+  store x86_fp80 %t, ptr %gep.3, align 16
+  %iv.next = add nuw nsw i64 %iv, 1
+  %exitcond.not = icmp eq i64 %iv.next, 1024
+  br i1 %exitcond.not, label %exit, label %loop, !llvm.loop !4
+
+exit:
+  ret void
+}
+
 !0 = !{!0, !1, !2}
 !1 = !{!"llvm.loop.vectorize.width", i32 4}
 !2 = !{!"llvm.loop.vectorize.enable"}
+!3 = !{!3, !1, !2}
+!4 = !{!4, !1, !2}

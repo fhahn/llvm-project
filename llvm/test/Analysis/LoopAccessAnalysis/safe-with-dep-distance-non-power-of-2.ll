@@ -146,6 +146,81 @@ exit:
   ret void
 }
 
+; The dependence distance is 3 iterations with types whose alloc size is larger
+; than their type size.
+; FIXME: The max safe vector width should be based on the type size.
+define void @test_may_clobber_i24(ptr %p) {
+; CHECK-LABEL: 'test_may_clobber_i24'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with a maximum safe vector width of 96 bits
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        BackwardVectorizable:
+; CHECK-NEXT:            store i24 %t, ptr %a1, align 4 ->
+; CHECK-NEXT:            store i24 %t, ptr %a2, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [0, %entry], [%iv.next, %loop]
+  %a1 = getelementptr i24, ptr %p, i64 %iv
+  %t = trunc i64 %iv to i24
+  store i24 %t, ptr %a1, align 4
+  %offset = add i64 %iv, 3
+  %a2 = getelementptr i24, ptr %p, i64 %offset
+  store i24 %t, ptr %a2, align 4
+  %iv.next = add i64 %iv, 1
+  %cmp = icmp ne i64 %iv, 199
+  br i1 %cmp, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+define void @test_may_clobber_x86_fp80(ptr %p) {
+; CHECK-LABEL: 'test_may_clobber_x86_fp80'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with a maximum safe vector width of 384 bits
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        BackwardVectorizable:
+; CHECK-NEXT:            store x86_fp80 %t, ptr %a1, align 16 ->
+; CHECK-NEXT:            store x86_fp80 %t, ptr %a2, align 16
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [0, %entry], [%iv.next, %loop]
+  %a1 = getelementptr x86_fp80, ptr %p, i64 %iv
+  %t = uitofp i64 %iv to x86_fp80
+  store x86_fp80 %t, ptr %a1, align 16
+  %offset = add i64 %iv, 3
+  %a2 = getelementptr x86_fp80, ptr %p, i64 %offset
+  store x86_fp80 %t, ptr %a2, align 16
+  %iv.next = add i64 %iv, 1
+  %cmp = icmp ne i64 %iv, 199
+  br i1 %cmp, label %loop, label %exit
+
+exit:
+  ret void
+}
+
 ; Trivially no overlap due to minimum distance (8192) exceeding value of VLEN and LMUL.
 define void @trivial_due_max_vscale(ptr %p) {
 ; CHECK-LABEL: 'trivial_due_max_vscale'
