@@ -371,3 +371,135 @@ loop.latch:
 exit:
   ret void
 }
+
+; Both loads of %a execute before the early exit in every iteration, so their
+; bounds are accessed and they can be grouped.
+define void @uncond_accesses_large_negative_offset_before_early_exit(ptr %a, ptr %b, i64 %n, i64 %k, i1 %c) {
+; CHECK-LABEL: 'uncond_accesses_large_negative_offset_before_early_exit'
+; CHECK-NEXT:    loop.header:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.a.off = getelementptr i32, ptr %a, i64 %iv.off
+; CHECK-NEXT:          %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %b High: (4 + (4 * (%k umin_seq (-1 + %n))) + %b))
+; CHECK-NEXT:            Member: {%b,+,4}<%loop.header>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: (-4398046511104 + %a) High: (4 + (4 * (%k umin_seq (-1 + %n))) + %a))
+; CHECK-NEXT:            Member: {(-4398046511104 + %a),+,4}<%loop.header>
+; CHECK-NEXT:            Member: {%a,+,4}<nuw><%loop.header>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop.header
+
+loop.header:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
+  %l.a = load i32, ptr %gep.a, align 4
+  br i1 %c, label %then, label %loop.body
+
+then:
+  br label %loop.body
+
+loop.body:
+  %iv.off = add i64 %iv, -1099511627776
+  %gep.a.off = getelementptr i32, ptr %a, i64 %iv.off
+  %l.a.off = load i32, ptr %gep.a.off, align 4
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
+  store i32 %l.a, ptr %gep.b, align 4
+  %ec.early = icmp eq i64 %iv, %k
+  br i1 %ec.early, label %exit, label %loop.latch
+
+loop.latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop.header
+
+exit:
+  ret void
+}
+
+; %gep.dst1.then and %gep.dst1.else have the same bounds, but only
+; %gep.dst1.else may be accessed if %c is false, so it cannot be grouped with
+; %gep.dst2.then.
+define void @cond_stores_same_bounds_large_negative_offset(ptr %dst, ptr %src, i1 %c, i64 %n) {
+; CHECK-LABEL: 'cond_stores_same_bounds_large_negative_offset'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Forward:
+; CHECK-NEXT:            store i64 %v, ptr %gep.dst1.then, align 8 ->
+; CHECK-NEXT:            store i64 7, ptr %gep.dst2.then, align 8
+; CHECK-EMPTY:
+; CHECK-NEXT:        Forward:
+; CHECK-NEXT:            store i64 %r, ptr %gep.dst1.else, align 8 ->
+; CHECK-NEXT:            store i64 7, ptr %gep.dst2.then, align 8
+; CHECK-EMPTY:
+; CHECK-NEXT:        Forward:
+; CHECK-NEXT:            store i64 %r, ptr %gep.dst1.else, align 8 ->
+; CHECK-NEXT:            store i64 %v, ptr %gep.dst1.then, align 8
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.dst2.then = getelementptr i8, ptr %gep.dst1.then, i64 -1099511627776
+; CHECK-NEXT:          %gep.dst1.then = getelementptr i64, ptr %dst, i64 %iv
+; CHECK-NEXT:          %gep.dst1.else = getelementptr i64, ptr %dst, i64 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.src = getelementptr i64, ptr %src, i64 %iv
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: (-1099511627776 + %dst) High: ((8 * %n) + %dst))
+; CHECK-NEXT:            Member: {(-1099511627776 + %dst),+,8}<%loop>
+; CHECK-NEXT:            Member: {%dst,+,8}<%loop>
+; CHECK-NEXT:            Member: {%dst,+,8}<%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %src High: ((8 * %n) + %src))
+; CHECK-NEXT:            Member: {%src,+,8}<%loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  %gep.src = getelementptr i64, ptr %src, i64 %iv
+  %v = load i64, ptr %gep.src, align 8
+  br i1 %c, label %then, label %else
+
+then:
+  %gep.dst1.then = getelementptr i64, ptr %dst, i64 %iv
+  store i64 %v, ptr %gep.dst1.then, align 8
+  %gep.dst2.then = getelementptr i8, ptr %gep.dst1.then, i64 -1099511627776
+  store i64 7, ptr %gep.dst2.then, align 8
+  br label %latch
+
+else:
+  %r = add i64 %v, 1
+  %gep.dst1.else = getelementptr i64, ptr %dst, i64 %iv
+  store i64 %r, ptr %gep.dst1.else, align 8
+  br label %latch
+
+latch:
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
