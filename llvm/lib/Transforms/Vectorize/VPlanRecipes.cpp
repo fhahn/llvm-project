@@ -1218,6 +1218,10 @@ InstructionCost VPRecipeWithIRFlags::getCostForRecipeWithOpcode(
   case Instruction::SDiv:
   case Instruction::SRem:
   case Instruction::URem:
+    // If the div/rem operation isn't safe to speculate and requires
+    // predication, then the only way we can even create a vplan is to insert
+    // a select on the second input operand to ensure we use the value of 1
+    // for the inactive lanes. The select will be costed separately.
   case Instruction::Add:
   case Instruction::FAdd:
   case Instruction::Sub:
@@ -2978,41 +2982,6 @@ void VPWidenRecipe::execute(VPTransformState &State) {
   case Instruction::PHI:
   case Instruction::GetElementPtr:
     llvm_unreachable("This instruction is handled by a different recipe.");
-  case Instruction::UDiv:
-  case Instruction::SDiv:
-  case Instruction::SRem:
-  case Instruction::URem:
-  case Instruction::Add:
-  case Instruction::FAdd:
-  case Instruction::Sub:
-  case Instruction::FSub:
-  case Instruction::FNeg:
-  case Instruction::Mul:
-  case Instruction::FMul:
-  case Instruction::FDiv:
-  case Instruction::FRem:
-  case Instruction::Shl:
-  case Instruction::LShr:
-  case Instruction::AShr:
-  case Instruction::And:
-  case Instruction::Or:
-  case Instruction::Xor: {
-    // Just widen unops and binops.
-    SmallVector<Value *, 2> Ops;
-    for (VPValue *VPOp : operands())
-      Ops.push_back(State.get(VPOp));
-
-    Value *V = Builder.CreateNAryOp(Opcode, Ops);
-
-    if (auto *VecOp = dyn_cast<Instruction>(V)) {
-      applyFlags(*VecOp);
-      applyMetadata(*VecOp);
-    }
-
-    // Use this vector value for all users of the original instruction.
-    State.set(this, V);
-    break;
-  }
   case Instruction::ExtractValue: {
     Value *Op = State.get(getOperand(0));
     Value *Extract =
@@ -3059,11 +3028,26 @@ void VPWidenRecipe::execute(VPTransformState &State) {
     }
     break;
   }
-  default:
-    // This instruction is not vectorized by simple widening.
-    LLVM_DEBUG(dbgs() << "LV: Found an unhandled opcode : "
-                      << Instruction::getOpcodeName(Opcode));
-    llvm_unreachable("Unhandled instruction!");
+  default: {
+    assert(
+        (Instruction::isBinaryOp(Opcode) || Instruction::isUnaryOp(Opcode)) &&
+        "Unexpected opcode for VPWidenRecipe");
+    // Just widen unops and binops.
+    SmallVector<Value *, 2> Ops;
+    for (VPValue *VPOp : operands())
+      Ops.push_back(State.get(VPOp));
+
+    Value *V = Builder.CreateNAryOp(Opcode, Ops);
+
+    if (auto *VecOp = dyn_cast<Instruction>(V)) {
+      applyFlags(*VecOp);
+      applyMetadata(*VecOp);
+    }
+
+    // Use this vector value for all users of the original instruction.
+    State.set(this, V);
+    break;
+  }
   } // end of switch.
 
 #if !defined(NDEBUG)
@@ -3077,39 +3061,7 @@ void VPWidenRecipe::execute(VPTransformState &State) {
 
 InstructionCost VPWidenRecipe::computeCost(ElementCount VF,
                                            VPCostContext &Ctx) const {
-  switch (Opcode) {
-  case Instruction::UDiv:
-  case Instruction::SDiv:
-  case Instruction::SRem:
-  case Instruction::URem:
-    // If the div/rem operation isn't safe to speculate and requires
-    // predication, then the only way we can even create a vplan is to insert
-    // a select on the second input operand to ensure we use the value of 1
-    // for the inactive lanes. The select will be costed separately.
-  case Instruction::FNeg:
-  case Instruction::Add:
-  case Instruction::FAdd:
-  case Instruction::Sub:
-  case Instruction::FSub:
-  case Instruction::Mul:
-  case Instruction::FMul:
-  case Instruction::FDiv:
-  case Instruction::FRem:
-  case Instruction::Shl:
-  case Instruction::LShr:
-  case Instruction::AShr:
-  case Instruction::And:
-  case Instruction::Or:
-  case Instruction::Xor:
-  case Instruction::Freeze:
-  case Instruction::ExtractValue:
-  case Instruction::ICmp:
-  case Instruction::FCmp:
-  case Instruction::Select:
-    return getCostForRecipeWithOpcode(getOpcode(), VF, Ctx);
-  default:
-    llvm_unreachable("Unsupported opcode for instruction");
-  }
+  return getCostForRecipeWithOpcode(getOpcode(), VF, Ctx);
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
@@ -4181,6 +4133,20 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
   case Instruction::Xor:
   case Instruction::ICmp:
   case Instruction::FCmp:
+  case Instruction::Select:
+  case Instruction::SExt:
+  case Instruction::ZExt:
+  case Instruction::FPToUI:
+  case Instruction::FPToSI:
+  case Instruction::FPExt:
+  case Instruction::PtrToInt:
+  case Instruction::PtrToAddr:
+  case Instruction::IntToPtr:
+  case Instruction::SIToFP:
+  case Instruction::UIToFP:
+  case Instruction::Trunc:
+  case Instruction::FPTrunc:
+  case Instruction::AddrSpaceCast:
     return getCostForRecipeWithOpcode(getOpcode(), ElementCount::getFixed(1),
                                       Ctx) *
            (isSingleScalar() ? 1 : VF.getFixedValue());
@@ -4299,24 +4265,6 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
       }
     }
     return Cost;
-  }
-  case Instruction::SExt:
-  case Instruction::ZExt:
-  case Instruction::FPToUI:
-  case Instruction::FPToSI:
-  case Instruction::FPExt:
-  case Instruction::PtrToInt:
-  case Instruction::PtrToAddr:
-  case Instruction::IntToPtr:
-  case Instruction::SIToFP:
-  case Instruction::UIToFP:
-  case Instruction::Trunc:
-  case Instruction::FPTrunc:
-  case Instruction::Select:
-  case Instruction::AddrSpaceCast: {
-    return getCostForRecipeWithOpcode(getOpcode(), ElementCount::getFixed(1),
-                                      Ctx) *
-           (isSingleScalar() ? 1 : VF.getFixedValue());
   }
   case Instruction::ExtractValue:
     return Ctx.TTI.getInsertExtractValueCost(getOpcode(), Ctx.CostKind);
