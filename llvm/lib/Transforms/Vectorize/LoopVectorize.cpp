@@ -717,7 +717,7 @@ public:
   /// Returns true if the target machine supports masked loads or stores
   /// for \p I's data type and alignment. The caller must ensure the access is
   /// consecutive or part of an interleave group.
-  bool isLegalMaskedLoadOrStore(Instruction *I, ElementCount VF) const;
+  bool isLegalMaskedLoadOrStore(Instruction *I) const;
 
   /// Returns true if the target machine supports gather or scatter for \p I's
   /// data type and alignment.
@@ -923,11 +923,10 @@ public:
   /// if it's needed.
   InstructionCost getVectorCallCost(CallInst *CI, ElementCount VF) const;
 
-  /// Returns the expected execution cost. The unit of the cost does
-  /// not matter because we use the 'cost' units to compare different
-  /// vector widths. The cost that is returned is *not* normalized by
-  /// the factor width.
-  InstructionCost expectedCost(ElementCount VF);
+  /// Returns the expected execution cost of the scalar loop. The unit of the
+  /// cost does not matter because we use the 'cost' units to compare
+  /// different vector widths.
+  InstructionCost expectedCost();
 
   /// Returns the execution time cost of an instruction for a given vector
   /// width. Vector width of one means scalar.
@@ -1564,17 +1563,17 @@ static void collectSupportedLoops(const VectorizeOptions &Opts, Loop &L,
 // LoopVectorizationCostModel and LoopVectorizationPlanner.
 //===----------------------------------------------------------------------===//
 
-/// For the given VF and UF and maximum trip count computed for the loop, return
-/// whether the induction variable might overflow in the vectorized loop. If not,
-/// then we know a runtime overflow check always evaluates to false and can be
-/// removed.
-static bool isIndvarOverflowCheckKnownFalse(
-    const VectorizeOptions &Opts, const LoopVectorizationCostModel *Cost,
-    ElementCount VF, std::optional<unsigned> UF = std::nullopt) {
-  // Always be conservative if we don't know the exact unroll factor.
-  uint64_t MaxUF = UF ? *UF
-                      : std::max(Cost->TTI.getMaxInterleaveFactor(VF, false),
-                                 Cost->TTI.getMaxInterleaveFactor(VF, true));
+/// For the given VF and maximum trip count computed for the loop, return
+/// whether the induction variable might overflow in the vectorized loop. If
+/// not, then we know a runtime overflow check always evaluates to false and can
+/// be removed.
+static bool
+isIndvarOverflowCheckKnownFalse(const VectorizeOptions &Opts,
+                                const LoopVectorizationCostModel *Cost,
+                                ElementCount VF) {
+  // Always be conservative, as the exact unroll factor is not known yet.
+  uint64_t MaxUF = std::max(Cost->TTI.getMaxInterleaveFactor(VF, false),
+                            Cost->TTI.getMaxInterleaveFactor(VF, true));
 
   IntegerType *IdxTy = Cost->Legal->getWidestInductionType();
   APInt MaxUIntTripCount = IdxTy->getMask();
@@ -2007,7 +2006,7 @@ void LoopVectorizationCostModel::collectLoopScalars(ElementCount VF) {
 }
 
 bool LoopVectorizationCostModel::isLegalMaskedLoadOrStore(
-    Instruction *I, ElementCount VF) const {
+    Instruction *I) const {
   assert(isa<LoadInst>(I) || isa<StoreInst>(I));
   return Config.isLegalMaskedLoadOrStore(isa<LoadInst>(I), getLoadStoreType(I),
                                          getLoadStoreAlignment(I),
@@ -2043,7 +2042,7 @@ bool LoopVectorizationCostModel::isScalarWithPredication(Instruction *I,
   case Instruction::Store: {
     bool IsConsecutive = Legal->isConsecutivePtr(getLoadStoreType(I),
                                                  getLoadStorePointerOperand(I));
-    return !(IsConsecutive && isLegalMaskedLoadOrStore(I, VF)) &&
+    return !(IsConsecutive && isLegalMaskedLoadOrStore(I)) &&
            !isLegalGatherOrScatter(I, VF);
   }
   case Instruction::UDiv:
@@ -2270,7 +2269,7 @@ bool LoopVectorizationCostModel::interleavedAccessCanBeWidened(
   if (VF.isScalable() && NeedsMaskForGaps)
     return false;
 
-  return isLegalMaskedLoadOrStore(I, VF);
+  return isLegalMaskedLoadOrStore(I);
 }
 
 std::optional<LoopVectorizationCostModel::InstWidening>
@@ -3409,7 +3408,7 @@ LoopVectorizationPlanner::selectInterleaveCount(VPlan &Plan, ElementCount VF,
   // then we calculate the cost of VF here.
   if (LoopCost == 0) {
     if (VF.isScalar())
-      LoopCost = CM->expectedCost(VF);
+      LoopCost = CM->expectedCost();
     else
       LoopCost = cost(Plan, VF, &R, *CM);
     assert(LoopCost.isValid() && "Expected to have chosen a VF with valid cost");
@@ -3874,9 +3873,8 @@ InstructionCost LoopVectorizationCostModel::computePredInstDiscount(
   return Discount;
 }
 
-InstructionCost LoopVectorizationCostModel::expectedCost(ElementCount VF) {
+InstructionCost LoopVectorizationCostModel::expectedCost() {
   InstructionCost Cost;
-  assert(VF.isScalar() && "must only be called for scalar VFs");
 
   // For each block.
   for (BasicBlock *BB : TheLoop->blocks()) {
@@ -3885,19 +3883,18 @@ InstructionCost LoopVectorizationCostModel::expectedCost(ElementCount VF) {
     // For each instruction in the old loop.
     for (Instruction &I : *BB) {
       // Skip ignored values.
-      if (ValuesToIgnore.count(&I) ||
-          (VF.isVector() && VecValuesToIgnore.count(&I)))
+      if (ValuesToIgnore.contains(&I))
         continue;
 
-      InstructionCost C = getInstructionCost(&I, VF);
+      InstructionCost C = getInstructionCost(&I, ElementCount::getFixed(1));
 
       // Check if we should override the cost.
       if (C.isValid() && Opts.force_target_instruction_cost)
         C = InstructionCost(*Opts.force_target_instruction_cost);
 
       BlockCost += C;
-      LLVM_DEBUG(dbgs() << "LV: Found an estimated cost of " << C << " for VF "
-                        << VF << " For instruction: " << I << '\n');
+      LLVM_DEBUG(dbgs() << "LV: Found an estimated cost of " << C
+                        << " for VF 1 For instruction: " << I << '\n');
     }
 
     // In the scalar loop, we may not always execute the predicated block, if it
@@ -4189,8 +4186,7 @@ LoopVectorizationCostModel::getScalarizationOverhead(Instruction *I,
 }
 
 void LoopVectorizationCostModel::setCostBasedWideningDecision(ElementCount VF) {
-  if (VF.isScalar())
-    return;
+  assert(VF.isVector() && "Expected VF >= 2");
 
   // TODO: We should generate better code and update the cost model for
   // predicated uniform stores. Today they are treated as any other
@@ -5358,7 +5354,7 @@ LoopVectorizationPlanner::computeBestVF() {
          "More than a single plan/VF w/o any plan having scalar VF");
 
   // TODO: Compute scalar cost using VPlan-based cost model.
-  InstructionCost ScalarCost = CM->expectedCost(ScalarVF);
+  InstructionCost ScalarCost = CM->expectedCost();
   LLVM_DEBUG(dbgs() << "LV: Scalar loop costs: " << ScalarCost << ".\n");
   VectorizationFactor ScalarFactor(ScalarVF, ScalarCost, ScalarCost);
   VectorizationFactor BestFactor = ScalarFactor;
