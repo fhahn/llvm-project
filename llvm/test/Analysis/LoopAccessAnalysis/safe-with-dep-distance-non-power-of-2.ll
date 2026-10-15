@@ -148,11 +148,10 @@ exit:
 
 ; The dependence distance is 3 iterations with types whose alloc size is larger
 ; than their type size.
-; FIXME: The max safe vector width should be based on the type size.
 define void @test_may_clobber_i24(ptr %p) {
 ; CHECK-LABEL: 'test_may_clobber_i24'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with a maximum safe vector width of 96 bits
+; CHECK-NEXT:      Memory dependences are safe with a maximum safe vector width of 72 bits
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:        BackwardVectorizable:
 ; CHECK-NEXT:            store i24 %t, ptr %a1, align 4 ->
@@ -188,7 +187,7 @@ exit:
 define void @test_may_clobber_x86_fp80(ptr %p) {
 ; CHECK-LABEL: 'test_may_clobber_x86_fp80'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with a maximum safe vector width of 384 bits
+; CHECK-NEXT:      Memory dependences are safe with a maximum safe vector width of 240 bits
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:        BackwardVectorizable:
 ; CHECK-NEXT:            store x86_fp80 %t, ptr %a1, align 16 ->

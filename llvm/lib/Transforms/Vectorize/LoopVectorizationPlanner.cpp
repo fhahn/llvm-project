@@ -358,7 +358,7 @@ FixedScalableVFPair VFSelectionContext::computeFeasibleMaxVF(
   auto [SmallestType, WidestType] = getSmallestAndWidestTypes();
 
   // Get the maximum safe dependence distance in bits computed by LAA.
-  // It is computed by MaxVF * sizeOf(type) * 8, where type is taken from
+  // It is computed by MaxVF * the type size in bits, where type is taken from
   // the memory accesses that is most restrictive (involved in the smallest
   // dependence distance).
   unsigned MaxSafeElementsPowerOf2 =
