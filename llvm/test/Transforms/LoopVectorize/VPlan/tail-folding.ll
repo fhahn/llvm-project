@@ -111,14 +111,14 @@ define i32 @conditional_live_out(ptr noalias %p, i32 %n, i1 %c) {
 ; CHECK-NEXT:    Successor(s): vector.body.split, vector.latch
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body.split:
-; CHECK-NEXT:      EMIT branch-on-cond ir<%c>
+; CHECK-NEXT:      EMIT branch-on-cond ir<%c> (!vplan.prof.estimated estimated {1073741824, 1073741824})
 ; CHECK-NEXT:    Successor(s): if, latch
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    if:
-; CHECK-NEXT:      EMIT ir<%gep> = getelementptr ir<%p>, ir<%iv>
-; CHECK-NEXT:      EMIT-SCALAR ir<%x> = load ir<%gep>
-; CHECK-NEXT:      EMIT ir<%y> = add ir<%x>, ir<1>
-; CHECK-NEXT:      EMIT store ir<%y>, ir<%gep>
+; CHECK-NEXT:      EMIT ir<%gep> = getelementptr ir<%p>, ir<%iv> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
+; CHECK-NEXT:      EMIT-SCALAR ir<%x> = load ir<%gep> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
+; CHECK-NEXT:      EMIT ir<%y> = add ir<%x>, ir<1> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
+; CHECK-NEXT:      EMIT store ir<%y>, ir<%gep> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
 ; CHECK-NEXT:    Successor(s): latch
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    latch:
@@ -350,4 +350,182 @@ loop:
 
 exit:
   ret i32 %rdx.next
+}
+
+define i32 @sunk_live_out(ptr noalias %p, i32 %n) {
+;
+; CHECK-LABEL: VPlan for loop in 'sunk_live_out'
+; CHECK:  VPlan ' for UF>=1' {
+; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
+; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in ir<%n> = original trip-count
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<entry>:
+; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:  Successor(s): vector loop
+; CHECK-EMPTY:
+; CHECK-NEXT:  <x1> vector loop: {
+; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP4:%[0-9]+]]> = HEADER-MASK
+; CHECK-EMPTY:
+; CHECK-NEXT:    vector.body:
+; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT branch-on-cond vp<[[VP4]]>
+; CHECK-NEXT:    Successor(s): vector.body.split, vector.latch
+; CHECK-EMPTY:
+; CHECK-NEXT:    vector.body.split:
+; CHECK-NEXT:      EMIT ir<%gep> = getelementptr ir<%p>, ir<%iv>
+; CHECK-NEXT:      EMIT-SCALAR ir<%x> = load ir<%gep>
+; CHECK-NEXT:      EMIT ir<%y> = add ir<%x>, ir<1>
+; CHECK-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
+; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<%n>
+; CHECK-NEXT:    Successor(s): vector.latch
+; CHECK-EMPTY:
+; CHECK-NEXT:    vector.latch:
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP6:%[0-9]+]]> = phi [ ir<%y>, vector.body.split ], [ ir<poison>, vector.body ]
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:    No successors
+; CHECK-NEXT:  }
+; CHECK-NEXT:  Successor(s): middle.block
+; CHECK-EMPTY:
+; CHECK-NEXT:  middle.block:
+; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = exiting-iv-value ir<%iv>
+; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = extract-last-part vp<[[VP6]]>
+; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = extract-last-lane vp<[[VP9]]>
+; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = last-active-lane vp<[[VP4]]>
+; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = extract-lane vp<[[VP11]]>, vp<[[VP6]]>
+; CHECK-NEXT:    EMIT branch-on-cond ir<true>
+; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<exit>:
+; CHECK-NEXT:    IR   %y.lcssa = phi i32 [ %y, %loop ] (extra operand: vp<[[VP12]]> from middle.block)
+; CHECK-NEXT:  No successors
+; CHECK-EMPTY:
+; CHECK-NEXT:  scalar.ph:
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP8]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:  Successor(s): ir-bb<loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<loop>:
+; CHECK-NEXT:    IR   %iv = phi i32 [ 0, %entry ], [ %iv.next, %loop ] (extra operand: vp<%bc.resume.val> from scalar.ph)
+; CHECK-NEXT:    IR   %gep = getelementptr i32, ptr %p, i32 %iv
+; CHECK-NEXT:    IR   %x = load i32, ptr %gep, align 4
+; CHECK-NEXT:    IR   %y = add i32 %x, 1
+; CHECK-NEXT:    IR   %iv.next = add i32 %iv, 1
+; CHECK-NEXT:    IR   %ec = icmp eq i32 %iv.next, %n
+; CHECK-NEXT:  No successors
+; CHECK-NEXT:  }
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i32 [0, %entry], [%iv.next, %loop]
+  %gep = getelementptr i32, ptr %p, i32 %iv
+  %x = load i32, ptr %gep
+  %y = add i32 %x, 1
+  %iv.next = add i32 %iv, 1
+  %ec = icmp eq i32 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret i32 %y
+}
+
+define i32 @conditional_sunk_live_out(ptr noalias %p, i32 %n, i1 %c) {
+;
+; CHECK-LABEL: VPlan for loop in 'conditional_sunk_live_out'
+; CHECK:  VPlan ' for UF>=1' {
+; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
+; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in ir<%n> = original trip-count
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<entry>:
+; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:  Successor(s): vector loop
+; CHECK-EMPTY:
+; CHECK-NEXT:  <x1> vector loop: {
+; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP4:%[0-9]+]]> = HEADER-MASK
+; CHECK-EMPTY:
+; CHECK-NEXT:    vector.body:
+; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT branch-on-cond vp<[[VP4]]>
+; CHECK-NEXT:    Successor(s): vector.body.split, vector.latch
+; CHECK-EMPTY:
+; CHECK-NEXT:    vector.body.split:
+; CHECK-NEXT:      EMIT branch-on-cond ir<%c> (!vplan.prof.estimated estimated {1073741824, 1073741824})
+; CHECK-NEXT:    Successor(s): if, latch
+; CHECK-EMPTY:
+; CHECK-NEXT:    if:
+; CHECK-NEXT:      EMIT ir<%gep> = getelementptr ir<%p>, ir<%iv> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
+; CHECK-NEXT:      EMIT-SCALAR ir<%x> = load ir<%gep> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
+; CHECK-NEXT:    Successor(s): latch
+; CHECK-EMPTY:
+; CHECK-NEXT:    latch:
+; CHECK-NEXT:      EMIT-SCALAR ir<%phi> = phi [ ir<%x>, if ], [ ir<0>, vector.body.split ]
+; CHECK-NEXT:      EMIT ir<%y> = add ir<%phi>, ir<1>
+; CHECK-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
+; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<%n>
+; CHECK-NEXT:    Successor(s): vector.latch
+; CHECK-EMPTY:
+; CHECK-NEXT:    vector.latch:
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP6:%[0-9]+]]> = phi [ ir<%y>, latch ], [ ir<poison>, vector.body ]
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:    No successors
+; CHECK-NEXT:  }
+; CHECK-NEXT:  Successor(s): middle.block
+; CHECK-EMPTY:
+; CHECK-NEXT:  middle.block:
+; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = exiting-iv-value ir<%iv>
+; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = extract-last-part vp<[[VP6]]>
+; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = extract-last-lane vp<[[VP9]]>
+; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = last-active-lane vp<[[VP4]]>
+; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = extract-lane vp<[[VP11]]>, vp<[[VP6]]>
+; CHECK-NEXT:    EMIT branch-on-cond ir<true>
+; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<exit>:
+; CHECK-NEXT:    IR   %y.lcssa = phi i32 [ %y, %latch ] (extra operand: vp<[[VP12]]> from middle.block)
+; CHECK-NEXT:  No successors
+; CHECK-EMPTY:
+; CHECK-NEXT:  scalar.ph:
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP8]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:  Successor(s): ir-bb<loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<loop>:
+; CHECK-NEXT:    IR   %iv = phi i32 [ 0, %entry ], [ %iv.next, %latch ] (extra operand: vp<%bc.resume.val> from scalar.ph)
+; CHECK-NEXT:  No successors
+; CHECK-NEXT:  }
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i32 [0, %entry], [%iv.next, %latch]
+  br i1 %c, label %if, label %latch
+
+if:
+  %gep = getelementptr i32, ptr %p, i32 %iv
+  %x = load i32, ptr %gep
+  br label %latch
+
+latch:
+  %phi = phi i32 [%x, %if], [0, %loop]
+  %y = add i32 %phi, 1
+  %iv.next = add i32 %iv, 1
+  %ec = icmp eq i32 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret i32 %y
 }
