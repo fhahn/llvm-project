@@ -5736,12 +5736,13 @@ VPRecipeBase *VPRecipeBuilder::tryToWidenMemory(VPInstruction *VPI,
   }
 
   if (Reverse && Mask)
-    Mask = Builder.createNaryOp(VPInstruction::Reverse, Mask, I->getDebugLoc());
+    Mask =
+        Builder.createNaryOp(VPInstruction::Reverse, Mask, VPI->getDebugLoc());
 
   if (VPI->getOpcode() == Instruction::Load) {
     auto *Load = cast<LoadInst>(I);
     auto *LoadR = Builder.createWidenLoad(*Load, Ptr, Mask, Consecutive, *VPI,
-                                          Load->getDebugLoc());
+                                          VPI->getDebugLoc());
     if (Reverse)
       return Builder.createNaryOp(VPInstruction::Reverse, LoadR,
                                   LoadR->getDebugLoc());
@@ -5752,9 +5753,9 @@ VPRecipeBase *VPRecipeBuilder::tryToWidenMemory(VPInstruction *VPI,
   VPValue *StoredVal = VPI->getOperand(0);
   if (Reverse)
     StoredVal = Builder.createNaryOp(VPInstruction::Reverse, StoredVal,
-                                     Store->getDebugLoc());
+                                     VPI->getDebugLoc());
   return Builder.createWidenStore(*Store, Ptr, StoredVal, Mask, Consecutive,
-                                  *VPI, Store->getDebugLoc());
+                                  *VPI, VPI->getDebugLoc());
 }
 
 bool VPRecipeBuilder::shouldWiden(Instruction *I, VFRange &Range) const {
@@ -5784,7 +5785,7 @@ VPRecipeWithIRFlags *VPRecipeBuilder::tryToWiden(VPInstruction *VPI) {
     if (CM.isPredicatedInst(I))
       return new VPWidenIntrinsicRecipe(
           getMaskedDivRemIntrinsic(VPI->getOpcode()), VPI->operands(),
-          I->getType(), {}, {}, VPI->getDebugLoc());
+          VPI->getScalarType(), {}, {}, VPI->getDebugLoc());
     [[fallthrough]];
   case Instruction::Add:
   case Instruction::And:
