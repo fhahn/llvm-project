@@ -2149,10 +2149,12 @@ static PointerBounds expandBounds(const RuntimeCheckingPtrGroup *CG,
     const SCEV *Recur = LowAR->getStepRecurrence(SE);
     if (Recur == HighAR->getStepRecurrence(SE) &&
         HighAR->getLoop() == OuterLoop && LowAR->getLoop() == OuterLoop) {
-      BasicBlock *OuterLoopLatch = OuterLoop->getLoopLatch();
-      const SCEV *OuterExitCount = SE.getExitCount(OuterLoop, OuterLoopLatch);
-      if (!isa<SCEVCouldNotCompute>(OuterExitCount) &&
-          OuterExitCount->getType()->isIntegerTy()) {
+      // Use the exact backedge-taken count; the latch exit count may exceed it
+      // if the outer loop has other exits. Require a rotated outer loop, as
+      // otherwise the last counted iteration may not reach the inner loop.
+      const SCEV *OuterExitCount = SE.getBackedgeTakenCount(OuterLoop);
+      if (OuterLoop->isRotatedForm() &&
+          !isa<SCEVCouldNotCompute>(OuterExitCount)) {
         const SCEV *NewHigh =
             cast<SCEVAddRecExpr>(High)->evaluateAtIteration(OuterExitCount, SE);
         if (!isa<SCEVCouldNotCompute>(NewHigh)) {

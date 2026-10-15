@@ -1570,19 +1570,20 @@ exit:
 
 ; The outer loop has an early exit, so its latch exit count (-2) exceeds the
 ; number of executed iterations.
-; FIXME: The expanded ranges are evaluated at the latch exit count and wrap.
 define void @outer_loop_early_exit(ptr %dst, ptr %src, i64 %n, i1 %c) {
 ; CHECK-LABEL: define void @outer_loop_early_exit(
 ; CHECK-SAME: ptr [[DST:%.*]], ptr [[SRC:%.*]], i64 [[N:%.*]], i1 [[C:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
-; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], -128
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP1]]
-; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP0]], -256
-; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP2]]
 ; CHECK-NEXT:    br label %[[OUTER_LOOP:.*]]
 ; CHECK:       [[OUTER_LOOP]]:
 ; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[OUTER_IV]], 6
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP0]], [[TMP1]]
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP2]]
+; CHECK-NEXT:    [[TMP8:%.*]] = shl i64 [[OUTER_IV]], 7
+; CHECK-NEXT:    [[TMP9:%.*]] = add i64 [[TMP0]], [[TMP8]]
+; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP9]]
 ; CHECK-NEXT:    [[DST_OFF:%.*]] = mul i64 [[OUTER_IV]], 64
 ; CHECK-NEXT:    [[DST_START:%.*]] = getelementptr i8, ptr [[DST]], i64 [[DST_OFF]]
 ; CHECK-NEXT:    [[SRC_OFF:%.*]] = mul i64 [[OUTER_IV]], 128
@@ -1590,8 +1591,8 @@ define void @outer_loop_early_exit(ptr %dst, ptr %src, i64 %n, i1 %c) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP1]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC]], [[SCEVGEP]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST_START]], [[SCEVGEP1]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC_START]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
