@@ -5294,11 +5294,27 @@ LoopVectorizationPlanner::precomputeCosts(VPlan &Plan, ElementCount VF,
   // accounted for here using the legacy cost model. However, some opcodes
   // are excluded from these precomputed scalarization costs and are instead
   // modeled later by the VPlan cost model (see UseVPlanCostModel below).
+  // Forced scalars that VPlan narrowed to single scalars are executed once.
+  SmallPtrSet<Instruction *, 8> SingleScalars;
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_deep(Plan.getVectorLoopRegion()->getEntry()))) {
+    for (VPRecipeBase &R : *VPBB) {
+      auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
+      auto *VPI = dyn_cast<VPInstruction>(&R);
+      if ((RepR && RepR->isSingleScalar()) ||
+          (VPI && vputils::isSingleScalar(VPI)))
+        if (auto *I = dyn_cast_or_null<Instruction>(
+                R.getVPSingleValue()->getUnderlyingValue()))
+          SingleScalars.insert(I);
+    }
+  }
   for (Instruction *ForcedScalar : CostCtx.CM.ForcedScalars[VF]) {
     if (CostCtx.skipCostComputation(ForcedScalar, VF.isVector()))
       continue;
     CostCtx.SkipCostComputation.insert(ForcedScalar);
-    InstructionCost ForcedCost = CostCtx.getLegacyCost(ForcedScalar, VF);
+    InstructionCost ForcedCost = CostCtx.getLegacyCost(
+        ForcedScalar,
+        SingleScalars.contains(ForcedScalar) ? ElementCount::getFixed(1) : VF);
     LLVM_DEBUG({
       dbgs() << "Cost of " << ForcedCost << " for VF " << VF
              << ": forced scalar " << *ForcedScalar << "\n";
