@@ -227,3 +227,649 @@ loop.latch:
 exit:
   ret void
 }
+
+; The guard is in the outer loop header; the inner loop is entered from a
+; merge block in the outer loop body.
+; TODO: The guard is not used, as the walk continues directly at the outer
+; loop's predecessor.
+define void @guard_in_outer_loop_before_merge(i32 %n, i1 %c, i32 %m) {
+; CHECK-LABEL: 'guard_in_outer_loop_before_merge'
+; CHECK-NEXT:  Determining loop execution counts for: @guard_in_outer_loop_before_merge
+; CHECK-NEXT:  Loop %inner: backedge-taken count is (-1 + (1 smax %n))<nsw>
+; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i32 2147483646
+; CHECK-NEXT:  Loop %inner: symbolic max backedge-taken count is (-1 + (1 smax %n))<nsw>
+; CHECK-NEXT:  Loop %inner: Trip multiple is 1
+; CHECK-NEXT:  Loop %outer.header: backedge-taken count is (-1 + (1 umax %m))
+; CHECK-NEXT:  Loop %outer.header: constant max backedge-taken count is i32 -2
+; CHECK-NEXT:  Loop %outer.header: symbolic max backedge-taken count is (-1 + (1 umax %m))
+; CHECK-NEXT:  Loop %outer.header: Trip multiple is 1
+;
+entry:
+  br label %outer.header
+
+outer.header:
+  %i = phi i32 [ 0, %entry ], [ %i.next, %outer.latch ]
+  %guard = icmp sgt i32 %n, 0
+  br i1 %guard, label %split, label %outer.latch
+
+split:
+  br i1 %c, label %then, label %else
+
+then:
+  br label %inner.ph
+
+else:
+  br label %inner.ph
+
+inner.ph:
+  br label %inner
+
+inner:
+  %j = phi i32 [ 0, %inner.ph ], [ %j.next, %inner ]
+  %j.next = add nsw i32 %j, 1
+  %ec = icmp slt i32 %j.next, %n
+  br i1 %ec, label %inner, label %outer.latch
+
+outer.latch:
+  %i.next = add i32 %i, 1
+  %oc = icmp ult i32 %i.next, %m
+  br i1 %oc, label %outer.header, label %exit
+
+exit:
+  ret void
+}
+
+; Same as above, but the guard is only on one path to the merge block, so it
+; must not be used.
+define void @guard_in_outer_loop_not_dominating_merge(i32 %n, i1 %c, i32 %m) {
+; CHECK-LABEL: 'guard_in_outer_loop_not_dominating_merge'
+; CHECK-NEXT:  Determining loop execution counts for: @guard_in_outer_loop_not_dominating_merge
+; CHECK-NEXT:  Loop %inner: backedge-taken count is (-1 + (1 smax %n))<nsw>
+; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i32 2147483646
+; CHECK-NEXT:  Loop %inner: symbolic max backedge-taken count is (-1 + (1 smax %n))<nsw>
+; CHECK-NEXT:  Loop %inner: Trip multiple is 1
+; CHECK-NEXT:  Loop %outer.header: backedge-taken count is (-1 + (1 umax %m))
+; CHECK-NEXT:  Loop %outer.header: constant max backedge-taken count is i32 -2
+; CHECK-NEXT:  Loop %outer.header: symbolic max backedge-taken count is (-1 + (1 umax %m))
+; CHECK-NEXT:  Loop %outer.header: Trip multiple is 1
+;
+entry:
+  br label %outer.header
+
+outer.header:
+  %i = phi i32 [ 0, %entry ], [ %i.next, %outer.latch ]
+  br i1 %c, label %then, label %else
+
+then:
+  %guard = icmp sgt i32 %n, 0
+  br i1 %guard, label %inner.ph, label %outer.latch
+
+else:
+  br label %inner.ph
+
+inner.ph:
+  br label %inner
+
+inner:
+  %j = phi i32 [ 0, %inner.ph ], [ %j.next, %inner ]
+  %j.next = add nsw i32 %j, 1
+  %ec = icmp slt i32 %j.next, %n
+  br i1 %ec, label %inner, label %outer.latch
+
+outer.latch:
+  %i.next = add i32 %i, 1
+  %oc = icmp ult i32 %i.next, %m
+  br i1 %oc, label %outer.header, label %exit
+
+exit:
+  ret void
+}
+
+; The inner loop bound is a phi in a merge block in the outer loop body, with
+; guards on both incoming edges.
+; TODO: The guards are not used, as the walk continues directly at the outer
+; loop's predecessor.
+define void @phi_guards_in_outer_loop(i32 %a, i32 %b, i1 %c, i32 %m) {
+; CHECK-LABEL: 'phi_guards_in_outer_loop'
+; CHECK-NEXT:  Determining loop execution counts for: @phi_guards_in_outer_loop
+; CHECK-NEXT:  Loop %inner: backedge-taken count is (-1 + (1 smax %n))<nsw>
+; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i32 2147483646
+; CHECK-NEXT:  Loop %inner: symbolic max backedge-taken count is (-1 + (1 smax %n))<nsw>
+; CHECK-NEXT:  Loop %inner: Trip multiple is 1
+; CHECK-NEXT:  Loop %outer.header: backedge-taken count is (-1 + (1 umax %m))
+; CHECK-NEXT:  Loop %outer.header: constant max backedge-taken count is i32 -2
+; CHECK-NEXT:  Loop %outer.header: symbolic max backedge-taken count is (-1 + (1 umax %m))
+; CHECK-NEXT:  Loop %outer.header: Trip multiple is 1
+;
+entry:
+  br label %outer.header
+
+outer.header:
+  %i = phi i32 [ 0, %entry ], [ %i.next, %outer.latch ]
+  br i1 %c, label %then, label %else
+
+then:
+  %guard.a = icmp sgt i32 %a, 0
+  br i1 %guard.a, label %inner.ph, label %outer.latch
+
+else:
+  %guard.b = icmp sgt i32 %b, 5
+  br i1 %guard.b, label %inner.ph, label %outer.latch
+
+inner.ph:
+  %n = phi i32 [ %a, %then ], [ %b, %else ]
+  br label %inner
+
+inner:
+  %j = phi i32 [ 0, %inner.ph ], [ %j.next, %inner ]
+  %j.next = add nsw i32 %j, 1
+  %ec = icmp slt i32 %j.next, %n
+  br i1 %ec, label %inner, label %outer.latch
+
+outer.latch:
+  %i.next = add i32 %i, 1
+  %oc = icmp ult i32 %i.next, %m
+  br i1 %oc, label %outer.header, label %exit
+
+exit:
+  ret void
+}
+
+; Blocks with a unique predecessor between the guard and the merge block do not
+; count towards the dominator tree step limit.
+define void @guard_before_long_unique_pred_chain(i32 %n, i1 %c) {
+; CHECK-LABEL: 'guard_before_long_unique_pred_chain'
+; CHECK-NEXT:  Determining loop execution counts for: @guard_before_long_unique_pred_chain
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %n)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 2147483646
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + %n)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %guard = icmp sgt i32 %n, 0
+  br i1 %guard, label %bb0, label %exit
+
+bb0:
+  call void @foo()
+  br label %bb1
+
+bb1:
+  call void @foo()
+  br label %bb2
+
+bb2:
+  call void @foo()
+  br label %bb3
+
+bb3:
+  call void @foo()
+  br label %bb4
+
+bb4:
+  call void @foo()
+  br label %bb5
+
+bb5:
+  call void @foo()
+  br label %bb6
+
+bb6:
+  call void @foo()
+  br label %bb7
+
+bb7:
+  call void @foo()
+  br label %bb8
+
+bb8:
+  call void @foo()
+  br label %split
+
+split:
+  br i1 %c, label %then, label %else
+
+then:
+  br label %ph
+
+else:
+  br label %ph
+
+ph:
+  br label %loop
+
+loop:
+  %i = phi i32 [ 0, %ph ], [ %iv.next, %loop ]
+  %iv.next = add nsw i32 %i, 1
+  %ec = icmp slt i32 %iv.next, %n
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; The guard is in an earlier loop, which is exited from multiple blocks.
+define void @guard_in_earlier_loop(ptr %p, i32 %n) {
+; CHECK-LABEL: 'guard_in_earlier_loop'
+; CHECK-NEXT:  Determining loop execution counts for: @guard_in_earlier_loop
+; CHECK-NEXT:  Loop %loop.2: backedge-taken count is (-1 + %b)
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 2147483646
+; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (-1 + %b)
+; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop.1: <multiple exits> Unpredictable backedge-taken count.
+; CHECK-NEXT:    exit count for loop.1: ***COULDNOTCOMPUTE***
+; CHECK-NEXT:    exit count for loop.1.body: ***COULDNOTCOMPUTE***
+; CHECK-NEXT:    exit count for loop.1.latch: (-1 + (1 umax %n))
+; CHECK-NEXT:  Loop %loop.1: constant max backedge-taken count is i32 -2
+; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is (-1 + (1 umax %n))
+; CHECK-NEXT:    symbolic max exit count for loop.1: ***COULDNOTCOMPUTE***
+; CHECK-NEXT:    symbolic max exit count for loop.1.body: ***COULDNOTCOMPUTE***
+; CHECK-NEXT:    symbolic max exit count for loop.1.latch: (-1 + (1 umax %n))
+;
+entry:
+  br label %loop.1
+
+loop.1:
+  %iv.1 = phi i32 [ 0, %entry ], [ %iv.1.next, %loop.1.latch ]
+  %b = load volatile i32, ptr %p, align 4
+  %guard = icmp sgt i32 %b, 0
+  br i1 %guard, label %loop.1.body, label %exit
+
+loop.1.body:
+  %x = load volatile i32, ptr %p, align 4
+  %early.ec = icmp eq i32 %x, 0
+  br i1 %early.ec, label %ph.2, label %loop.1.latch
+
+loop.1.latch:
+  %iv.1.next = add nuw nsw i32 %iv.1, 1
+  %ec.1 = icmp ult i32 %iv.1.next, %n
+  br i1 %ec.1, label %loop.1, label %ph.2
+
+ph.2:
+  %b.lcssa = phi i32 [ %b, %loop.1.body ], [ %b, %loop.1.latch ]
+  br label %loop.2
+
+loop.2:
+  %iv.2 = phi i32 [ 0, %ph.2 ], [ %iv.2.next, %loop.2 ]
+  %iv.2.next = add nuw i32 %iv.2, 1
+  %ec.2 = icmp slt i32 %iv.2.next, %b.lcssa
+  br i1 %ec.2, label %loop.2, label %exit
+
+exit:
+  ret void
+}
+
+; The outer loop has no unique predecessor; the inner loop bound is a phi in the
+; outer loop header, with guards on all incoming edges.
+define void @phi_in_outer_header_without_unique_pred(ptr %p, i32 %a, i32 %b, i1 %c, i1 %d) {
+; CHECK-LABEL: 'phi_in_outer_header_without_unique_pred'
+; CHECK-NEXT:  Determining loop execution counts for: @phi_in_outer_header_without_unique_pred
+; CHECK-NEXT:  Loop %inner: backedge-taken count is (-1 + %n)<nsw>
+; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i32 2147483646
+; CHECK-NEXT:  Loop %inner: symbolic max backedge-taken count is (-1 + %n)<nsw>
+; CHECK-NEXT:  Loop %inner: Trip multiple is 1
+; CHECK-NEXT:  Loop %outer.header: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %outer.header: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %outer.header: Unpredictable symbolic max backedge-taken count.
+;
+entry:
+  br i1 %d, label %entry.a, label %entry.b
+
+entry.a:
+  %guard.a = icmp sgt i32 %a, 0
+  br i1 %guard.a, label %outer.header, label %exit
+
+entry.b:
+  %guard.b = icmp sgt i32 %b, 0
+  br i1 %guard.b, label %outer.header, label %exit
+
+outer.header:
+  %n = phi i32 [ %a, %entry.a ], [ %b, %entry.b ], [ %n.next, %outer.latch ]
+  br i1 %c, label %then, label %else
+
+then:
+  br label %inner.ph
+
+else:
+  br label %inner.ph
+
+inner.ph:
+  br label %inner
+
+inner:
+  %j = phi i32 [ 0, %inner.ph ], [ %j.next, %inner ]
+  %j.next = add nsw i32 %j, 1
+  %ec = icmp slt i32 %j.next, %n
+  br i1 %ec, label %inner, label %outer.latch
+
+outer.latch:
+  %n.next = load i32, ptr %p, align 4
+  %guard.n = icmp sgt i32 %n.next, 0
+  br i1 %guard.n, label %outer.header, label %exit
+
+exit:
+  ret void
+}
+
+; The loop bound is a phi with guards on all incoming edges. The guard for the
+; first incoming value is only reachable from the incoming block by walking up
+; the dominator tree past a merge block.
+define void @phi_incoming_guard_before_merge(i32 %a, i32 %b, i1 %c, i1 %d) {
+; CHECK-LABEL: 'phi_incoming_guard_before_merge'
+; CHECK-NEXT:  Determining loop execution counts for: @phi_incoming_guard_before_merge
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %n)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 2147483646
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + %n)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %guard.a = icmp sgt i32 %a, 0
+  br i1 %guard.a, label %split, label %exit
+
+split:
+  br i1 %c, label %split.then, label %split.else
+
+split.then:
+  br label %merge
+
+split.else:
+  br label %merge
+
+merge:
+  br i1 %d, label %then, label %else
+
+then:
+  br label %ph
+
+else:
+  %guard.b = icmp sgt i32 %b, 0
+  br i1 %guard.b, label %ph, label %exit
+
+ph:
+  %n = phi i32 [ %a, %then ], [ %b, %else ]
+  br label %loop
+
+loop:
+  %iv = phi i32 [ 0, %ph ], [ %iv.next, %loop ]
+  %iv.next = add nsw i32 %iv, 1
+  %ec = icmp slt i32 %iv.next, %n
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; The guard is outside the outer loop and the inner loop is entered after more
+; merge blocks in the outer loop body than the dominator tree step limit.
+define void @guard_outside_outer_loop_many_merges(i32 %n, i1 %c, i32 %m) {
+; CHECK-LABEL: 'guard_outside_outer_loop_many_merges'
+; CHECK-NEXT:  Determining loop execution counts for: @guard_outside_outer_loop_many_merges
+; CHECK-NEXT:  Loop %inner: backedge-taken count is (-1 + %n)
+; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %inner: symbolic max backedge-taken count is (-1 + %n)
+; CHECK-NEXT:  Loop %inner: Trip multiple is 4
+; CHECK-NEXT:  Loop %outer.header: backedge-taken count is (-1 + (1 umax %m))
+; CHECK-NEXT:  Loop %outer.header: constant max backedge-taken count is i32 -2
+; CHECK-NEXT:  Loop %outer.header: symbolic max backedge-taken count is (-1 + (1 umax %m))
+; CHECK-NEXT:  Loop %outer.header: Trip multiple is 1
+;
+entry:
+  %rem = and i32 %n, 3
+  %guard = icmp eq i32 %rem, 0
+  br i1 %guard, label %outer.header, label %exit
+
+outer.header:
+  %i = phi i32 [ 0, %entry ], [ %i.next, %outer.latch ]
+  br label %split0
+
+split0:
+  br i1 %c, label %splitthen0, label %splitelse0
+
+splitthen0:
+  br label %split1
+
+splitelse0:
+  br label %split1
+
+split1:
+  br i1 %c, label %splitthen1, label %splitelse1
+
+splitthen1:
+  br label %split2
+
+splitelse1:
+  br label %split2
+
+split2:
+  br i1 %c, label %splitthen2, label %splitelse2
+
+splitthen2:
+  br label %split3
+
+splitelse2:
+  br label %split3
+
+split3:
+  br i1 %c, label %splitthen3, label %splitelse3
+
+splitthen3:
+  br label %split4
+
+splitelse3:
+  br label %split4
+
+split4:
+  br i1 %c, label %splitthen4, label %splitelse4
+
+splitthen4:
+  br label %split5
+
+splitelse4:
+  br label %split5
+
+split5:
+  br i1 %c, label %splitthen5, label %splitelse5
+
+splitthen5:
+  br label %split6
+
+splitelse5:
+  br label %split6
+
+split6:
+  br i1 %c, label %splitthen6, label %splitelse6
+
+splitthen6:
+  br label %split7
+
+splitelse6:
+  br label %split7
+
+split7:
+  br i1 %c, label %splitthen7, label %splitelse7
+
+splitthen7:
+  br label %split8
+
+splitelse7:
+  br label %split8
+
+split8:
+  br i1 %c, label %splitthen8, label %splitelse8
+
+splitthen8:
+  br label %inner.ph
+
+splitelse8:
+  br label %inner.ph
+
+inner.ph:
+  br label %inner
+
+inner:
+  %j = phi i32 [ 0, %inner.ph ], [ %j.next, %inner ]
+  %j.next = add i32 %j, 1
+  %ec = icmp ne i32 %j.next, %n
+  br i1 %ec, label %inner, label %outer.latch
+
+outer.latch:
+  %i.next = add i32 %i, 1
+  %oc = icmp ult i32 %i.next, %m
+  br i1 %oc, label %outer.header, label %exit
+
+exit:
+  ret void
+}
+
+; There are more merge blocks between the guard and the loop than the dominator
+; tree step limit, so the guard is not used.
+define void @guard_before_too_many_merges(i32 %n, i1 %c) {
+; CHECK-LABEL: 'guard_before_too_many_merges'
+; CHECK-NEXT:  Determining loop execution counts for: @guard_before_too_many_merges
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (1 smax %n))<nsw>
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 2147483646
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (1 smax %n))<nsw>
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %guard = icmp sgt i32 %n, 0
+  br i1 %guard, label %split0, label %exit
+
+split0:
+  br i1 %c, label %splitthen0, label %splitelse0
+
+splitthen0:
+  br label %split1
+
+splitelse0:
+  br label %split1
+
+split1:
+  br i1 %c, label %splitthen1, label %splitelse1
+
+splitthen1:
+  br label %split2
+
+splitelse1:
+  br label %split2
+
+split2:
+  br i1 %c, label %splitthen2, label %splitelse2
+
+splitthen2:
+  br label %split3
+
+splitelse2:
+  br label %split3
+
+split3:
+  br i1 %c, label %splitthen3, label %splitelse3
+
+splitthen3:
+  br label %split4
+
+splitelse3:
+  br label %split4
+
+split4:
+  br i1 %c, label %splitthen4, label %splitelse4
+
+splitthen4:
+  br label %split5
+
+splitelse4:
+  br label %split5
+
+split5:
+  br i1 %c, label %splitthen5, label %splitelse5
+
+splitthen5:
+  br label %split6
+
+splitelse5:
+  br label %split6
+
+split6:
+  br i1 %c, label %splitthen6, label %splitelse6
+
+splitthen6:
+  br label %split7
+
+splitelse6:
+  br label %split7
+
+split7:
+  br i1 %c, label %splitthen7, label %splitelse7
+
+splitthen7:
+  br label %split8
+
+splitelse7:
+  br label %split8
+
+split8:
+  br i1 %c, label %splitthen8, label %splitelse8
+
+splitthen8:
+  br label %ph
+
+splitelse8:
+  br label %ph
+
+ph:
+  br label %loop
+
+loop:
+  %iv = phi i32 [ 0, %ph ], [ %iv.next, %loop ]
+  %iv.next = add nsw i32 %iv, 1
+  %ec = icmp slt i32 %iv.next, %n
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+declare void @foo()
+
+; The loop bound is a phi guarded on all incoming edges, in a merge block above
+; the merge block the predecessor chain ends at.
+define void @phi_guards_above_chain_end(i32 %a, i32 %b, i1 %c, i1 %d) {
+; CHECK-LABEL: 'phi_guards_above_chain_end'
+; CHECK-NEXT:  Determining loop execution counts for: @phi_guards_above_chain_end
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %n)<nsw>
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 2147483646
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + %n)<nsw>
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  br i1 %c, label %then, label %else
+
+then:
+  %guard.a = icmp sgt i32 %a, 0
+  br i1 %guard.a, label %merge.1, label %exit
+
+else:
+  %guard.b = icmp sgt i32 %b, 5
+  br i1 %guard.b, label %merge.1, label %exit
+
+merge.1:
+  %n = phi i32 [ %a, %then ], [ %b, %else ]
+  br i1 %d, label %left, label %right
+
+left:
+  br label %merge.2
+
+right:
+  br label %merge.2
+
+merge.2:
+  br label %loop
+
+loop:
+  %iv = phi i32 [ 0, %merge.2 ], [ %iv.next, %loop ]
+  %iv.next = add nsw i32 %iv, 1
+  %ec = icmp slt i32 %iv.next, %n
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  ret void
+}
