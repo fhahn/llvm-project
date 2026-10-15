@@ -177,13 +177,13 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
                                               Ingredient.getDebugLoc());
           } else {
             NewRecipe = new VPWidenIntrinsicRecipe(
-                *CI, VectorID, drop_end(Ingredient.operands()), CI->getType(),
-                VPIRFlags(*CI), *VPI, CI->getDebugLoc());
+                *CI, VectorID, drop_end(Ingredient.operands()),
+                VPI->getScalarType(), *VPI, *VPI, Ingredient.getDebugLoc());
           }
         } else if (auto *CI = dyn_cast<CastInst>(Inst)) {
           NewRecipe = new VPWidenCastRecipe(
-              CI->getOpcode(), Ingredient.getOperand(0), CI->getType(), CI,
-              VPIRFlags(*CI), VPIRMetadata(*CI));
+              Instruction::CastOps(VPI->getOpcode()), Ingredient.getOperand(0),
+              VPI->getScalarType(), CI, *VPI, *VPI);
         } else {
           NewRecipe = new VPWidenRecipe(*Inst, Ingredient.operands(), *VPI,
                                         *VPI, Ingredient.getDebugLoc());
