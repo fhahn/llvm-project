@@ -80,11 +80,10 @@ declare void @inc(ptr)
 
 ; When we have a chain of phis in nested loops we should recognise if there's
 ; actually only one underlying value.
-; FIXME: All of these could be NoAlias.
 ; CHECK-LABEL: loop_phi_chain
-; CHECK: MayAlias: i32* %val1, i32* @Y
-; CHECK: MayAlias: i32* %val2, i32* @Y
-; CHECK: MayAlias: i32* %val3, i32* @Y
+; CHECK: NoAlias: i32* %val1, i32* @Y
+; CHECK: NoAlias: i32* %val2, i32* @Y
+; CHECK: NoAlias: i32* %val3, i32* @Y
 define void @loop_phi_chain(i32 %a, i32 %b, i32 %c) {
 entry:
   br label %loop1
@@ -290,7 +289,7 @@ outer:                                            ; preds = %loopexit, %entry
 ; %ptr.inner is based on argument %start, which may alias argument %q.
 ; CHECK-LABEL: nested_loop_arg
 ; CHECK: MayAlias: i8* %ptr.inner, i8* %q
-; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+; CHECK: NoAlias: i8* %buf, i8* %ptr.inner
 define void @nested_loop_arg(ptr %start, ptr %q, i1 %c) {
 entry:
   %buf = alloca [16 x i8]
@@ -318,7 +317,7 @@ exit:
 
 ; %ptr.inner is based on a load and %buf is never captured.
 ; CHECK-LABEL: nested_loop_load_not_captured
-; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+; CHECK: NoAlias: i8* %buf, i8* %ptr.inner
 define void @nested_loop_load_not_captured(ptr %p, i1 %c) {
 entry:
   %buf = alloca [16 x i8]
@@ -327,6 +326,90 @@ entry:
 
 outer:
   %ptr.outer = phi ptr [ %start, %entry ], [ %ptr.next.lcssa, %outer.latch ]
+  br label %inner
+
+inner:
+  %ptr.inner = phi ptr [ %ptr.outer, %outer ], [ %ptr.next, %inner ]
+  %l = load i8, ptr %buf
+  store i8 %l, ptr %ptr.inner
+  %ptr.next = getelementptr inbounds i8, ptr %ptr.inner, i64 1
+  br i1 %c, label %outer.latch, label %inner
+
+outer.latch:
+  %ptr.next.lcssa = phi ptr [ %ptr.next, %inner ]
+  br i1 %c, label %exit, label %outer
+
+exit:
+  ret void
+}
+
+; %ptr.inner is based on a load and %buf is captured before the load.
+; CHECK-LABEL: nested_loop_load_captured
+; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+define void @nested_loop_load_captured(ptr %p, i1 %c) {
+entry:
+  %buf = alloca [16 x i8]
+  call void @inc(ptr %buf)
+  %start = load ptr, ptr %p
+  br label %outer
+
+outer:
+  %ptr.outer = phi ptr [ %start, %entry ], [ %ptr.next.lcssa, %outer.latch ]
+  br label %inner
+
+inner:
+  %ptr.inner = phi ptr [ %ptr.outer, %outer ], [ %ptr.next, %inner ]
+  %l = load i8, ptr %buf
+  store i8 %l, ptr %ptr.inner
+  %ptr.next = getelementptr inbounds i8, ptr %ptr.inner, i64 1
+  br i1 %c, label %outer.latch, label %inner
+
+outer.latch:
+  %ptr.next.lcssa = phi ptr [ %ptr.next, %inner ]
+  br i1 %c, label %exit, label %outer
+
+exit:
+  ret void
+}
+
+; %start is a phi with more incoming values than the limit on visited values.
+; CHECK-LABEL: nested_loop_phi_too_many_incoming
+; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+define void @nested_loop_phi_too_many_incoming(ptr %a, i32 %sw, i1 %c) {
+entry:
+  %buf = alloca [16 x i8]
+  switch i32 %sw, label %join [ i32 0, label %c0
+                                i32 1, label %c1
+                                i32 2, label %c2
+                                i32 3, label %c3
+                                i32 4, label %c4
+                                i32 5, label %c5
+                                i32 6, label %c6
+                                i32 7, label %c7 ]
+
+c0:
+  br label %join
+c1:
+  br label %join
+c2:
+  br label %join
+c3:
+  br label %join
+c4:
+  br label %join
+c5:
+  br label %join
+c6:
+  br label %join
+c7:
+  br label %join
+
+join:
+  %start = phi ptr [ %a, %entry ], [ %a, %c0 ], [ %a, %c1 ], [ %a, %c2 ], [ %a, %c3 ], [ %a, %c4 ], [ %a, %c5 ], [ %a, %c6 ], [ %a, %c7 ]
+  br label %outer
+
+outer:
+  %ptr.outer = phi ptr [ %start, %join ], [ %ptr.next.lcssa, %outer.latch ]
   br label %inner
 
 inner:
@@ -460,7 +543,7 @@ exit:
 
 ; Reaches the limit on visited values.
 ; CHECK-LABEL: nested_loop_max_values
-; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+; CHECK: NoAlias: i8* %buf, i8* %ptr.inner
 define void @nested_loop_max_values(ptr %a, ptr %b, ptr %d, i1 %c) {
 entry:
   %buf = alloca [16 x i8]
