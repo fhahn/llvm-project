@@ -583,21 +583,22 @@ protected:
 #endif
 };
 
-// Helper macro to define common classof implementations for recipes.
-#define VP_CLASSOF_IMPL(VPRecipeID)                                            \
+// Helper macro to define common classof implementations for recipes with one
+// of the given recipe IDs.
+#define VP_CLASSOF_IMPL(...)                                                   \
   static inline bool classof(const VPRecipeBase *R) {                          \
-    return R->getVPRecipeID() == VPRecipeID;                                   \
+    return is_contained({__VA_ARGS__}, R->getVPRecipeID());                    \
   }                                                                            \
   static inline bool classof(const VPValue *V) {                               \
     auto *R = V->getDefiningRecipe();                                          \
-    return R && R->getVPRecipeID() == VPRecipeID;                              \
+    return R && classof(R);                                                    \
   }                                                                            \
   static inline bool classof(const VPUser *U) {                                \
     auto *R = dyn_cast<VPRecipeBase>(U);                                       \
-    return R && R->getVPRecipeID() == VPRecipeID;                              \
+    return R && classof(R);                                                    \
   }                                                                            \
   static inline bool classof(const VPSingleDefRecipe *R) {                     \
-    return R->getVPRecipeID() == VPRecipeID;                                   \
+    return classof(static_cast<const VPRecipeBase *>(R));                      \
   }
 
 /// Compute the scalar result type for an IR \p Opcode given \p Operands.
@@ -1098,39 +1099,19 @@ struct VPRecipeWithIRFlags : public VPSingleDefRecipe, public VPIRFlags {
       : VPSingleDefRecipe(SC, Operands, ResultTy, /*UV=*/nullptr, DL),
         VPIRFlags(Flags) {}
 
-  static inline bool classof(const VPRecipeBase *R) {
-    return R->getVPRecipeID() == VPRecipeBase::VPBlendSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPInstructionSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPWidenSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPWidenGEPSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPWidenCallSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPWidenCastSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPWidenIntrinsicSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPWidenMemIntrinsicSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPReductionSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPReductionEVLSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPReplicateSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPVectorEndPointerSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPVectorPointerSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPWidenCanonicalIVSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPDerivedIVSC;
-  }
-
-  static inline bool classof(const VPUser *U) {
-    auto *R = dyn_cast<VPRecipeBase>(U);
-    return R && classof(R);
-  }
-
-  static inline bool classof(const VPValue *V) {
-    auto *R = V->getDefiningRecipe();
-    return R && classof(R);
-  }
+  VP_CLASSOF_IMPL(VPRecipeBase::VPBlendSC, VPRecipeBase::VPInstructionSC,
+                  VPRecipeBase::VPWidenSC, VPRecipeBase::VPWidenGEPSC,
+                  VPRecipeBase::VPWidenCallSC, VPRecipeBase::VPWidenCastSC,
+                  VPRecipeBase::VPWidenIntrinsicSC,
+                  VPRecipeBase::VPWidenMemIntrinsicSC,
+                  VPRecipeBase::VPReductionSC, VPRecipeBase::VPReductionEVLSC,
+                  VPRecipeBase::VPReplicateSC,
+                  VPRecipeBase::VPVectorEndPointerSC,
+                  VPRecipeBase::VPVectorPointerSC,
+                  VPRecipeBase::VPWidenCanonicalIVSC,
+                  VPRecipeBase::VPDerivedIVSC)
 
   VPRecipeWithIRFlags *clone() override = 0;
-
-  static inline bool classof(const VPSingleDefRecipe *R) {
-    return classof(static_cast<const VPRecipeBase *>(R));
-  }
 
   void execute(VPTransformState &State) override = 0;
 
@@ -1982,24 +1963,8 @@ public:
                                       getDebugLoc());
   }
 
-  static inline bool classof(const VPRecipeBase *R) {
-    return R->getVPRecipeID() == VPRecipeBase::VPWidenIntrinsicSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPWidenMemIntrinsicSC;
-  }
-
-  static inline bool classof(const VPUser *U) {
-    auto *R = dyn_cast<VPRecipeBase>(U);
-    return R && classof(R);
-  }
-
-  static inline bool classof(const VPValue *V) {
-    auto *R = V->getDefiningRecipe();
-    return R && classof(R);
-  }
-
-  static inline bool classof(const VPSingleDefRecipe *R) {
-    return classof(static_cast<const VPRecipeBase *>(R));
-  }
+  VP_CLASSOF_IMPL(VPRecipeBase::VPWidenIntrinsicSC,
+                  VPRecipeBase::VPWidenMemIntrinsicSC)
 
   /// Produce a widened version of the vector intrinsic.
   void execute(VPTransformState &State) override;
@@ -2545,19 +2510,8 @@ public:
     VPUser::addOperand(LastPart);
   }
 
-  static inline bool classof(const VPRecipeBase *R) {
-    return R->getVPRecipeID() == VPRecipeBase::VPWidenIntOrFpInductionSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPWidenPointerInductionSC;
-  }
-
-  static inline bool classof(const VPValue *V) {
-    auto *R = V->getDefiningRecipe();
-    return R && classof(R);
-  }
-
-  static inline bool classof(const VPSingleDefRecipe *R) {
-    return classof(static_cast<const VPRecipeBase *>(R));
-  }
+  VP_CLASSOF_IMPL(VPRecipeBase::VPWidenIntOrFpInductionSC,
+                  VPRecipeBase::VPWidenPointerInductionSC)
 
   void execute(VPTransformState &State) override = 0;
 
@@ -3091,15 +3045,7 @@ protected:
 public:
   VPInterleaveBase *clone() override = 0;
 
-  static inline bool classof(const VPRecipeBase *R) {
-    return R->getVPRecipeID() == VPRecipeBase::VPInterleaveSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPInterleaveEVLSC;
-  }
-
-  static inline bool classof(const VPUser *U) {
-    auto *R = dyn_cast<VPRecipeBase>(U);
-    return R && classof(R);
-  }
+  VP_CLASSOF_IMPL(VPRecipeBase::VPInterleaveSC, VPRecipeBase::VPInterleaveEVLSC)
 
   /// Return the address accessed by this recipe.
   VPValue *getAddr() const {
@@ -3293,24 +3239,7 @@ public:
                                  getCondOp(), Style, getDebugLoc());
   }
 
-  static inline bool classof(const VPRecipeBase *R) {
-    return R->getVPRecipeID() == VPRecipeBase::VPReductionSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPReductionEVLSC;
-  }
-
-  static inline bool classof(const VPUser *U) {
-    auto *R = dyn_cast<VPRecipeBase>(U);
-    return R && classof(R);
-  }
-
-  static inline bool classof(const VPValue *VPV) {
-    const VPRecipeBase *R = VPV->getDefiningRecipe();
-    return R && classof(R);
-  }
-
-  static inline bool classof(const VPSingleDefRecipe *R) {
-    return classof(static_cast<const VPRecipeBase *>(R));
-  }
+  VP_CLASSOF_IMPL(VPRecipeBase::VPReductionSC, VPRecipeBase::VPReductionEVLSC)
 
   /// Generate the reduction in the loop.
   void execute(VPTransformState &State) override;
