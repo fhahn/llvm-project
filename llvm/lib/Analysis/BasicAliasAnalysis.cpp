@@ -1471,6 +1471,37 @@ static bool areDistinctObjectsNoAlias(const Value *O1, const Value *O2,
   return false;
 }
 
+/// Return true if no underlying object of \p V, looking through phis and
+/// selects, can alias \p Obj. Unlike getUnderlyingObjects, this bounds compile
+/// time by visiting at most MaxVisited values and giving up on phis with more
+/// incoming values.
+static bool allUnderlyingObjectsNoAlias(const Value *V, const Value *Obj,
+                                        const AAQueryInfo &AAQI) {
+  constexpr unsigned MaxVisited = 8;
+  SmallPtrSet<const Value *, 8> Visited;
+  SmallVector<const Value *> Worklist({V});
+  do {
+    const Value *P = getUnderlyingObject(Worklist.pop_back_val());
+    if (!Visited.insert(P).second)
+      continue;
+    if (Visited.size() > MaxVisited)
+      return false;
+    if (const auto *SI = dyn_cast<SelectInst>(P)) {
+      Worklist.append({SI->getTrueValue(), SI->getFalseValue()});
+      continue;
+    }
+    if (const auto *PN = dyn_cast<PHINode>(P)) {
+      if (PN->getNumIncomingValues() > MaxVisited)
+        return false;
+      append_range(Worklist, PN->incoming_values());
+      continue;
+    }
+    if (!areDistinctObjectsNoAlias(P, Obj, AAQI))
+      return false;
+  } while (!Worklist.empty());
+  return true;
+}
+
 /// Provide a bunch of ad-hoc rules to disambiguate a PHI instruction against
 /// another.
 AliasResult BasicAAResult::aliasPHI(const PHINode *PN, LocationSize PNSize,
@@ -1531,9 +1562,12 @@ AliasResult BasicAAResult::aliasPHI(const PHINode *PN, LocationSize PNSize,
 
   // To control compile time, only recurse into a phi source if it is the only
   // non-recursive source. This handles LCSSA phis and (with the recursive phi
-  // handling) simple pointer induction variables.
+  // handling) simple pointer induction variables. Otherwise, check the
+  // underlying objects of the phi instead.
   if (V1Srcs.size() > 1 && any_of(V1Srcs, IsaPred<PHINode>))
-    return AliasResult::MayAlias;
+    return allUnderlyingObjectsNoAlias(PN, getUnderlyingObject(V2), AAQI)
+               ? AliasResult::NoAlias
+               : AliasResult::MayAlias;
 
   // If V1Srcs is empty then that means that the phi has no underlying non-phi
   // value. This should only be possible in blocks unreachable from the entry
