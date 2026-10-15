@@ -5876,11 +5876,11 @@ bool VPRecipeBuilder::shouldWiden(VPInstruction *VPI, VFRange &Range) const {
   bool FeedsPredicated = reachesPredicatedRecipe(VPI);
   // Instruction should be widened, unless it is scalar after vectorization,
   // scalarization is profitable for a chain feeding a predicated recipe, or it
-  // is scalar with predication.
+  // is masked and scalar with predication.
   auto WillScalarize = [&](ElementCount VF) -> bool {
     return CM.isScalarAfterVectorization(I, VF) ||
            (FeedsPredicated && CM.isProfitableToScalarize(I, VF)) ||
-           CM.isScalarWithPredication(I, VF);
+           (VPI->isMasked() && CM.isScalarWithPredication(I, VF));
   };
   return !LoopVectorizationPlanner::getDecisionAndClampRange(WillScalarize,
                                                              Range);
@@ -5896,7 +5896,7 @@ VPRecipeWithIRFlags *VPRecipeBuilder::tryToWiden(VPInstruction *VPI) {
   case Instruction::SRem:
   case Instruction::URem:
     // If not provably safe, use a masked intrinsic.
-    if (CM.isPredicatedInst(I))
+    if (VPI->isMasked() && CM.isPredicatedInst(I))
       return new VPWidenIntrinsicRecipe(
           getMaskedDivRemIntrinsic(VPI->getOpcode()), VPI->operands(),
           I->getType(), {}, {}, VPI->getDebugLoc());
@@ -5945,7 +5945,7 @@ VPHistogramRecipe *VPRecipeBuilder::widenIfHistogram(VPInstruction *VPI) {
 
   // In case of predicated execution (due to tail-folding, or conditional
   // execution, or both), pass the relevant mask.
-  if (CM.isMaskRequired(HI->Store))
+  if (VPI->isMasked() && CM.isMaskRequired(HI->Store))
     HGramOps.push_back(VPI->getMask());
 
   return new VPHistogramRecipe(HI->UpdateKind, HGramOps,
@@ -5988,7 +5988,7 @@ VPSingleDefRecipe *VPRecipeBuilder::handleReplication(VPInstruction *VPI,
       [&](ElementCount VF) { return CM.isUniformAfterVectorization(I, VF); },
       Range);
 
-  bool IsPredicated = CM.isPredicatedInst(I);
+  bool IsPredicated = VPI->isMasked() && CM.isPredicatedInst(I);
 
   // Even if the instruction is not marked as uniform, there are certain
   // intrinsic calls that can be effectively treated as such, so we check for
