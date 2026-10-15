@@ -980,6 +980,7 @@ VPlanTransforms::materializeAliasMask(VPlan &Plan, VPBasicBlock *AliasCheckVPBB,
 
   VPValue *AliasMask = nullptr;
   for (const PointerDiffInfo &Check : DiffChecks) {
+    assert(!Check.IsSymmetric && "Alias masks require one-sided diff checks");
     VPValue *Src = Expander.expand(Check.SrcStart);
     VPValue *Sink = Expander.expand(Check.SinkStart);
     Type *AddrType = Src->getScalarType();
