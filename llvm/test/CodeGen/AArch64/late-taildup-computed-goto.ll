@@ -71,8 +71,8 @@ define void @test_interp(ptr %frame, ptr %dst) {
 ; CHECK-NEXT:    ; =>This Inner Loop Header: Depth=1
 ; CHECK-NEXT:    str x23, [x19]
 ; CHECK-NEXT:    ldur x8, [x23, #12]
-; CHECK-NEXT:    ldur x9, [x20, #-8]
 ; CHECK-NEXT:    add x23, x23, #20
+; CHECK-NEXT:    ldur x9, [x20, #-8]
 ; CHECK-NEXT:    stp x8, x9, [x20, #-8]
 ; CHECK-NEXT:    add x8, x21, x24, lsl #3
 ; CHECK-NEXT:    add x20, x20, #8

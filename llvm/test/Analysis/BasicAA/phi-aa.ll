@@ -466,7 +466,7 @@ exit:
 
 ; %ptr.inner is based on a select of an argument and null.
 ; CHECK-LABEL: nested_loop_select_of_arg_and_null:
-; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+; CHECK: NoAlias: i8* %buf, i8* %ptr.inner
 define void @nested_loop_select_of_arg_and_null(ptr %a, i1 %c) {
 entry:
   %buf = alloca [16 x i8]
@@ -522,7 +522,7 @@ exit:
 
 ; %ptr.inner is based on a select of an argument and undef.
 ; CHECK-LABEL: nested_loop_select_of_arg_and_undef
-; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+; CHECK: NoAlias: i8* %buf, i8* %ptr.inner
 define void @nested_loop_select_of_arg_and_undef(ptr %a, i1 %c) {
 entry:
   %buf = alloca [16 x i8]
@@ -550,7 +550,7 @@ exit:
 
 ; %ptr.outer is null on entry to the loop nest, or an argument.
 ; CHECK-LABEL: nested_loop_phi_of_arg_and_null
-; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+; CHECK: NoAlias: i8* %buf, i8* %ptr.inner
 define void @nested_loop_phi_of_arg_and_null(ptr %a, i1 %c) {
 entry:
   %buf = alloca [16 x i8]
@@ -578,9 +578,10 @@ exit:
   ret void
 }
 
-; %ptr.inner is based on a select of an argument and a variable GEP of null.
+; %ptr.inner is based on a select of an argument and a GEP of null with a
+; variable offset.
 ; CHECK-LABEL: nested_loop_select_of_arg_and_gep_null
-; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+; CHECK: NoAlias: i8* %buf, i8* %ptr.inner
 define void @nested_loop_select_of_arg_and_gep_null(ptr %a, i64 %x, i1 %c) {
 entry:
   %buf = alloca [16 x i8]
