@@ -2518,11 +2518,16 @@ protected:
 class VPWidenInductionRecipe : public VPHeaderPHIRecipe {
   InductionDescriptor IndDesc;
 
+  /// SCEV predicates required for the induction to not wrap.
+  SmallVector<const SCEVPredicate *> NoWrapPredicates;
+
 public:
   VPWidenInductionRecipe(VPRecipeTy Kind, PHINode *IV, VPValue *Start,
                          VPValue *Step, const InductionDescriptor &IndDesc,
+                         ArrayRef<const SCEVPredicate *> NoWrapPredicates,
                          Type *ResultTy, DebugLoc DL)
-      : VPHeaderPHIRecipe(Kind, IV, Start, ResultTy, DL), IndDesc(IndDesc) {
+      : VPHeaderPHIRecipe(Kind, IV, Start, ResultTy, DL), IndDesc(IndDesc),
+        NoWrapPredicates(NoWrapPredicates) {
     addOperand(Step);
   }
 
@@ -2578,7 +2583,7 @@ public:
 
   /// Returns the SCEV predicates associated with this induction.
   ArrayRef<const SCEVPredicate *> getNoWrapPredicates() const {
-    return IndDesc.getNoWrapPredicates();
+    return NoWrapPredicates;
   }
 
   VPValue *getBackedgeValue() override {
@@ -2608,22 +2613,26 @@ class VPWidenIntOrFpInductionRecipe : public VPWidenInductionRecipe,
   bool isUnrolled() const { return getNumOperands() == 5; }
 
 public:
-  VPWidenIntOrFpInductionRecipe(PHINode *IV, VPValue *Start, VPValue *Step,
-                                VPValue *VF, const InductionDescriptor &IndDesc,
-                                const VPIRFlags &Flags, DebugLoc DL)
+  VPWidenIntOrFpInductionRecipe(
+      PHINode *IV, VPValue *Start, VPValue *Step, VPValue *VF,
+      const InductionDescriptor &IndDesc,
+      ArrayRef<const SCEVPredicate *> NoWrapPredicates, const VPIRFlags &Flags,
+      DebugLoc DL)
       : VPWidenInductionRecipe(VPRecipeBase::VPWidenIntOrFpInductionSC, IV,
-                               Start, Step, IndDesc, Start->getScalarType(),
-                               DL),
+                               Start, Step, IndDesc, NoWrapPredicates,
+                               Start->getScalarType(), DL),
         VPIRFlags(Flags) {
     addOperand(VF);
   }
 
-  VPWidenIntOrFpInductionRecipe(PHINode *IV, VPValue *Start, VPValue *Step,
-                                VPValue *VF, const InductionDescriptor &IndDesc,
-                                Type *ResultTy, const VPIRFlags &Flags,
-                                DebugLoc DL)
+  VPWidenIntOrFpInductionRecipe(
+      PHINode *IV, VPValue *Start, VPValue *Step, VPValue *VF,
+      const InductionDescriptor &IndDesc,
+      ArrayRef<const SCEVPredicate *> NoWrapPredicates, Type *ResultTy,
+      const VPIRFlags &Flags, DebugLoc DL)
       : VPWidenInductionRecipe(VPRecipeBase::VPWidenIntOrFpInductionSC, IV,
-                               Start, Step, IndDesc, ResultTy, DL),
+                               Start, Step, IndDesc, NoWrapPredicates, ResultTy,
+                               DL),
         VPIRFlags(Flags) {
     addOperand(VF);
   }
@@ -2633,7 +2642,8 @@ public:
   VPWidenIntOrFpInductionRecipe *clone() override {
     return new VPWidenIntOrFpInductionRecipe(
         getPHINode(), getStartValue(), getStepValue(), getVFValue(),
-        getInductionDescriptor(), getScalarType(), *this, getDebugLoc());
+        getInductionDescriptor(), getNoWrapPredicates(), getScalarType(), *this,
+        getDebugLoc());
   }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPWidenIntOrFpInductionSC)
@@ -2686,12 +2696,13 @@ public:
   /// Create a new VPWidenPointerInductionRecipe for \p Phi with start value \p
   /// Start and the number of elements unrolled \p NumUnrolledElems, typically
   /// VF*UF.
-  VPWidenPointerInductionRecipe(PHINode *Phi, VPValue *Start, VPValue *Step,
-                                VPValue *NumUnrolledElems,
-                                const InductionDescriptor &IndDesc, DebugLoc DL)
+  VPWidenPointerInductionRecipe(
+      PHINode *Phi, VPValue *Start, VPValue *Step, VPValue *NumUnrolledElems,
+      const InductionDescriptor &IndDesc,
+      ArrayRef<const SCEVPredicate *> NoWrapPredicates, DebugLoc DL)
       : VPWidenInductionRecipe(VPRecipeBase::VPWidenPointerInductionSC, Phi,
-                               Start, Step, IndDesc, Start->getScalarType(),
-                               DL) {
+                               Start, Step, IndDesc, NoWrapPredicates,
+                               Start->getScalarType(), DL) {
     addOperand(NumUnrolledElems);
   }
 
@@ -2700,7 +2711,8 @@ public:
   VPWidenPointerInductionRecipe *clone() override {
     return new VPWidenPointerInductionRecipe(
         cast<PHINode>(getUnderlyingInstr()), getOperand(0), getOperand(1),
-        getOperand(2), getInductionDescriptor(), getDebugLoc());
+        getOperand(2), getInductionDescriptor(), getNoWrapPredicates(),
+        getDebugLoc());
   }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPWidenPointerInductionSC)

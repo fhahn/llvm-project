@@ -711,7 +711,8 @@ createWidenInductionRecipe(PHINode *Phi, VPPhi *PhiR, VPIRValue *Start,
 
   if (IndDesc.getKind() == InductionDescriptor::IK_PtrInduction) {
     auto *WideIV = new VPWidenPointerInductionRecipe(
-        Phi, Start, Step, &Plan.getVFxUF(), IndDesc, DL);
+        Phi, Start, Step, &Plan.getVFxUF(), IndDesc,
+        IndDesc.getNoWrapPredicates(), DL);
     ReplaceExtractsWithExitingIVValueIfPossible(WideIV);
     return WideIV;
   }
@@ -732,7 +733,8 @@ createWidenInductionRecipe(PHINode *Phi, VPPhi *PhiR, VPIRValue *Start,
   VPIRFlags Flags = vputils::getFlagsForInduction(IndDesc, PhiR);
 
   auto *WideIV = new VPWidenIntOrFpInductionRecipe(
-      Phi, Start, Step, &Plan.getVF(), IndDesc, Flags, DL);
+      Phi, Start, Step, &Plan.getVF(), IndDesc, IndDesc.getNoWrapPredicates(),
+      Flags, DL);
 
   ReplaceExtractsWithExitingIVValueIfPossible(WideIV);
   return WideIV;
@@ -2084,7 +2086,7 @@ static bool handleFirstArgMinOrMax(
     VPIRValue *One = Plan.getConstantInt(Ty, 1);
     auto *WidenCanIV = new VPWidenIntOrFpInductionRecipe(
         nullptr, Zero, One, WideIV->getVFValue(),
-        WideIV->getInductionDescriptor(),
+        WideIV->getInductionDescriptor(), WideIV->getNoWrapPredicates(),
         VPIRFlags::WrapFlagsTy(/*HasNUW=*/true, /*HasNSW=*/false),
         WideIV->getDebugLoc());
     WidenCanIV->insertBefore(WideIV);
