@@ -724,15 +724,9 @@ bool VPInstruction::doesGenerateSingleScalar() const {
   switch (Opcode) {
   case Instruction::Freeze:
   case Instruction::ICmp:
-  case Instruction::PHI:
   case Instruction::Select:
   case VPInstruction::BranchOnCond:
-  case VPInstruction::BranchOnTwoConds:
-  case VPInstruction::BranchOnCount:
-  case VPInstruction::CanonicalIVIncrementForPart:
   case VPInstruction::PtrAdd:
-  case VPInstruction::ExplicitVectorLength:
-  case VPInstruction::AnyOf:
   case VPInstruction::Not:
     return vputils::onlyFirstLaneUsed(this);
   default:
