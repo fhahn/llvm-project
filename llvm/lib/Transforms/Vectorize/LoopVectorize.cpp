@@ -6017,11 +6017,9 @@ VPSingleDefRecipe *VPRecipeBuilder::handleReplication(VPInstruction *VPI,
   return Recipe;
 }
 
-VPRecipeBase *
-VPRecipeBuilder::tryToCreateWidenNonPhiRecipe(VPSingleDefRecipe *R,
-                                              VFRange &Range) {
-  assert(!R->isPhi() && "phis must be handled earlier");
-  auto *VPI = cast<VPInstruction>(R);
+VPRecipeBase *VPRecipeBuilder::tryToCreateWidenNonPhiRecipe(VPInstruction *VPI,
+                                                            VFRange &Range) {
+  assert(!VPI->isPhi() && "phis must be handled earlier");
   assert(VPI->getOpcode() != Instruction::Call &&
          "Call should have been handled by makeCallWideningDecisions");
 
@@ -6030,7 +6028,7 @@ VPRecipeBuilder::tryToCreateWidenNonPhiRecipe(VPSingleDefRecipe *R,
           [&](ElementCount VF) { return VF.isScalar(); }, Range))
     return nullptr;
 
-  Instruction *Instr = R->getUnderlyingInstr();
+  Instruction *Instr = VPI->getUnderlyingInstr();
   assert(!is_contained({Instruction::Load, Instruction::Store},
                        VPI->getOpcode()) &&
          "Should have been handled prior to this!");

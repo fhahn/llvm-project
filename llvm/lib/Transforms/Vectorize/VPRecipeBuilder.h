@@ -53,9 +53,9 @@ public:
   /// FIXME: Fully migrate logic to determine if mask is needed to VPlan.
   bool isPredicatedInst(Instruction *I) const;
 
-  /// Create and return a widened recipe for a non-phi recipe \p R if one can be
+  /// Create and return a widened recipe for non-phi \p VPI if one can be
   /// created within the given VF \p Range.
-  VPRecipeBase *tryToCreateWidenNonPhiRecipe(VPSingleDefRecipe *R,
+  VPRecipeBase *tryToCreateWidenNonPhiRecipe(VPInstruction *VPI,
                                              VFRange &Range);
 
   /// Check if the load or store instruction \p VPI should widened for \p
