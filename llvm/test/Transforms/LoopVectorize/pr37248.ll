@@ -12,9 +12,9 @@
 ;
 @a = external global [2 x i16], align 1
 
-define void @f1(ptr noalias %b, i1 %c, i32 %start) {
+define void @f1(ptr noalias %b, i32 %start) {
 ; CHECK-LABEL: define void @f1(
-; CHECK-SAME: ptr noalias [[B:%.*]], i1 [[C:%.*]], i32 [[START:%.*]]) {
+; CHECK-SAME: ptr noalias [[B:%.*]], i32 [[START:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[SMIN1:%.*]] = call i32 @llvm.smin.i32(i32 [[START]], i32 1)
 ; CHECK-NEXT:    [[TMP7:%.*]] = add i32 [[START]], 1
@@ -35,17 +35,24 @@ define void @f1(ptr noalias %b, i1 %c, i32 %start) {
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP1]], 1
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP1]], [[N_MOD_VF]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = sub i32 [[START]], [[N_VEC]]
-; CHECK-NEXT:    [[TMP12:%.*]] = xor i1 [[C]], true
+; CHECK-NEXT:    [[TMP19:%.*]] = trunc i32 [[START]] to i1
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i1> poison, i1 [[TMP19]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i1> [[BROADCAST_SPLATINSERT]], <2 x i1> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[INDUCTION:%.*]] = add <2 x i1> [[BROADCAST_SPLAT]], <i1 false, i1 true>
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE3:.*]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i1> [ [[INDUCTION]], %[[VECTOR_PH]] ], [ [[VEC_IND]], %[[PRED_STORE_CONTINUE3]] ]
 ; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = sub i32 [[START]], [[INDEX]]
+; CHECK-NEXT:    [[TMP14:%.*]] = xor <2 x i1> [[VEC_IND]], splat (i1 true)
+; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <2 x i1> [[TMP14]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP12]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; CHECK:       [[PRED_STORE_IF]]:
 ; CHECK-NEXT:    store i32 10, ptr [[B]], align 1
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; CHECK:       [[PRED_STORE_CONTINUE]]:
-; CHECK-NEXT:    br i1 [[TMP12]], label %[[PRED_STORE_IF2:.*]], label %[[PRED_STORE_CONTINUE3]]
+; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <2 x i1> [[TMP14]], i64 1
+; CHECK-NEXT:    br i1 [[TMP16]], label %[[PRED_STORE_IF2:.*]], label %[[PRED_STORE_CONTINUE3]]
 ; CHECK:       [[PRED_STORE_IF2]]:
 ; CHECK-NEXT:    store i32 10, ptr [[B]], align 1
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE3]]
@@ -67,6 +74,7 @@ entry:
 
 loop.header:
   %iv = phi i32 [ %start, %entry ], [ %iv.next, %loop.latch ]
+  %c = trunc i32 %iv to i1
   br i1 %c, label %loop.latch, label %else
 
 else:

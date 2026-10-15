@@ -170,7 +170,7 @@ exit:
 
 ; One of the bounds of the runtime check is an AddRec of the preceding
 ; sibling loop.
-define void @bound_is_addrec_of_sibling_loop(ptr %a, ptr %b, i64 %n, i64 %d, i1 %cond) {
+define void @bound_is_addrec_of_sibling_loop(ptr %a, ptr %b, i64 %n, i64 %d) {
 ; CHECK-LABEL: VPlan for loop in 'bound_is_addrec_of_sibling_loop'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
@@ -214,13 +214,12 @@ define void @bound_is_addrec_of_sibling_loop(ptr %a, ptr %b, i64 %n, i64 %d, i1 
 ; CHECK-NEXT:  vector.ph:
 ; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = and ir<%n>, ir<3>
 ; CHECK-NEXT:    EMIT vp<%n.vec> = sub ir<%n>, vp<[[VP5]]>
-; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = broadcast ir<%d>
+; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = broadcast ir<%iv.1.lcssa>
 ; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = broadcast ir<%n>
-; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = broadcast ir<%cond>
-; CHECK-NEXT:    WIDEN-INTRINSIC vp<[[VP9:%[0-9]+]]> = call llvm.masked.udiv(vp<[[VP7]]>, vp<[[VP6]]>, vp<[[VP8]]>)
-; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = broadcast ir<%iv.1.lcssa>
-; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = step-vector i64
-; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = broadcast ir<4>
+; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = broadcast ir<%d>
+; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = step-vector i64
+; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = broadcast ir<4>
+; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = step-vector i1
 ; CHECK-NEXT:  Successor(s): vector.body
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.body:
@@ -240,6 +239,7 @@ ph.2:
 
 loop.2:
   %iv.2 = phi i64 [ 0, %ph.2 ], [ %iv.2.next, %latch ]
+  %cond = trunc i64 %iv.2 to i1
   br i1 %cond, label %then, label %latch
 
 then:

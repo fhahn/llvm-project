@@ -5,7 +5,7 @@
 target datalayout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64-S128"
 
 ; Make sure recipes with side-effects are not sunk.
-define void @sink_with_sideeffects(i1 %c, ptr %ptr) {
+define void @sink_with_sideeffects(ptr %ptr) {
 ; CHECK-LABEL: VPlan for loop in 'sink_with_sideeffects'
 ; CHECK:  VPlan 'Initial VPlan for VF={1},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
@@ -25,6 +25,8 @@ define void @sink_with_sideeffects(i1 %c, ptr %ptr) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = SCALAR-STEPS vp<[[VP4]]>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP6:%[0-9]+]]> = trunc vp<[[VP4]]> to i1
+; CHECK-NEXT:      vp<[[VP7:%[0-9]+]]> = SCALAR-STEPS vp<[[VP6]]>, ir<true>, vp<[[VP0]]>
 ; CHECK-NEXT:      CLONE ir<%tmp2> = getelementptr ir<%ptr>, vp<[[VP5]]>
 ; CHECK-NEXT:      CLONE ir<%tmp3> = load ir<%tmp2>
 ; CHECK-NEXT:      CLONE store ir<0>, ir<%tmp2>
@@ -32,7 +34,7 @@ define void @sink_with_sideeffects(i1 %c, ptr %ptr) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    <xVFxUF> pred.store: {
 ; CHECK-NEXT:      pred.store.entry:
-; CHECK-NEXT:        BRANCH-ON-MASK ir<%c>
+; CHECK-NEXT:        BRANCH-ON-MASK vp<[[VP7]]>
 ; CHECK-NEXT:      Successor(s): pred.store.if, pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.if:
@@ -72,6 +74,7 @@ define void @sink_with_sideeffects(i1 %c, ptr %ptr) {
 ; CHECK-NEXT:    IR   store i8 0, ptr %tmp2, align 1
 ; CHECK-NEXT:    IR   %tmp4 = zext i8 %tmp3 to i32
 ; CHECK-NEXT:    IR   %tmp5 = trunc i32 %tmp4 to i8
+; CHECK-NEXT:    IR   %c = trunc i64 %tmp0 to i1
 ; CHECK-NEXT:  No successors
 ; CHECK-NEXT:  }
 ;
@@ -86,6 +89,7 @@ for.body:
   store i8 0, ptr %tmp2
   %tmp4 = zext i8 %tmp3 to i32
   %tmp5 = trunc i32 %tmp4 to i8
+  %c = trunc i64 %tmp0 to i1
   br i1 %c, label %if.then, label %for.inc
 
 if.then:
