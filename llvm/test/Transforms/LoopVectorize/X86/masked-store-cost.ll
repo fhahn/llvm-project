@@ -244,4 +244,68 @@ exit:
   ret void
 }
 
+; The merge block has a phi, so the store is masked with the loop-invariant
+; condition.
+define i32 @test_scalar_cost_single_store_loop_invariant_cond_phi_at_merge(ptr %dst, i1 %c) #0 {
+; CHECK-LABEL: define i32 @test_scalar_cost_single_store_loop_invariant_cond_phi_at_merge(
+; CHECK-SAME: ptr [[DST:%.*]], i1 [[C:%.*]]) #[[ATTR0]] {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <8 x i1> poison, i1 [[C]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <8 x i1> [[BROADCAST_SPLATINSERT]], <8 x i1> poison, <8 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr i8, ptr [[DST]], i64 96
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[INDEX]], 2
+; CHECK-NEXT:    [[NEXT_GEP:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP1]]
+; CHECK-NEXT:    call void @llvm.masked.store.v8i32.p0(<8 x i32> zeroinitializer, ptr align 4 [[NEXT_GEP]], <8 x i1> [[BROADCAST_SPLAT]])
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
+; CHECK-NEXT:    [[TMP2:%.*]] = icmp eq i64 [[INDEX_NEXT]], 24
+; CHECK-NEXT:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br label %[[SCALAR_PH:.*]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[PTR_IV:%.*]] = phi ptr [ [[TMP0]], %[[SCALAR_PH]] ], [ [[PTR_IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 96, %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH]] ]
+; CHECK-NEXT:    br i1 [[C]], label %[[IF_THEN:.*]], label %[[LOOP_LATCH]]
+; CHECK:       [[IF_THEN]]:
+; CHECK-NEXT:    store i32 0, ptr [[PTR_IV]], align 4
+; CHECK-NEXT:    br label %[[LOOP_LATCH]]
+; CHECK:       [[LOOP_LATCH]]:
+; CHECK-NEXT:    [[P:%.*]] = phi i32 [ 1, %[[IF_THEN]] ], [ 0, %[[LOOP_HEADER]] ]
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 4
+; CHECK-NEXT:    [[PTR_IV_NEXT]] = getelementptr i8, ptr [[DST]], i64 [[IV_NEXT]]
+; CHECK-NEXT:    [[CMP_NOT:%.*]] = icmp eq i64 [[IV]], 116
+; CHECK-NEXT:    br i1 [[CMP_NOT]], label %[[EXIT:.*]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP11:![0-9]+]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    [[P_LCSSA:%.*]] = phi i32 [ [[P]], %[[LOOP_LATCH]] ]
+; CHECK-NEXT:    ret i32 [[P_LCSSA]]
+;
+entry:
+  br label %loop.header
+
+loop.header:
+  %ptr.iv = phi ptr [ %dst, %entry ], [ %ptr.iv.next, %loop.latch ]
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  br i1 %c, label %if.then, label %loop.latch
+
+if.then:
+  store i32 0, ptr %ptr.iv, align 4
+  br label %loop.latch
+
+loop.latch:
+  %p = phi i32 [ 1, %if.then ], [ 0, %loop.header ]
+  %iv.next = add i64 %iv, 4
+  %ptr.iv.next = getelementptr i8, ptr %dst, i64 %iv.next
+  %cmp.not = icmp eq i64 %iv, 116
+  br i1 %cmp.not, label %exit, label %loop.header
+
+exit:
+  ret i32 %p
+}
+
 attributes #0 = { "min-legal-vector-width"="0" "target-cpu"="skylake-avx512" }

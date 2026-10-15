@@ -931,6 +931,62 @@ for.exit:
   ret void
 }
 
+; The histogram is skipped on a loop-invariant condition.
+define void @histogram_on_invariant_cond(ptr noalias %buckets, ptr readonly %indices, i1 %c, i64 %N) #0 {
+; CHECK-LABEL: define void @histogram_on_invariant_cond(
+; CHECK-SAME: ptr noalias [[BUCKETS:%.*]], ptr readonly [[INDICES:%.*]], i1 [[C:%.*]], i64 [[N:%.*]]) #[[ATTR0]] {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
+; CHECK-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 2
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
+; CHECK:       vector.ph:
+; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N]], [[TMP1]]
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x i1> poison, i1 [[C]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x i1> [[BROADCAST_SPLATINSERT]], <vscale x 4 x i1> poison, <vscale x 4 x i32> zeroinitializer
+; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
+; CHECK:       vector.body:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i32, ptr [[INDICES]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <vscale x 4 x i32> @llvm.masked.load.nxv4i32.p0(ptr align 4 [[TMP2]], <vscale x 4 x i1> [[BROADCAST_SPLAT]], <vscale x 4 x i32> poison)
+; CHECK-NEXT:    [[TMP3:%.*]] = zext <vscale x 4 x i32> [[WIDE_MASKED_LOAD]] to <vscale x 4 x i64>
+; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr inbounds i32, ptr [[BUCKETS]], <vscale x 4 x i64> [[TMP3]]
+; CHECK-NEXT:    call void @llvm.experimental.vector.histogram.add.nxv4p0.i32(<vscale x 4 x ptr> [[WIDE_GEP]], i32 1, <vscale x 4 x i1> [[BROADCAST_SPLAT]])
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP1]]
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP4]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP37:![0-9]+]]
+; CHECK:       middle.block:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label [[FOR_EXIT:%.*]], label [[SCALAR_PH]]
+; CHECK:       scalar.ph:
+;
+entry:
+  br label %for.body
+
+for.body:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %next ]
+  br i1 %c, label %iftrue, label %next
+
+iftrue:
+  %gep.indices = getelementptr inbounds i32, ptr %indices, i64 %iv
+  %l.idx = load i32, ptr %gep.indices, align 4
+  %idxprom1 = zext i32 %l.idx to i64
+  %gep.bucket = getelementptr inbounds i32, ptr %buckets, i64 %idxprom1
+  %l.bucket = load i32, ptr %gep.bucket, align 4
+  %inc = add nsw i32 %l.bucket, 1
+  store i32 %inc, ptr %gep.bucket, align 4
+  br label %next
+
+next:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %exitcond = icmp eq i64 %iv.next, %N
+  br i1 %exitcond, label %for.exit, label %for.body, !llvm.loop !4
+
+for.exit:
+  ret void
+}
+
 !0 = distinct !{!0, !1}
 !1 = !{!"llvm.loop.interleave.count", i32 2}
 !2 = distinct !{!2, !3}
