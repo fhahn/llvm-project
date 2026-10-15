@@ -660,15 +660,14 @@ vputils::getEarlyExits(const VPlan &Plan, const VPBlockBase *MiddleVPBB) {
 }
 
 VPScalarIVStepsRecipe *vputils::createScalarIVSteps(
-    VPlan &Plan, InductionDescriptor::InductionKind Kind,
-    Instruction::BinaryOps InductionOpcode, FPMathOperator *FPBinOp,
-    Type *ResultTy, VPValue *StartV, VPValue *Step, DebugLoc DL,
-    VPBuilder &Builder, const VPIRFlags::WrapFlagsTy &Flags) {
+    VPlan &Plan, Instruction::BinaryOps InductionOpcode,
+    FPMathOperator *FPBinOp, Type *ResultTy, VPValue *StartV, VPValue *Step,
+    DebugLoc DL, VPBuilder &Builder, const VPIRFlags::WrapFlagsTy &Flags) {
   VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
   VPBasicBlock *HeaderVPBB = LoopRegion->getEntryBasicBlock();
   VPValue *CanonicalIV = LoopRegion->getCanonicalIV();
   VPValue *BaseIV =
-      Builder.createDerivedIV(Kind, FPBinOp, StartV, CanonicalIV, Step, Flags);
+      Builder.createDerivedIV(FPBinOp, StartV, CanonicalIV, Step, Flags);
 
   // Truncate BaseIV and Step to ResultTy.
   if (ResultTy->isIntegerTy()) {
@@ -699,8 +698,8 @@ vputils::scalarizeVPWidenPointerInduction(VPWidenPointerInductionRecipe *PtrIV,
   VPValue *StepV = PtrIV->getStepValue();
   VPIRValue *StartV = Plan.getZero(StepV->getScalarType());
   VPScalarIVStepsRecipe *Steps = createScalarIVSteps(
-      Plan, InductionDescriptor::IK_IntInduction, Instruction::Add, nullptr,
-      StartV->getScalarType(), StartV, StepV, PtrIV->getDebugLoc(), Builder);
+      Plan, Instruction::Add, nullptr, StartV->getScalarType(), StartV, StepV,
+      PtrIV->getDebugLoc(), Builder);
 
   return Builder.createPtrAdd(PtrIV->getStartValue(), Steps,
                               PtrIV->getDebugLoc(), "next.gep");

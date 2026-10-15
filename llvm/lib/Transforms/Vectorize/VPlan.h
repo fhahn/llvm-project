@@ -4228,25 +4228,22 @@ protected:
 /// FastMathFlags are derived from the \p FPBinOp in the case of FP inductions,
 /// and the passed NoWrap \p Flags apply in the case of Ptr and Int inductions.
 class LLVM_ABI_FOR_TEST VPDerivedIVRecipe : public VPRecipeWithIRFlags {
-  /// Kind of the induction.
-  const InductionDescriptor::InductionKind Kind;
   /// If not nullptr, the floating point induction binary operator. Must be set
   /// for floating point inductions.
   const FPMathOperator *FPBinOp;
 
 public:
-  VPDerivedIVRecipe(InductionDescriptor::InductionKind Kind,
-                    const FPMathOperator *FPBinOp, VPValue *Start,
+  VPDerivedIVRecipe(const FPMathOperator *FPBinOp, VPValue *Start,
                     VPValue *Current, VPValue *Step,
                     const VPIRFlags::WrapFlagsTy &Flags = {})
       : VPRecipeWithIRFlags(VPRecipeBase::VPDerivedIVSC, {Start, Current, Step},
                             Start->getScalarType(), Flags),
-        Kind(Kind), FPBinOp(FPBinOp) {}
+        FPBinOp(FPBinOp) {}
 
   ~VPDerivedIVRecipe() override = default;
 
   VPDerivedIVRecipe *clone() override {
-    return new VPDerivedIVRecipe(Kind, FPBinOp, getStartValue(), getOperand(1),
+    return new VPDerivedIVRecipe(FPBinOp, getStartValue(), getOperand(1),
                                  getStepValue(), getNoWrapFlags());
   }
 
@@ -4264,7 +4261,6 @@ public:
   VPValue *getIndex() const { return getOperand(1); }
   VPValue *getStepValue() const { return getOperand(2); }
   const FPMathOperator *getFPBinOp() const { return FPBinOp; }
-  InductionDescriptor::InductionKind getInductionKind() const { return Kind; }
 
   /// Returns true if the recipe only uses the first lane of operand \p Op.
   bool usesFirstLaneOnly(const VPValue *Op) const override {

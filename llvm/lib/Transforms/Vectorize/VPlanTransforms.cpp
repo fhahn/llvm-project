@@ -888,7 +888,7 @@ static void legalizeAndOptimizeInductions(VPlan &Plan) {
     if (match(WideIV->getStepValue(), m_APInt(Step)) && Step->isNonNegative())
       WrapFlags = WideIV->getNoWrapFlagsOrNone().withoutNoSignedWrap();
     VPScalarIVStepsRecipe *Steps = vputils::createScalarIVSteps(
-        Plan, ID.getKind(), ID.getInductionOpcode(),
+        Plan, ID.getInductionOpcode(),
         dyn_cast_or_null<FPMathOperator>(ID.getInductionBinOp()),
         WideIV->getScalarType(), WideIV->getStartValue(),
         WideIV->getStepValue(), WideIV->getDebugLoc(), Builder, WrapFlags);
@@ -1007,8 +1007,8 @@ static VPValue *optimizeEarlyExitInductionUser(VPlan &Plan, VPValue *Op,
     VPValue *Start = WideIV->getStartValue();
     VPValue *Step = WideIV->getStepValue();
     EndValue = B.createDerivedIV(
-        ID.getKind(), dyn_cast_or_null<FPMathOperator>(ID.getInductionBinOp()),
-        Start, EndValue, Step);
+        dyn_cast_or_null<FPMathOperator>(ID.getInductionBinOp()), Start,
+        EndValue, Step);
   }
 
   return EndValue;
@@ -1031,8 +1031,8 @@ static VPValue *tryToComputeEndValueForInduction(VPWidenInductionRecipe *WideIV,
   VPValue *EndValue = VectorTC;
   if (!match(WideIV, m_CanonicalWidenIV())) {
     EndValue = VectorPHBuilder.createDerivedIV(
-        ID.getKind(), dyn_cast_or_null<FPMathOperator>(ID.getInductionBinOp()),
-        Start, VectorTC, Step);
+        dyn_cast_or_null<FPMathOperator>(ID.getInductionBinOp()), Start,
+        VectorTC, Step);
   }
 
   // EndValue is derived from the vector trip count (which has the same type as
@@ -1120,16 +1120,11 @@ static VPValue *optimizeLatchExitIVUserViaSCEV(VPlan &Plan, VPValue *Op,
   VPValue *StartVPV = Expander.expand(Start);
   VPValue *StepVPV = Expander.expand(Step);
 
-  Type *StartTy = StartVPV->getScalarType();
-  assert(StartTy->isIntOrPtrTy() && "The type must be SCEVable");
-  InductionDescriptor::InductionKind Kind =
-      StartTy->isPointerTy() ? InductionDescriptor::IK_PtrInduction
-                             : InductionDescriptor::IK_IntInduction;
   Type *TCTy = ResumeTC->getScalarType();
   VPValue *ExitCount = Builder.createOverflowingOp(
       Instruction::Sub, {ResumeTC, Plan.getConstantInt(TCTy, 1)},
       {/*HasNUW=*/true, /*HasNSW=*/false}, DebugLoc::getUnknown());
-  return Builder.createDerivedIV(Kind, /*FPBinOp=*/nullptr, StartVPV, ExitCount,
+  return Builder.createDerivedIV(/*FPBinOp=*/nullptr, StartVPV, ExitCount,
                                  StepVPV);
 }
 
