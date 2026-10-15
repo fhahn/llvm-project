@@ -2482,9 +2482,6 @@ public:
                               VPCostContext &Ctx) const override;
 
   /// Returns the start value of the phi, if one is set.
-  VPValue *getStartValue() {
-    return getNumOperands() == 0 ? nullptr : getOperand(0);
-  }
   VPValue *getStartValue() const {
     return getNumOperands() == 0 ? nullptr : getOperand(0);
   }
@@ -2567,7 +2564,7 @@ public:
   const VPValue *getVFValue() const { return getOperand(2); }
 
   /// Returns the number of incoming values, also number of incoming blocks.
-  /// Note that at the moment, VPWidenPointerInductionRecipe only has a single
+  /// Note that at the moment, VPWidenInductionRecipes only have a single
   /// incoming value, its start value.
   unsigned getNumIncoming() const override { return 1; }
 
@@ -2651,11 +2648,6 @@ public:
   VPValue *getSplatVFValue() const {
     return isUnrolled() ? getOperand(getNumOperands() - 2) : nullptr;
   }
-
-  /// Returns the number of incoming values, also number of incoming blocks.
-  /// Note that at the moment, VPWidenIntOrFpInductionRecipes only have a single
-  /// incoming value, its start value.
-  unsigned getNumIncoming() const override { return 1; }
 
   /// Returns true if this induction is evaluated in a narrower type than the
   /// start value.
