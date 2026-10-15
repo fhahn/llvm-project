@@ -644,7 +644,8 @@ std::unique_ptr<VPlan> VPlanTransforms::buildVPlan0(
 void VPlanTransforms::recordExecutionFrequencies(VPlan &Plan) {
   VPBasicBlock *Header = VPBlockUtils::getPlainCFGHeaderAndLatch(Plan).first;
   SmallVector<VPBasicBlock *> Blocks = vp_rpo_plain_cfg_loop_body(Header);
-  auto Frequencies = vputils::computeExecutionFrequencies(Blocks);
+  auto Frequencies =
+      vputils::computeExecutionFrequencies(to_vector_of<VPBlockBase *>(Blocks));
   LLVMContext &Ctx = Plan.getContext();
   for (VPBasicBlock *VPBB : Blocks) {
     std::optional<VPExecutionFrequency> Freq = Frequencies.lookup(VPBB);

@@ -237,8 +237,8 @@ BranchProbability getExecutionProbability(BlockFrequency Freq);
 /// The frequency of a block is the sum over its incoming edges, or std::nullopt
 /// if any edge on a path reaching it lacks branch weights. Edges to blocks
 /// outside \p Blocks are ignored.
-DenseMap<const VPBasicBlock *, std::optional<VPExecutionFrequency>>
-computeExecutionFrequencies(ArrayRef<VPBasicBlock *> Blocks);
+DenseMap<const VPBlockBase *, std::optional<VPExecutionFrequency>>
+computeExecutionFrequencies(ArrayRef<VPBlockBase *> Blocks);
 
 namespace detail {
 

@@ -762,9 +762,19 @@ const VPBasicBlock *VPBasicBlock::getCFGPredecessor(unsigned Idx) const {
 
 InstructionCost VPRegionBlock::cost(ElementCount VF, VPCostContext &Ctx) {
   if (!isReplicator()) {
+    // Scale the cost of each block by the frequency with which it executes.
+    // Replicate regions already scale the costs of their recipes.
+    ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>>
+        RPOT(getEntry());
+    SmallVector<VPBlockBase *> Blocks = to_vector(RPOT);
+    auto Frequencies = vputils::computeExecutionFrequencies(Blocks);
     InstructionCost Cost = 0;
-    for (VPBlockBase *Block : vp_depth_first_shallow(getEntry()))
-      Cost += Block->cost(VF, Ctx);
+    for (VPBlockBase *Block : Blocks) {
+      InstructionCost BlockCost = Block->cost(VF, Ctx);
+      if (isa<VPBasicBlock>(Block))
+        BlockCost /= Ctx.getCostDivisor(Frequencies.lookup(Block));
+      Cost += BlockCost;
+    }
     // Add the costs of the loop's backedge and canonical IV increment
     auto AddCost = [&](InstructionCost C, const char *Name) {
       if (Ctx.Opts.force_target_instruction_cost)

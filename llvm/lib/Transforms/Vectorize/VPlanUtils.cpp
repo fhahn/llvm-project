@@ -1241,25 +1241,24 @@ BranchProbability vputils::getExecutionProbability(BlockFrequency Freq) {
       BlockFrequencyInfoImplBase::BlockMass::getFull().getMass());
 }
 
-/// Returns the probability of each successor edge of \p VPBB, computed via
+/// Returns the probability of each successor edge of \p VPB, computed via
 /// BranchProbabilityInfo::getEdgeProbabilitiesFromWeights from the branch
-/// weights recorded on its terminator, or std::nullopt if not available.
+/// weights recorded on its terminator \p Term, or std::nullopt if unavailable.
 static std::optional<SmallVector<BranchProbability>>
-getSuccessorProbabilities(const VPBasicBlock *VPBB) {
+getSuccessorProbabilities(const VPBlockBase *VPB, const VPInstruction *Term) {
   // With a single successor the edge is always taken and needs no weights.
-  if (VPBB->getSingleSuccessor())
+  if (VPB->getSingleSuccessor())
     return SmallVector<BranchProbability>{BranchProbability::getOne()};
 
   SmallVector<uint32_t> Weights;
-  auto *Term = dyn_cast_if_present<VPInstruction>(VPBB->getTerminator());
   if (!Term || !extractBranchWeights(Term->getBranchWeights(), Weights) ||
-      Weights.size() != VPBB->getNumSuccessors())
+      Weights.size() != VPB->getNumSuccessors())
     return std::nullopt;
   return BranchProbabilityInfo::getEdgeProbabilitiesFromWeights(Weights);
 }
 
-DenseMap<const VPBasicBlock *, std::optional<VPExecutionFrequency>>
-vputils::computeExecutionFrequencies(ArrayRef<VPBasicBlock *> Blocks) {
+DenseMap<const VPBlockBase *, std::optional<VPExecutionFrequency>>
+vputils::computeExecutionFrequencies(ArrayRef<VPBlockBase *> Blocks) {
   using BFIBase = BlockFrequencyInfoImplBase;
   assert(!Blocks.empty() && "expected at least the header block");
   // Distribute the header's frequency using BFI. Nodes for blocks are numbered
@@ -1269,8 +1268,8 @@ vputils::computeExecutionFrequencies(ArrayRef<VPBasicBlock *> Blocks) {
   BFIBase::BlockNode Header(0), Outside(Blocks.size());
   BFIBase::LoopData &Loop = BFI.Loops.emplace_back(nullptr, Header);
   DenseMap<const VPBlockBase *, BFIBase::BlockNode> Nodes;
-  for (auto [Idx, VPBB] : enumerate(Blocks)) {
-    Nodes[VPBB] = BFIBase::BlockNode(Idx);
+  for (auto [Idx, VPB] : enumerate(Blocks)) {
+    Nodes[VPB] = BFIBase::BlockNode(Idx);
     BFI.Working.emplace_back(BFIBase::BlockNode(Idx)).Loop = &Loop;
   }
   BFI.Working.emplace_back(Outside);
@@ -1279,13 +1278,16 @@ vputils::computeExecutionFrequencies(ArrayRef<VPBasicBlock *> Blocks) {
   // Keep track nodes reached via an edge without branch weighs or with
   // estimated ones
   SmallVector<bool> IsUnknown(Blocks.size()), IsEstimated(Blocks.size());
-  for (auto [Idx, VPBB] : enumerate(Blocks)) {
+  for (auto [Idx, VPB] : enumerate(Blocks)) {
     BFIBase::BlockNode Node(Idx);
-    auto Probs = getSuccessorProbabilities(VPBB);
-    auto *Term = dyn_cast_if_present<VPInstruction>(VPBB->getTerminator());
+    auto *VPBB = dyn_cast<VPBasicBlock>(VPB);
+    auto *Term = VPBB
+                     ? dyn_cast_if_present<VPInstruction>(VPBB->getTerminator())
+                     : nullptr;
+    auto Probs = getSuccessorProbabilities(VPB, Term);
     bool TermIsEstimated = Term && Term->hasEstimatedBranchWeights();
     BFIBase::Distribution Dist;
-    for (auto [SuccIdx, Succ] : enumerate(VPBB->getSuccessors())) {
+    for (auto [SuccIdx, Succ] : enumerate(VPB->getSuccessors())) {
       BFIBase::BlockNode SuccNode = Nodes.lookup_or(Succ, Outside);
       if (SuccNode != Header && SuccNode != Outside) {
         IsUnknown[SuccNode.Index] |= IsUnknown[Idx] || !Probs;
@@ -1302,10 +1304,10 @@ vputils::computeExecutionFrequencies(ArrayRef<VPBasicBlock *> Blocks) {
   // Round frequencies up to at least 1, so all edges are reached with a
   // non-zero frequency, to distinguish rarely executed blocks from unreachable
   // ones. blocks distinguishable from unreachable ones.
-  DenseMap<const VPBasicBlock *, std::optional<VPExecutionFrequency>>
+  DenseMap<const VPBlockBase *, std::optional<VPExecutionFrequency>>
       Frequencies;
-  for (auto [Idx, VPBB] : enumerate(Blocks)) {
-    std::optional<VPExecutionFrequency> &Freq = Frequencies[VPBB];
+  for (auto [Idx, VPB] : enumerate(Blocks)) {
+    std::optional<VPExecutionFrequency> &Freq = Frequencies[VPB];
     if (IsUnknown[Idx])
       continue;
     uint64_t Mass = BFI.Working[Idx].getMass().getMass();
