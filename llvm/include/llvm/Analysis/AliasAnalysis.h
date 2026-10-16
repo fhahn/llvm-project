@@ -599,6 +599,7 @@ private:
 
   std::vector<AnalysisKey *> AADeps;
 
+  friend class AAManager;
   friend class BatchAAResults;
 };
 
