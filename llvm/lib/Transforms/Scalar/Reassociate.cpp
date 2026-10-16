@@ -2771,6 +2771,10 @@ PreservedAnalyses ReassociatePass::runImpl(Function &F, UniformityInfo &UI) {
         ++II;
       }
 
+    // Copying the (deque-based) set allocates, so skip the common empty case.
+    if (RedoInsts.empty())
+      continue;
+
     // Make a copy of all the instructions to be redone so we can remove dead
     // instructions.
     OrderedSet ToRedo(RedoInsts);
