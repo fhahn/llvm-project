@@ -12,7 +12,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/LoopNestAnalysis.h"
-#include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/Analysis/ValueTracking.h"
 
@@ -41,7 +40,11 @@ static bool checkLoopsStructure(const Loop &OuterLoop, const Loop &InnerLoop,
 
 LoopNest::LoopNest(Loop &Root, ScalarEvolution &SE)
     : MaxPerfectDepth(getMaxPerfectDepth(Root, SE)) {
-  append_range(Loops, breadth_first(&Root));
+  // Collect the loops in breadth-first order. The loops form a tree, so a
+  // worklist without a visited set suffices.
+  Loops.push_back(&Root);
+  for (unsigned I = 0; I != Loops.size(); ++I)
+    append_range(Loops, Loops[I]->getSubLoops());
 }
 
 std::unique_ptr<LoopNest> LoopNest::getLoopNest(Loop &Root,
