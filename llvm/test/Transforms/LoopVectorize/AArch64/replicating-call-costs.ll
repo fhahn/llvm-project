@@ -32,6 +32,7 @@ exit:
 define void @replicated_umul_with_overflow(ptr noalias %dst) {
 ; CHECK-LABEL: LV: Checking a loop in 'replicated_umul_with_overflow'
 ; CHECK: Cost of 14 for VF 2: REPLICATE ir<%res> = call @llvm.umul.with.overflow.i64(vp<%{{.+}}>, ir<3>)
+; CHECK: Cost of 0 for VF 2: REPLICATE ir<%mul> = extractvalue ir<%res>, ir<0>
 entry:
   br label %loop
 
@@ -44,6 +45,37 @@ loop:
   %iv.next = add nuw nsw i64 %iv, 1
   %ec = icmp eq i64 %iv.next, 1000
   br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The results of the replicated umul.with.overflow are only used by replicated
+; recipes, so they should not be packed into a vector.
+define void @replicated_umul_with_overflow_scalar_users(ptr noalias %src, ptr noalias %dst) {
+; CHECK-LABEL: LV: Checking a loop in 'replicated_umul_with_overflow_scalar_users'
+; CHECK: Cost of 14 for VF 2: REPLICATE ir<%res> = call @llvm.umul.with.overflow.i64(vp<%{{.+}}>, ir<3>)
+entry:
+  br label %loop.header
+
+loop.header:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  %res = call { i64, i1 } @llvm.umul.with.overflow.i64(i64 %iv, i64 3)
+  %mul = extractvalue { i64, i1 } %res, 0
+  %gep.src = getelementptr i8, ptr %src, i64 %iv
+  %l = load i8, ptr %gep.src
+  %c = icmp eq i8 %l, 0
+  br i1 %c, label %then, label %loop.latch
+
+then:
+  %gep.dst = getelementptr i64, ptr %dst, i64 %iv
+  store i64 %mul, ptr %gep.dst
+  br label %loop.latch
+
+loop.latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 1000
+  br i1 %ec, label %exit, label %loop.header
 
 exit:
   ret void
