@@ -103,3 +103,28 @@ latch:
 exit:
   ret void
 }
+
+; %mul is replicated to compute the addresses of the scalarized load.
+define void @scalar_steps_replicated_mul_by_power_of_2(ptr noalias %dst, ptr noalias %src, i64 %off) {
+; CHECK-LABEL: LV: Checking a loop in 'scalar_steps_replicated_mul_by_power_of_2'
+; CHECK: Cost of 1 for VF 2: ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<{{.+}}>
+; CHECK: Cost of 0 for VF 2: {{.*}} = SCALAR-STEPS {{.*}}, ir<1>, {{.*}}
+; CHECK: Cost of 0 for VF 2: EMIT {{.*}} = shl nuw nsw ir<%iv>, ir<2>
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %mul = mul nuw nsw i64 %iv, 4
+  %idx = xor i64 %mul, %off
+  %gep.src = getelementptr inbounds i32, ptr %src, i64 %idx
+  %l = load i32, ptr %gep.src, align 4
+  %gep.dst = getelementptr inbounds i32, ptr %dst, i64 %iv
+  store i32 %l, ptr %gep.dst, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv, 100
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
