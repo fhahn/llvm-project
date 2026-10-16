@@ -53,8 +53,18 @@ using namespace llvm::VPlanPatternMatch;
 /// attributes.
 static std::pair<VPIRAttributes, AttributeSet>
 getCallAndCalleeAttributes(const VPRecipeBase &R) {
-  auto *Call = cast<VPWidenCallRecipe>(&R);
-  return {*Call, Call->getCalledScalarFunction()->getAttributes().getFnAttrs()};
+  if (auto *Call = dyn_cast<VPWidenCallRecipe>(&R))
+    return {*Call,
+            Call->getCalledScalarFunction()->getAttributes().getFnAttrs()};
+  auto *VPI = cast<VPInstruction>(&R);
+  if (auto *Call = dyn_cast<VPCallInstruction>(VPI))
+    return {*Call,
+            Call->getCalledScalarFunction()->getAttributes().getFnAttrs()};
+  assert(VPI->getOpcode() == VPInstruction::Intrinsic &&
+         "expected call or intrinsic");
+  return {VPIRAttributes(),
+          Intrinsic::getFnAttributes(VPI->getScalarType()->getContext(),
+                                     vputils::getIntrinsicID(VPI))};
 }
 
 bool VPRecipeBase::mayWriteToMemory() const {
@@ -197,6 +207,12 @@ bool VPRecipeBase::mayHaveSideEffects() const {
     return false;
   case VPInstructionSC: {
     auto *VPI = cast<VPInstruction>(this);
+    if (VPI->getOpcode() == Instruction::Call ||
+        VPI->getOpcode() == VPInstruction::Intrinsic) {
+      auto [Attrs, CalleeFnAttrs] = getCallAndCalleeAttributes(*VPI);
+      return mayWriteToMemory() || !Attrs.doesNotThrow(CalleeFnAttrs) ||
+             !Attrs.willReturn(CalleeFnAttrs);
+    }
     return mayWriteToMemory() ||
            VPI->getOpcode() == VPInstruction::BranchOnCount ||
            VPI->getOpcode() == VPInstruction::BranchOnCond ||
@@ -644,6 +660,20 @@ VPInstruction::VPInstruction(unsigned Opcode, ArrayRef<VPValue *> Operands,
           getNumOperandsForOpcode() == getNumOperands() ||
           (isMasked() && getNumOperandsForOpcode() + 1 == getNumOperands())) &&
          "number of operands does not match opcode");
+}
+
+VPInstruction *VPInstruction::cloneWithOperands(ArrayRef<VPValue *> NewOperands,
+                                                Type *ResultTy) {
+  VPInstruction *New;
+  if (auto *Call = dyn_cast<VPCallInstruction>(this))
+    New = new VPCallInstruction(NewOperands, *this, *this, *Call, getDebugLoc(),
+                                Name, ResultTy);
+  else
+    New = new VPInstruction(Opcode, NewOperands, *this, *this, getDebugLoc(),
+                            Name, ResultTy);
+  if (getUnderlyingValue())
+    New->setUnderlyingValue(getUnderlyingInstr());
+  return New;
 }
 
 unsigned VPInstruction::getNumOperandsForOpcode() const {
@@ -1783,14 +1813,11 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
   case VPInstruction::Reverse:
   case VPInstruction::Unpack:
     return false;
-  case VPInstruction::Intrinsic: {
-    LLVMContext &Ctx = getScalarType()->getContext();
-    AttributeSet Attrs =
-        Intrinsic::getFnAttributes(Ctx, vputils::getIntrinsicID(this));
-    return !Attrs.getMemoryEffects().doesNotAccessMemory();
+  case VPInstruction::Intrinsic:
+  case Instruction::Call: {
+    auto [Attrs, CalleeFnAttrs] = getCallAndCalleeAttributes(*this);
+    return !Attrs.getMemoryEffects(CalleeFnAttrs).doesNotAccessMemory();
   }
-  case Instruction::Call:
-    return !getCalledFunction(operands())->doesNotAccessMemory();
   default:
     return true;
   }
@@ -2264,12 +2291,13 @@ void VPIRMetadata::print(raw_ostream &O, VPSlotTracker &SlotTracker) const {
 }
 #endif
 
-VPIRAttributes::VPIRAttributes(const CallInst &CI, FunctionType *WideTy,
-                               bool IsMaskedCall) {
-  assert(CI.arg_size() <= WideTy->getNumParams() &&
+VPIRAttributes::VPIRAttributes(const VPIRAttributes &ScalarCallAttrs,
+                               ArrayRef<VPValue *> ScalarArgs,
+                               FunctionType *WideTy, bool IsMaskedCall) {
+  assert(ScalarArgs.size() <= WideTy->getNumParams() &&
          "widened call must take all scalar arguments");
-  LLVMContext &Ctx = CI.getContext();
-  AttributeList ScalarAttrs = CI.getAttributes();
+  LLVMContext &Ctx = WideTy->getContext();
+  AttributeList ScalarAttrs = ScalarCallAttrs.CallAttrs;
 
   // Only poison-generating attributes, as masked-off lanes may be poison.
   // TODO: Support additional attributes.
@@ -2292,11 +2320,11 @@ VPIRAttributes::VPIRAttributes(const CallInst &CI, FunctionType *WideTy,
 
   // For masked calls, only widened args of masked variants keep attributes;
   // scalar (uniform or linear) args are shared by all lanes.
-  bool IsMaskedVariant = WideTy->getNumParams() > CI.arg_size();
+  bool IsMaskedVariant = WideTy->getNumParams() > ScalarArgs.size();
   SmallVector<AttributeSet> ArgAttrs(WideTy->getNumParams());
-  for (unsigned I = 0, E = CI.arg_size(); I != E; ++I) {
+  for (unsigned I = 0, E = ScalarArgs.size(); I != E; ++I) {
     Type *WideArgTy = WideTy->getParamType(I);
-    bool IsWidenedArg = WideArgTy != CI.getArgOperand(I)->getType();
+    bool IsWidenedArg = WideArgTy != ScalarArgs[I]->getScalarType();
     if (IsMaskedCall && (!IsMaskedVariant || !IsWidenedArg))
       continue;
     ArgAttrs[I] = Filter(WideArgTy, ScalarAttrs.getParamAttrs(I));

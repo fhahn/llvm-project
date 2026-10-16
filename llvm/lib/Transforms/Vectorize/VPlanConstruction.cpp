@@ -302,9 +302,17 @@ void PlainCFGBuilder::createVPInstructionsForVPBB(VPBasicBlock *VPBB,
       if (auto *EVI = dyn_cast<ExtractValueInst>(Inst))
         for (unsigned Idx : EVI->indices())
           VPOperands.push_back(Plan->getConstantInt(32, Idx));
-      NewR = VPIRBuilder.createNaryOp(Inst->getOpcode(), VPOperands, Inst,
-                                      VPIRFlags(*Inst), MD, Inst->getDebugLoc(),
-                                      "", Inst->getType());
+      if (auto *CI = dyn_cast<CallInst>(Inst)) {
+        NewR = VPIRBuilder.insert(
+            new VPCallInstruction(VPOperands, VPIRFlags(*Inst), MD,
+                                  VPIRAttributes(CI->getAttributes()),
+                                  Inst->getDebugLoc(), "", Inst->getType()));
+        NewR->setUnderlyingValue(Inst);
+      } else {
+        NewR = VPIRBuilder.createNaryOp(
+            Inst->getOpcode(), VPOperands, Inst, VPIRFlags(*Inst), MD,
+            Inst->getDebugLoc(), "", Inst->getType());
+      }
     }
 
     IRDef2VPValue[Inst] = NewR;

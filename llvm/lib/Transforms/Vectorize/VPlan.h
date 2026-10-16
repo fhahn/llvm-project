@@ -1286,8 +1286,13 @@ class VPIRAttributes {
 public:
   VPIRAttributes() = default;
 
-  /// Keeps the attributes of \p CI valid for a widened call of type \p WideTy.
-  VPIRAttributes(const CallInst &CI, FunctionType *WideTy, bool IsMaskedCall);
+  explicit VPIRAttributes(AttributeList CallAttrs) : CallAttrs(CallAttrs) {}
+
+  /// Keeps the attributes of \p ScalarCallAttrs valid for a widened call of
+  /// type \p WideTy with scalar arguments \p ScalarArgs.
+  VPIRAttributes(const VPIRAttributes &ScalarCallAttrs,
+                 ArrayRef<VPValue *> ScalarArgs, FunctionType *WideTy,
+                 bool IsMaskedCall);
 
   /// Intersect with the attributes of \p Other.
   void intersectAttrs(const VPIRAttributes &Other, LLVMContext &Ctx);
@@ -1511,13 +1516,7 @@ public:
   }
 
   VPInstruction *cloneWithOperands(ArrayRef<VPValue *> NewOperands,
-                                   Type *ResultTy = nullptr) {
-    auto *New = new VPInstruction(Opcode, NewOperands, *this, *this,
-                                  getDebugLoc(), Name, ResultTy);
-    if (getUnderlyingValue())
-      New->setUnderlyingValue(getUnderlyingInstr());
-    return New;
-  }
+                                   Type *ResultTy = nullptr);
 
   unsigned getOpcode() const { return Opcode; }
 
@@ -1751,6 +1750,40 @@ protected:
 #endif
 
   const VPRecipeBase *getAsRecipe() const override { return this; }
+};
+
+/// A VPInstruction for a call, carrying the call's attributes.
+class LLVM_ABI_FOR_TEST VPCallInstruction : public VPInstruction,
+                                            public VPIRAttributes {
+public:
+  VPCallInstruction(ArrayRef<VPValue *> Operands, const VPIRFlags &Flags,
+                    const VPIRMetadata &MD, const VPIRAttributes &Attrs,
+                    DebugLoc DL, const Twine &Name = "",
+                    Type *ResultTy = nullptr)
+      : VPInstruction(Instruction::Call, Operands, Flags, MD, DL, Name,
+                      ResultTy),
+        VPIRAttributes(Attrs) {}
+
+  static inline bool classof(const VPUser *U) {
+    auto *VPI = dyn_cast<VPInstruction>(U);
+    return VPI && VPI->getOpcode() == Instruction::Call;
+  }
+
+  static inline bool classof(const VPValue *V) {
+    auto *VPI = dyn_cast<VPInstruction>(V);
+    return VPI && VPI->getOpcode() == Instruction::Call;
+  }
+
+  static inline bool classof(const VPSingleDefRecipe *SDR) {
+    auto *VPI = dyn_cast<VPInstruction>(SDR);
+    return VPI && VPI->getOpcode() == Instruction::Call;
+  }
+
+  /// Returns the called scalar function.
+  Function *getCalledScalarFunction() const {
+    return cast<Function>(
+        getOperand(getNumOperandsWithoutMask() - 1)->getLiveInIRValue());
+  }
 };
 
 /// A recipe to wrap on original IR instruction not to be modified during
