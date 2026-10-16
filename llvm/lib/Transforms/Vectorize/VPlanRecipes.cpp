@@ -4150,8 +4150,8 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
       return ScalarCost;
 
     // If any of the operands is from a different replicate region and has its
-    // cost skipped, it may have been forced to scalar. Fall back to legacy cost
-    // model to avoid cost mis-match.
+    // cost skipped, its legacy scalarization cost may have been precomputed.
+    // Fall back to legacy cost model to avoid cost mis-match.
     if (any_of(operands(), [&Ctx, VF](VPValue *Op) {
           auto *PredR = dyn_cast<VPPredInstPHIRecipe>(Op);
           if (!PredR)

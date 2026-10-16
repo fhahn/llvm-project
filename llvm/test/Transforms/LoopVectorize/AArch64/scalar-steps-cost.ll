@@ -108,7 +108,7 @@ exit:
 define void @scalar_steps_replicated_mul_by_power_of_2(ptr noalias %dst, ptr noalias %src, i64 %off) {
 ; CHECK-LABEL: LV: Checking a loop in 'scalar_steps_replicated_mul_by_power_of_2'
 ; CHECK: Cost of 1 for VF 2: {{.*}} = SCALAR-STEPS {{.*}}, ir<1>, {{.*}}
-; CHECK: Cost of 0 for VF 2: REPLICATE ir<%mul> = mul nuw nsw {{.*}}, ir<4>
+; CHECK: Cost of 2 for VF 2: REPLICATE ir<%mul> = mul nuw nsw {{.*}}, ir<4>
 entry:
   br label %loop
 
