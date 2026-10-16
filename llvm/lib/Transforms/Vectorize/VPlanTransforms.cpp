@@ -1579,13 +1579,18 @@ static VPSingleDefRecipe *combineRecipe(VPlan &Plan, VPSingleDefRecipe *Def,
     return Builder.createSub(X, Y, Def->getDebugLoc(), "", NW);
   }
 
+  // Don't strength-reduce replicated recipes to VPInstructions, which compute
+  // a vector to extract the lanes from.
+  auto *RepR = dyn_cast<VPReplicateRecipe>(Def);
+  bool CanStrengthReduce =
+      CanCreateNewRecipe && (!RepR || RepR->isSingleScalar());
   const APInt *APC;
-  if (CanCreateNewRecipe && match(Def, m_URem(m_VPValue(X), m_APInt(APC))) &&
+  if (CanStrengthReduce && match(Def, m_URem(m_VPValue(X), m_APInt(APC))) &&
       APC->isPowerOf2())
     return Builder.createAnd(X, Plan.getConstantInt(*APC - 1),
                              Def->getDebugLoc());
 
-  if (CanCreateNewRecipe && match(Def, m_c_Mul(m_VPValue(X), m_APInt(APC))) &&
+  if (CanStrengthReduce && match(Def, m_c_Mul(m_VPValue(X), m_APInt(APC))) &&
       APC->isPowerOf2()) {
     auto *MulR = cast<VPRecipeWithIRFlags>(Def);
     unsigned ShiftAmt = APC->exactLogBase2();
@@ -1598,7 +1603,7 @@ static VPSingleDefRecipe *combineRecipe(VPlan &Plan, VPSingleDefRecipe *Def,
         Def->getDebugLoc());
   }
 
-  if (CanCreateNewRecipe && match(Def, m_UDiv(m_VPValue(X), m_APInt(APC))) &&
+  if (CanStrengthReduce && match(Def, m_UDiv(m_VPValue(X), m_APInt(APC))) &&
       APC->isPowerOf2())
     return Builder.createNaryOp(
         Instruction::LShr,
