@@ -604,6 +604,7 @@ private:
 
   SmallVector<AnalysisKey *, 4> AADeps;
 
+  friend class AAManager;
   friend class BatchAAResults;
 };
 
