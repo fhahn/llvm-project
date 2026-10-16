@@ -1718,7 +1718,8 @@ void MemorySSA::moveTo(MemoryAccess *What, BasicBlock *BB,
 
 MemoryPhi *MemorySSA::createMemoryPhi(BasicBlock *BB) {
   assert(!getMemoryAccess(BB) && "MemoryPhi already exists for this BB");
-  MemoryPhi *Phi = new MemoryPhi(BB->getContext(), BB, NextID++);
+  MemoryPhi *Phi =
+      new MemoryPhi(BB->getContext(), BB, NextID++, pred_size(BB));
   // Phi's always are placed at the front of the block.
   insertIntoListsForBlock(Phi, BB, Beginning);
   ValueToMemoryAccess[BB] = Phi;
