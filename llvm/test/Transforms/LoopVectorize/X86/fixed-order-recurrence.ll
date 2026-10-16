@@ -432,7 +432,7 @@ exit:
 define void @replicated_load_used_as_address_via_recurrence(ptr noalias %src, ptr noalias %idx, ptr noalias %dst, i64 %n) #0 {
 ; CHECK-LABEL: @replicated_load_used_as_address_via_recurrence(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N:%.*]], 8
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N:%.*]], 12
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[TMP0:%.*]] = and i64 [[N]], 3
@@ -441,11 +441,17 @@ define void @replicated_load_used_as_address_via_recurrence(ptr noalias %src, pt
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VECTOR_RECUR:%.*]] = phi <4 x i64> [ <i64 poison, i64 poison, i64 poison, i64 0>, [[VECTOR_PH]] ], [ [[TMP9:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP29:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP30:%.*]] = add i64 [[INDEX]], 2
+; CHECK-NEXT:    [[TMP31:%.*]] = add i64 [[INDEX]], 3
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i64, ptr [[IDX:%.*]], i64 [[INDEX]]
+; CHECK-NEXT:    [[TMP32:%.*]] = getelementptr inbounds i64, ptr [[IDX]], i64 [[TMP29]]
+; CHECK-NEXT:    [[TMP33:%.*]] = getelementptr inbounds i64, ptr [[IDX]], i64 [[TMP30]]
+; CHECK-NEXT:    [[TMP34:%.*]] = getelementptr inbounds i64, ptr [[IDX]], i64 [[TMP31]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[TMP1]], align 8
-; CHECK-NEXT:    [[TMP3:%.*]] = load i64, ptr [[TMP1]], align 8
-; CHECK-NEXT:    [[TMP4:%.*]] = load i64, ptr [[TMP1]], align 8
-; CHECK-NEXT:    [[TMP5:%.*]] = load i64, ptr [[TMP1]], align 8
+; CHECK-NEXT:    [[TMP3:%.*]] = load i64, ptr [[TMP32]], align 8
+; CHECK-NEXT:    [[TMP4:%.*]] = load i64, ptr [[TMP33]], align 8
+; CHECK-NEXT:    [[TMP5:%.*]] = load i64, ptr [[TMP34]], align 8
 ; CHECK-NEXT:    [[TMP6:%.*]] = insertelement <4 x i64> poison, i64 [[TMP2]], i64 0
 ; CHECK-NEXT:    [[TMP7:%.*]] = insertelement <4 x i64> [[TMP6]], i64 [[TMP3]], i64 1
 ; CHECK-NEXT:    [[TMP8:%.*]] = insertelement <4 x i64> [[TMP7]], i64 [[TMP4]], i64 2

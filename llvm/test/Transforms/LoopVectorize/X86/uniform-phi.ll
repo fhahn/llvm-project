@@ -27,7 +27,6 @@ for.end:
 
 ; CHECK-LABEL: foo
 ; CHECK-DAG: LV: Found uniform instruction:   %cond = icmp eq i64 %i.next, %n
-; CHECK-DAG: LV: Found uniform instruction:   %tmp1 = getelementptr inbounds i32, ptr %a, i32 %tmp0
 ; CHECK-NOT: LV: Found uniform instruction:   %i = phi i64 [ %i.next, %for.body ], [ 0, %entry ]
 
 define void @foo(ptr %a, i64 %n) {

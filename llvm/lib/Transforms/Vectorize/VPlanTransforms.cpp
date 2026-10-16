@@ -835,25 +835,58 @@ static void legalizeAndOptimizeInductions(VPlan &Plan) {
       auto *RepR = dyn_cast<VPReplicateRecipe>(U);
       // Skip recipes that shouldn't be narrowed.
       if (!Def ||
-          !isa<VPReplicateRecipe, VPWidenRecipe, VPWidenGEPRecipe>(Def) ||
+          !isa<VPReplicateRecipe, VPWidenRecipe, VPWidenCastRecipe,
+               VPWidenGEPRecipe, VPWidenIntrinsicRecipe>(Def) ||
           Def->user_empty() || !Def->getUnderlyingValue() ||
           (RepR && (RepR->isSingleScalar() || RepR->isPredicated())))
         continue;
 
+      // ExtractValues take the shape of their aggregate, so calls returning
+      // structs are narrowed together with their extractvalue users.
+      auto IsFirstLaneExtract = [](VPUser *U) {
+        auto *EV = dyn_cast<VPRecipeWithIRFlags>(U);
+        return EV && vputils::getOpcode(EV) == Instruction::ExtractValue &&
+               vputils::onlyFirstLaneUsed(EV);
+      };
+      bool OnlyExtracts = all_of(Def->users(), IsFirstLaneExtract);
+
       // Skip recipes that may have other lanes than their first used.
-      if (!vputils::isSingleScalar(Def) && !vputils::onlyFirstLaneUsed(Def))
+      if (!OnlyExtracts && !vputils::isSingleScalar(Def) &&
+          !vputils::onlyFirstLaneUsed(Def))
         continue;
 
-      // TODO: Support scalarizing ExtractValue.
+      // TODO: Support scalarizing ExtractValue on its own.
       if (match(Def,
                 m_Binary<Instruction::ExtractValue>(m_VPValue(), m_VPValue())))
         continue;
 
+      // Single-scalar calls take the called function as last operand.
+      SmallVector<VPValue *> Ops(Def->operands());
+      if (isa<VPWidenIntrinsicRecipe>(Def)) {
+        auto *CI = dyn_cast<CallInst>(Def->getUnderlyingInstr());
+        if (!CI)
+          continue;
+        Ops.push_back(Plan.getOrAddLiveIn(CI->getCalledFunction()));
+      }
       auto *Clone = VPBuilder::createSingleScalarOp(
-          Def->getUnderlyingInstr()->getOpcode(), Def->operands(),
+          Def->getUnderlyingInstr()->getOpcode(), Ops,
           /*Mask=*/nullptr, *Def, getMetadataOf(Def), DebugLoc::getUnknown(),
           Def->getScalarType(), Def->getUnderlyingInstr());
       Clone->insertAfter(Def);
+      if (OnlyExtracts) {
+        for (VPUser *U : to_vector(Def->users())) {
+          auto *EV = cast<VPRecipeWithIRFlags>(U);
+          SmallVector<VPValue *> EVOps(EV->operands());
+          EVOps[0] = Clone;
+          auto *EVClone = VPBuilder::createSingleScalarOp(
+              Instruction::ExtractValue, EVOps, /*Mask=*/nullptr, *EV,
+              getMetadataOf(EV), DebugLoc::getUnknown(), EV->getScalarType(),
+              EV->getUnderlyingInstr());
+          EVClone->insertAfter(EV);
+          EV->replaceAllUsesWith(EVClone);
+          EV->eraseFromParent();
+        }
+      }
       Def->replaceAllUsesWith(Clone);
       Def->eraseFromParent();
     }

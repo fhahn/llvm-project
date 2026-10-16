@@ -2466,38 +2466,8 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
     return TheLoop->isLoopInvariant(cast<StoreInst>(I)->getValueOperand());
   };
 
-  auto IsUniformDecision = [&](Instruction *I, ElementCount VF) {
-    InstWidening WideningDecision = getWideningDecision(I, VF);
-    assert(WideningDecision != CM_Unknown &&
-           "Widening decision should be ready at this moment");
-
-    if (IsUniformMemOpUse(I))
-      return true;
-
-    return (WideningDecision == CM_Widen ||
-            WideningDecision == CM_Widen_Reverse ||
-            WideningDecision == CM_Interleave);
-  };
-
-  // Returns true if Ptr is the pointer operand of a memory access instruction
-  // I, I is known to not require scalarization, and the pointer is not also
-  // stored.
-  auto IsVectorizedMemAccessUse = [&](Instruction *I, Value *Ptr) -> bool {
-    if (isa<StoreInst>(I) && I->getOperand(0) == Ptr)
-      return false;
-    return getLoadStorePointerOperand(I) == Ptr &&
-           (IsUniformDecision(I, VF) || Legal->isInvariant(Ptr));
-  };
-
-  // Holds a list of values which are known to have at least one uniform use.
-  // Note that there may be other uses which aren't uniform.  A "uniform use"
-  // here is something which only demands lane 0 of the unrolled iterations;
-  // it does not imply that all lanes produce the same value (e.g. this is not
-  // the usual meaning of uniform)
-  SetVector<Value *> HasUniformUse;
-
-  // Scan the loop for instructions which are either a) known to have only
-  // lane 0 demanded or b) are uses which demand only lane 0 of their operand.
+  // Scan the loop for instructions which are known to have only lane 0
+  // demanded.
   for (auto *BB : TheLoop->blocks())
     for (auto &I : *BB) {
       if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I)) {
@@ -2538,25 +2508,7 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
 
       if (IsUniformMemOpUse(&I))
         AddToWorklistIfAllowed(&I);
-
-      if (IsVectorizedMemAccessUse(&I, Ptr))
-        HasUniformUse.insert(Ptr);
     }
-
-  // Add to the worklist any operands which have *only* uniform (e.g. lane 0
-  // demanding) users.  Since loops are assumed to be in LCSSA form, this
-  // disallows uses outside the loop as well.
-  for (auto *V : HasUniformUse) {
-    if (IsOutOfScope(V))
-      continue;
-    auto *I = cast<Instruction>(V);
-    bool UsersAreMemAccesses = all_of(I->users(), [&](User *U) -> bool {
-      auto *UI = cast<Instruction>(U);
-      return TheLoop->contains(UI) && IsVectorizedMemAccessUse(UI, V);
-    });
-    if (UsersAreMemAccesses)
-      AddToWorklistIfAllowed(I);
-  }
 
   // Expand Worklist in topological order: whenever a new instruction
   // is added , its users should be already inside Worklist.  It ensures
@@ -2578,8 +2530,7 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
       // operand into the uniform worklist.
       auto *OI = cast<Instruction>(OV);
       if (llvm::all_of(OI->users(), [&](User *U) -> bool {
-            auto *J = cast<Instruction>(U);
-            return Worklist.count(J) || IsVectorizedMemAccessUse(J, OI);
+            return Worklist.count(cast<Instruction>(U));
           }))
         AddToWorklistIfAllowed(OI);
     }
@@ -3820,9 +3771,14 @@ InstructionCost LoopVectorizationCostModel::computePredInstDiscount(
     if (isScalarWithPredication(I, VF))
       return false;
 
+    // Widened loads, e.g. masked loads, are not scalarized.
+    if (isa<LoadInst>(I) &&
+        is_contained({CM_Widen, CM_Widen_Reverse, CM_Interleave},
+                     getWideningDecision(I, VF)))
+      return false;
+
     // If any of the instruction's operands are uniform after vectorization,
-    // the instruction cannot be scalarized. This prevents, for example, a
-    // masked load from being scalarized.
+    // the instruction cannot be scalarized.
     //
     // We assume we will only emit a value for lane zero of an instruction
     // marked uniform after vectorization, rather than VF identical values.
