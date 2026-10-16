@@ -992,12 +992,6 @@ public:
   /// trivially hoistable.
   bool shouldConsiderInvariant(Value *Op);
 
-  /// Returns true if \p I has been forced to be scalarized at \p VF.
-  bool isForcedScalar(Instruction *I, ElementCount VF) const {
-    auto FS = ForcedScalars.find(VF);
-    return FS != ForcedScalars.end() && FS->second.contains(I);
-  }
-
 private:
   const VectorizeOptions &Opts;
 
@@ -5240,7 +5234,7 @@ void VPCostContext::invalidateWideningDecision(Instruction *I,
 
 bool VPCostContext::willBeScalarized(Instruction *I, ElementCount VF) const {
   return CM.isScalarWithPredication(I, VF) ||
-         CM.isUniformAfterVectorization(I, VF) || CM.isForcedScalar(I, VF) ||
+         CM.isScalarAfterVectorization(I, VF) ||
          (VF.isVector() && CM.isProfitableToScalarize(I, VF));
 }
 
