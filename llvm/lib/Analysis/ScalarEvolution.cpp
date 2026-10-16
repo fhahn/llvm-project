@@ -16108,17 +16108,16 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   // predecessor, climb up the predecessor chain, as long as there are
   // predecessors that can be found that have unique successors leading to the
   // original header. If there is no such predecessor, continue at the
-  // immediate dominator. Only immediate dominator steps count towards
-  // MaxGuardDomTreeSteps.
+  // immediate dominator.
   // TODO: share this logic with isLoopEntryGuardedByCond.
   unsigned NumCollectedConditions = 0;
   unsigned NumDomTreeSteps = 0;
-  auto GetNext = [&](const BasicBlock *BB) {
-    auto Pair = SE.getPredecessorWithUniqueSuccessorForBB(BB);
-    while (!Pair.first) {
-      // There is no unique predecessor to continue. At the first such block,
-      // try to build conditions for its phis by merging the conditions
-      // collected for their incoming blocks.
+  VisitedBlocks.insert(Block);
+  std::pair<const BasicBlock *, const BasicBlock *> Pair(Pred, Block);
+  for (;; Pair = SE.getPredecessorWithUniqueSuccessorForBB(Pair.first)) {
+    if (!Pair.first) {
+      // At the first block without a unique predecessor, try to build
+      // conditions for its phis by merging those of their incoming blocks.
       if (!NumDomTreeSteps && Depth < MaxLoopGuardCollectionDepth) {
         SmallDenseMap<const BasicBlock *, LoopGuards> IncomingGuards;
         for (auto &Phi : Pair.second->phis())
@@ -16127,13 +16126,9 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       const DomTreeNode *IDom = SE.DT.getNode(Pair.second)->getIDom();
       if (!IDom || ++NumDomTreeSteps > MaxGuardDomTreeSteps)
         break;
-      Pair = SE.getPredecessorWithUniqueSuccessorForBB(IDom->getBlock());
+      Pair.first = IDom->getBlock();
+      continue;
     }
-    return Pair;
-  };
-  VisitedBlocks.insert(Block);
-  std::pair<const BasicBlock *, const BasicBlock *> Pair(Pred, Block);
-  for (; Pair.first; Pair = GetNext(Pair.first)) {
     VisitedBlocks.insert(Pair.second);
     const CondBrInst *LoopEntryPredicate =
         dyn_cast<CondBrInst>(Pair.first->getTerminator());
