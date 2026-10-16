@@ -891,6 +891,9 @@ void AAResultsWrapperPass::getAnalysisUsage(AnalysisUsage &AU) const {
 
 AAManager::Result AAManager::run(Function &F, FunctionAnalysisManager &AM) {
   Result R(AM.getResult<TargetLibraryAnalysis>(F));
+  // Each getter adds at most one result and one dependency.
+  R.AAs.reserve(ResultGetters.size());
+  R.AADeps.reserve(ResultGetters.size());
   for (auto &Getter : ResultGetters)
     (*Getter)(F, AM, R);
   return R;
