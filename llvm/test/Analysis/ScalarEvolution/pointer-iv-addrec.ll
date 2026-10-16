@@ -4,6 +4,7 @@
 target datalayout = "e-m:e-p:64:64-p1:32:32-i64:64-n32:64"
 
 %struct.S = type { i32, i64 }
+%empty = type {}
 
 define void @gep_iv_constant_step(ptr %p, i64 %n) {
 ; CHECK-LABEL: 'gep_iv_constant_step'
@@ -96,6 +97,40 @@ loop:
   %iv = phi ptr [ %p, %entry ], [ %iv.next, %loop ]
   %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
   %iv.next = getelementptr nusw i32, ptr %iv, i64 -1
+  %i.next = add nuw nsw i64 %i, 1
+  store i32 0, ptr %iv, align 4
+  %ec = icmp eq i64 %i.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The index may be negative, so only nw can be derived from nusw.
+define void @gep_iv_nusw_may_be_negative(ptr %p, i64 %step, i64 %n) {
+; CHECK-LABEL: 'gep_iv_nusw_may_be_negative'
+; CHECK-NEXT:  Classifying expressions for: @gep_iv_nusw_may_be_negative
+; CHECK-NEXT:    %iv = phi ptr [ %p, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {%p,+,(4 * %step)}<nw><%loop> U: full-set S: full-set Exits: ((4 * (-1 + %n) * %step) + %p) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-9223372036854775808) S: [0,-9223372036854775808) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = getelementptr nusw i32, ptr %iv, i64 %step
+; CHECK-NEXT:    --> {((4 * %step) + %p),+,(4 * %step)}<nw><%loop> U: full-set S: full-set Exits: ((4 * %step * %n) + %p) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i.next = add nuw nsw i64 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,-9223372036854775808) S: [1,-9223372036854775808) Exits: %n LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @gep_iv_nusw_may_be_negative
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %n)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + %n)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi ptr [ %p, %entry ], [ %iv.next, %loop ]
+  %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
+  %iv.next = getelementptr nusw i32, ptr %iv, i64 %step
   %i.next = add nuw nsw i64 %i, 1
   store i32 0, ptr %iv, align 4
   %ec = icmp eq i64 %i.next, %n
@@ -232,6 +267,41 @@ loop:
   %iv = phi ptr [ %p, %entry ], [ %iv.next, %loop ]
   %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
   %iv.next = getelementptr inbounds i32, ptr %iv, i64 0
+  %i.next = add nuw nsw i64 %i, 1
+  store i32 0, ptr %iv, align 4
+  %ec = icmp eq i64 %i.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The element type is zero-sized, so the step is zero and the PHI is
+; loop-invariant.
+define void @gep_iv_zero_sized_element(ptr %p, i64 %n) {
+; CHECK-LABEL: 'gep_iv_zero_sized_element'
+; CHECK-NEXT:  Classifying expressions for: @gep_iv_zero_sized_element
+; CHECK-NEXT:    %iv = phi ptr [ %p, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> %p U: full-set S: full-set Exits: %p LoopDispositions: { %loop: Invariant }
+; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-9223372036854775808) S: [0,-9223372036854775808) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = getelementptr inbounds %empty, ptr %iv, i64 1
+; CHECK-NEXT:    --> %p U: full-set S: full-set Exits: %p LoopDispositions: { %loop: Invariant }
+; CHECK-NEXT:    %i.next = add nuw nsw i64 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,-9223372036854775808) S: [1,-9223372036854775808) Exits: %n LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @gep_iv_zero_sized_element
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %n)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + %n)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi ptr [ %p, %entry ], [ %iv.next, %loop ]
+  %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
+  %iv.next = getelementptr inbounds %empty, ptr %iv, i64 1
   %i.next = add nuw nsw i64 %i, 1
   store i32 0, ptr %iv, align 4
   %ec = icmp eq i64 %i.next, %n
