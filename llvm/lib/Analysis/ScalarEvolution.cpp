@@ -16116,10 +16116,10 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   auto GetNext = [&](const BasicBlock *BB) {
     auto Pair = SE.getPredecessorWithUniqueSuccessorForBB(BB);
     while (!Pair.first) {
-      // There is no unique predecessor to continue, try to collect conditions
-      // for PHINodes by recursively following all of their incoming blocks and
-      // try to merge the found conditions to build a new one for the Phi.
-      if (Depth < MaxLoopGuardCollectionDepth) {
+      // There is no unique predecessor to continue. At the first such block,
+      // try to build conditions for its phis by merging the conditions
+      // collected for their incoming blocks.
+      if (!NumDomTreeSteps && Depth < MaxLoopGuardCollectionDepth) {
         SmallDenseMap<const BasicBlock *, LoopGuards> IncomingGuards;
         for (auto &Phi : Pair.second->phis())
           collectFromPHI(SE, Guards, Phi, VisitedBlocks, IncomingGuards, Depth);

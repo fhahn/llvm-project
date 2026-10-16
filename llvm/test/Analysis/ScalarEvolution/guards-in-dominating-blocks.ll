@@ -831,13 +831,14 @@ exit:
 declare void @foo()
 
 ; The loop bound is a phi guarded on all incoming edges, in a merge block above
-; the merge block the predecessor chain ends at.
+; the merge block the predecessor chain ends at. Not handled, phis are only
+; processed at the merge block the predecessor chain ends at.
 define void @phi_guards_above_chain_end(i32 %a, i32 %b, i1 %c, i1 %d) {
 ; CHECK-LABEL: 'phi_guards_above_chain_end'
 ; CHECK-NEXT:  Determining loop execution counts for: @phi_guards_above_chain_end
-; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %n)<nsw>
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (1 smax %n))<nsw>
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 2147483646
-; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + %n)<nsw>
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (1 smax %n))<nsw>
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
 entry:
