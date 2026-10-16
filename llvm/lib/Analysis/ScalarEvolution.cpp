@@ -5693,6 +5693,39 @@ static SCEVFlags getNoWrapFlagsForGEP(GEPOperator *GEP, const SCEV *Accum,
   return Flags;
 }
 
+std::optional<ScalarEvolution::SimpleAffineStep>
+ScalarEvolution::matchSimpleAffineStep(const Loop *L, PHINode *PN,
+                                       Value *BEValueV) {
+  if (auto BO = MatchBinaryOp(BEValueV, getDataLayout(), AC, DT, PN)) {
+    if (BO->Opcode != Instruction::Add)
+      return std::nullopt;
+
+    Value *StepV = nullptr;
+    if (BO->LHS == PN && L->isLoopInvariant(BO->RHS))
+      StepV = BO->RHS;
+    else if (BO->RHS == PN && L->isLoopInvariant(BO->LHS))
+      StepV = BO->LHS;
+    if (!StepV)
+      return std::nullopt;
+
+    SCEVFlags Flags = SCEV::FlagNone;
+    if (BO->IsNUW)
+      Flags = setFlags(Flags, SCEV::FlagNUW);
+    if (BO->IsNSW)
+      Flags = setFlags(Flags, SCEV::FlagNSW);
+    return SimpleAffineStep{StepV, /*GEP=*/nullptr, Flags};
+  }
+
+  // Handle pointer induction variable: PN = PHI(Start, gep PN, LoopInvariant).
+  auto *GEP = dyn_cast<GEPOperator>(BEValueV);
+  if (!GEP || GEP->getPointerOperand() != PN || GEP->getNumIndices() != 1)
+    return std::nullopt;
+  Value *Idx = *GEP->idx_begin();
+  if (!L->isLoopInvariant(Idx))
+    return std::nullopt;
+  return SimpleAffineStep{Idx, GEP, SCEV::FlagNone};
+}
+
 /// A helper function for createAddRecFromPHI to handle simple cases.
 ///
 /// This function tries to find an AddRec expression for the simplest (yet most
@@ -5706,36 +5739,17 @@ const SCEV *ScalarEvolution::createSimpleAffineAddRec(PHINode *PN,
   assert(L && L->getHeader() == PN->getParent());
   assert(BEValueV && StartValueV);
 
-  const SCEV *Accum = nullptr;
-  SCEVFlags Flags = SCEV::FlagNone;
-  if (auto BO = MatchBinaryOp(BEValueV, getDataLayout(), AC, DT, PN)) {
-    if (BO->Opcode != Instruction::Add)
-      return nullptr;
+  std::optional<SimpleAffineStep> Step =
+      matchSimpleAffineStep(L, PN, BEValueV);
+  if (!Step)
+    return nullptr;
 
-    if (BO->LHS == PN && L->isLoopInvariant(BO->RHS))
-      Accum = getSCEV(BO->RHS);
-    else if (BO->RHS == PN && L->isLoopInvariant(BO->LHS))
-      Accum = getSCEV(BO->LHS);
-
-    if (!Accum)
-      return nullptr;
-
-    if (BO->IsNUW)
-      Flags = setFlags(Flags, SCEV::FlagNUW);
-    if (BO->IsNSW)
-      Flags = setFlags(Flags, SCEV::FlagNSW);
-  } else {
-    // Handle pointer induction variable: PN = PHI(Start, gep PN,
-    // LoopInvariant).
-    auto *GEP = dyn_cast<GEPOperator>(BEValueV);
-    if (!GEP || GEP->getPointerOperand() != PN || GEP->getNumIndices() != 1)
-      return nullptr;
-    Value *Idx = *GEP->idx_begin();
-    if (!L->isLoopInvariant(Idx))
-      return nullptr;
-
+  const SCEV *Accum = getSCEV(Step->StepV);
+  SCEVFlags Flags = Step->Flags;
+  if (GEPOperator *GEP = Step->GEP) {
+    // The step is the index scaled by the source element size.
     Type *IntIdxTy = getEffectiveSCEVType(GEP->getType());
-    Accum = getMulExpr(getTruncateOrSignExtend(getSCEV(Idx), IntIdxTy),
+    Accum = getMulExpr(getTruncateOrSignExtend(Accum, IntIdxTy),
                        getSizeOfExpr(IntIdxTy, GEP->getSourceElementType()));
     Flags = getNoWrapFlagsForGEP(GEP, Accum, *this);
   }
