@@ -4291,11 +4291,10 @@ InstructionCost VPReplicateRecipe::computeCallCost(
   }
 
   InstructionCost ScalarCallCost =
-      Ctx.TTI.getCallInstrCost(CalledFn, ResultTy, Tys, Ctx.CostKind);
-  if (IsSingleScalar) {
-    ScalarCallCost = std::min(ScalarCallCost, GetIntrinsicCost());
+      std::min(Ctx.TTI.getCallInstrCost(CalledFn, ResultTy, Tys, Ctx.CostKind),
+               GetIntrinsicCost());
+  if (IsSingleScalar)
     return ScalarCallCost;
-  }
 
   // Scalarization overhead is undefined for scalable VFs.
   if (VF.isScalable())

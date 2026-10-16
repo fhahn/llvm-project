@@ -1860,6 +1860,7 @@ InstructionCost VPCostContext::getScalarizationOverhead(
     if (isa<VPIRValue>(Op) ||
         (!AlwaysIncludeReplicatingR &&
          isa<VPReplicateRecipe, VPPredInstPHIRecipe>(Op)) ||
+        isa<VPScalarIVStepsRecipe>(Op) ||
         (isa<VPReplicateRecipe>(Op) &&
          cast<VPReplicateRecipe>(Op)->getOpcode() == Instruction::Load) ||
         !UniqueOperands.insert(Op).second)

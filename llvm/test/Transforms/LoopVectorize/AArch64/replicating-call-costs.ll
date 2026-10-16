@@ -8,7 +8,7 @@ target triple = "arm64-apple-macosx"
 define void @replicated_call_scalar_steps_operand(ptr noalias %dst) {
 ; CHECK-LABEL: LV: Checking a loop in 'replicated_call_scalar_steps_operand'
 ; CHECK: Cost of 1 for VF 2: [[STEPS:vp<%.+>]] = SCALAR-STEPS vp<%{{.+}}>, ir<1>, vp<%0>
-; CHECK: Cost of 28 for VF 2: REPLICATE ir<%r> = call @foo([[STEPS]])
+; CHECK: Cost of 24 for VF 2: REPLICATE ir<%r> = call @foo([[STEPS]])
 ; CHECK: Cost of 10 for VF 4: WIDEN-CALL ir<%r> = call @foo(ir<%iv>) (using library function: foo_v4)
 entry:
   br label %loop
@@ -31,7 +31,7 @@ exit:
 ; replicating should be cheaper than widening at VF 2.
 define void @replicated_umul_with_overflow(ptr noalias %dst) {
 ; CHECK-LABEL: LV: Checking a loop in 'replicated_umul_with_overflow'
-; CHECK: Cost of 27 for VF 2: WIDEN-INTRINSIC ir<%res> = call llvm.umul.with.overflow(ir<%iv>, ir<3>)
+; CHECK: Cost of 14 for VF 2: REPLICATE ir<%res> = call @llvm.umul.with.overflow.i64(vp<%{{.+}}>, ir<3>)
 entry:
   br label %loop
 
