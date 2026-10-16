@@ -1273,9 +1273,15 @@ public:
 #endif
 };
 
-/// Return and argument attributes of a call valid for the widened call.
+/// Attributes of a call: function attributes for queries, and return and
+/// argument attributes valid for the widened call.
 class VPIRAttributes {
   AttributeList CallAttrs;
+
+  /// Returns true if the call site or \p CalleeFnAttrs has \p Kind.
+  bool hasFnAttr(Attribute::AttrKind Kind, AttributeSet CalleeFnAttrs) const {
+    return CallAttrs.hasFnAttr(Kind) || CalleeFnAttrs.hasAttribute(Kind);
+  }
 
 public:
   VPIRAttributes() = default;
@@ -1286,9 +1292,24 @@ public:
   /// Intersect with the attributes of \p Other.
   void intersectAttrs(const VPIRAttributes &Other, LLVMContext &Ctx);
 
-  /// Apply the stored attributes to \p WideCall.
+  /// Apply the return and argument attributes to \p WideCall.
   void applyAttrs(CallInst &WideCall) const {
-    WideCall.setAttributes(CallAttrs);
+    WideCall.setAttributes(CallAttrs.removeFnAttributes(WideCall.getContext()));
+  }
+
+  /// Returns the memory effects of the call.
+  MemoryEffects getMemoryEffects(AttributeSet CalleeFnAttrs) const {
+    return CallAttrs.getMemoryEffects() & CalleeFnAttrs.getMemoryEffects();
+  }
+
+  /// Returns true if the call cannot unwind.
+  bool doesNotThrow(AttributeSet CalleeFnAttrs) const {
+    return hasFnAttr(Attribute::NoUnwind, CalleeFnAttrs);
+  }
+
+  /// Returns true if the call will return.
+  bool willReturn(AttributeSet CalleeFnAttrs) const {
+    return hasFnAttr(Attribute::WillReturn, CalleeFnAttrs);
   }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)

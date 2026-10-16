@@ -49,6 +49,14 @@ using namespace llvm::VPlanPatternMatch;
 #define LV_NAME "loop-vectorize"
 #define DEBUG_TYPE LV_NAME
 
+/// Returns the call-site attributes of \p R and its callee's function
+/// attributes.
+static std::pair<VPIRAttributes, AttributeSet>
+getCallAndCalleeAttributes(const VPRecipeBase &R) {
+  auto *Call = cast<VPWidenCallRecipe>(&R);
+  return {*Call, Call->getCalledScalarFunction()->getAttributes().getFnAttrs()};
+}
+
 bool VPRecipeBase::mayWriteToMemory() const {
   switch (getVPRecipeID()) {
   case VPExpressionSC:
@@ -70,10 +78,10 @@ bool VPRecipeBase::mayWriteToMemory() const {
   case VPReplicateSC:
     return cast<Instruction>(getVPSingleValue()->getUnderlyingValue())
         ->mayWriteToMemory();
-  case VPWidenCallSC:
-    return !cast<VPWidenCallRecipe>(this)
-                ->getCalledScalarFunction()
-                ->onlyReadsMemory();
+  case VPWidenCallSC: {
+    auto [Attrs, CalleeFnAttrs] = getCallAndCalleeAttributes(*this);
+    return !Attrs.getMemoryEffects(CalleeFnAttrs).onlyReadsMemory();
+  }
   case VPWidenMemIntrinsicSC:
   case VPWidenIntrinsicSC:
     return cast<VPWidenIntrinsicRecipe>(this)->mayWriteToMemory();
@@ -130,10 +138,10 @@ bool VPRecipeBase::mayReadFromMemory() const {
   case VPReplicateSC:
     return cast<Instruction>(getVPSingleValue()->getUnderlyingValue())
         ->mayReadFromMemory();
-  case VPWidenCallSC:
-    return !cast<VPWidenCallRecipe>(this)
-                ->getCalledScalarFunction()
-                ->onlyWritesMemory();
+  case VPWidenCallSC: {
+    auto [Attrs, CalleeFnAttrs] = getCallAndCalleeAttributes(*this);
+    return !Attrs.getMemoryEffects(CalleeFnAttrs).onlyWritesMemory();
+  }
   case VPWidenMemIntrinsicSC:
   case VPWidenIntrinsicSC:
     return cast<VPWidenIntrinsicRecipe>(this)->mayReadFromMemory();
@@ -195,8 +203,9 @@ bool VPRecipeBase::mayHaveSideEffects() const {
            VPI->getOpcode() == VPInstruction::BranchOnTwoConds;
   }
   case VPWidenCallSC: {
-    Function *Fn = cast<VPWidenCallRecipe>(this)->getCalledScalarFunction();
-    return mayWriteToMemory() || !Fn->doesNotThrow() || !Fn->willReturn();
+    auto [Attrs, CalleeFnAttrs] = getCallAndCalleeAttributes(*this);
+    return mayWriteToMemory() || !Attrs.doesNotThrow(CalleeFnAttrs) ||
+           !Attrs.willReturn(CalleeFnAttrs);
   }
   case VPWidenMemIntrinsicSC:
   case VPWidenIntrinsicSC:
@@ -2293,7 +2302,8 @@ VPIRAttributes::VPIRAttributes(const CallInst &CI, FunctionType *WideTy,
     ArgAttrs[I] = Filter(WideArgTy, ScalarAttrs.getParamAttrs(I));
   }
 
-  CallAttrs = AttributeList::get(Ctx, AttributeSet(), RetAttrs, ArgAttrs);
+  CallAttrs =
+      AttributeList::get(Ctx, ScalarAttrs.getFnAttrs(), RetAttrs, ArgAttrs);
 }
 
 void VPIRAttributes::intersectAttrs(const VPIRAttributes &Other,
