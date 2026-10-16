@@ -4082,6 +4082,16 @@ static const SCEV *getAddressAccessSCEV(const VPValue *Ptr,
   return vputils::isAddressSCEVForCost(Addr, *PSE.getSE(), L) ? Addr : nullptr;
 }
 
+/// Returns true if the per-lane results of \p R are packed into a vector for
+/// any of its users, directly or via a VPPredInstPHIRecipe.
+static bool isPackedIntoVector(const VPReplicateRecipe &R) {
+  return any_of(R.users(), [&R](const VPUser *U) {
+    if (auto *PredR = dyn_cast<VPPredInstPHIRecipe>(U))
+      return !vputils::onlyScalarValuesUsed(PredR);
+    return !U->usesScalars(&R);
+  });
+}
+
 InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
                                                VPCostContext &Ctx) const {
   Instruction *UI = cast<Instruction>(getUnderlyingValue());
@@ -4108,7 +4118,8 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
     auto *CalledFn = cast<Function>(getLastOperand()->getLiveInIRValue());
     Type *ResultTy = this->getScalarType();
     return computeCallCost(CalledFn, ResultTy, drop_end(operands()),
-                           isSingleScalar(), VF, Ctx);
+                           isSingleScalar(), VF, Ctx,
+                           isPackedIntoVector(*this));
   }
   case Instruction::Add:
   case Instruction::Sub:
@@ -4264,8 +4275,13 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
            (isSingleScalar() ? 1 : VF.getFixedValue());
   }
   case Instruction::ExtractValue:
-  case Instruction::InsertValue:
-    return Ctx.TTI.getInsertExtractValueCost(getOpcode(), Ctx.CostKind);
+  case Instruction::InsertValue: {
+    InstructionCost Cost =
+        Ctx.TTI.getInsertExtractValueCost(getOpcode(), Ctx.CostKind);
+    if (!isSingleScalar() && isPackedIntoVector(*this))
+      Cost += Ctx.getScalarizationOverhead(getScalarType(), {}, VF);
+    return Cost;
+  }
   }
 
   return Ctx.getLegacyCost(UI, VF);
@@ -4273,7 +4289,7 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
 
 InstructionCost VPReplicateRecipe::computeCallCost(
     Function *CalledFn, Type *ResultTy, ArrayRef<const VPValue *> ArgOps,
-    bool IsSingleScalar, ElementCount VF, VPCostContext &Ctx) {
+    bool IsSingleScalar, ElementCount VF, VPCostContext &Ctx, bool PackResult) {
   SmallVector<Type *, 4> Tys = map_to_vector<4>(
       ArgOps, [&](const VPValue *Op) { return Op->getScalarType(); });
 
@@ -4300,8 +4316,10 @@ InstructionCost VPReplicateRecipe::computeCallCost(
   if (VF.isScalable())
     return InstructionCost::getInvalid();
 
+  Type *PackedTy =
+      PackResult ? ResultTy : Type::getVoidTy(ResultTy->getContext());
   return ScalarCallCost * VF.getFixedValue() +
-         Ctx.getScalarizationOverhead(ResultTy, ArgOps, VF);
+         Ctx.getScalarizationOverhead(PackedTy, ArgOps, VF);
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)

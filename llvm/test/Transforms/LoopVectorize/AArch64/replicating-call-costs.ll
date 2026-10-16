@@ -31,8 +31,8 @@ exit:
 ; replicating should be cheaper than widening at VF 2.
 define void @replicated_umul_with_overflow(ptr noalias %dst) {
 ; CHECK-LABEL: LV: Checking a loop in 'replicated_umul_with_overflow'
-; CHECK: Cost of 14 for VF 2: REPLICATE ir<%res> = call @llvm.umul.with.overflow.i64(vp<%{{.+}}>, ir<3>)
-; CHECK: Cost of 0 for VF 2: REPLICATE ir<%mul> = extractvalue ir<%res>, ir<0>
+; CHECK: Cost of 6 for VF 2: REPLICATE ir<%res> = call @llvm.umul.with.overflow.i64(vp<%{{.+}}>, ir<3>)
+; CHECK: Cost of 4 for VF 2: REPLICATE ir<%mul> = extractvalue ir<%res>, ir<0>
 entry:
   br label %loop
 
@@ -54,7 +54,7 @@ exit:
 ; recipes, so they should not be packed into a vector.
 define void @replicated_umul_with_overflow_scalar_users(ptr noalias %src, ptr noalias %dst) {
 ; CHECK-LABEL: LV: Checking a loop in 'replicated_umul_with_overflow_scalar_users'
-; CHECK: Cost of 14 for VF 2: REPLICATE ir<%res> = call @llvm.umul.with.overflow.i64(vp<%{{.+}}>, ir<3>)
+; CHECK: Cost of 6 for VF 2: REPLICATE ir<%res> = call @llvm.umul.with.overflow.i64(vp<%{{.+}}>, ir<3>)
 entry:
   br label %loop.header
 

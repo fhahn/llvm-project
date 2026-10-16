@@ -3461,11 +3461,13 @@ public:
                               VPCostContext &Ctx) const override;
 
   /// Return the cost of scalarizing a call to \p CalledFn with argument
-  /// operands \p ArgOps for a given \p VF.
+  /// operands \p ArgOps for a given \p VF. The cost of packing the results into
+  /// a vector is only included if \p PackResult is true.
   static InstructionCost computeCallCost(Function *CalledFn, Type *ResultTy,
                                          ArrayRef<const VPValue *> ArgOps,
                                          bool IsSingleScalar, ElementCount VF,
-                                         VPCostContext &Ctx);
+                                         VPCostContext &Ctx,
+                                         bool PackResult = true);
 
   /// Returns true if the recipe produces a single scalar value.
   bool isSingleScalar() const { return IsSingleScalar; }

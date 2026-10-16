@@ -5333,6 +5333,11 @@ LoopVectorizationPlanner::precomputeCosts(VPlan &Plan, ElementCount VF,
         CostCtx.skipCostComputation(Scalarized, VF.isVector()))
       continue;
     CostCtx.SkipCostComputation.insert(Scalarized);
+    // The legacy cost of a predicated struct result includes packing its
+    // members, skip their extractvalues.
+    if (Scalarized->getType()->isStructTy())
+      for (User *U : Scalarized->users())
+        CostCtx.SkipCostComputation.insert(cast<Instruction>(U));
     LLVM_DEBUG({
       dbgs() << "Cost of " << ScalarCost << " for VF " << VF
              << ": profitable to scalarize " << *Scalarized << "\n";
