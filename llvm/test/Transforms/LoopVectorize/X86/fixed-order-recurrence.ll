@@ -427,6 +427,93 @@ exit:
   ret void
 }
 
+; %l is replicated, as it is used as address via the recurrence. Make sure its
+; address %gep.idx is computed for each lane.
+define void @replicated_load_used_as_address_via_recurrence(ptr noalias %src, ptr noalias %idx, ptr noalias %dst, i64 %n) #0 {
+; CHECK-LABEL: @replicated_load_used_as_address_via_recurrence(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N:%.*]], 8
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
+; CHECK:       vector.ph:
+; CHECK-NEXT:    [[TMP0:%.*]] = and i64 [[N]], 3
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP0]]
+; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
+; CHECK:       vector.body:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VECTOR_RECUR:%.*]] = phi <4 x i64> [ <i64 poison, i64 poison, i64 poison, i64 0>, [[VECTOR_PH]] ], [ [[TMP9:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i64, ptr [[IDX:%.*]], i64 [[INDEX]]
+; CHECK-NEXT:    [[TMP2:%.*]] = load i64, ptr [[TMP1]], align 8
+; CHECK-NEXT:    [[TMP3:%.*]] = load i64, ptr [[TMP1]], align 8
+; CHECK-NEXT:    [[TMP4:%.*]] = load i64, ptr [[TMP1]], align 8
+; CHECK-NEXT:    [[TMP5:%.*]] = load i64, ptr [[TMP1]], align 8
+; CHECK-NEXT:    [[TMP6:%.*]] = insertelement <4 x i64> poison, i64 [[TMP2]], i64 0
+; CHECK-NEXT:    [[TMP7:%.*]] = insertelement <4 x i64> [[TMP6]], i64 [[TMP3]], i64 1
+; CHECK-NEXT:    [[TMP8:%.*]] = insertelement <4 x i64> [[TMP7]], i64 [[TMP4]], i64 2
+; CHECK-NEXT:    [[TMP9]] = insertelement <4 x i64> [[TMP8]], i64 [[TMP5]], i64 3
+; CHECK-NEXT:    [[TMP10:%.*]] = shufflevector <4 x i64> [[VECTOR_RECUR]], <4 x i64> [[TMP9]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
+; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <4 x i64> [[TMP10]], i64 0
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i64, ptr [[SRC:%.*]], i64 [[TMP11]]
+; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <4 x i64> [[TMP10]], i64 1
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i64 [[TMP13]]
+; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <4 x i64> [[TMP10]], i64 2
+; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i64 [[TMP15]]
+; CHECK-NEXT:    [[TMP17:%.*]] = extractelement <4 x i64> [[TMP10]], i64 3
+; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i64 [[TMP17]]
+; CHECK-NEXT:    [[TMP19:%.*]] = load i64, ptr [[TMP12]], align 8
+; CHECK-NEXT:    [[TMP20:%.*]] = load i64, ptr [[TMP14]], align 8
+; CHECK-NEXT:    [[TMP21:%.*]] = load i64, ptr [[TMP16]], align 8
+; CHECK-NEXT:    [[TMP22:%.*]] = load i64, ptr [[TMP18]], align 8
+; CHECK-NEXT:    [[TMP23:%.*]] = insertelement <4 x i64> poison, i64 [[TMP19]], i64 0
+; CHECK-NEXT:    [[TMP24:%.*]] = insertelement <4 x i64> [[TMP23]], i64 [[TMP20]], i64 1
+; CHECK-NEXT:    [[TMP25:%.*]] = insertelement <4 x i64> [[TMP24]], i64 [[TMP21]], i64 2
+; CHECK-NEXT:    [[TMP26:%.*]] = insertelement <4 x i64> [[TMP25]], i64 [[TMP22]], i64 3
+; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr inbounds i64, ptr [[DST:%.*]], i64 [[INDEX]]
+; CHECK-NEXT:    store <4 x i64> [[TMP26]], ptr [[TMP27]], align 8
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP28:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP28]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
+; CHECK:       middle.block:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
+; CHECK:       scalar.ph:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], [[MIDDLE_BLOCK]] ], [ 0, [[ENTRY:%.*]] ]
+; CHECK-NEXT:    [[SCALAR_RECUR_INIT:%.*]] = phi i64 [ [[TMP5]], [[MIDDLE_BLOCK]] ], [ 0, [[ENTRY]] ]
+; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK:       loop:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], [[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[FOR:%.*]] = phi i64 [ [[SCALAR_RECUR_INIT]], [[SCALAR_PH]] ], [ [[L:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[GEP_IDX:%.*]] = getelementptr inbounds i64, ptr [[IDX]], i64 [[IV]]
+; CHECK-NEXT:    [[L]] = load i64, ptr [[GEP_IDX]], align 8
+; CHECK-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i64 [[FOR]]
+; CHECK-NEXT:    [[V:%.*]] = load i64, ptr [[GEP_SRC]], align 8
+; CHECK-NEXT:    [[GEP_DST:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[IV]]
+; CHECK-NEXT:    store i64 [[V]], ptr [[GEP_DST]], align 8
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label [[EXIT]], label [[LOOP]], !llvm.loop [[LOOP13:![0-9]+]]
+; CHECK:       exit:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %for = phi i64 [ 0, %entry ], [ %l, %loop ]
+  %gep.idx = getelementptr inbounds i64, ptr %idx, i64 %iv
+  %l = load i64, ptr %gep.idx, align 8
+  %gep.src = getelementptr inbounds i64, ptr %src, i64 %for
+  %v = load i64, ptr %gep.src, align 8
+  %gep.dst = getelementptr inbounds i64, ptr %dst, i64 %iv
+  store i64 %v, ptr %gep.dst, align 8
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop, !llvm.loop !0
+
+exit:
+  ret void
+}
+
 ; Make sure we don't consider first order recurrence phis as profitable to scalarize.
 ; Test case for https://github.com/llvm/llvm-project/issues/139060 and
 ; https://github.com/llvm/llvm-project/issues/139065.
@@ -467,3 +554,6 @@ exit:
 
 
 attributes #0 = { "target-cpu"="znver3" }
+
+!0 = distinct !{!0, !1}
+!1 = !{!"llvm.loop.interleave.count", i32 1}
