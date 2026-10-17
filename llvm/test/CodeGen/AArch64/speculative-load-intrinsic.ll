@@ -77,7 +77,7 @@ define <vscale x 2 x double> @speculative_load_nxv2f64(ptr %ptr) {
 
 ; Oracle form tests
 
-define internal i64 @oracle(ptr %p, i64 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" {
+define internal i64 @oracle(ptr %p, i64 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" disable_sanitizer_instrumentation noprofile {
 ; CHECK-LABEL: oracle:
 ; CHECK:       // %bb.0:
 ; CHECK-NEXT:    mov x0, x1

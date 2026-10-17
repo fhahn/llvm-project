@@ -3535,9 +3535,14 @@ void Verifier::visitFunction(const Function &F) {
   }
 
   // Oracle functions of llvm.speculative.load may not be referenced in any
-  // other way.
+  // other way. They are never executed, so they must not be instrumented.
   if (isMaterialized && F.hasFnAttribute("oracle-function")) {
     Check(F.hasLocalLinkage(), "oracle function must have local linkage", &F);
+    Check(F.hasFnAttribute(Attribute::DisableSanitizerInstrumentation) &&
+              F.hasFnAttribute(Attribute::NoProfile),
+          "oracle function must have the disable_sanitizer_instrumentation and "
+          "noprofile attributes",
+          &F);
     for (const Use &U : F.uses()) {
       auto *II = dyn_cast<IntrinsicInst>(U.getUser());
       Check(II && II->getIntrinsicID() == Intrinsic::speculative_load &&

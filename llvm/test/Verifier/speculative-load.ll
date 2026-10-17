@@ -13,34 +13,44 @@ declare [4 x i32] @llvm.speculative.load.a4i32.p0(ptr, i1, ...)
 declare <4 x b3> @llvm.speculative.load.v4b3.p0(ptr, i1, ...)
 declare <3 x ptr> @llvm.speculative.load.v3p0.p0(ptr, i1, ...)
 
-define internal i32 @bad_oracle_ret(ptr %p, i64 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" {
+define internal i32 @bad_oracle_ret(ptr %p, i64 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" disable_sanitizer_instrumentation noprofile {
   ret i32 0
 }
-define internal i64 @good_oracle(ptr %p, i64 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" {
+define internal i64 @good_oracle(ptr %p, i64 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" disable_sanitizer_instrumentation noprofile {
   ret i64 %n
 }
-define internal i64 @oracle_i32_param(i32 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" {
+define internal i64 @oracle_i32_param(i32 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" disable_sanitizer_instrumentation noprofile {
   ret i64 0
 }
-define internal i64 @side_effecting_oracle(ptr %p, i64 %n) "oracle-function" {
+define internal i64 @side_effecting_oracle(ptr %p, i64 %n) "oracle-function" disable_sanitizer_instrumentation noprofile {
   ret i64 %n
 }
-define internal i64 @throwing_oracle(ptr %p, i64 %n) memory(argmem: read) nosync willreturn "oracle-function" {
+define internal i64 @throwing_oracle(ptr %p, i64 %n) memory(argmem: read) nosync willreturn "oracle-function" disable_sanitizer_instrumentation noprofile {
   ret i64 %n
 }
-define internal i64 @syncing_oracle(ptr %p, i64 %n) memory(argmem: read) nounwind willreturn "oracle-function" {
+define internal i64 @syncing_oracle(ptr %p, i64 %n) memory(argmem: read) nounwind willreturn "oracle-function" disable_sanitizer_instrumentation noprofile {
   ret i64 %n
 }
-define internal i64 @looping_oracle(ptr %p, i64 %n) memory(argmem: read) nounwind nosync "oracle-function" {
+define internal i64 @looping_oracle(ptr %p, i64 %n) memory(argmem: read) nounwind nosync "oracle-function" disable_sanitizer_instrumentation noprofile {
   ret i64 %n
 }
-define internal i64 @variadic_oracle(i64 %n, ...) memory(argmem: read) nounwind nosync willreturn "oracle-function" {
+define internal i64 @variadic_oracle(i64 %n, ...) memory(argmem: read) nounwind nosync willreturn "oracle-function" disable_sanitizer_instrumentation noprofile {
   ret i64 %n
 }
 ; CHECK: oracle function must have local linkage
 ; CHECK-NEXT: ptr @external_oracle
-declare i64 @external_oracle(ptr, i64) memory(argmem: read) nounwind nosync willreturn "oracle-function"
+declare i64 @external_oracle(ptr, i64) memory(argmem: read) nounwind nosync willreturn "oracle-function" disable_sanitizer_instrumentation noprofile
 define internal i64 @oracle_missing_attr(ptr %p, i64 %n) memory(argmem: read) nounwind nosync willreturn {
+  ret i64 %n
+}
+; CHECK: oracle function must have the disable_sanitizer_instrumentation and noprofile attributes
+; CHECK-NEXT: ptr @oracle_missing_dsi
+define internal i64 @oracle_missing_dsi(ptr %p, i64 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" noprofile {
+  ret i64 %n
+}
+; CHECK: oracle function must have the disable_sanitizer_instrumentation and noprofile attributes
+; CHECK-NEXT: ptr @oracle_missing_noprofile
+define internal i64 @oracle_missing_noprofile(ptr %p, i64 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" disable_sanitizer_instrumentation {
   ret i64 %n
 }
 
@@ -154,6 +164,12 @@ define b128 @test_oracle_external_linkage(ptr %ptr, i64 %n) {
   ret b128 %res
 }
 
+define b128 @test_oracle_missing_instrumentation_attrs(ptr %ptr, i64 %n) {
+  %a = call b128 (ptr, i1, ...) @llvm.speculative.load.b128.p0(ptr %ptr, i1 false, ptr @oracle_missing_dsi, ptr %ptr, i64 %n)
+  %b = call b128 (ptr, i1, ...) @llvm.speculative.load.b128.p0(ptr %ptr, i1 false, ptr @oracle_missing_noprofile, ptr %ptr, i64 %n)
+  ret b128 %b
+}
+
 define b128 @test_oracle_missing_attr(ptr %ptr, i64 %n) {
 ; CHECK: llvm.speculative.load oracle function must have the "oracle-function" attribute
 ; CHECK-NEXT: call b128 (ptr, i1, ...) @llvm.speculative.load.b128.p0(ptr %ptr, i1 false, ptr @oracle_missing_attr, ptr %ptr, i64 %n)
@@ -227,28 +243,28 @@ define <3 x ptr> @test_vector_of_pointers_size_not_pow2(ptr %ptr) {
 ; CHECK: oracle function may only be used as the oracle operand of llvm.speculative.load
 ; CHECK-NEXT: ptr @oracle_called
 ; CHECK-NEXT: %r = call i64 @oracle_called(i64 %n)
-define internal i64 @oracle_called(i64 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" {
+define internal i64 @oracle_called(i64 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" disable_sanitizer_instrumentation noprofile {
   ret i64 %n
 }
 
 ; CHECK: oracle function may only be used as the oracle operand of llvm.speculative.load
 ; CHECK-NEXT: ptr @oracle_stored
 ; CHECK-NEXT: store ptr @oracle_stored, ptr %ptr
-define internal i64 @oracle_stored(i64 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" {
+define internal i64 @oracle_stored(i64 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" disable_sanitizer_instrumentation noprofile {
   ret i64 %n
 }
 
 ; CHECK: oracle function may only be used as the oracle operand of llvm.speculative.load
 ; CHECK-NEXT: ptr @oracle_in_used
 ; CHECK-NEXT: [1 x ptr] [ptr @oracle_in_used]
-define internal i64 @oracle_in_used(i64 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" {
+define internal i64 @oracle_in_used(i64 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" disable_sanitizer_instrumentation noprofile {
   ret i64 %n
 }
 
 ; CHECK: oracle function may only be used as the oracle operand of llvm.speculative.load
 ; CHECK-NEXT: ptr @oracle_aliased
 ; CHECK-NEXT: ptr @alias
-define internal i64 @oracle_aliased(i64 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" {
+define internal i64 @oracle_aliased(i64 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" disable_sanitizer_instrumentation noprofile {
   ret i64 %n
 }
 
@@ -256,7 +272,7 @@ define internal i64 @oracle_aliased(i64 %n) memory(argmem: read) nounwind nosync
 ; CHECK: oracle function may only be used as the oracle operand of llvm.speculative.load
 ; CHECK-NEXT: ptr @oracle_other_intrinsic
 ; CHECK-NEXT: call void (i64, i32, ...) @llvm.experimental.stackmap(i64 0, i32 0, ptr @oracle_other_intrinsic)
-define internal i64 @oracle_other_intrinsic(i64 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" {
+define internal i64 @oracle_other_intrinsic(i64 %n) memory(argmem: read) nounwind nosync willreturn "oracle-function" disable_sanitizer_instrumentation noprofile {
   ret i64 %n
 }
 
