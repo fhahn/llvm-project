@@ -4,8 +4,6 @@ target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
 ; CHECK-LABEL: test
-; CHECK-DAG: LV: Found uniform instruction:   %indvars.iv = phi i64 [ 0, %entry ], [ %indvars.iv.next, %for.body ]
-; CHECK-DAG: LV: Found uniform instruction:   %indvars.iv.next = add nuw nsw i64 %indvars.iv, 1
 ; CHECK-DAG: LV: Found uniform instruction:   %exitcond = icmp eq i64 %indvars.iv, 1599
 
 define void @test(ptr noalias nocapture %a, ptr noalias nocapture readonly %b) #0 {

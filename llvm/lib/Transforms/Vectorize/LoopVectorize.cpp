@@ -2585,41 +2585,6 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
     }
   }
 
-  // For an instruction to be added into Worklist above, all its users inside
-  // the loop should also be in Worklist. However, this condition cannot be
-  // true for phi nodes that form a cyclic dependence. We must process phi
-  // nodes separately. An induction variable will remain uniform if all users
-  // of the induction variable and induction variable update remain uniform.
-  // The code below handles both pointer and non-pointer induction variables.
-  BasicBlock *Latch = TheLoop->getLoopLatch();
-  for (PHINode *Ind : Legal->getInductionVars().keys()) {
-    auto *IndUpdate = cast<Instruction>(Ind->getIncomingValueForBlock(Latch));
-
-    // Determine if all users of the induction variable are uniform after
-    // vectorization.
-    bool UniformInd = all_of(Ind->users(), [&](User *U) -> bool {
-      auto *I = cast<Instruction>(U);
-      return I == IndUpdate || !TheLoop->contains(I) || Worklist.count(I) ||
-             IsVectorizedMemAccessUse(I, Ind);
-    });
-    if (!UniformInd)
-      continue;
-
-    // Determine if all users of the induction variable update instruction are
-    // uniform after vectorization.
-    bool UniformIndUpdate = all_of(IndUpdate->users(), [&](User *U) -> bool {
-      auto *I = cast<Instruction>(U);
-      return I == Ind || Worklist.count(I) ||
-             IsVectorizedMemAccessUse(I, IndUpdate);
-    });
-    if (!UniformIndUpdate)
-      continue;
-
-    // The induction variable and its update instruction will remain uniform.
-    AddToWorklistIfAllowed(Ind);
-    AddToWorklistIfAllowed(IndUpdate);
-  }
-
   Uniforms[VF].insert_range(Worklist);
 }
 
