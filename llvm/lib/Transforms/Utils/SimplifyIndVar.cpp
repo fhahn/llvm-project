@@ -242,6 +242,11 @@ bool SimplifyIndvar::makeIVComparisonInvariant(ICmpInst *ICmp,
   ICmp->setPredicate(InvariantPredicate);
   ICmp->setOperand(0, NewLHS);
   ICmp->setOperand(1, NewRHS);
+  // Hoist the now loop-invariant compare to the preheader, so the extra
+  // SimpleLoopUnswitch run after IndVars sees a loop-invariant condition.
+  ICmp->moveBefore(PHTerm->getIterator());
+  ICmp->updateLocationAfterHoist();
+  SE->forgetBlockAndLoopDispositions(ICmp);
   RunUnswitching = true;
   return true;
 }
