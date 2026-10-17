@@ -857,6 +857,28 @@ static void legalizeAndOptimizeInductions(VPlan &Plan) {
       Def->replaceAllUsesWith(Clone);
       Def->eraseFromParent();
     }
+
+    // If the only user using vectors is an increment by an invariant offset
+    // of which only scalars are used, replicate it, so both the induction and
+    // the increment can use scalar steps below.
+    auto VectorUsers = make_filter_range(PhiR->users(), [PhiR](VPUser *U) {
+      return !U->usesScalars(PhiR);
+    });
+    auto *Inc = hasSingleElement(VectorUsers)
+                    ? dyn_cast<VPWidenRecipe>(*VectorUsers.begin())
+                    : nullptr;
+    VPValue *Offset;
+    if (!Inc || !Inc->getUnderlyingValue() ||
+        !match(Inc, m_c_Add(m_Specific(PhiR), m_VPValue(Offset))) ||
+        !Offset->isDefinedOutsideLoopRegions() ||
+        !vputils::onlyScalarValuesUsed(Inc))
+      continue;
+    auto *Clone = new VPReplicateRecipe(
+        Inc->getUnderlyingInstr(), Inc->operands(), /*IsSingleScalar=*/false,
+        /*Mask=*/nullptr, *Inc, *Inc, Inc->getDebugLoc());
+    Clone->insertBefore(Inc);
+    Inc->replaceAllUsesWith(Clone);
+    Inc->eraseFromParent();
   }
 
   VPBuilder Builder(HeaderVPBB, HeaderVPBB->getFirstNonPhi());
