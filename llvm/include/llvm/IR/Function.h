@@ -518,6 +518,13 @@ public:
     return AttributeSets.getParamNoFPClass(ArgNo);
   }
 
+  /// Determine if the function is an oracle function of
+  /// llvm.speculative.load. Oracle functions only define the semantics of
+  /// llvm.speculative.load and are never executed.
+  bool isSpeculativeLoadOracle() const {
+    return hasFnAttribute("oracle-function");
+  }
+
   /// Determine if the function is presplit coroutine.
   bool isPresplitCoroutine() const {
     return hasFnAttribute(Attribute::PresplitCoroutine);

@@ -3536,7 +3536,7 @@ void Verifier::visitFunction(const Function &F) {
 
   // Oracle functions of llvm.speculative.load may not be referenced in any
   // other way. They are never executed, so they must not be instrumented.
-  if (isMaterialized && F.hasFnAttribute("oracle-function")) {
+  if (isMaterialized && F.isSpeculativeLoadOracle()) {
     Check(F.hasLocalLinkage(), "oracle function must have local linkage", &F);
     Check(F.hasFnAttribute(Attribute::DisableSanitizerInstrumentation) &&
               F.hasFnAttribute(Attribute::NoProfile),
@@ -7116,7 +7116,7 @@ void Verifier::visitIntrinsicCall(Intrinsic::ID ID, CallBase &Call) {
             "reference to an oracle function",
             &Call);
 
-      Check(OracleFn->hasFnAttribute("oracle-function"),
+      Check(OracleFn->isSpeculativeLoadOracle(),
             "llvm.speculative.load oracle function must have the "
             "\"oracle-function\" attribute",
             &Call);
