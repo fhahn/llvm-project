@@ -12,6 +12,7 @@
 ; RUN: opt < %s -passes='module(sancov-module)' -sanitizer-coverage-level=3 -sanitizer-coverage-trace-pc -sanitizer-coverage-pc-table -S | FileCheck %s
 ; RUN: opt < %s -passes='pgo-instr-gen,instrprof' -S | FileCheck %s
 ; RUN: opt < %s -passes=ctx-instr-gen -S | FileCheck %s
+; RUN: opt < %s -passes=instrumentor -S | FileCheck %s
 
 ; REQUIRES: x86-registered-target
 
