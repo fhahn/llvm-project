@@ -89,6 +89,11 @@ PreservedAnalyses ExtractGVPass::run(Module &M, ModuleAnalysisManager &) {
 
   // Visit the Functions.
   for (Function &F : M) {
+    // Oracle functions must stay local and are kept together with their
+    // users. Leave them alone; unused ones can be removed by GlobalDCE.
+    if (F.isSpeculativeLoadOracle())
+      continue;
+
     bool Delete = deleteStuff == (bool)Named.count(&F) && !F.isDeclaration();
     if (!Delete) {
       if (F.hasAvailableExternallyLinkage())
