@@ -444,3 +444,76 @@ loop.latch:
 exit:
   ret void
 }
+
+; %iv is used via casts as address of a consecutive load and its increment
+; %iv.next only as address of a replicated store.
+define void @iv_cast_used_as_address_increment_only_scalar_users(ptr noalias %dst, ptr noalias %src, i64 %n) {
+; CHECK-LABEL: define void @iv_cast_used_as_address_increment_only_scalar_users(
+; CHECK-SAME: ptr noalias [[DST:%.*]], ptr noalias [[SRC:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 2
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
+; CHECK:       [[VECTOR_SCEVCHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N]], -1
+; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i64 [[TMP0]], 4294967295
+; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP2:%.*]] = and i64 [[N]], 1
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP2]]
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP4:%.*]] = trunc nuw i64 [[INDEX]] to i32
+; CHECK-NEXT:    [[TMP5:%.*]] = zext i32 [[TMP4]] to i64
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw i8, ptr [[SRC]], i64 [[TMP5]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i8>, ptr [[TMP6]], align 1
+; CHECK-NEXT:    [[TMP7:%.*]] = add nuw nsw i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP8:%.*]] = add nuw nsw i64 [[TMP3]], 1
+; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds nuw [36 x i8], ptr [[DST]], i64 [[TMP7]]
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds nuw [36 x i8], ptr [[DST]], i64 [[TMP8]]
+; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <2 x i8> [[WIDE_LOAD]], i64 0
+; CHECK-NEXT:    store i8 [[TMP11]], ptr [[TMP9]], align 1
+; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <2 x i8> [[WIDE_LOAD]], i64 1
+; CHECK-NEXT:    store i8 [[TMP12]], ptr [[TMP10]], align 1
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
+; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ], [ 0, %[[VECTOR_SCEVCHECK]] ]
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[T:%.*]] = trunc nuw i64 [[IV]] to i32
+; CHECK-NEXT:    [[IDX:%.*]] = zext i32 [[T]] to i64
+; CHECK-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds nuw i8, ptr [[SRC]], i64 [[IDX]]
+; CHECK-NEXT:    [[L:%.*]] = load i8, ptr [[GEP_SRC]], align 1
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[GEP_DST:%.*]] = getelementptr inbounds nuw [36 x i8], ptr [[DST]], i64 [[IV_NEXT]]
+; CHECK-NEXT:    store i8 [[L]], ptr [[GEP_DST]], align 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP11:![0-9]+]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %t = trunc nuw i64 %iv to i32
+  %idx = zext i32 %t to i64
+  %gep.src = getelementptr inbounds nuw i8, ptr %src, i64 %idx
+  %l = load i8, ptr %gep.src, align 1
+  %iv.next = add nuw nsw i64 %iv, 1
+  %gep.dst = getelementptr inbounds nuw [36 x i8], ptr %dst, i64 %iv.next
+  store i8 %l, ptr %gep.dst, align 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
