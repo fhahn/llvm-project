@@ -61,6 +61,8 @@ namespace {
     SCEVExpander     &Rewriter;
     SmallVectorImpl<WeakTrackingVH> &DeadInsts;
 
+    bool HoistInvariantCmps;
+
     bool Changed = false;
     bool RunUnswitching = false;
 
@@ -68,9 +70,10 @@ namespace {
     SimplifyIndvar(Loop *Loop, ScalarEvolution *SE, DominatorTree *DT,
                    LoopInfo *LI, const TargetTransformInfo *TTI,
                    SCEVExpander &Rewriter,
-                   SmallVectorImpl<WeakTrackingVH> &Dead)
+                   SmallVectorImpl<WeakTrackingVH> &Dead,
+                   bool HoistInvariantCmps)
         : L(Loop), LI(LI), SE(SE), DT(DT), TTI(TTI), Rewriter(Rewriter),
-          DeadInsts(Dead) {
+          DeadInsts(Dead), HoistInvariantCmps(HoistInvariantCmps) {
       assert(LI && "IV simplification requires LoopInfo");
     }
 
@@ -242,6 +245,13 @@ bool SimplifyIndvar::makeIVComparisonInvariant(ICmpInst *ICmp,
   ICmp->setPredicate(InvariantPredicate);
   ICmp->setOperand(0, NewLHS);
   ICmp->setOperand(1, NewRHS);
+  // Hoist the now loop-invariant compare to the preheader, so the extra
+  // SimpleLoopUnswitch run after IndVars sees a loop-invariant condition.
+  if (HoistInvariantCmps) {
+    ICmp->moveBefore(PHTerm->getIterator());
+    ICmp->updateLocationAfterHoist();
+    SE->forgetBlockAndLoopDispositions(ICmp);
+  }
   RunUnswitching = true;
   return true;
 }
@@ -1023,9 +1033,10 @@ std::pair<bool, bool> simplifyUsersOfIV(PHINode *CurrIV, ScalarEvolution *SE,
                                         DominatorTree *DT, LoopInfo *LI,
                                         const TargetTransformInfo *TTI,
                                         SmallVectorImpl<WeakTrackingVH> &Dead,
-                                        SCEVExpander &Rewriter, IVVisitor *V) {
+                                        SCEVExpander &Rewriter, IVVisitor *V,
+                                        bool HoistInvariantCmps) {
   SimplifyIndvar SIV(LI->getLoopFor(CurrIV->getParent()), SE, DT, LI, TTI,
-                     Rewriter, Dead);
+                     Rewriter, Dead, HoistInvariantCmps);
   SIV.simplifyUsers(CurrIV, V);
   return {SIV.hasChanged(), SIV.runUnswitching()};
 }
