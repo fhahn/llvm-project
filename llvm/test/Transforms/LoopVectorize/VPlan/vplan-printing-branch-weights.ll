@@ -49,8 +49,6 @@ define void @predicated_block(ptr noalias %a, ptr noalias %idx) {
 ; PREDICATE-NEXT:    Successor(s): latch
 ; PREDICATE-EMPTY:
 ; PREDICATE-NEXT:    latch:
-; PREDICATE-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
-; PREDICATE-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<1024>
 ; PREDICATE-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; PREDICATE-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; PREDICATE-NEXT:    No successors
@@ -92,8 +90,6 @@ define void @predicated_block(ptr noalias %a, ptr noalias %idx) {
 ; CONSTRUCT-NEXT:    Successor(s): latch
 ; CONSTRUCT-EMPTY:
 ; CONSTRUCT-NEXT:    latch:
-; CONSTRUCT-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
-; CONSTRUCT-NEXT:      CLONE ir<%ec> = icmp eq ir<%iv.next>, ir<1024>
 ; CONSTRUCT-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CONSTRUCT-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CONSTRUCT-NEXT:    No successors
@@ -257,8 +253,6 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ; PREDICATE-NEXT:      EMIT ir<%sel.uniform> = select ir<%c>, ir<20>, ir<10> (!prof {5, 3})
 ; PREDICATE-NEXT:      EMIT ir<%gep.b> = getelementptr inbounds ir<%b>, ir<%iv>
 ; PREDICATE-NEXT:      EMIT store ir<%sel.uniform>, ir<%gep.b>
-; PREDICATE-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
-; PREDICATE-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<%n>
 ; PREDICATE-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; PREDICATE-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; PREDICATE-NEXT:    No successors
@@ -296,8 +290,6 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ; CONSTRUCT-NEXT:      CLONE ir<%gep.b> = getelementptr inbounds ir<%b>, ir<%iv>
 ; CONSTRUCT-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep.b>, ir<1>
 ; CONSTRUCT-NEXT:      WIDEN store vp<[[VP6]]>, ir<%sel.uniform>
-; CONSTRUCT-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
-; CONSTRUCT-NEXT:      CLONE ir<%ec> = icmp eq ir<%iv.next>, ir<%n>
 ; CONSTRUCT-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CONSTRUCT-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CONSTRUCT-NEXT:    No successors

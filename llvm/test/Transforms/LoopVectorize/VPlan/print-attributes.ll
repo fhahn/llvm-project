@@ -32,8 +32,6 @@ define void @wide_call_attrs(ptr noalias %in.ptr, ptr noalias %out.ptr) {
 ; CHECK-NEXT:      CLONE ir<%out.gep> = getelementptr inbounds ir<%out.ptr>, ir<%iv>
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds double, ir<%out.gep>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<%call>
-; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
-; CHECK-NEXT:      CLONE ir<%exitcond> = icmp eq ir<%iv.next>, ir<1000>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
@@ -97,8 +95,6 @@ define void @test_intrinsic_with_arg_and_ret_attrs(ptr noalias %A, ptr noalias %
 ; CHECK-NEXT:      WIDEN-INTRINSIC ir<%m> = call llvm.minnum(ir<%a>, ir<%b>)
 ; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds float, ir<%gep.A>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%m>
-; CHECK-NEXT:      EMIT ir<%i.next> = add ir<%i>, ir<1>
-; CHECK-NEXT:      CLONE ir<%cond> = icmp eq ir<%i.next>, ir<%n>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors

@@ -25,8 +25,6 @@ define void @scalarize_irregular_types(ptr noalias %p1, ptr noalias %p2) {
 ; CHECK-NEXT:      EMIT-SCALAR ir<%load2.zext> = zext ir<%load2> to i64
 ; CHECK-NEXT:      EMIT ir<%add> = add ir<%load1>, ir<%load2.zext>
 ; CHECK-NEXT:      EMIT store ir<%add>, ir<%gep1>
-; CHECK-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
-; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<100>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ; CHECK-NEXT:    No successors
@@ -48,8 +46,6 @@ define void @scalarize_irregular_types(ptr noalias %p1, ptr noalias %p2) {
 ; ALL-MEMOP-WIDEN-NEXT:      EMIT ir<%add> = add ir<%load1>, ir<%load2.zext>
 ; ALL-MEMOP-WIDEN-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer i64, ir<%gep1>, ir<1>
 ; ALL-MEMOP-WIDEN-NEXT:      WIDEN store vp<[[VP5]]>, ir<%add>
-; ALL-MEMOP-WIDEN-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
-; ALL-MEMOP-WIDEN-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<100>
 ; ALL-MEMOP-WIDEN-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; ALL-MEMOP-WIDEN-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ; ALL-MEMOP-WIDEN-NEXT:    No successors
@@ -89,8 +85,6 @@ define void @irregular_gather(ptr noalias %p, ptr noalias %idx, ptr noalias %out
 ; CHECK-NEXT:      REPLICATE ir<%v> = load ir<%gep.p>
 ; CHECK-NEXT:      EMIT ir<%gep.out> = getelementptr inbounds ir<%out>, ir<%iv>
 ; CHECK-NEXT:      REPLICATE store ir<%v>, ir<%gep.out>
-; CHECK-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
-; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<100>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ; CHECK-NEXT:    No successors
@@ -110,8 +104,6 @@ define void @irregular_gather(ptr noalias %p, ptr noalias %idx, ptr noalias %out
 ; ALL-MEMOP-WIDEN-NEXT:      REPLICATE ir<%v> = load ir<%gep.p>
 ; ALL-MEMOP-WIDEN-NEXT:      EMIT ir<%gep.out> = getelementptr inbounds ir<%out>, ir<%iv>
 ; ALL-MEMOP-WIDEN-NEXT:      REPLICATE store ir<%v>, ir<%gep.out>
-; ALL-MEMOP-WIDEN-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
-; ALL-MEMOP-WIDEN-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<100>
 ; ALL-MEMOP-WIDEN-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; ALL-MEMOP-WIDEN-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ; ALL-MEMOP-WIDEN-NEXT:    No successors

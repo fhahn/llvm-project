@@ -28,8 +28,6 @@ define void @simple_histogram(ptr noalias %buckets, ptr readonly %indices, i64 %
 ; CHECK-NEXT:      EMIT-SCALAR ir<%l.bucket> = load ir<%gep.bucket>
 ; CHECK-NEXT:      EMIT ir<%inc> = add nsw ir<%l.bucket>, ir<1>
 ; CHECK-NEXT:      WIDEN-HISTOGRAM buckets: ir<%gep.bucket>, inc: ir<1>
-; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
-; CHECK-NEXT:      EMIT ir<%exitcond> = icmp eq ir<%iv.next>, ir<%N>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
@@ -111,8 +109,6 @@ define void @reduc_store_inside_unrolled(ptr noalias %dst, ptr noalias readonly 
 ; CHECK-NEXT:      EMIT ir<%gep.src.1> = getelementptr inbounds ir<%src>, ir<%1>
 ; CHECK-NEXT:      EMIT-SCALAR ir<%2> = load ir<%gep.src.1>
 ; CHECK-NEXT:      EMIT ir<%sum.2> = add nsw ir<%2>, ir<%sum.1>
-; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<2>
-; CHECK-NEXT:      EMIT ir<%cmp> = icmp sge ir<%iv.next>, ir<1000>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors

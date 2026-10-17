@@ -507,7 +507,9 @@ static void createLoopRegion(VPlan &Plan, VPBlockBase *HeaderVPB, DebugLoc DL) {
   if (match(LatchTerm, m_BranchOnTwoConds())) {
     auto *IsLatchExitTaken = Builder.createICmp(
         CmpInst::ICMP_EQ, CanonicalIVIncrement, &Plan.getVectorTripCount());
+    VPValue *OldCond = LatchTerm->getOperand(1);
     LatchTerm->setOperand(1, IsLatchExitTaken);
+    vputils::recursivelyDeleteDeadRecipes(OldCond);
   } else {
     // We are replacing the branch to exit the region. Remove the original
     // BranchOnCond.
@@ -516,7 +518,9 @@ static void createLoopRegion(VPlan &Plan, VPBlockBase *HeaderVPB, DebugLoc DL) {
     Builder.createNaryOp(VPInstruction::BranchOnCount,
                          {CanonicalIVIncrement, &Plan.getVectorTripCount()},
                          LatchDL);
+    VPValue *OldCond = LatchTerm->getOperand(0);
     LatchTerm->eraseFromParent();
+    vputils::recursivelyDeleteDeadRecipes(OldCond);
   }
 }
 
