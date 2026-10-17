@@ -93,6 +93,11 @@ PreservedAnalyses RealtimeSanitizerPass::run(Module &M,
     if (F.empty())
       continue;
 
+    // __attribute__(disable_sanitizer_instrumentation) prevents all kinds of
+    // instrumentation.
+    if (F.hasFnAttribute(Attribute::DisableSanitizerInstrumentation))
+      continue;
+
     if (F.hasFnAttribute(Attribute::SanitizeRealtime))
       runSanitizeRealtime(F);
 
