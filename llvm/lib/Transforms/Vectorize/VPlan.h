@@ -2000,36 +2000,18 @@ protected:
 
 /// A recipe for widening vector intrinsics.
 class LLVM_ABI_FOR_TEST VPWidenIntrinsicRecipe : public VPRecipeWithIRFlags,
-                                                 public VPIRMetadata {
+                                                 public VPIRMetadata,
+                                                 public VPIRAttributes {
   /// ID of the vector intrinsic to widen.
   Intrinsic::ID VectorIntrinsicID;
-
-  /// True if the intrinsic may read from memory.
-  bool MayReadFromMemory;
-
-  /// True if the intrinsic may read write to memory.
-  bool MayWriteToMemory;
-
-  /// True if the intrinsic may have side-effects.
-  bool MayHaveSideEffects;
 
 protected:
   VPWidenIntrinsicRecipe(VPRecipeTy SC, Intrinsic::ID VectorIntrinsicID,
                          ArrayRef<VPValue *> CallArguments, Type *Ty,
-                         const VPIRFlags &Flags = {},
-                         const VPIRMetadata &MD = {},
-                         DebugLoc DL = DebugLoc::getUnknown())
+                         const VPIRFlags &Flags, const VPIRMetadata &MD,
+                         const VPIRAttributes &Attrs, DebugLoc DL)
       : VPRecipeWithIRFlags(SC, CallArguments, Ty, Flags, DL), VPIRMetadata(MD),
-        VectorIntrinsicID(VectorIntrinsicID) {
-    LLVMContext &Ctx = Ty->getContext();
-    AttributeSet Attrs = Intrinsic::getFnAttributes(Ctx, VectorIntrinsicID);
-    MemoryEffects ME = Attrs.getMemoryEffects();
-    MayReadFromMemory = !ME.onlyWritesMemory();
-    MayWriteToMemory = !ME.onlyReadsMemory();
-    MayHaveSideEffects = MayWriteToMemory ||
-                         !Attrs.hasAttribute(Attribute::NoUnwind) ||
-                         !Attrs.hasAttribute(Attribute::WillReturn);
-  }
+        VPIRAttributes(Attrs), VectorIntrinsicID(VectorIntrinsicID) {}
 
   /// Helper function to produce the widened intrinsic call.
   CallInst *createVectorCall(VPTransformState &State);
@@ -2039,13 +2021,11 @@ public:
                          ArrayRef<VPValue *> CallArguments, Type *Ty,
                          const VPIRFlags &Flags = {},
                          const VPIRMetadata &MD = {},
+                         const VPIRAttributes &Attrs = {},
                          DebugLoc DL = DebugLoc::getUnknown())
-      : VPRecipeWithIRFlags(VPRecipeBase::VPWidenIntrinsicSC, CallArguments, Ty,
-                            Flags, DL),
-        VPIRMetadata(MD), VectorIntrinsicID(VectorIntrinsicID),
-        MayReadFromMemory(CI.mayReadFromMemory()),
-        MayWriteToMemory(CI.mayWriteToMemory()),
-        MayHaveSideEffects(CI.mayHaveSideEffects()) {
+      : VPWidenIntrinsicRecipe(VPRecipeBase::VPWidenIntrinsicSC,
+                               VectorIntrinsicID, CallArguments, Ty, Flags, MD,
+                               Attrs, DL) {
     setUnderlyingValue(&CI);
   }
 
@@ -2056,18 +2036,16 @@ public:
                          DebugLoc DL = DebugLoc::getUnknown())
       : VPWidenIntrinsicRecipe(VPRecipeBase::VPWidenIntrinsicSC,
                                VectorIntrinsicID, CallArguments, Ty, Flags,
-                               Metadata, DL) {}
+                               Metadata, {}, DL) {}
 
   ~VPWidenIntrinsicRecipe() override = default;
 
   VPWidenIntrinsicRecipe *clone() override {
-    if (Value *CI = getUnderlyingValue())
-      return new VPWidenIntrinsicRecipe(*cast<CallInst>(CI), VectorIntrinsicID,
-                                        operands(), getScalarType(), *this,
-                                        *this, getDebugLoc());
-    return new VPWidenIntrinsicRecipe(VectorIntrinsicID, operands(),
-                                      getScalarType(), *this, *this,
-                                      getDebugLoc());
+    auto *New = new VPWidenIntrinsicRecipe(
+        VPRecipeBase::VPWidenIntrinsicSC, VectorIntrinsicID, operands(),
+        getScalarType(), *this, *this, *this, getDebugLoc());
+    New->setUnderlyingValue(getUnderlyingValue());
+    return New;
   }
 
   static inline bool classof(const VPRecipeBase *R) {
@@ -2108,15 +2086,6 @@ public:
   /// Return to name of the intrinsic as string.
   StringRef getIntrinsicName() const;
 
-  /// Returns true if the intrinsic may read from memory.
-  bool mayReadFromMemory() const { return MayReadFromMemory; }
-
-  /// Returns true if the intrinsic may write to memory.
-  bool mayWriteToMemory() const { return MayWriteToMemory; }
-
-  /// Returns true if the intrinsic may have side-effects.
-  bool mayHaveSideEffects() const { return MayHaveSideEffects; }
-
   bool usesFirstLaneOnly(const VPValue *Op) const override;
 
 protected:
@@ -2139,7 +2108,7 @@ public:
                             Align Alignment, const VPIRMetadata &MD = {},
                             DebugLoc DL = DebugLoc::getUnknown())
       : VPWidenIntrinsicRecipe(VPRecipeBase::VPWidenMemIntrinsicSC,
-                               VectorIntrinsicID, CallArguments, Ty, {}, MD,
+                               VectorIntrinsicID, CallArguments, Ty, {}, MD, {},
                                DL),
         Alignment(Alignment) {
     assert(getVectorMemoryIntrinsicPointerArgIdx(VectorIntrinsicID) &&

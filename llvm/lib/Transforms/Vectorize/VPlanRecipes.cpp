@@ -56,6 +56,10 @@ getCallAndCalleeAttributes(const VPRecipeBase &R) {
   if (auto *Call = dyn_cast<VPWidenCallRecipe>(&R))
     return {*Call,
             Call->getCalledScalarFunction()->getAttributes().getFnAttrs()};
+  if (auto *Intr = dyn_cast<VPWidenIntrinsicRecipe>(&R))
+    return {*Intr,
+            Intrinsic::getFnAttributes(Intr->getScalarType()->getContext(),
+                                       Intr->getVectorIntrinsicID())};
   auto *VPI = cast<VPInstruction>(&R);
   if (auto *Call = dyn_cast<VPCallInstruction>(VPI))
     return {*Call,
@@ -88,13 +92,12 @@ bool VPRecipeBase::mayWriteToMemory() const {
   case VPReplicateSC:
     return cast<Instruction>(getVPSingleValue()->getUnderlyingValue())
         ->mayWriteToMemory();
-  case VPWidenCallSC: {
+  case VPWidenCallSC:
+  case VPWidenMemIntrinsicSC:
+  case VPWidenIntrinsicSC: {
     auto [Attrs, CalleeFnAttrs] = getCallAndCalleeAttributes(*this);
     return !Attrs.getMemoryEffects(CalleeFnAttrs).onlyReadsMemory();
   }
-  case VPWidenMemIntrinsicSC:
-  case VPWidenIntrinsicSC:
-    return cast<VPWidenIntrinsicRecipe>(this)->mayWriteToMemory();
   case VPActiveLaneMaskPHISC:
   case VPCurrentIterationPHISC:
   case VPBranchOnMaskSC:
@@ -148,13 +151,12 @@ bool VPRecipeBase::mayReadFromMemory() const {
   case VPReplicateSC:
     return cast<Instruction>(getVPSingleValue()->getUnderlyingValue())
         ->mayReadFromMemory();
-  case VPWidenCallSC: {
+  case VPWidenCallSC:
+  case VPWidenMemIntrinsicSC:
+  case VPWidenIntrinsicSC: {
     auto [Attrs, CalleeFnAttrs] = getCallAndCalleeAttributes(*this);
     return !Attrs.getMemoryEffects(CalleeFnAttrs).onlyWritesMemory();
   }
-  case VPWidenMemIntrinsicSC:
-  case VPWidenIntrinsicSC:
-    return cast<VPWidenIntrinsicRecipe>(this)->mayReadFromMemory();
   case VPActiveLaneMaskPHISC:
   case VPBranchOnMaskSC:
   case VPDerivedIVSC:
@@ -218,14 +220,13 @@ bool VPRecipeBase::mayHaveSideEffects() const {
            VPI->getOpcode() == VPInstruction::BranchOnCond ||
            VPI->getOpcode() == VPInstruction::BranchOnTwoConds;
   }
-  case VPWidenCallSC: {
+  case VPWidenCallSC:
+  case VPWidenMemIntrinsicSC:
+  case VPWidenIntrinsicSC: {
     auto [Attrs, CalleeFnAttrs] = getCallAndCalleeAttributes(*this);
     return mayWriteToMemory() || !Attrs.doesNotThrow(CalleeFnAttrs) ||
            !Attrs.willReturn(CalleeFnAttrs);
   }
-  case VPWidenMemIntrinsicSC:
-  case VPWidenIntrinsicSC:
-    return cast<VPWidenIntrinsicRecipe>(this)->mayHaveSideEffects();
   case VPBlendSC:
   case VPReductionEVLSC:
   case VPReductionSC:
