@@ -730,7 +730,10 @@ static void computeFunctionSummary(
   }
 #endif
 
-  bool NonRenamableLocal = isNonRenamableLocal(F);
+  // Oracle functions must stay local, so they cannot be promoted, and
+  // functions referencing them cannot be imported.
+  bool NonRenamableLocal =
+      isNonRenamableLocal(F) || F.isSpeculativeLoadOracle();
   bool NotEligibleForImport =
       NonRenamableLocal || HasInlineAsmMaybeReferencingInternal ||
       HasIndirBranchToBlockAddress || HasLocalIFuncCallOrRef;
