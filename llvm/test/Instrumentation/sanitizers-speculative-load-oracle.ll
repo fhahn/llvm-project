@@ -3,6 +3,7 @@
 ; referenced other than by llvm.speculative.load.
 
 ; RUN: opt < %s -passes=asan -S | FileCheck %s
+; RUN: opt < %s -passes=hwasan -S | FileCheck %s
 ; RUN: opt < %s -passes=msan -S | FileCheck %s
 ; RUN: opt < %s -passes=tsan -S | FileCheck %s
 ; RUN: opt < %s -passes='module(sancov-module)' -sanitizer-coverage-level=3 -sanitizer-coverage-trace-pc -sanitizer-coverage-pc-table -S | FileCheck %s
