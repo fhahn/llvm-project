@@ -6,6 +6,7 @@
 ; RUN: opt < %s -passes=hwasan -S | FileCheck %s
 ; RUN: opt < %s -passes=msan -S | FileCheck %s
 ; RUN: opt < %s -passes=tsan -S | FileCheck %s
+; RUN: opt < %s -passes='memprof-module,function(memprof)' -S | FileCheck %s
 ; RUN: opt < %s -passes='module(sancov-module)' -sanitizer-coverage-level=3 -sanitizer-coverage-trace-pc -sanitizer-coverage-pc-table -S | FileCheck %s
 ; RUN: opt < %s -passes='pgo-instr-gen,instrprof' -S | FileCheck %s
 ; RUN: opt < %s -passes=ctx-instr-gen -S | FileCheck %s

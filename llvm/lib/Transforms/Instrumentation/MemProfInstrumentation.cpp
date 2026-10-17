@@ -547,6 +547,9 @@ bool MemProfiler::instrumentFunction(Function &F) {
     return false;
   if (F.getName().starts_with("__memprof_"))
     return false;
+  // Don't profile functions with noprofile.
+  if (F.hasFnAttribute(Attribute::NoProfile))
+    return false;
 
   bool FunctionModified = false;
 
