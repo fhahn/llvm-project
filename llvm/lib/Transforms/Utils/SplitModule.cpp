@@ -228,8 +228,11 @@ void llvm::SplitModule(
     function_ref<void(std::unique_ptr<Module> MPart)> ModuleCallback,
     bool PreserveLocals, bool RoundRobin) {
   if (!PreserveLocals) {
+    // Oracle functions must stay local; findPartitions keeps them together
+    // with their users.
     for (Function &F : M)
-      F.externalize();
+      if (!F.isSpeculativeLoadOracle())
+        F.externalize();
     for (GlobalVariable &GV : M.globals())
       GV.externalize();
     for (GlobalAlias &GA : M.aliases())
@@ -292,6 +295,13 @@ void llvm::SplitModule(
         }));
     if (I != 0)
       MPart->removeModuleInlineAsm();
+    // Oracle functions are placed with their users, so other partitions only
+    // contain unused declarations of them, which are invalid.
+    for (Function &F : make_early_inc_range(*MPart))
+      if (F.isSpeculativeLoadOracle() && F.isDeclaration()) {
+        assert(F.use_empty() && "oracle function not placed with its users");
+        F.eraseFromParent();
+      }
     ModuleCallback(std::move(MPart));
   }
 }
