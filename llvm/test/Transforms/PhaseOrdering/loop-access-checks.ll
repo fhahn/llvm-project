@@ -461,9 +461,8 @@ if.end:                                           ; preds = %entry
   ret ptr %add.ptr
 }
 
-; IndVars rewrites the in-loop check %i <s 0 to the loop-invariant %from <s 0.
-; The trap exit it guards should be unswitched out of the loop by the extra
-; SimpleLoopUnswitch run after IndVars.
+; Make sure loop gets unswitched after IndVarSimplify makes a condition in the
+; loop invariant.
 define i64 @unswitch_after_indvars_rewrite_to_invariant(ptr %p, i64 %count, i64 %from) {
 ; CHECK-LABEL: define range(i64 -1, 9223372036854775807) i64 @unswitch_after_indvars_rewrite_to_invariant(
 ; CHECK-SAME: ptr nofree readonly captures(none) [[P:%.*]], i64 [[COUNT:%.*]], i64 [[FROM:%.*]]) local_unnamed_addr #[[ATTR2:[0-9]+]] {
@@ -474,11 +473,9 @@ define i64 @unswitch_after_indvars_rewrite_to_invariant(ptr %p, i64 %count, i64 
 ; CHECK-NEXT:    br i1 [[IN_RANGE1]], label %[[CHECK_PREHEADER:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[CHECK_PREHEADER]]:
 ; CHECK-NEXT:    [[NEG:%.*]] = icmp slt i64 [[FROM]], 0
-; CHECK-NEXT:    br label %[[CHECK:.*]]
-; CHECK:       [[CHECK]]:
-; CHECK-NEXT:    [[I2:%.*]] = phi i64 [ [[I_NEXT:%.*]], %[[LOOP_LATCH:.*]] ], [ [[FROM]], %[[CHECK_PREHEADER]] ]
 ; CHECK-NEXT:    br i1 [[NEG]], label %[[TRAP:.*]], label %[[BODY:.*]]
 ; CHECK:       [[BODY]]:
+; CHECK-NEXT:    [[I2:%.*]] = phi i64 [ [[I_NEXT:%.*]], %[[LOOP_LATCH:.*]] ], [ [[FROM]], %[[CHECK_PREHEADER]] ]
 ; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds nuw [2 x i8], ptr [[P]], i64 [[I2]]
 ; CHECK-NEXT:    [[LD:%.*]] = load i16, ptr [[GEP]], align 2
 ; CHECK-NEXT:    [[IS_SPACE:%.*]] = icmp eq i16 [[LD]], 32
@@ -486,7 +483,7 @@ define i64 @unswitch_after_indvars_rewrite_to_invariant(ptr %p, i64 %count, i64 
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[I_NEXT]] = add nuw nsw i64 [[I2]], 1
 ; CHECK-NEXT:    [[IN_RANGE:%.*]] = icmp slt i64 [[I_NEXT]], [[COUNT]]
-; CHECK-NEXT:    br i1 [[IN_RANGE]], label %[[CHECK]], label %[[EXIT]]
+; CHECK-NEXT:    br i1 [[IN_RANGE]], label %[[BODY]], label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[RES:%.*]] = phi i64 [ -1, %[[ENTRY]] ], [ [[I2]], %[[BODY]] ], [ -1, %[[LOOP_LATCH]] ]
 ; CHECK-NEXT:    ret i64 [[RES]]
