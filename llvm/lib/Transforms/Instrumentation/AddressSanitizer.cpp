@@ -363,6 +363,11 @@ void llvm::getAddressSanitizerParams(const LLVMContext &Ctx,
 }
 
 void llvm::removeASanIncompatibleFnAttributes(Function &F, bool ReadsArgMem) {
+  // Oracle functions of llvm.speculative.load are never executed, so their
+  // attributes remain valid.
+  if (F.isSpeculativeLoadOracle())
+    return;
+
   // Adding sanitizer checks invalidates previously inferred memory attributes.
   //
   // This is not only true for sanitized functions, because AttrInfer can
