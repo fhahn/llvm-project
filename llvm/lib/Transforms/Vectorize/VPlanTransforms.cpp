@@ -3831,10 +3831,8 @@ void VPlanTransforms::convertMaskedEarlyExitToBailToScalar(
   for (VPRecipeBase &R : concat<VPRecipeBase>(
            reverse(drop_end(*LatchVPBB)),
            reverse(make_range(MaskR->getIterator(), HeaderVPBB->end())))) {
-    if (all_of(R.definedValues(), [&Skipped](VPValue *Def) {
-          return all_of(Def->users(), [&Skipped](VPUser *U) {
-            return Skipped.contains(cast<VPRecipeBase>(U));
-          });
+    if (all_of(R.getVPSingleValue()->users(), [&Skipped](VPUser *U) {
+          return Skipped.contains(cast<VPRecipeBase>(U));
         }))
       Skipped.insert(&R);
   }
