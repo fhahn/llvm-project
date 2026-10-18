@@ -310,8 +310,7 @@ exit:
 
 ; CHECK-LABEL: early_exit_store_trunc
 ;
-; Check the costs of an add and trunc feeding a store in an early-exit loop,
-; which are not masked.
+; Check costs for the unpredicated add and trunc feeding the store.
 ;
 ; CHECK: Cost of 4 for VF 2: profitable to scalarize   store i16 %add.trunc, ptr %gep.dst, align 2
 ; CHECK: Cost of 0 for VF 2: profitable to scalarize   %add.trunc = trunc i64 %add to i16

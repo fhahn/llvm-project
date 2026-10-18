@@ -3,12 +3,8 @@
 ; RUN: opt -S < %s -p loop-vectorize -mtriple=x86_64-- -mattr=+avx2 -enable-early-exit-vectorization-with-side-effects | FileCheck %s --check-prefixes=AVX2
 ; RUN: opt -S < %s -p loop-vectorize -mtriple=x86_64-- -mattr=+avx512f,+avx512bw,+avx512vl -enable-early-exit-vectorization-with-side-effects | FileCheck %s --check-prefixes=AVX512
 
-;; See ../early_exit_store_legality.ll for reasons why a particular loop doesn't
-;; vectorize yet.
-
-;; AVX2 can mask the i32 load but not the i16 store. The add and trunc are not
-;; masked, so they should be widened instead of scalarized together with the
-;; store.
+;; AVX2 can mask the i32 load but not the i16 store. The unmasked add and trunc
+;; should still be widened.
 define void @load_i32_store_i16(ptr noalias %a, ptr noalias %b, ptr align 2 dereferenceable(2000) %ee.src) {
 ; SSE2-LABEL: define void @load_i32_store_i16(
 ; SSE2-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], ptr align 2 dereferenceable(2000) [[EE_SRC:%.*]]) #[[ATTR0:[0-9]+]] {
