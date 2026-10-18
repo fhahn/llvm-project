@@ -19,6 +19,88 @@ namespace {
 
 class VPlanHCFGTest : public VPlanTestIRBase {};
 
+TEST_F(VPlanHCFGTest, KeepHeaderAnyOfBranch) {
+  const char *ModuleString = R"(
+define void @f(ptr %a, ptr %b, i64 %n) {
+entry:
+  br label %header
+header:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  %index = getelementptr i32, ptr %a, i64 %iv
+  %value = load i32, ptr %index
+  %skip = icmp eq i32 %value, 0
+  br i1 %skip, label %latch, label %body
+body:
+  %x = load i32, ptr %b
+  store i32 %x, ptr %index
+  %cond = icmp sgt i32 %x, 0
+  br i1 %cond, label %then, label %merge
+then:
+  %y = load i32, ptr %index
+  store i32 %y, ptr %b
+  br label %merge
+merge:
+  %result = phi i32 [ %x, %body ], [ %y, %then ]
+  store i32 %result, ptr %index
+  br label %latch
+latch:
+  store i32 0, ptr %b
+  %iv.next = add i64 %iv, 1
+  %done = icmp eq i64 %iv.next, %n
+  br i1 %done, label %exit, label %header
+exit:
+  ret void
+}
+)";
+  Module &M = parseModule(ModuleString);
+  BasicBlock *LoopHeader =
+      M.getFunction("f")->getEntryBlock().getSingleSuccessor();
+
+  // Check both successor orders.
+  for (bool SwapSuccessors : {false, true}) {
+    SCOPED_TRACE(SwapSuccessors);
+    auto Plan = buildVPlan(LoopHeader);
+    VPBasicBlock *Header = Plan->getVectorLoopRegion()->getEntryBasicBlock();
+    auto *Latch = cast<VPBasicBlock>(Header->getSuccessors()[0]);
+    auto *Body = cast<VPBasicBlock>(Header->getSuccessors()[1]);
+    auto *Then = cast<VPBasicBlock>(Body->getSuccessors()[0]);
+    auto *Merge = cast<VPBasicBlock>(Body->getSuccessors()[1]);
+    VPValue *InnerCond = Body->getTerminator()->getOperand(0);
+
+    // Test AnyOf predication independently of the bailout transform.
+    auto *HeaderBranch = cast<VPInstruction>(Header->getTerminator());
+    auto *AnyOf =
+        new VPInstruction(VPInstruction::AnyOf, {HeaderBranch->getOperand(0)});
+    AnyOf->insertBefore(HeaderBranch);
+    HeaderBranch->setOperand(0, AnyOf);
+    if (SwapSuccessors)
+      Header->swapSuccessors();
+
+    VPlanTransforms::introduceMasksAndLinearize(*Plan);
+
+    // Preserve the branch and successor order, without masking accesses.
+    ASSERT_EQ(HeaderBranch, Header->getTerminator());
+    EXPECT_EQ(AnyOf, HeaderBranch->getOperand(0));
+    ASSERT_EQ(2u, Header->getNumSuccessors());
+    EXPECT_EQ(SwapSuccessors ? Body : Latch, Header->getSuccessors()[0]);
+    EXPECT_EQ(SwapSuccessors ? Latch : Body, Header->getSuccessors()[1]);
+    for (VPBasicBlock *VPBB : {Header, Body, Merge, Latch})
+      for (VPInstruction &I : make_isa_range<VPInstruction>(*VPBB))
+        EXPECT_FALSE(I.isMasked());
+
+    // If-convert the inner branch using only its condition.
+    EXPECT_EQ(Merge, Then->getSingleSuccessor());
+    EXPECT_EQ(Then, Body->getSingleSuccessor());
+    EXPECT_EQ(Latch, Merge->getSingleSuccessor());
+    EXPECT_EQ(nullptr, Body->getTerminator());
+    EXPECT_EQ(InnerCond, cast<VPInstruction>(&Then->front())->getMask());
+    EXPECT_EQ(InnerCond, cast<VPInstruction>(&Then->back())->getMask());
+    EXPECT_TRUE(Merge->phis().empty());
+    VPValue *MergedValue = cast<VPInstruction>(&Merge->back())->getOperand(0);
+    EXPECT_TRUE(isa<VPBlendRecipe>(MergedValue->getDefiningRecipe()));
+  }
+}
+
 TEST_F(VPlanHCFGTest, testBuildHCFGInnerLoop) {
   const char *ModuleString =
       "define void @f(ptr %A, i64 %N) {\n"
