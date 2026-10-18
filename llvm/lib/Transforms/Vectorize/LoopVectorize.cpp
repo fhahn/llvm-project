@@ -5849,18 +5849,18 @@ VPRecipeBase *VPRecipeBuilder::tryToWidenMemory(VPInstruction *VPI,
                                   *VPI, Store->getDebugLoc());
 }
 
-/// Returns true if the single-use chain in \p VPI's block starting at \p VPI
-/// reaches a recipe that is predicated in the plan.
-static bool reachesPredicatedRecipe(VPInstruction *VPI) {
-  VPRecipeBase *R = VPI;
-  while (auto *ChainI = dyn_cast<VPInstruction>(R)) {
+/// Check whether \p VPI is masked or feeds a predicated recipe through a
+/// single-use chain in the same block.
+static bool reachesPredicatedRecipe(const VPInstruction *VPI) {
+  const VPRecipeBase *R = VPI;
+  while (const auto *ChainI = dyn_cast<VPInstruction>(R)) {
     if (ChainI->isMasked())
       return true;
     R = cast_if_present<VPRecipeBase>(ChainI->getSingleUser());
     if (!R || R->getParent() != VPI->getParent())
       return false;
   }
-  auto *RepR = dyn_cast<VPReplicateRecipe>(R);
+  const auto *RepR = dyn_cast<VPReplicateRecipe>(R);
   return RepR && RepR->isPredicated();
 }
 
@@ -5868,18 +5868,11 @@ bool VPRecipeBuilder::shouldWiden(VPInstruction *VPI, VFRange &Range) const {
   Instruction *I = VPI->getUnderlyingInstr();
   assert((!isa<UncondBrInst, CondBrInst, PHINode, LoadInst, StoreInst>(I)) &&
          "Instruction should have been handled earlier");
-  // The legacy cost model scalarizes single-use chains together with the
-  // predicated instruction they feed, so only do so if that instruction is
-  // predicated in the plan. Stopping at the first masked chain member is
-  // equivalent, as masks are uniform within a block and in early-exit loops
-  // the predicated instructions are memory accesses.
-  bool FeedsPredicated = reachesPredicatedRecipe(VPI);
-  // Instruction should be widened, unless it is scalar after vectorization,
-  // scalarization is profitable for a chain feeding a predicated recipe, or it
-  // is scalar with predication.
+  // Only apply legacy scalarization discounts to chains still predicated in
+  // the plan.
   auto WillScalarize = [&](ElementCount VF) -> bool {
     return CM.isScalarAfterVectorization(I, VF) ||
-           (FeedsPredicated && CM.isProfitableToScalarize(I, VF)) ||
+           (CM.isProfitableToScalarize(I, VF) && reachesPredicatedRecipe(VPI)) ||
            CM.isScalarWithPredication(I, VF);
   };
   return !LoopVectorizationPlanner::getDecisionAndClampRange(WillScalarize,

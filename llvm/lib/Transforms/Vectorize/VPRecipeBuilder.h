@@ -33,10 +33,9 @@ class VPRecipeBuilder {
 
   VPBuilder &Builder;
 
-  /// Check if \p VPI can be widened at the start of \p Range and possibly
-  /// decrease the range such that the returned value holds for the entire \p
-  /// Range. The function should not be called for memory instructions or calls.
-  /// Masks must already have been introduced.
+  /// Check if \p VPI should be widened at the start of \p Range, clamping the
+  /// range to VFs with the same decision. Masks must already be introduced.
+  /// Do not call for memory instructions or calls.
   bool shouldWiden(VPInstruction *VPI, VFRange &Range) const;
 
   /// Check if \p VPI has an opcode that can be widened and return a

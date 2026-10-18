@@ -5991,9 +5991,8 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         "makeVPlanMemOpDecision", ProcessSubset, Plan, [&](VPInstruction *VPI) {
           Instruction *I = VPI->getUnderlyingInstr();
           bool IsLoad = VPI->getOpcode() == Instruction::Load;
-          // TODO: Use the plan's mask instead. Not possible yet, as the legacy
-          // cost model makes the address GEP of loads it treats as predicated
-          // uniform, so all lanes would use lane 0's address.
+          // TODO: Use the plan's mask once the legacy cost model no longer marks
+          // predicated loads' address GEPs uniform.
           if (RecipeBuilder.isPredicatedInst(I) || !IsLoad ||
               !vputils::isUsedByLoadStoreAddress(VPI))
             return false;
@@ -6023,7 +6022,7 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
       "widenConsecutiveMemOps", ProcessSubset, Plan, [&](VPInstruction *VPI) {
         Instruction *I = VPI->getUnderlyingInstr();
         bool IsLoad = VPI->getOpcode() == Instruction::Load;
-        VPValue *Ptr = VPI->getOperand(!IsLoad);
+        VPValue *Ptr = VPI->getOperand(IsLoad ? 0 : 1);
         Type *ScalarTy =
             IsLoad ? VPI->getScalarType() : VPI->getOperand(0)->getScalarType();
         std::optional<int64_t> Stride =
@@ -6032,23 +6031,21 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
           return false;
         bool Reverse = Stride == -1;
 
-        // A predicated access can only be widened (rather than scalarized) if
-        // the target supports a masked load/store for it. Accesses without a
-        // mask are not predicated.
-        // TODO: Determine in VPlan if masked accesses are safe to execute
-        // unconditionally, instead of using isPredicatedInst.
-        bool IsPredicated =
-            VPI->isMasked() && RecipeBuilder.isPredicatedInst(I);
-        if (IsPredicated && !CostCtx.Config.isLegalMaskedLoadOrStore(
-                                IsLoad, ScalarTy, getLoadStoreAlignment(I),
-                                getLoadStoreAddressSpace(I)))
+        // Drop the mask if the access is safe to execute unconditionally.
+        // TODO: Determine this directly in VPlan.
+        VPValue *Mask = VPI->getMask();
+        if (Mask && !RecipeBuilder.isPredicatedInst(I))
+          Mask = nullptr;
+
+        if (Mask && !CostCtx.Config.isLegalMaskedLoadOrStore(
+                        IsLoad, ScalarTy, getLoadStoreAlignment(I),
+                        getLoadStoreAddressSpace(I)))
           return false;
 
         VPBuilder Builder(VPI);
         VPSingleDefRecipe *VectorPtr = Builder.createConsecutiveVectorPointer(
             Ptr, ScalarTy, Reverse, VPI->getDebugLoc());
 
-        VPValue *Mask = IsPredicated ? VPI->getMask() : nullptr;
         // Reverse the mask so it matches the reversed access order.
         if (Reverse && Mask)
           Mask = Builder.createNaryOp(VPInstruction::Reverse, Mask,
