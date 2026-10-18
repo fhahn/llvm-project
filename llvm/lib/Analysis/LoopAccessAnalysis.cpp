@@ -435,6 +435,22 @@ getNonAffineMonotonicBounds(const Loop *Lp, const SCEV *PtrExpr,
           SE->getAddExpr(Base, OffEnd, EltSizeSCEV)};
 }
 
+const SCEV *llvm::getBTCForHoistedRuntimeChecks(const Loop *OuterLoop,
+                                                ScalarEvolution &SE) {
+  // The hoisted checks cover all iterations up to the backedge-taken count of
+  // OuterLoop. The bounds of iterations that do not execute may wrap or be
+  // poison, so OuterLoop must execute all of them: it must not exit abnormally,
+  // and all its subloops must terminate.
+  // FIXME: Irreducible cycles in OuterLoop may not terminate.
+  if (!SE.loopHasNoAbnormalExits(OuterLoop) ||
+      any_of(drop_begin(OuterLoop->getLoopsInPreorder()), [&SE](const Loop *L) {
+        return isa<SCEVCouldNotCompute>(SE.getSymbolicMaxBackedgeTakenCount(L));
+      }))
+    return SE.getCouldNotCompute();
+  // Use the exact backedge-taken count, which accounts for all exits.
+  return SE.getBackedgeTakenCount(OuterLoop);
+}
+
 std::pair<const SCEV *, const SCEV *> llvm::getStartAndEndForAccess(
     const Loop *Lp, const SCEV *PtrExpr, Type *AccessTy, const SCEV *BTC,
     const SCEV *MaxBTC, ScalarEvolution *SE,
@@ -643,7 +659,9 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
         // recurrences being the same), then we prefer to keep the diff checks
         // because they are cheaper.
         SrcStartAR->getStepRecurrence(*SE) !=
-            SinkStartAR->getStepRecurrence(*SE)) {
+            SinkStartAR->getStepRecurrence(*SE) &&
+        !isa<SCEVCouldNotCompute>(
+            getBTCForHoistedRuntimeChecks(StartARLoop, *SE))) {
       LLVM_DEBUG(dbgs() << "LAA: Not creating diff runtime check, since these "
                            "cannot be hoisted out of the outer loop\n");
       return false;

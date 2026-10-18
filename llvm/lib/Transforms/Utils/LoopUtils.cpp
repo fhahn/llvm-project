@@ -2149,12 +2149,10 @@ static PointerBounds expandBounds(const RuntimeCheckingPtrGroup *CG,
     const SCEV *Recur = LowAR->getStepRecurrence(SE);
     if (Recur == HighAR->getStepRecurrence(SE) &&
         HighAR->getLoop() == OuterLoop && LowAR->getLoop() == OuterLoop) {
-      BasicBlock *OuterLoopLatch = OuterLoop->getLoopLatch();
-      const SCEV *OuterExitCount = SE.getExitCount(OuterLoop, OuterLoopLatch);
-      if (!isa<SCEVCouldNotCompute>(OuterExitCount) &&
-          OuterExitCount->getType()->isIntegerTy()) {
+      const SCEV *OuterBTC = getBTCForHoistedRuntimeChecks(OuterLoop, SE);
+      if (!isa<SCEVCouldNotCompute>(OuterBTC)) {
         const SCEV *NewHigh =
-            cast<SCEVAddRecExpr>(High)->evaluateAtIteration(OuterExitCount, SE);
+            cast<SCEVAddRecExpr>(High)->evaluateAtIteration(OuterBTC, SE);
         if (!isa<SCEVCouldNotCompute>(NewHigh)) {
           LLVM_DEBUG(dbgs() << "LAA: Expanded RT check for range to include "
                                "outer loop in order to permit hoisting\n");

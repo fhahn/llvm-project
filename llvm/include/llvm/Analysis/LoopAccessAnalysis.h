@@ -981,6 +981,12 @@ LLVM_ABI bool sortPtrAccesses(ArrayRef<Value *> VL, Type *ElemTy,
 LLVM_ABI bool isConsecutiveAccess(Value *A, Value *B, const DataLayout &DL,
                                   ScalarEvolution &SE, bool CheckType = true);
 
+/// Returns the backedge-taken count of \p OuterLoop at which the bounds of the
+/// runtime checks of its inner loop are evaluated to hoist them out of
+/// \p OuterLoop, or SCEVCouldNotCompute if they cannot be hoisted.
+LLVM_ABI const SCEV *getBTCForHoistedRuntimeChecks(const Loop *OuterLoop,
+                                                   ScalarEvolution &SE);
+
 /// Calculate Start and End points of memory access using exact backedge taken
 /// count \p BTC if computable or maximum backedge taken count \p MaxBTC
 /// otherwise.
