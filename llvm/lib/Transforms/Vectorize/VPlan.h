@@ -85,15 +85,9 @@ enum class UncountableExitStyle {
   /// in the loop and branch either to the middle block if the trip count was
   /// reached, or an early exitblock to determine which exit was taken.
   ReadOnly,
-  /// All memory operations other than the load(s) required to determine whether
-  /// an uncountable exit occurre will be masked based on that condition. If an
-  /// uncountable exit is taken, then all lanes before the exiting lane will
-  /// complete, leaving just the final lane to execute in the scalar tail.
-  /// If the target cannot mask some of the accesses, all accesses after the
-  /// exit condition are instead skipped if any lane exits, and the whole vector
-  /// iteration is re-executed by the scalar loop. They are still masked if
-  /// there is control flow between the header and the latch, or a skipped
-  /// access is used outside the skipped recipes.
+  /// Mask accesses other than condition loads and resume at the first exiting
+  /// lane in the scalar loop. If an access cannot be masked, try skipping these
+  /// accesses when any lane exits and resume at the first lane instead.
   MaskedHandleExitInScalarLoop,
 };
 

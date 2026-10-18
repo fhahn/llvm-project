@@ -3308,26 +3308,18 @@ struct EarlyExitInfo {
   VPValue *CondToExit;
 };
 
-/// If the target cannot mask some of the memory accesses from \p AfterExitCond
-/// to the end of \p Header and in \p Latch, move all of them and the recipes
-/// only they use to a block that is skipped if any lane exits, make \p Header
-/// branch on the AnyOf of the exit condition and return it. Otherwise, or if
-/// \p Header does not branch unconditionally to a separate \p Latch, or an
-/// access is used outside the skipped recipes, return nullptr and leave the
-/// plan unchanged.
-static VPValue *skipAccessesIfAnyLaneExits(VPBasicBlock *Header,
-                                           VPBasicBlock *Latch,
-                                           VPBasicBlock::iterator AfterExitCond,
-                                           const VFSelectionContext &Config,
-                                           PredicatedScalarEvolution &PSE,
-                                           const Loop *L) {
+/// Try to skip accesses from \p AfterExitCond in \p Header and in \p Latch
+/// if any lane exits and the target cannot mask all accesses. Return the AnyOf
+/// condition on success, otherwise nullptr without changing the plan.
+static VPValue *skipAccessesIfAnyLaneExits(
+    VPBasicBlock *Header, VPBasicBlock *Latch,
+    VPBasicBlock::iterator AfterExitCond, const VFSelectionContext &Config) {
   if (Header->getSingleSuccessor() != Latch)
     return nullptr;
 
-  // Returns true if the load or store \p MemI can be widened to a masked
-  // load/store or a gather/scatter. Matches
-  // LoopVectorizationCostModel::isScalarWithPredication for loads and stores.
   VPlan &Plan = *Header->getPlan();
+  // Match the load/store checks in
+  // LoopVectorizationCostModel::isScalarWithPredication.
   auto IsMaskable = [&](VPInstruction *MemI) {
     Instruction *I = MemI->getUnderlyingInstr();
     Type *ScalarTy = getLoadStoreType(I);
@@ -3335,16 +3327,17 @@ static VPValue *skipAccessesIfAnyLaneExits(VPBasicBlock *Header,
       return false;
     bool IsLoad = MemI->getOpcode() == Instruction::Load;
     Align Alignment = getLoadStoreAlignment(I);
-    std::optional<int64_t> Stride =
-        vputils::getConstantStride(MemI->getOperand(!IsLoad), ScalarTy, PSE, L);
+    std::optional<int64_t> Stride = vputils::getConstantStride(
+        MemI->getOperand(IsLoad ? 0 : 1), ScalarTy, Config.getPSE(),
+        Config.getLoop());
     if ((Stride == 1 || Stride == -1) &&
         Config.isLegalMaskedLoadOrStore(IsLoad, ScalarTy, Alignment,
-                                        getLoadStoreAddressSpace(I)))
+                                       getLoadStoreAddressSpace(I)))
       return true;
-    // The VF is not known yet, so query gather/scatter for the scalar type,
-    // which may only be legal for some VFs; masking stays the fallback.
+    // The VF is not known yet. Conservatively allow masking if gather/scatter
+    // is supported for the scalar type.
     return Config.isLegalGatherOrScatter(IsLoad, ScalarTy, Alignment,
-                                         ElementCount::getFixed(1));
+                                        ElementCount::getFixed(1));
   };
 
   // Visit users before their operands, skipping the latch terminator.
@@ -3357,7 +3350,6 @@ static VPValue *skipAccessesIfAnyLaneExits(VPBasicBlock *Header,
     if (any_of(Def->users(), [&Skipped](VPUser *U) {
           return !Skipped.contains(cast<VPRecipeBase>(U));
         })) {
-      // An access used outside the skipped recipes needs to be masked instead.
       if (R.mayReadOrWriteMemory())
         return nullptr;
       continue;
@@ -3365,7 +3357,7 @@ static VPValue *skipAccessesIfAnyLaneExits(VPBasicBlock *Header,
     Skipped.insert(&R);
     auto *MemI = dyn_cast<VPInstruction>(&R);
     if (MemI && is_contained({Instruction::Load, Instruction::Store},
-                             MemI->getOpcode()))
+                            MemI->getOpcode()))
       CanMask &= IsMaskable(MemI);
   }
   if (CanMask)
@@ -3377,9 +3369,8 @@ static VPValue *skipAccessesIfAnyLaneExits(VPBasicBlock *Header,
   // Skipped is in reverse program order, so prepending restores it.
   for (VPRecipeBase *R : Skipped)
     R->moveBefore(*SkippedVPBB, SkippedVPBB->begin());
-  // Move the remaining latch recipes, including the AnyOf, to the header to
-  // branch on it. VPPredicator keeps that branch, so the skipped recipes are
-  // not masked.
+  // Move the remaining latch recipes to the header and branch on AnyOf.
+  // VPPredicator preserves this branch, avoiding masks for the skipped recipes.
   while (&Latch->front() != Latch->getTerminator())
     Latch->front().moveBefore(*Header, Header->end());
   VPValue *AnyExit = Latch->getTerminator()->getOperand(0);
@@ -3387,46 +3378,37 @@ static VPValue *skipAccessesIfAnyLaneExits(VPBasicBlock *Header,
   return AnyExit;
 }
 
-/// Update \p Plan to mask memory operations in the loop based on whether the
-/// early exit is taken or not. If the target cannot mask them, skip them
-/// instead if any lane exits.
+/// Mask memory accesses according to the early exit condition, or skip them
+/// if any lane exits and the target cannot mask them.
 ///
-/// We're currently expecting to find a loop with properties similar to the
-/// following:
+/// For a header -> latch loop, masking adds:
 ///
-/// for.body:
-///   ir<%indvars.iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<%0>
-///   EMIT ir<%arrayidx> = getelementptr inbounds nuw ir<@c>, ir<%indvars.iv>
-///   EMIT-SCALAR ir<%0> = load ir<%arrayidx>
-///   EMIT ir<%cmp1> = icmp sgt ir<%0>, ir<5>
-///   EMIT vp<%1> = masked-cond ir<%cmp1>
-/// Successor(s): if.end
+/// header:
+///   %cond = ...
+///   %first = first-active-lane %cond
+///   %mask = active-lane-mask 0, %first
+/// latch:
+///   load/store ..., %mask
+///   branch-on-two-conds (any-of (freeze %cond)), %count.done
 ///
-/// if.end:
-///   EMIT ir<%arrayidx3> = getelementptr inbounds nuw ir<@src>, ir<%indvars.iv>
-///   EMIT-SCALAR ir<%2> = load ir<%arrayidx3>
-///   EMIT ir<%add> = add nsw ir<%2>, ir<42>
-///   EMIT ir<%arrayidx5> = getelementptr inbounds nuw ir<@dst>, ir<%indvars.iv>
-///   EMIT store ir<%add>, ir<%arrayidx5>
-///   EMIT ir<%indvars.iv.next> = add nuw nsw ir<%indvars.iv>, ir<1>
-///   EMIT vp<%freeze> = freeze ir<%1>
-///   EMIT vp<%3> = any-of ir<%freeze>
-///   EMIT ir<%exitcond.not> = icmp eq ir<%indvars.iv.next>, ir<10000>
-///   EMIT branch-on-two-conds vp<%3>, ir<%exitcond.not>
-/// Successor(s): middle.block, middle.block, for.body
+/// If masking is not legal, move the accesses to a block skipped on any exit:
 ///
-/// We currently expect LoopVectorizationLegality to ensure that:
-/// * There must also be a counted exit. We will need to support speculative
-///   or first-faulting loads before we can remove this restriction.
-/// * Any stores within the loop must not alias with the load used for the
-///   uncountable exit. We can relax this a bit with runtime aliasing checks.
-/// * Other memory operations in the loop can take place before or after the
-///   uncountable exit, but must also be unconditional. We need to support
-///   combining the conditions in VPlanPredicator.
-/// * The loop must have a single unconditional load contributing to the
-///   uncountable exit comparison, and the other term must be loop-invariant.
-///   Improving upon this requires work in getRecipesForUncountableExit to
-///   handle more complex recipe graphs.
+/// header:
+///   %cond = ...
+///   %any = any-of (freeze %cond)
+///   branch-on-cond %any
+/// Successor(s): latch, skipped
+/// skipped:
+///   load/store ...
+/// Successor(s): latch
+/// latch:
+///   branch-on-two-conds %any, %count.done
+///
+/// Resume in the scalar loop at IV + %first when masking, or IV on bailout.
+///
+/// Requires a counted exit and an uncountable exit comparing a single
+/// unconditional load against a loop-invariant value. All other memory accesses
+/// must be unconditional and stores must not alias the condition load.
 static bool handleUncountableExitsWithSideEffects(
     VPlan &Plan, SmallVectorImpl<EarlyExitInfo> &Exits,
     VPBasicBlock *HeaderVPBB, VPBasicBlock *LatchVPBB, VPBasicBlock *MiddleVPBB,
@@ -3447,9 +3429,7 @@ static bool handleUncountableExitsWithSideEffects(
 
   VPDominatorTree VPDT(Plan);
 
-  // We can abandon a VPlan entirely if we return false here, so we shouldn't
-  // crash if some earlier assumptions on scalar IR don't hold for the vplan
-  // version of the loop.
+  // Reject the plan if scalar IR assumptions no longer hold.
   SmallVector<VPInstruction *, 8> ConditionRecipes;
 
   VPValue *Cond = getRecipesForUncountableExit(ConditionRecipes, LatchVPBB);
@@ -3460,10 +3440,7 @@ static bool handleUncountableExitsWithSideEffects(
     return false;
   }
 
-  // Find load contributing to condition.
-  // At the moment LoopVectorizationLegality only supports a single
-  // early-exit expression with a compare and a single load that must
-  // be unconditional.
+  // Find the single unconditional load contributing to the exit condition.
   // TODO: Support more than one load.
   auto *Load =
       find_singleton<VPInstruction>(ConditionRecipes, [](auto *I, bool _) {
@@ -3477,12 +3454,8 @@ static bool handleUncountableExitsWithSideEffects(
          "Uncountable exit condition load is conditional.");
   VPInstruction *Ptr = cast<VPInstruction>(Load->getOperand(0));
 
-  // Ensure that we are guaranteed to be able to dereference the memory used
-  // for determining the uncountable exit for the maximum possible number of
-  // scalar iterations of the loop.
-  //
-  // TODO: Support first-faulting loads in cases where we don't know whether
-  //       all possible addresses are dereferenceable.
+  // The condition load must be dereferenceable for all possible iterations.
+  // TODO: Support first-faulting loads otherwise.
   {
     SmallVector<const SCEVPredicate *, 4> Predicates;
     const SCEV *PtrSCEV = vputils::getSCEVExprForVPValue(Ptr, PSE, TheLoop);
@@ -3502,21 +3475,11 @@ static bool handleUncountableExitsWithSideEffects(
     }
   }
 
-  // Check for a single GEP for the condition load to see if we can link it to
-  // a widen IV recipe with a step of 1; we're only interested in contiguous
-  // accesses for the condition load right now.
+  // Require contiguous accesses based on a zero-start, unit-step induction.
   auto *IV = cast<VPWidenInductionRecipe>(&HeaderVPBB->front());
   if (!match(IV->getStartValue(), m_SpecificInt(0)) ||
-      !match(IV->getStepValue(), m_SpecificInt(1))) {
-    reportVectorizationFailure("Early exit loop with side effects contains "
-                               "load used by the exit condition with an "
-                               "unsupported memory access pattern",
-                               "EarlyExitSideEffectsBadLoadAccessPattern", ORE,
-                               TheLoop);
-    return false;
-  }
-
-  if (!match(Ptr, m_VPInstruction<Instruction::GetElementPtr>(
+      !match(IV->getStepValue(), m_SpecificInt(1)) ||
+      !match(Ptr, m_VPInstruction<Instruction::GetElementPtr>(
                       m_LiveIn(), m_Specific(IV)))) {
     reportVectorizationFailure("Early exit loop with side effects contains "
                                "load used by the exit condition with an "
@@ -3526,10 +3489,8 @@ static bool handleUncountableExitsWithSideEffects(
     return false;
   }
 
-  // We want to guarantee that the uncountable exit condition (and the mask
-  // we will generate from it) are available for all operations in the loop
-  // that need to be masked. If the condition recipes are not already the first
-  // recipes in the header after the last phi, move them there.
+  // Move the condition recipes after the header phis so the condition dominates
+  // all accesses to be masked or skipped.
   auto InsertIt = HeaderVPBB->getFirstNonPhi();
   while (InsertIt != HeaderVPBB->end() &&
          is_contained(ConditionRecipes, &*InsertIt)) {
@@ -3544,16 +3505,14 @@ static bool handleUncountableExitsWithSideEffects(
   assert(match(MiddleVPBB->getTerminator(), m_BranchOnCond()) &&
          "Expected BranchOnCond terminator for MiddleVPBB");
   VPBuilder MiddleBuilder(MiddleVPBB->getTerminator());
-  // The number of lanes the vector iteration completes.
   VPValue *NumCompletedLanes;
   if (VPValue *AnyExit = skipAccessesIfAnyLaneExits(
-          HeaderVPBB, LatchVPBB, InsertIt, Config, PSE, TheLoop)) {
+          HeaderVPBB, LatchVPBB, InsertIt, Config)) {
     // The scalar loop re-executes the whole vector iteration if any lane exits.
     NumCompletedLanes =
         MiddleBuilder.createSelect(AnyExit, Zero, &Plan.getVFxUF());
   } else {
-    // Create a mask to represent all lanes that fully execute in the vector
-    // loop, stopping short of any early exit.
+    // Mask off lanes starting at the first early exit.
     VPBuilder MaskBuilder(HeaderVPBB, InsertIt);
     VPValue *FirstActive = MaskBuilder.createFirstActiveLane(Cond);
     NumCompletedLanes = MaskBuilder.createScalarZExtOrTrunc(
@@ -3579,8 +3538,7 @@ static bool handleUncountableExitsWithSideEffects(
         }
   }
 
-  // Update middle block branch to compare (IV + NumCompletedLanes) against the
-  // full trip count, since we may be exiting the vector loop early.
+  // Resume at the first incomplete iteration unless the trip count was reached.
   VPValue *ScalarIV = MiddleBuilder.createNaryOp(VPInstruction::ExtractLane,
                                                  {Zero, IV}, DebugLoc());
   VPValue *ExitIV = MiddleBuilder.createAdd(ScalarIV, NumCompletedLanes);
@@ -3601,7 +3559,6 @@ static bool handleUncountableExitsWithSideEffects(
     return false;
   }
   VPPhi *ContinueIV = cast<VPPhi>(Phis.begin());
-  // Make sure we're referring to the same IV.
   assert(
       match(ContinueIV->getOperand(0),
             m_VPInstruction<VPInstruction::ExitingIVValue>(m_Specific(IV))) &&

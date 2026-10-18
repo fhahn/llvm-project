@@ -106,16 +106,13 @@ protected:
           MapVector<PHINode *, RecurrenceDescriptor>(),
           SmallPtrSet<const PHINode *, 1>(), SmallPtrSet<PHINode *, 1>(),
           /*AllowReordering=*/false);
-    }
-
-    if (Style) {
       TargetTransformInfo TTI(DL);
       const auto &Opts = Ctx->getLibraryOptions().get<VectorizeOptions>();
       VFSelectionContext Config(Opts, TTI, /*Legal=*/nullptr, L, F, PSE,
                                 /*DB=*/nullptr, &ORE, /*Hints=*/nullptr,
                                 /*OptForSize=*/false);
       VPlanTransforms::handleUncountableEarlyExits(*Plan, &ORE, L, PSE, *DT,
-                                                   AC.get(), *Style, Config);
+                                                AC.get(), *Style, Config);
     } else
       VPlanTransforms::handleCountableEarlyExits(*Plan);
     VPlanTransforms::addMiddleCheck(*Plan);
