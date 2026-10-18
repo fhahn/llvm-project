@@ -195,8 +195,7 @@ exit:
   ret void
 }
 
-; Store with a strided address; the only consecutive access is the load before
-; the early-exit check, whose value is stored after it.
+; A load before the early-exit check feeds a strided store after it.
 define void @load_in_header_strided_store_in_latch(ptr noalias %a, ptr noalias %b, ptr align 2 dereferenceable(40) %pred) {
 ; CHECK-LABEL: define void @load_in_header_strided_store_in_latch(
 ; CHECK-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], ptr align 2 dereferenceable(40) [[PRED:%.*]]) {
@@ -728,7 +727,7 @@ exit:
   ret ptr %res
 }
 
-; Negative test: a load after the early-exit check is live out.
+; A live-out load prevents bailing to scalar.
 define i16 @load_live_out(ptr noalias %a, ptr align 2 dereferenceable(40) %pred) {
 ; CHECK-LABEL: define i16 @load_live_out(
 ; CHECK-SAME: ptr noalias [[A:%.*]], ptr align 2 dereferenceable(40) [[PRED:%.*]]) {
@@ -862,7 +861,7 @@ exit:
   ret i16 %res
 }
 
-; Negative test: control flow between the early-exit check and the latch.
+; Internal control flow prevents bailing to scalar.
 define void @internal_control_flow(ptr noalias %a, ptr align 2 dereferenceable(40) %pred, i1 %c) {
 ; CHECK-LABEL: define void @internal_control_flow(
 ; CHECK-SAME: ptr noalias [[A:%.*]], ptr align 2 dereferenceable(40) [[PRED:%.*]], i1 [[C:%.*]]) {
