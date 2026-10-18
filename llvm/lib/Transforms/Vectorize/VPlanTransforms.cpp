@@ -3800,14 +3800,11 @@ void VPlanTransforms::convertMaskedEarlyExitToBailToScalar(
   if (HeaderVPBB->getSingleSuccessor() != LatchVPBB)
     return;
 
-  // Find the mask created by handleUncountableEarlyExits.
-  auto *AnyOfR = cast<VPInstruction>(LatchVPBB->getTerminator()->getOperand(0));
-  auto *MaskR = find_singleton<VPInstruction>(
-      *HeaderVPBB, [AnyOfR](VPRecipeBase &R, bool) -> VPInstruction * {
-        return match(&R,
-                     m_VPInstruction<VPInstruction::ActiveLaneMask>(
-                         m_ZeroInt(), m_ZExtOrTruncOrSelf(m_FirstActiveLane(
-                                          m_Specific(AnyOfR->getOperand(0))))))
+  // The early-exit mask is the only ActiveLaneMask at this stage. Header masks
+  // for tail folding are materialized later.
+  auto *MaskR =
+      find_singleton<VPInstruction>(*HeaderVPBB, [](VPRecipeBase &R, bool) {
+        return match(&R, m_VPInstruction<VPInstruction::ActiveLaneMask>())
                    ? cast<VPInstruction>(&R)
                    : nullptr;
       });
@@ -3819,7 +3816,7 @@ void VPlanTransforms::convertMaskedEarlyExitToBailToScalar(
         auto *VPI = cast<VPInstruction>(U);
         Instruction *I = VPI->getUnderlyingInstr();
         bool IsLoad = VPI->getOpcode() == Instruction::Load;
-        Type *ScalarTy = (IsLoad ? VPI : VPI->getOperand(0))->getScalarType();
+        Type *ScalarTy = getLoadStoreValueType(VPI);
         std::optional<int64_t> Stride = vputils::getConstantStride(
             VPI->getOperand(!IsLoad), ScalarTy, PSE, L);
         return (Stride == 1 || Stride == -1) &&
@@ -3846,6 +3843,7 @@ void VPlanTransforms::convertMaskedEarlyExitToBailToScalar(
 
   // Branch around the skipped recipes if any lane exits. The remaining latch
   // body recipes may feed them, so move those to the header.
+  auto *AnyOfR = cast<VPInstruction>(LatchVPBB->getTerminator()->getOperand(0));
   auto *NonBailingVPBB = Plan.createVPBasicBlock("vector.body.nonbailing");
   VPBlockUtils::insertBlockAfter(NonBailingVPBB, HeaderVPBB);
   for (VPRecipeBase *R : reverse(Skipped))
@@ -6071,18 +6069,17 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         // A predicated access can only be widened (rather than scalarized) if
         // the target supports a masked load/store for it.
         // TODO: Determine if a load/store needs predication directly in VPlan.
-        bool IsPredicated =
-            RecipeBuilder.isPredicatedInst(I) && VPI->isMasked();
-        if (IsPredicated && !CostCtx.Config.isLegalMaskedLoadOrStore(
-                                IsLoad, ScalarTy, getLoadStoreAlignment(I),
-                                getLoadStoreAddressSpace(I)))
+        VPValue *Mask =
+            RecipeBuilder.isPredicatedInst(I) ? VPI->getMask() : nullptr;
+        if (Mask && !CostCtx.Config.isLegalMaskedLoadOrStore(
+                        IsLoad, ScalarTy, getLoadStoreAlignment(I),
+                        getLoadStoreAddressSpace(I)))
           return false;
 
         VPBuilder Builder(VPI);
         VPSingleDefRecipe *VectorPtr = Builder.createConsecutiveVectorPointer(
             Ptr, ScalarTy, Reverse, VPI->getDebugLoc());
 
-        VPValue *Mask = IsPredicated ? VPI->getMask() : nullptr;
         // Reverse the mask so it matches the reversed access order.
         if (Reverse && Mask)
           Mask = Builder.createNaryOp(VPInstruction::Reverse, Mask,
