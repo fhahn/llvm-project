@@ -731,10 +731,14 @@ define void @sink_multiple_store_groups_noalias_via_scev(ptr %dst, ptr %src) {
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 12696
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[SRC]], i64 12828
+; CHECK-NEXT:    [[TMP26:%.*]] = getelementptr i8, ptr [[DST]], i64 12680
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP1]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[BOUND16:%.*]] = icmp ult ptr [[SRC]], [[TMP26]]
+; CHECK-NEXT:    [[FOUND_CONFLICT7:%.*]] = and i1 [[BOUND0]], [[BOUND16]]
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT7]]
+; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
@@ -759,14 +763,14 @@ define void @sink_multiple_store_groups_noalias_via_scev(ptr %dst, ptr %src) {
 ; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr double, ptr [[DST]], i64 [[TMP1]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = select <2 x i1> [[TMP10]], <2 x double> [[TMP14]], <2 x double> [[TMP15]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = extractelement <2 x double> [[TMP18]], i64 0
-; CHECK-NEXT:    store double [[TMP19]], ptr [[TMP16]], align 8, !alias.scope [[META81:![0-9]+]], !noalias [[META78]]
+; CHECK-NEXT:    store double [[TMP19]], ptr [[TMP16]], align 8, !noalias [[META78]]
 ; CHECK-NEXT:    [[TMP20:%.*]] = extractelement <2 x double> [[TMP18]], i64 1
-; CHECK-NEXT:    store double [[TMP20]], ptr [[TMP17]], align 8, !alias.scope [[META81]], !noalias [[META78]]
+; CHECK-NEXT:    store double [[TMP20]], ptr [[TMP17]], align 8, !noalias [[META78]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = extractelement <2 x i1> [[TMP10]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP21]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; CHECK:       [[PRED_STORE_IF]]:
 ; CHECK-NEXT:    [[TMP22:%.*]] = getelementptr i8, ptr [[TMP16]], i64 16
-; CHECK-NEXT:    store double 1.000000e+01, ptr [[TMP22]], align 8, !alias.scope [[META81]], !noalias [[META78]]
+; CHECK-NEXT:    store double 1.000000e+01, ptr [[TMP22]], align 8, !alias.scope [[META81:![0-9]+]], !noalias [[META78]]
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; CHECK:       [[PRED_STORE_CONTINUE]]:
 ; CHECK-NEXT:    [[TMP23:%.*]] = extractelement <2 x i1> [[TMP10]], i64 1
@@ -827,10 +831,14 @@ define void @sink_multiple_store_groups_alias_via_scev(ptr %dst, ptr %src) {
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 12688
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[SRC]], i64 12828
+; CHECK-NEXT:    [[TMP30:%.*]] = getelementptr i8, ptr [[DST]], i64 12680
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP1]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[BOUND16:%.*]] = icmp ult ptr [[SRC]], [[TMP30]]
+; CHECK-NEXT:    [[FOUND_CONFLICT7:%.*]] = and i1 [[BOUND0]], [[BOUND16]]
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT7]]
+; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
@@ -872,23 +880,23 @@ define void @sink_multiple_store_groups_alias_via_scev(ptr %dst, ptr %src) {
 ; CHECK-NEXT:    br i1 [[TMP23]], label %[[PRED_STORE_IF4:.*]], label %[[PRED_STORE_CONTINUE5:.*]]
 ; CHECK:       [[PRED_STORE_IF4]]:
 ; CHECK-NEXT:    [[TMP24:%.*]] = getelementptr double, ptr [[DST]], i64 [[TMP0]]
-; CHECK-NEXT:    store double [[TMP11]], ptr [[TMP24]], align 8, !alias.scope [[META88]], !noalias [[META85]]
+; CHECK-NEXT:    store double [[TMP11]], ptr [[TMP24]], align 8, !alias.scope [[META90:![0-9]+]], !noalias [[META85]]
 ; CHECK-NEXT:    [[TMP25:%.*]] = getelementptr i8, ptr [[TMP24]], i64 8
-; CHECK-NEXT:    store double 1.000000e+01, ptr [[TMP25]], align 8, !alias.scope [[META88]], !noalias [[META85]]
+; CHECK-NEXT:    store double 1.000000e+01, ptr [[TMP25]], align 8, !alias.scope [[META90]], !noalias [[META85]]
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE5]]
 ; CHECK:       [[PRED_STORE_CONTINUE5]]:
 ; CHECK-NEXT:    [[TMP26:%.*]] = extractelement <2 x i1> [[TMP10]], i64 1
 ; CHECK-NEXT:    br i1 [[TMP26]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7]]
 ; CHECK:       [[PRED_STORE_IF6]]:
 ; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr double, ptr [[DST]], i64 [[TMP1]]
-; CHECK-NEXT:    store double [[TMP12]], ptr [[TMP27]], align 8, !alias.scope [[META88]], !noalias [[META85]]
+; CHECK-NEXT:    store double [[TMP12]], ptr [[TMP27]], align 8, !alias.scope [[META90]], !noalias [[META85]]
 ; CHECK-NEXT:    [[TMP28:%.*]] = getelementptr i8, ptr [[TMP27]], i64 8
-; CHECK-NEXT:    store double 1.000000e+01, ptr [[TMP28]], align 8, !alias.scope [[META88]], !noalias [[META85]]
+; CHECK-NEXT:    store double 1.000000e+01, ptr [[TMP28]], align 8, !alias.scope [[META90]], !noalias [[META85]]
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE7]]
 ; CHECK:       [[PRED_STORE_CONTINUE7]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP29:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
-; CHECK-NEXT:    br i1 [[TMP29]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP90:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP29]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP92:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br [[EXIT:label %.*]]
 ; CHECK:       [[SCALAR_PH]]:

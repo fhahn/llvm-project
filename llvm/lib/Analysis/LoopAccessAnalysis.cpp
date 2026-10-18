@@ -538,6 +538,37 @@ std::pair<const SCEV *, const SCEV *> llvm::getStartAndEndForAccess(
   return Res;
 }
 
+/// Returns a block that executes in exactly the iterations of \p L in which
+/// \p Ptr is accessed: the header if \p Ptr is accessed in every iteration,
+/// i.e. directly, not via a phi, in a block dominating the latch and all
+/// exiting blocks; otherwise the single block containing all accesses via
+/// \p Ptr, or nullptr.
+static const BasicBlock *getAccessBlock(Value *Ptr, const Loop *L,
+                                        const MemoryDepChecker &DC) {
+  SmallVector<Instruction *> Accesses =
+      DC.getInstructionsForAccess(Ptr, /*IsWrite=*/false);
+  append_range(Accesses, DC.getInstructionsForAccess(Ptr, /*IsWrite=*/true));
+  SmallVector<BasicBlock *> MustReach;
+  L->getExitingBlocks(MustReach);
+  MustReach.push_back(L->getLoopLatch());
+  auto IsDirect = [Ptr](Instruction *I) {
+    return getLoadStorePointerOperand(I) == Ptr;
+  };
+  if (any_of(Accesses, [&](Instruction *I) {
+        return IsDirect(I) && all_of(MustReach, [&](BasicBlock *BB) {
+                 return DC.getDT()->dominates(I->getParent(), BB);
+               });
+      }))
+    return L->getHeader();
+  const BasicBlock *BB = Accesses.front()->getParent();
+  return all_of(Accesses,
+                [&](Instruction *I) {
+                  return IsDirect(I) && I->getParent() == BB;
+                })
+             ? BB
+             : nullptr;
+}
+
 /// Calculate Start and End points of memory access using
 /// getStartAndEndForAccess.
 bool RuntimePointerChecking::insert(Loop *Lp, Value *Ptr, const SCEV *PtrExpr,
@@ -552,8 +583,11 @@ bool RuntimePointerChecking::insert(Loop *Lp, Value *Ptr, const SCEV *PtrExpr,
       &DC.getPointerBounds(), DC.getDT(), DC.getAC(), LoopGuards);
   if (isa<SCEVCouldNotCompute>(ScStart) || isa<SCEVCouldNotCompute>(ScEnd))
     return false;
+  // Each arm of a forked pointer is only accessed in some iterations.
+  const BasicBlock *AccessBlock =
+      IsForked ? nullptr : getAccessBlock(Ptr, Lp, DC);
   Pointers.emplace_back(Ptr, ScStart, ScEnd, WritePtr, DepSetId, ASId, PtrExpr,
-                        NeedsFreeze, IsForked);
+                        NeedsFreeze, IsForked, AccessBlock);
   return true;
 }
 
@@ -702,8 +736,41 @@ static const SCEV *getMinFromExprs(const SCEV *I, const SCEV *J,
   return Diff->isNegative() ? J : I;
 }
 
+/// Returns true if the bounds of \p P and \p Q cannot wrap around the address
+/// space relative to each other, so their signed difference matches their
+/// unsigned order.
+static bool
+boundsCannotWrapRelatively(const RuntimePointerChecking::PointerInfo &P,
+                           const RuntimePointerChecking::PointerInfo &Q,
+                           const MemoryDepChecker &DC) {
+  if (P.Start == Q.Start && P.End == Q.End)
+    return true;
+  // Otherwise P and Q must be accessed in the same iterations. Accessed
+  // addresses cannot wrap relative to each other.
+  if (!P.AccessBlock || P.AccessBlock != Q.AccessBlock)
+    return false;
+  // With an exact backedge-taken count, pointers accessed in every iteration
+  // access their bounds.
+  const Loop *L = DC.getInnermostLoop();
+  if (P.AccessBlock == L->getHeader() &&
+      !isa<SCEVCouldNotCompute>(DC.getPSE().getBackedgeTakenCount()))
+    return true;
+  // Otherwise their distance must be loop-invariant.
+  ScalarEvolution &SE = *DC.getPSE().getSE();
+  const SCEV *Dist = SE.getMinusSCEV(P.Expr, Q.Expr);
+  return !isa<SCEVCouldNotCompute>(Dist) && SE.isLoopInvariant(Dist, L);
+}
+
 bool RuntimeCheckingPtrGroup::addPointer(
     unsigned Index, const RuntimePointerChecking &RtCheck) {
+  // Bounds are ordered by the sign of their difference, which only matches the
+  // unsigned order of the runtime checks if they cannot wrap relative to each
+  // other.
+  if (!all_of(Members, [&](unsigned M) {
+        return boundsCannotWrapRelatively(RtCheck.Pointers[Index],
+                                          RtCheck.Pointers[M], RtCheck.DC);
+      }))
+    return false;
   return addPointer(
       Index, RtCheck.Pointers[Index].Start, RtCheck.Pointers[Index].End,
       RtCheck.Pointers[Index].PointerValue->getType()->getPointerAddressSpace(),

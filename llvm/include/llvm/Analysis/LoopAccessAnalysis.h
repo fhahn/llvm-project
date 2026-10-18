@@ -506,8 +506,9 @@ struct RuntimeCheckingPtrGroup {
   /// Tries to add the pointer recorded in RtCheck at index
   /// \p Index to this pointer checking group. We can only add a pointer
   /// to a checking group if we will still be able to get
-  /// the upper and lower bounds of the check. Returns true in case
-  /// of success, false otherwise.
+  /// the upper and lower bounds of the check, and if its bounds cannot wrap
+  /// relative to those of the members. Returns true in case of success, false
+  /// otherwise.
   LLVM_ABI bool addPointer(unsigned Index,
                            const RuntimePointerChecking &RtCheck);
   LLVM_ABI bool addPointer(unsigned Index, const SCEV *Start, const SCEV *End,
@@ -572,14 +573,18 @@ public:
     bool NeedsFreeze;
     /// True if this entry represents one arm of a forked pointer.
     bool IsForked;
+    /// If not null, Expr is accessed in exactly the loop iterations in which
+    /// this block executes.
+    const BasicBlock *AccessBlock;
 
     PointerInfo(Value *PointerValue, const SCEV *Start, const SCEV *End,
                 bool IsWritePtr, unsigned DependencySetId, unsigned AliasSetId,
-                const SCEV *Expr, bool NeedsFreeze, bool IsForked)
+                const SCEV *Expr, bool NeedsFreeze, bool IsForked,
+                const BasicBlock *AccessBlock)
         : PointerValue(PointerValue), Start(Start), End(End),
           IsWritePtr(IsWritePtr), DependencySetId(DependencySetId),
           AliasSetId(AliasSetId), Expr(Expr), NeedsFreeze(NeedsFreeze),
-          IsForked(IsForked) {}
+          IsForked(IsForked), AccessBlock(AccessBlock) {}
   };
 
   RuntimePointerChecking(MemoryDepChecker &DC, ScalarEvolution *SE,
