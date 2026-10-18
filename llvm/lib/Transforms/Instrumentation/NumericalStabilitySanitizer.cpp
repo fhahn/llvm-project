@@ -1970,6 +1970,11 @@ bool NumericalStabilitySanitizer::sanitizeFunction(
       F.isDeclaration())
     return false;
 
+  // __attribute__(disable_sanitizer_instrumentation) prevents all kinds of
+  // instrumentation.
+  if (F.hasFnAttribute(Attribute::DisableSanitizerInstrumentation))
+    return false;
+
   // This is required to prevent instrumenting call to __nsan_init from within
   // the module constructor.
   if (F.getName() == kNsanModuleCtorName)
