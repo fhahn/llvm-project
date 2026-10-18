@@ -42,6 +42,7 @@
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/TypeSize.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
+#include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 
 using namespace llvm;
 using namespace LoopVectorizationUtils;
@@ -2845,12 +2846,14 @@ void VPlanTransforms::replaceSymbolicStrides(
     RewriteMap[StrideV] = StrideExpr;
   }
 
+  // The entry block is executed before the stride checks.
+  SCEVExpander Expander(*PSE.getSE(), "");
   for (VPExpandSCEVRecipe &ExpSCEV :
        make_isa_range<VPExpandSCEVRecipe>(*Plan.getEntry())) {
     const SCEV *ScevExpr = ExpSCEV.getSCEV();
     auto *NewSCEV =
         SCEVParameterRewriter::rewrite(ScevExpr, *PSE.getSE(), RewriteMap);
-    if (NewSCEV != ScevExpr) {
+    if (NewSCEV != ScevExpr && Expander.isSafeToExpand(NewSCEV)) {
       VPValue *NewExp = vputils::getOrCreateVPValueForSCEVExpr(Plan, NewSCEV);
       ExpSCEV.replaceAllUsesWith(NewExp);
       if (Plan.getTripCount() == &ExpSCEV)
