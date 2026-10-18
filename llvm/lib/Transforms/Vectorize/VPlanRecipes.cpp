@@ -27,6 +27,7 @@
 #include "llvm/Analysis/IVDescriptors.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
+#include "llvm/IR/AttributeMask.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instruction.h"
@@ -2254,6 +2255,61 @@ void VPIRMetadata::print(raw_ostream &O, VPSlotTracker &SlotTracker) const {
 }
 #endif
 
+VPIRAttributes::VPIRAttributes(const CallInst &CI, FunctionType *WideTy,
+                               bool IsMaskedCall) {
+  assert(CI.arg_size() <= WideTy->getNumParams() &&
+         "widened call must take all scalar arguments");
+  LLVMContext &Ctx = CI.getContext();
+  AttributeList ScalarAttrs = CI.getAttributes();
+
+  // Only poison-generating attributes, as masked-off lanes may be poison.
+  // TODO: Support additional attributes.
+  static constexpr Attribute::AttrKind PropagatableAttrKinds[] = {
+      Attribute::Alignment, Attribute::NonNull, Attribute::NoFPClass,
+      Attribute::Range};
+
+  // Keep allowed attributes compatible with Ty.
+  auto Filter = [&](Type *Ty, AttributeSet AS) {
+    AttributeMask Incompatible = AttributeFuncs::typeIncompatible(Ty, AS);
+    AttrBuilder AB(Ctx);
+    for (Attribute::AttrKind K : PropagatableAttrKinds)
+      if (AS.hasAttribute(K) && !Incompatible.contains(K))
+        AB.addAttribute(AS.getAttribute(K));
+    return AttributeSet::get(Ctx, AB);
+  };
+
+  AttributeSet RetAttrs =
+      Filter(WideTy->getReturnType(), ScalarAttrs.getRetAttrs());
+
+  // For masked calls, only widened args of masked variants keep attributes;
+  // scalar (uniform or linear) args are shared by all lanes.
+  bool IsMaskedVariant = WideTy->getNumParams() > CI.arg_size();
+  SmallVector<AttributeSet> ArgAttrs(WideTy->getNumParams());
+  for (unsigned I = 0, E = CI.arg_size(); I != E; ++I) {
+    Type *WideArgTy = WideTy->getParamType(I);
+    bool IsWidenedArg = WideArgTy != CI.getArgOperand(I)->getType();
+    if (IsMaskedCall && (!IsMaskedVariant || !IsWidenedArg))
+      continue;
+    ArgAttrs[I] = Filter(WideArgTy, ScalarAttrs.getParamAttrs(I));
+  }
+
+  CallAttrs = AttributeList::get(Ctx, AttributeSet(), RetAttrs, ArgAttrs);
+}
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+void VPIRAttributes::printRetAttrs(raw_ostream &O) const {
+  AttributeSet RetAttrs = CallAttrs.getRetAttrs();
+  if (RetAttrs.hasAttributes())
+    O << RetAttrs.getAsString() << " ";
+}
+
+void VPIRAttributes::printParamAttrs(raw_ostream &O, unsigned ArgIdx) const {
+  AttributeSet PA = CallAttrs.getParamAttrs(ArgIdx);
+  if (PA.hasAttributes())
+    O << PA.getAsString() << " ";
+}
+#endif
+
 void VPWidenCallRecipe::execute(VPTransformState &State) {
   assert(State.VF.isVector() && "not widening");
   assert(Variant != nullptr && "Can't create vector function.");
@@ -2281,6 +2337,7 @@ void VPWidenCallRecipe::execute(VPTransformState &State) {
   CallInst *V = State.Builder.CreateCall(Variant, Args, OpBundles);
   applyFlags(*V);
   applyMetadata(*V);
+  applyAttrs(*V);
   V->setCallingConv(Variant->getCallingConv());
 
   if (!V->getType()->isVoidTy())
@@ -2328,10 +2385,14 @@ void VPWidenCallRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
 
   O << "call";
   printFlags(O);
+  printRetAttrs(O);
   O << "@" << CalledFn->getName() << "(";
-  interleaveComma(args(), O, [&O, &SlotTracker](VPValue *Op) {
-    Op->printAsOperand(O, SlotTracker);
-  });
+  interleaveComma(enumerate(args()), O,
+                  [&O, &SlotTracker, this](const auto &IndexedOp) {
+                    auto [Idx, Op] = IndexedOp;
+                    printParamAttrs(O, Idx);
+                    Op->printAsOperand(O, SlotTracker);
+                  });
   O << ")";
 
   O << " (using library function";

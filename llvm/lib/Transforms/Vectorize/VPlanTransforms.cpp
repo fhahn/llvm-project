@@ -6232,8 +6232,10 @@ bool VPlanTransforms::makeCallWideningDecisions(VPlan &Plan, VFRange &Range,
           Ops.push_back(Mask);
         }
         Ops.push_back(VPI.getOperand(VPI.getNumOperandsWithoutMask() - 1));
+        VPIRAttributes Attrs(*CI, Decision.Variant->getFunctionType(),
+                             VPI.isMasked());
         Replacement = new VPWidenCallRecipe(CI, Decision.Variant, Ops, VPI, VPI,
-                                            VPI.getDebugLoc());
+                                            Attrs, VPI.getDebugLoc());
         Widened = true;
         break;
       }
