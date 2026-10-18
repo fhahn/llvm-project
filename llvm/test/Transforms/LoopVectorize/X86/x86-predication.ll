@@ -268,8 +268,8 @@ for.end:
   ret i32 %t7
 }
 
-; This test ensures that a GEP feeding the value of a predicated store is
-; scalarized and sunk together with the store.
+; Check that the GEP and ptrtoint are scalarized and sunk with the predicated
+; store. AVX-512 uses a masked scatter instead.
 define void @scalarize_and_sink_gep(ptr %src, ptr %dst, i1 %c, i64 %n) {
 ; CHECK-LABEL: define void @scalarize_and_sink_gep(
 ; CHECK-SAME: ptr [[SRC:%.*]], ptr [[DST:%.*]], i1 [[C:%.*]], i64 [[N:%.*]]) #[[ATTR0]] {
