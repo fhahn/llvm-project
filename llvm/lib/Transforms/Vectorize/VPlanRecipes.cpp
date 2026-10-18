@@ -2296,6 +2296,13 @@ VPIRAttributes::VPIRAttributes(const CallInst &CI, FunctionType *WideTy,
   CallAttrs = AttributeList::get(Ctx, AttributeSet(), RetAttrs, ArgAttrs);
 }
 
+void VPIRAttributes::intersectAttrs(const VPIRAttributes &Other,
+                                    LLVMContext &Ctx) {
+  // All stored attributes can be dropped.
+  CallAttrs =
+      CallAttrs.intersectWith(Ctx, Other.CallAttrs).value_or(AttributeList());
+}
+
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 void VPIRAttributes::printRetAttrs(raw_ostream &O) const {
   AttributeSet RetAttrs = CallAttrs.getRetAttrs();

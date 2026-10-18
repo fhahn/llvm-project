@@ -1283,6 +1283,9 @@ public:
   /// Keeps the attributes of \p CI valid for a widened call of type \p WideTy.
   VPIRAttributes(const CallInst &CI, FunctionType *WideTy, bool IsMaskedCall);
 
+  /// Intersect with the attributes of \p Other.
+  void intersectAttrs(const VPIRAttributes &Other, LLVMContext &Ctx);
+
   /// Apply the stored attributes to \p WideCall.
   void applyAttrs(CallInst &WideCall) const {
     WideCall.setAttributes(CallAttrs);

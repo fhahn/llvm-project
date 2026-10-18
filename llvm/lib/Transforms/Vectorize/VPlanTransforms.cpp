@@ -2454,6 +2454,9 @@ void VPlanTransforms::cse(VPlan &Plan, const VPDominatorTree &VPDT) {
       // Only keep flags present on both V and Def.
       if (auto *RFlags = dyn_cast<VPRecipeWithIRFlags>(V))
         RFlags->intersectFlags(*cast<VPRecipeWithIRFlags>(Def));
+      // Only keep call attributes valid for both V and Def.
+      if (auto *Call = dyn_cast<VPWidenCallRecipe>(V))
+        Call->intersectAttrs(*cast<VPWidenCallRecipe>(Def), Plan.getContext());
       Def->replaceAllUsesWith(V);
     }
     LoadCSEMap.clear();

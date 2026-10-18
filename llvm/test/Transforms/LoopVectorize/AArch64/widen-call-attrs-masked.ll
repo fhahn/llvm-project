@@ -185,7 +185,7 @@ define void @masked_nofpclass_ret_cse_intersected(ptr noalias %a, ptr readonly %
 ; CHECK-NEXT:    [[ACTIVE_LANE_MASK:%.*]] = phi <vscale x 2 x i1> [ splat (i1 true), %[[VECTOR_PH]] ], [ [[ACTIVE_LANE_MASK_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr double, ptr [[B]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <vscale x 2 x double> @llvm.masked.load.nxv2f64.p0(ptr align 8 [[TMP2]], <vscale x 2 x i1> [[ACTIVE_LANE_MASK]], <vscale x 2 x double> poison)
-; CHECK-NEXT:    [[TMP3:%.*]] = call nofpclass(nan) <vscale x 2 x double> @sin_vector(<vscale x 2 x double> [[WIDE_MASKED_LOAD]], <vscale x 2 x i1> [[ACTIVE_LANE_MASK]])
+; CHECK-NEXT:    [[TMP3:%.*]] = call <vscale x 2 x double> @sin_vector(<vscale x 2 x double> [[WIDE_MASKED_LOAD]], <vscale x 2 x i1> [[ACTIVE_LANE_MASK]])
 ; CHECK-NEXT:    [[TMP4:%.*]] = fadd <vscale x 2 x double> [[TMP3]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr double, ptr [[A]], i64 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.nxv2f64.p0(<vscale x 2 x double> [[TMP4]], ptr align 8 [[TMP5]], <vscale x 2 x i1> [[ACTIVE_LANE_MASK]])
