@@ -586,6 +586,18 @@ bool RuntimePointerChecking::insert(Loop *Lp, Value *Ptr, const SCEV *PtrExpr,
   // Each arm of a forked pointer is only accessed in some iterations.
   const BasicBlock *AccessBlock =
       IsForked ? nullptr : getAccessBlock(Ptr, Lp, DC);
+  // Unless Ptr is accessed in every iteration, it may be undef or poison
+  // without the loop having UB, so freeze its bounds.
+  // FIXME: Freezing is only sound if poison bounds imply that Ptr is never
+  // accessed. If e.g. a step may be poison, Ptr may still be accessed in the
+  // first iteration, and the frozen bounds may not cover it. A poison step also
+  // does not cause UB if the loop only executes a single iteration, even if Ptr
+  // is accessed in every iteration.
+  if (AccessBlock != Lp->getHeader())
+    NeedsFreeze |= SCEVExprContains(PtrExpr, [](const SCEV *S) {
+      auto *U = dyn_cast<SCEVUnknown>(S);
+      return U && !isGuaranteedNotToBeUndefOrPoison(U->getValue());
+    });
   Pointers.emplace_back(Ptr, ScStart, ScEnd, WritePtr, DepSetId, ASId, PtrExpr,
                         NeedsFreeze, IsForked, AccessBlock);
   return true;

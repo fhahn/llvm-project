@@ -1737,7 +1737,8 @@ exit:
 ; The store to %dst is conditional, so %dst and %stride may be poison without
 ; causing UB. As %stride only feeds the step of %dst.off, the store may also
 ; execute in the first outer iteration with poison %stride.
-; FIXME: The runtime checks branch on poison if %dst or %stride is poison.
+; FIXME: The stride check branches on poison if %stride is poison, and the
+; frozen bounds may not cover the store in the first outer iteration.
 define void @conditional_store_unknown_outer_stride(ptr %dst, ptr %src, i64 %stride, i64 %m, i64 %n, i1 %c) {
 ; CHECK-LABEL: define void @conditional_store_unknown_outer_stride(
 ; CHECK-SAME: ptr [[DST:%.*]], ptr [[SRC:%.*]], i64 [[STRIDE:%.*]], i64 [[M:%.*]], i64 [[N:%.*]], i1 [[C:%.*]]) {
@@ -1760,8 +1761,10 @@ define void @conditional_store_unknown_outer_stride(ptr %dst, ptr %src, i64 %str
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP1]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC]], [[SCEVGEP]]
+; CHECK-NEXT:    [[DST_FR:%.*]] = freeze ptr [[DST]]
+; CHECK-NEXT:    [[SCEVGEP_FR:%.*]] = freeze ptr [[SCEVGEP]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST_FR]], [[SCEVGEP1]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC]], [[SCEVGEP_FR]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    [[STRIDE_CHECK:%.*]] = icmp slt i64 [[TMP5]], 0
 ; CHECK-NEXT:    [[TMP8:%.*]] = or i1 [[FOUND_CONFLICT]], [[STRIDE_CHECK]]

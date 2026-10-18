@@ -7,9 +7,11 @@ define i32 @inner_cfg(ptr %a, ptr %b, i64 %n, i1 %c) {
 ; CHECK-NEXT:  [[LOOP_LVER_CHECK:.*:]]
 ; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP0]]
+; CHECK-NEXT:    [[B_FR:%.*]] = freeze ptr [[B]]
+; CHECK-NEXT:    [[SCEVGEP_FR:%.*]] = freeze ptr [[SCEVGEP]]
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP0]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[SCEVGEP1]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[SCEVGEP]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B_FR]], [[SCEVGEP1]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[SCEVGEP_FR]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[LOOP_PH_LVER_ORIG:.*]], label %[[LOOP_PH:.*]]
 ; CHECK:       [[LOOP_PH_LVER_ORIG]]:

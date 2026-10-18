@@ -815,9 +815,11 @@ define void @sinkable_predicated_store(ptr %A, ptr %B) {
 ; UNROLL-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; UNROLL:       [[VECTOR_MEMCHECK]]:
 ; UNROLL-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[A]], i64 404
+; UNROLL-NEXT:    [[TMP12:%.*]] = freeze ptr [[A]]
+; UNROLL-NEXT:    [[TMP13:%.*]] = freeze ptr [[SCEVGEP]]
 ; UNROLL-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[B]], i64 404
-; UNROLL-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[SCEVGEP1]]
-; UNROLL-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[SCEVGEP]]
+; UNROLL-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP12]], [[SCEVGEP1]]
+; UNROLL-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[TMP13]]
 ; UNROLL-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; UNROLL-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; UNROLL:       [[VECTOR_PH]]:
@@ -871,9 +873,11 @@ define void @sinkable_predicated_store(ptr %A, ptr %B) {
 ; UNROLL-NOSIMPLIFY-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; UNROLL-NOSIMPLIFY:       [[VECTOR_MEMCHECK]]:
 ; UNROLL-NOSIMPLIFY-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[A]], i64 404
+; UNROLL-NOSIMPLIFY-NEXT:    [[TMP12:%.*]] = freeze ptr [[A]]
+; UNROLL-NOSIMPLIFY-NEXT:    [[TMP13:%.*]] = freeze ptr [[SCEVGEP]]
 ; UNROLL-NOSIMPLIFY-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[B]], i64 404
-; UNROLL-NOSIMPLIFY-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[SCEVGEP1]]
-; UNROLL-NOSIMPLIFY-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[SCEVGEP]]
+; UNROLL-NOSIMPLIFY-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP12]], [[SCEVGEP1]]
+; UNROLL-NOSIMPLIFY-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[TMP13]]
 ; UNROLL-NOSIMPLIFY-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; UNROLL-NOSIMPLIFY-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; UNROLL-NOSIMPLIFY:       [[VECTOR_PH]]:
@@ -927,9 +931,11 @@ define void @sinkable_predicated_store(ptr %A, ptr %B) {
 ; VEC-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; VEC:       [[VECTOR_MEMCHECK]]:
 ; VEC-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[A]], i64 404
+; VEC-NEXT:    [[TMP9:%.*]] = freeze ptr [[A]]
+; VEC-NEXT:    [[TMP10:%.*]] = freeze ptr [[SCEVGEP]]
 ; VEC-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[B]], i64 404
-; VEC-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[SCEVGEP1]]
-; VEC-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[SCEVGEP]]
+; VEC-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP9]], [[SCEVGEP1]]
+; VEC-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[TMP10]]
 ; VEC-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; VEC-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; VEC:       [[VECTOR_PH]]:
@@ -1013,6 +1019,8 @@ define void @hoistable_predicated_store(ptr %A, ptr %B, ptr %C, ptr %D) {
 ; UNROLL-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[B]], i64 4
 ; UNROLL-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[D]], i64 404
 ; UNROLL-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[A]], i64 4
+; UNROLL-NEXT:    [[TMP4:%.*]] = freeze ptr [[A]]
+; UNROLL-NEXT:    [[TMP5:%.*]] = freeze ptr [[SCEVGEP3]]
 ; UNROLL-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[C]], [[SCEVGEP1]]
 ; UNROLL-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[SCEVGEP]]
 ; UNROLL-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
@@ -1020,16 +1028,16 @@ define void @hoistable_predicated_store(ptr %A, ptr %B, ptr %C, ptr %D) {
 ; UNROLL-NEXT:    [[BOUND15:%.*]] = icmp ult ptr [[D]], [[SCEVGEP]]
 ; UNROLL-NEXT:    [[FOUND_CONFLICT6:%.*]] = and i1 [[BOUND04]], [[BOUND15]]
 ; UNROLL-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT6]]
-; UNROLL-NEXT:    [[BOUND07:%.*]] = icmp ult ptr [[C]], [[SCEVGEP3]]
-; UNROLL-NEXT:    [[BOUND18:%.*]] = icmp ult ptr [[A]], [[SCEVGEP]]
+; UNROLL-NEXT:    [[BOUND07:%.*]] = icmp ult ptr [[C]], [[TMP5]]
+; UNROLL-NEXT:    [[BOUND18:%.*]] = icmp ult ptr [[TMP4]], [[SCEVGEP]]
 ; UNROLL-NEXT:    [[FOUND_CONFLICT9:%.*]] = and i1 [[BOUND07]], [[BOUND18]]
 ; UNROLL-NEXT:    [[CONFLICT_RDX10:%.*]] = or i1 [[CONFLICT_RDX]], [[FOUND_CONFLICT9]]
 ; UNROLL-NEXT:    [[BOUND011:%.*]] = icmp ult ptr [[B]], [[SCEVGEP2]]
 ; UNROLL-NEXT:    [[BOUND112:%.*]] = icmp ult ptr [[D]], [[SCEVGEP1]]
 ; UNROLL-NEXT:    [[FOUND_CONFLICT13:%.*]] = and i1 [[BOUND011]], [[BOUND112]]
 ; UNROLL-NEXT:    [[CONFLICT_RDX14:%.*]] = or i1 [[CONFLICT_RDX10]], [[FOUND_CONFLICT13]]
-; UNROLL-NEXT:    [[BOUND015:%.*]] = icmp ult ptr [[B]], [[SCEVGEP3]]
-; UNROLL-NEXT:    [[BOUND116:%.*]] = icmp ult ptr [[A]], [[SCEVGEP1]]
+; UNROLL-NEXT:    [[BOUND015:%.*]] = icmp ult ptr [[B]], [[TMP5]]
+; UNROLL-NEXT:    [[BOUND116:%.*]] = icmp ult ptr [[TMP4]], [[SCEVGEP1]]
 ; UNROLL-NEXT:    [[FOUND_CONFLICT17:%.*]] = and i1 [[BOUND015]], [[BOUND116]]
 ; UNROLL-NEXT:    [[CONFLICT_RDX18:%.*]] = or i1 [[CONFLICT_RDX14]], [[FOUND_CONFLICT17]]
 ; UNROLL-NEXT:    br i1 [[CONFLICT_RDX18]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
@@ -1079,6 +1087,8 @@ define void @hoistable_predicated_store(ptr %A, ptr %B, ptr %C, ptr %D) {
 ; UNROLL-NOSIMPLIFY-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[B]], i64 4
 ; UNROLL-NOSIMPLIFY-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[D]], i64 404
 ; UNROLL-NOSIMPLIFY-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[A]], i64 4
+; UNROLL-NOSIMPLIFY-NEXT:    [[TMP4:%.*]] = freeze ptr [[A]]
+; UNROLL-NOSIMPLIFY-NEXT:    [[TMP5:%.*]] = freeze ptr [[SCEVGEP3]]
 ; UNROLL-NOSIMPLIFY-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[C]], [[SCEVGEP1]]
 ; UNROLL-NOSIMPLIFY-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[SCEVGEP]]
 ; UNROLL-NOSIMPLIFY-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
@@ -1086,16 +1096,16 @@ define void @hoistable_predicated_store(ptr %A, ptr %B, ptr %C, ptr %D) {
 ; UNROLL-NOSIMPLIFY-NEXT:    [[BOUND15:%.*]] = icmp ult ptr [[D]], [[SCEVGEP]]
 ; UNROLL-NOSIMPLIFY-NEXT:    [[FOUND_CONFLICT6:%.*]] = and i1 [[BOUND04]], [[BOUND15]]
 ; UNROLL-NOSIMPLIFY-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT6]]
-; UNROLL-NOSIMPLIFY-NEXT:    [[BOUND07:%.*]] = icmp ult ptr [[C]], [[SCEVGEP3]]
-; UNROLL-NOSIMPLIFY-NEXT:    [[BOUND18:%.*]] = icmp ult ptr [[A]], [[SCEVGEP]]
+; UNROLL-NOSIMPLIFY-NEXT:    [[BOUND07:%.*]] = icmp ult ptr [[C]], [[TMP5]]
+; UNROLL-NOSIMPLIFY-NEXT:    [[BOUND18:%.*]] = icmp ult ptr [[TMP4]], [[SCEVGEP]]
 ; UNROLL-NOSIMPLIFY-NEXT:    [[FOUND_CONFLICT9:%.*]] = and i1 [[BOUND07]], [[BOUND18]]
 ; UNROLL-NOSIMPLIFY-NEXT:    [[CONFLICT_RDX10:%.*]] = or i1 [[CONFLICT_RDX]], [[FOUND_CONFLICT9]]
 ; UNROLL-NOSIMPLIFY-NEXT:    [[BOUND011:%.*]] = icmp ult ptr [[B]], [[SCEVGEP2]]
 ; UNROLL-NOSIMPLIFY-NEXT:    [[BOUND112:%.*]] = icmp ult ptr [[D]], [[SCEVGEP1]]
 ; UNROLL-NOSIMPLIFY-NEXT:    [[FOUND_CONFLICT13:%.*]] = and i1 [[BOUND011]], [[BOUND112]]
 ; UNROLL-NOSIMPLIFY-NEXT:    [[CONFLICT_RDX14:%.*]] = or i1 [[CONFLICT_RDX10]], [[FOUND_CONFLICT13]]
-; UNROLL-NOSIMPLIFY-NEXT:    [[BOUND015:%.*]] = icmp ult ptr [[B]], [[SCEVGEP3]]
-; UNROLL-NOSIMPLIFY-NEXT:    [[BOUND116:%.*]] = icmp ult ptr [[A]], [[SCEVGEP1]]
+; UNROLL-NOSIMPLIFY-NEXT:    [[BOUND015:%.*]] = icmp ult ptr [[B]], [[TMP5]]
+; UNROLL-NOSIMPLIFY-NEXT:    [[BOUND116:%.*]] = icmp ult ptr [[TMP4]], [[SCEVGEP1]]
 ; UNROLL-NOSIMPLIFY-NEXT:    [[FOUND_CONFLICT17:%.*]] = and i1 [[BOUND015]], [[BOUND116]]
 ; UNROLL-NOSIMPLIFY-NEXT:    [[CONFLICT_RDX18:%.*]] = or i1 [[CONFLICT_RDX14]], [[FOUND_CONFLICT17]]
 ; UNROLL-NOSIMPLIFY-NEXT:    br i1 [[CONFLICT_RDX18]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
@@ -1145,6 +1155,8 @@ define void @hoistable_predicated_store(ptr %A, ptr %B, ptr %C, ptr %D) {
 ; VEC-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[B]], i64 4
 ; VEC-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[D]], i64 404
 ; VEC-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[A]], i64 4
+; VEC-NEXT:    [[TMP4:%.*]] = freeze ptr [[A]]
+; VEC-NEXT:    [[TMP5:%.*]] = freeze ptr [[SCEVGEP3]]
 ; VEC-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[C]], [[SCEVGEP1]]
 ; VEC-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[SCEVGEP]]
 ; VEC-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
@@ -1152,16 +1164,16 @@ define void @hoistable_predicated_store(ptr %A, ptr %B, ptr %C, ptr %D) {
 ; VEC-NEXT:    [[BOUND15:%.*]] = icmp ult ptr [[D]], [[SCEVGEP]]
 ; VEC-NEXT:    [[FOUND_CONFLICT6:%.*]] = and i1 [[BOUND04]], [[BOUND15]]
 ; VEC-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT6]]
-; VEC-NEXT:    [[BOUND07:%.*]] = icmp ult ptr [[C]], [[SCEVGEP3]]
-; VEC-NEXT:    [[BOUND18:%.*]] = icmp ult ptr [[A]], [[SCEVGEP]]
+; VEC-NEXT:    [[BOUND07:%.*]] = icmp ult ptr [[C]], [[TMP5]]
+; VEC-NEXT:    [[BOUND18:%.*]] = icmp ult ptr [[TMP4]], [[SCEVGEP]]
 ; VEC-NEXT:    [[FOUND_CONFLICT9:%.*]] = and i1 [[BOUND07]], [[BOUND18]]
 ; VEC-NEXT:    [[CONFLICT_RDX10:%.*]] = or i1 [[CONFLICT_RDX]], [[FOUND_CONFLICT9]]
 ; VEC-NEXT:    [[BOUND011:%.*]] = icmp ult ptr [[B]], [[SCEVGEP2]]
 ; VEC-NEXT:    [[BOUND112:%.*]] = icmp ult ptr [[D]], [[SCEVGEP1]]
 ; VEC-NEXT:    [[FOUND_CONFLICT13:%.*]] = and i1 [[BOUND011]], [[BOUND112]]
 ; VEC-NEXT:    [[CONFLICT_RDX14:%.*]] = or i1 [[CONFLICT_RDX10]], [[FOUND_CONFLICT13]]
-; VEC-NEXT:    [[BOUND015:%.*]] = icmp ult ptr [[B]], [[SCEVGEP3]]
-; VEC-NEXT:    [[BOUND116:%.*]] = icmp ult ptr [[A]], [[SCEVGEP1]]
+; VEC-NEXT:    [[BOUND015:%.*]] = icmp ult ptr [[B]], [[TMP5]]
+; VEC-NEXT:    [[BOUND116:%.*]] = icmp ult ptr [[TMP4]], [[SCEVGEP1]]
 ; VEC-NEXT:    [[FOUND_CONFLICT17:%.*]] = and i1 [[BOUND015]], [[BOUND116]]
 ; VEC-NEXT:    [[CONFLICT_RDX18:%.*]] = or i1 [[CONFLICT_RDX14]], [[FOUND_CONFLICT17]]
 ; VEC-NEXT:    br i1 [[CONFLICT_RDX18]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]

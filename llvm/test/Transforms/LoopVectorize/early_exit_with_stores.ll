@@ -1556,7 +1556,6 @@ exit:
 
 ; The early exit may be taken in the first iteration, so %dst and %src may be
 ; poison without causing UB.
-; FIXME: The runtime check for %dst and %src should be frozen.
 define void @store_after_early_exit_requiring_alias_check(ptr %dst, ptr %src, ptr noalias align 2 dereferenceable(40) readonly %pred) {
 ; CHECK-LABEL: define void @store_after_early_exit_requiring_alias_check(
 ; CHECK-SAME: ptr [[DST:%.*]], ptr [[SRC:%.*]], ptr noalias readonly align 2 dereferenceable(40) [[PRED:%.*]]) {
@@ -1568,7 +1567,8 @@ define void @store_after_early_exit_requiring_alias_check(ptr %dst, ptr %src, pt
 ; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[DST3]], [[SRC4]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], 1
 ; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP1]], 7
-; CHECK-NEXT:    br i1 [[DIFF_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[DIFF_CHECK_FR:%.*]] = freeze i1 [[DIFF_CHECK]]
+; CHECK-NEXT:    br i1 [[DIFF_CHECK_FR]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:

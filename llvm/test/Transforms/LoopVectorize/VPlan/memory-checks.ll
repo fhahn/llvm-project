@@ -202,11 +202,15 @@ define void @bound_is_addrec_of_sibling_loop(ptr %a, ptr %b, i64 %n, i64 %d, i1 
 ; CHECK-NEXT:    IR   %9 = add i64 %8, %5
 ; CHECK-NEXT:    IR   %10 = add i64 %6, %9
 ; CHECK-NEXT:    IR   %scevgep1 = getelementptr i8, ptr %b, i64 %10
+; CHECK-NEXT:    IR   %scevgep.fr = freeze ptr %scevgep
+; CHECK-NEXT:    IR   %scevgep1.fr = freeze ptr %scevgep1
 ; CHECK-NEXT:    IR   %11 = shl i64 %n, 3
 ; CHECK-NEXT:    IR   %12 = add i64 %11, -4
 ; CHECK-NEXT:    IR   %scevgep2 = getelementptr i8, ptr %a, i64 %12
-; CHECK-NEXT:    IR   %bound0 = icmp ult ptr %scevgep, %scevgep2
-; CHECK-NEXT:    IR   %bound1 = icmp ult ptr %a, %scevgep1
+; CHECK-NEXT:    IR   %a.fr = freeze ptr %a
+; CHECK-NEXT:    IR   %scevgep2.fr = freeze ptr %scevgep2
+; CHECK-NEXT:    IR   %bound0 = icmp ult ptr %scevgep.fr, %scevgep2.fr
+; CHECK-NEXT:    IR   %bound1 = icmp ult ptr %a.fr, %scevgep1.fr
 ; CHECK-NEXT:    IR   %found.conflict = and i1 %bound0, %bound1
 ; CHECK-NEXT:    EMIT branch-on-cond ir<%found.conflict>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
