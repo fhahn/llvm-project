@@ -1053,7 +1053,8 @@ define void @replicated_load_wide_store_derived_iv_and(ptr noalias %src, ptr %ds
 ; I64-NEXT:    [[TMP0:%.*]] = trunc i32 [[STEP]] to i1
 ; I64-NEXT:    [[TMP4:%.*]] = sext i1 [[TMP0]] to i32
 ; I64-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i32 [[STEP]], [[TMP4]]
-; I64-NEXT:    [[TMP13:%.*]] = or i1 [[TMP0]], [[IDENT_CHECK]]
+; I64-NEXT:    [[TMP2:%.*]] = freeze i1 [[IDENT_CHECK]]
+; I64-NEXT:    [[TMP13:%.*]] = or i1 [[TMP0]], [[TMP2]]
 ; I64-NEXT:    br i1 [[TMP13]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; I64:       [[VECTOR_PH]]:
 ; I64-NEXT:    [[TMP14:%.*]] = shl i32 [[STEP]], 7
@@ -1159,7 +1160,8 @@ define void @replicated_load_wide_store_derived_iv_zext_and2(ptr noalias %dst, p
 ; I64-NEXT:    [[TMP0:%.*]] = trunc i32 [[STEP]] to i1
 ; I64-NEXT:    [[TMP4:%.*]] = sext i1 [[TMP0]] to i32
 ; I64-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i32 [[STEP]], [[TMP4]]
-; I64-NEXT:    [[TMP5:%.*]] = or i1 [[TMP0]], [[IDENT_CHECK]]
+; I64-NEXT:    [[TMP2:%.*]] = freeze i1 [[IDENT_CHECK]]
+; I64-NEXT:    [[TMP5:%.*]] = or i1 [[TMP0]], [[TMP2]]
 ; I64-NEXT:    br i1 [[TMP5]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; I64:       [[VECTOR_PH]]:
 ; I64-NEXT:    [[TMP6:%.*]] = shl i32 [[STEP]], 7

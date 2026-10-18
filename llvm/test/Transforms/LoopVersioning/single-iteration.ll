@@ -15,7 +15,8 @@ define double @single_iteration_unknown_stride(i32 %x, ptr %y, i1 %cond) {
 ; CHECK-NEXT:    [[SEXT7:%.*]] = sext i32 [[X]] to i64
 ; CHECK-NEXT:    [[GEP8:%.*]] = getelementptr i8, ptr [[Y]], i64 8
 ; CHECK-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i32 [[X]], 1
-; CHECK-NEXT:    br i1 [[IDENT_CHECK]], label %[[LOOP_BODY_PH_LVER_ORIG:.*]], label %[[LOOP_BODY_PH:.*]]
+; CHECK-NEXT:    [[TMP0:%.*]] = freeze i1 [[IDENT_CHECK]]
+; CHECK-NEXT:    br i1 [[TMP0]], label %[[LOOP_BODY_PH_LVER_ORIG:.*]], label %[[LOOP_BODY_PH:.*]]
 ; CHECK:       [[LOOP_BODY_PH_LVER_ORIG]]:
 ; CHECK-NEXT:    br label %[[LOOP_BODY_LVER_ORIG:.*]]
 ; CHECK:       [[LOOP_BODY_LVER_ORIG]]:

@@ -16,7 +16,8 @@ define void @unknown_stride_known_dependence(ptr %x, ptr %y, i1 %cond) {
 ; CHECK-NEXT:    [[GEP_8:%.*]] = getelementptr i8, ptr [[Y]], i64 8
 ; CHECK-NEXT:    [[GEP_16:%.*]] = getelementptr i8, ptr [[Y]], i64 16
 ; CHECK-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i32 [[LOAD]], 1
-; CHECK-NEXT:    br i1 [[IDENT_CHECK]], label %[[LOOP_PH_LVER_ORIG:.*]], label %[[LOOP_PH:.*]]
+; CHECK-NEXT:    [[TMP0:%.*]] = freeze i1 [[IDENT_CHECK]]
+; CHECK-NEXT:    br i1 [[TMP0]], label %[[LOOP_PH_LVER_ORIG:.*]], label %[[LOOP_PH:.*]]
 ; CHECK:       [[LOOP_PH_LVER_ORIG]]:
 ; CHECK-NEXT:    br label %[[LOOP_LVER_ORIG:.*]]
 ; CHECK:       [[LOOP_LVER_ORIG]]:

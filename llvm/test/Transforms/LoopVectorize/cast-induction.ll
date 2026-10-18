@@ -324,7 +324,8 @@ define void @test_start_zext(i32 %start, ptr %dst) {
 ; VF4-NEXT:    br label %[[VECTOR_SCEVCHECK:.*]]
 ; VF4:       [[VECTOR_SCEVCHECK]]:
 ; VF4-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i32 [[START]], 1
-; VF4-NEXT:    br i1 [[IDENT_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; VF4-NEXT:    [[TMP0:%.*]] = freeze i1 [[IDENT_CHECK]]
+; VF4-NEXT:    br i1 [[TMP0]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; VF4:       [[VECTOR_PH]]:
 ; VF4-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; VF4:       [[VECTOR_BODY]]:

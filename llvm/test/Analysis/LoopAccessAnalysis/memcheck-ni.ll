@@ -29,7 +29,8 @@ define void @test(ptr %arg) {
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr addrspace(13) [[I9]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[I13]], 1
-; CHECK-NEXT:    [[LVER_SAFE:%.*]] = or i1 [[FOUND_CONFLICT]], [[IDENT_CHECK]]
+; CHECK-NEXT:    [[TMP1:%.*]] = freeze i1 [[IDENT_CHECK]]
+; CHECK-NEXT:    [[LVER_SAFE:%.*]] = or i1 [[FOUND_CONFLICT]], [[TMP1]]
 ; CHECK-NEXT:    br i1 [[LVER_SAFE]], label [[L74_PH_LVER_ORIG:%.*]], label [[L74_PH:%.*]]
 ; CHECK:       L74.ph.lver.orig:
 ; CHECK-NEXT:    br label [[L74_LVER_ORIG:%.*]]

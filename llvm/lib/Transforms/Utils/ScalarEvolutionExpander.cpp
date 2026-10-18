@@ -2269,8 +2269,11 @@ Value *SCEVExpander::expandComparePredicate(const SCEVComparePredicate *Pred,
 
   Builder.SetInsertPoint(IP);
   auto InvPred = ICmpInst::getInversePredicate(Pred->getPredicate());
-  auto *I = Builder.CreateICmp(InvPred, Expr0, Expr1, "ident.check");
-  return I;
+  Value *Check = Builder.CreateICmp(InvPred, Expr0, Expr1, "ident.check");
+  if (!SE.isGuaranteedNotToBePoison(Pred->getLHS()) ||
+      !SE.isGuaranteedNotToBePoison(Pred->getRHS()))
+    Check = Builder.CreateFreeze(Check);
+  return Check;
 }
 
 Value *SCEVExpander::generateOverflowCheck(const SCEVAddRecExpr *AR,

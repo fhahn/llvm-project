@@ -706,7 +706,8 @@ define void @strided_ptr_iv_runtime_stride(ptr %pIn, ptr %pOut, i32 %nCols, i32 
 ; STRIDED-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
 ; STRIDED:       vector.scevcheck:
 ; STRIDED-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i32 [[STRIDE:%.*]], 1
-; STRIDED-NEXT:    br i1 [[IDENT_CHECK]], label [[SCALAR_PH]], label [[VECTOR_MEMCHECK:%.*]]
+; STRIDED-NEXT:    [[TMP12:%.*]] = freeze i1 [[IDENT_CHECK]]
+; STRIDED-NEXT:    br i1 [[TMP12]], label [[SCALAR_PH]], label [[VECTOR_MEMCHECK:%.*]]
 ; STRIDED:       vector.memcheck:
 ; STRIDED-NEXT:    [[TMP4:%.*]] = sub i64 [[POUT1]], [[PIN2]]
 ; STRIDED-NEXT:    [[TMP5:%.*]] = sub i64 [[TMP4]], 1

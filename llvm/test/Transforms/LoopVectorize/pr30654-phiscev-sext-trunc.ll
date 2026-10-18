@@ -61,7 +61,8 @@ define void @doit1(i32 %n, i32 %step) {
 ; CHECK-NEXT:    [[TMP14:%.*]] = or i1 [[TMP10]], [[TMP13]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = sext i8 [[TMP1]] to i32
 ; CHECK-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i32 [[STEP]], [[TMP15]]
-; CHECK-NEXT:    [[TMP16:%.*]] = or i1 [[TMP14]], [[IDENT_CHECK]]
+; CHECK-NEXT:    [[TMP17:%.*]] = freeze i1 [[IDENT_CHECK]]
+; CHECK-NEXT:    [[TMP16:%.*]] = or i1 [[TMP14]], [[TMP17]]
 ; CHECK-NEXT:    br i1 [[TMP16]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[WIDE_TRIP_COUNT]], 3
@@ -180,7 +181,8 @@ define void @doit2(i32 %n, i32 %step)  {
 ; CHECK-NEXT:    [[TMP13:%.*]] = or i1 [[TMP9]], [[TMP12]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = sext i8 [[TMP1]] to i32
 ; CHECK-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i32 [[STEP]], [[TMP14]]
-; CHECK-NEXT:    [[TMP15:%.*]] = or i1 [[TMP13]], [[IDENT_CHECK]]
+; CHECK-NEXT:    [[TMP16:%.*]] = freeze i1 [[IDENT_CHECK]]
+; CHECK-NEXT:    [[TMP15:%.*]] = or i1 [[TMP13]], [[TMP16]]
 ; CHECK-NEXT:    br i1 [[TMP15]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[WIDE_TRIP_COUNT]], 3

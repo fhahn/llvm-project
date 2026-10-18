@@ -427,7 +427,8 @@ define void @single_stride_int_iv(ptr %p, i64 %stride) vscale_range(2, 1024) {
 ; NOSTRIDED-NEXT:    br label %[[VECTOR_SCEVCHECK:.*]]
 ; NOSTRIDED:       [[VECTOR_SCEVCHECK]]:
 ; NOSTRIDED-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[STRIDE]], 1
-; NOSTRIDED-NEXT:    br i1 [[IDENT_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; NOSTRIDED-NEXT:    [[TMP0:%.*]] = freeze i1 [[IDENT_CHECK]]
+; NOSTRIDED-NEXT:    br i1 [[TMP0]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; NOSTRIDED:       [[VECTOR_PH]]:
 ; NOSTRIDED-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; NOSTRIDED:       [[VECTOR_BODY]]:
@@ -470,7 +471,8 @@ define void @single_stride_int_iv(ptr %p, i64 %stride) vscale_range(2, 1024) {
 ; NOSTRIDED-UF2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; NOSTRIDED-UF2:       [[VECTOR_SCEVCHECK]]:
 ; NOSTRIDED-UF2-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[STRIDE]], 1
-; NOSTRIDED-UF2-NEXT:    br i1 [[IDENT_CHECK]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; NOSTRIDED-UF2-NEXT:    [[TMP2:%.*]] = freeze i1 [[IDENT_CHECK]]
+; NOSTRIDED-UF2-NEXT:    br i1 [[TMP2]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; NOSTRIDED-UF2:       [[VECTOR_PH]]:
 ; NOSTRIDED-UF2-NEXT:    [[TMP5:%.*]] = shl nuw i64 [[TMP0]], 2
 ; NOSTRIDED-UF2-NEXT:    [[N_MOD_VF:%.*]] = urem i64 1024, [[TMP1]]
@@ -916,7 +918,8 @@ define void @double_stride_int_iv(ptr %p, ptr %p2, i64 %stride) vscale_range(2, 
 ; NOSTRIDED-NEXT:    br label %[[VECTOR_SCEVCHECK:.*]]
 ; NOSTRIDED:       [[VECTOR_SCEVCHECK]]:
 ; NOSTRIDED-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[STRIDE]], 1
-; NOSTRIDED-NEXT:    br i1 [[IDENT_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; NOSTRIDED-NEXT:    [[TMP0:%.*]] = freeze i1 [[IDENT_CHECK]]
+; NOSTRIDED-NEXT:    br i1 [[TMP0]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; NOSTRIDED:       [[VECTOR_PH]]:
 ; NOSTRIDED-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; NOSTRIDED:       [[VECTOR_BODY]]:
@@ -960,7 +963,8 @@ define void @double_stride_int_iv(ptr %p, ptr %p2, i64 %stride) vscale_range(2, 
 ; NOSTRIDED-UF2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; NOSTRIDED-UF2:       [[VECTOR_SCEVCHECK]]:
 ; NOSTRIDED-UF2-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[STRIDE]], 1
-; NOSTRIDED-UF2-NEXT:    br i1 [[IDENT_CHECK]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; NOSTRIDED-UF2-NEXT:    [[TMP2:%.*]] = freeze i1 [[IDENT_CHECK]]
+; NOSTRIDED-UF2-NEXT:    br i1 [[TMP2]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; NOSTRIDED-UF2:       [[VECTOR_PH]]:
 ; NOSTRIDED-UF2-NEXT:    [[TMP5:%.*]] = shl nuw i64 [[TMP0]], 2
 ; NOSTRIDED-UF2-NEXT:    [[N_MOD_VF:%.*]] = urem i64 1024, [[TMP1]]

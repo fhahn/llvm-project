@@ -507,6 +507,7 @@ define void @test_interleave_group_epilogue_with_preheader_phi(ptr %src, ptr %ds
 ; CHECK-NEXT:    [[TMP4:%.*]] = sub i4 0, [[TMP3]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = zext i4 [[TMP4]] to i64
 ; CHECK-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[TMP5]], 0
+; CHECK-NEXT:    [[TMP24:%.*]] = freeze i1 [[IDENT_CHECK]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 0, [[SRC1]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = lshr i64 [[TMP6]], 4
 ; CHECK-NEXT:    [[MUL:%.*]] = call { i64, i1 } @llvm.umul.with.overflow.i64(i64 16, i64 [[TMP7]])
@@ -519,7 +520,7 @@ define void @test_interleave_group_epilogue_with_preheader_phi(ptr %src, ptr %ds
 ; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr [[SCEVGEP]], i64 [[MUL_RESULT]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp ult ptr [[TMP11]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = or i1 [[TMP12]], [[MUL_OVERFLOW]]
-; CHECK-NEXT:    [[TMP14:%.*]] = or i1 [[IDENT_CHECK]], [[TMP10]]
+; CHECK-NEXT:    [[TMP14:%.*]] = or i1 [[TMP24]], [[TMP10]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = or i1 [[TMP14]], [[TMP13]]
 ; CHECK-NEXT:    br i1 [[TMP15]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VECTOR_MAIN_LOOP_ITER_CHECK:.*]]
 ; CHECK:       [[VECTOR_MAIN_LOOP_ITER_CHECK]]:

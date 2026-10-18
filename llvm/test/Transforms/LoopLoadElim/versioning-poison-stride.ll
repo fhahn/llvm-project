@@ -7,7 +7,8 @@ define void @stride_used_conditionally(ptr noalias %a, ptr noalias %b, i64 %stri
 ; CHECK-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], i64 [[STRIDE:%.*]], i64 [[X:%.*]]) {
 ; CHECK-NEXT:  [[LOOP_HEADER_LVER_CHECK:.*:]]
 ; CHECK-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[STRIDE]], 1
-; CHECK-NEXT:    br i1 [[IDENT_CHECK]], label %[[LOOP_HEADER_PH_LVER_ORIG:.*]], label %[[LOOP_HEADER_PH:.*]]
+; CHECK-NEXT:    [[TMP0:%.*]] = freeze i1 [[IDENT_CHECK]]
+; CHECK-NEXT:    br i1 [[TMP0]], label %[[LOOP_HEADER_PH_LVER_ORIG:.*]], label %[[LOOP_HEADER_PH:.*]]
 ; CHECK:       [[LOOP_HEADER_PH_LVER_ORIG]]:
 ; CHECK-NEXT:    br label %[[LOOP_HEADER_LVER_ORIG:.*]]
 ; CHECK:       [[LOOP_HEADER_LVER_ORIG]]:
