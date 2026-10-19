@@ -845,7 +845,7 @@ static bool generatesVector(const VPValue *V) {
       .Default(true);
 }
 
-void VPlanTransforms::materializeUnpacks(VPlan &Plan) {
+void VPlanTransforms::materializeUnpacksAndPacks(VPlan &Plan) {
   if (Plan.hasScalarVFOnly())
     return;
 
@@ -899,6 +899,27 @@ void VPlanTransforms::materializeUnpacks(VPlan &Plan) {
         assert(!R.isPhi() && "phis only use scalars of the first lane");
         R.setOperand(Idx,
                      VPBuilder(&R).createNaryOp(VPInstruction::Unpack, {Op}));
+      }
+
+      // Pack scalars generated per lane for vector users. Results of replicate
+      // regions are packed in the first block after the region and any
+      // directly following regions.
+      for (VPValue *Def : R.definedValues()) {
+        if ((!isa<VPPredInstPHIRecipe>(&R) &&
+             !vputils::doesGeneratePerAllLanes(&R)) ||
+            vputils::onlyScalarValuesUsed(Def))
+          continue;
+        auto Builder = VPBuilder::getToInsertAfter(&R);
+        if (isa<VPPredInstPHIRecipe>(&R)) {
+          VPBlockBase *Succ = VPBB->getParent()->getSingleSuccessor();
+          while (isa<VPRegionBlock>(Succ))
+            Succ = Succ->getSingleSuccessor();
+          auto *SuccVPBB = cast<VPBasicBlock>(Succ);
+          Builder.setInsertPoint(SuccVPBB, SuccVPBB->getFirstNonPhi());
+        }
+        auto *Pack = Builder.createNaryOp(VPInstruction::Pack, {Def});
+        Def->replaceUsesWithIf(
+            Pack, [Def](VPUser *U) { return !U->usesScalars(Def); });
       }
     }
   }

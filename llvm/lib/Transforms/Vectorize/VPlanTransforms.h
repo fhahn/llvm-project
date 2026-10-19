@@ -500,8 +500,9 @@ struct VPlanTransforms {
                                             VPBasicBlock *VectorPH);
 
   /// Add explicit Unpacks, or extracts of the first lane, for recipes using
-  /// scalars of values generated as vectors.
-  static void materializeUnpacks(VPlan &Plan);
+  /// scalars of values generated as vectors, and Packs for vector users of
+  /// values generated as scalars for all lanes.
+  static void materializeUnpacksAndPacks(VPlan &Plan);
 
   /// Materialize UF, VF and VFxUF to be computed explicitly using
   /// VPInstructions.

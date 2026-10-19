@@ -1369,6 +1369,10 @@ public:
     /// scalars extracted from a vector, to be replaced by VF ExtractElement
     /// VPInstructions.
     Unpack,
+    /// Packs the scalars generated for all lanes by its single operand into a
+    /// vector. This is an abstract VPInstruction, to be replaced by a
+    /// BuildVector of the lane values when replicating by VF.
+    Pack,
     /// Reduce the operands to the final reduction result using the operation
     /// specified via the operation's VPIRFlags.
     ComputeReductionResult,
@@ -1602,7 +1606,7 @@ public:
   /// Returns true if the recipe only uses scalars of operand \p Op.
   bool usesScalars(const VPValue *Op) const override {
     return doesGenerateSingleScalar() || getOpcode() == VPInstruction::PtrAdd ||
-           usesFirstLaneOnly(Op);
+           getOpcode() == VPInstruction::Pack || usesFirstLaneOnly(Op);
   }
 
   /// Returns true if the recipe only uses the first part of operand \p Op.
@@ -3791,6 +3795,13 @@ public:
                               VPCostContext &Ctx) const override {
     // TODO: Compute accurate cost after retiring the legacy cost model.
     return 0;
+  }
+
+  /// Returns true if the recipe uses scalars of operand \p Op.
+  bool usesScalars(const VPValue *Op) const override {
+    assert(is_contained(operands(), Op) &&
+           "Op must be an operand of the recipe");
+    return true;
   }
 
 protected:

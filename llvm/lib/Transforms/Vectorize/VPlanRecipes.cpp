@@ -680,6 +680,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case VPInstruction::Not:
   case VPInstruction::Reverse:
   case VPInstruction::Unpack:
+  case VPInstruction::Pack:
   case VPInstruction::NumActiveLanes:
     return 1;
   case Instruction::ICmp:
@@ -1768,6 +1769,7 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
   case VPInstruction::ReductionStartVector:
   case VPInstruction::Reverse:
   case VPInstruction::Unpack:
+  case VPInstruction::Pack:
     return false;
   case VPInstruction::Intrinsic: {
     LLVMContext &Ctx = getScalarType()->getContext();
@@ -1956,6 +1958,9 @@ void VPInstruction::printRecipe(raw_ostream &O, const Twine &Indent,
     break;
   case VPInstruction::Unpack:
     O << "unpack";
+    break;
+  case VPInstruction::Pack:
+    O << "pack";
     break;
   case VPInstruction::ExtractLastActive:
     O << "extract-last-active";

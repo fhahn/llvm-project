@@ -873,6 +873,12 @@ static void dissolveReplicateRegion(VPRegionBlock *Region, ElementCount VF,
   SmallVector<VPInstruction *> BuildVectors;
   for (auto &R : FirstLaneExiting->phis()) {
     auto *Phi = cast<VPPhi>(&R);
+    // Replace the Pack of the phi by the phi, whose vector users are replaced
+    // by the BuildVector below.
+    if (auto *Pack = findUserOf<VPInstruction::Pack>(Phi)) {
+      Pack->replaceAllUsesWith(Phi);
+      Pack->eraseFromParent();
+    }
     if (vputils::onlyFirstLaneUsed(Phi))
       continue;
 
@@ -1004,12 +1010,15 @@ void VPlanTransforms::replicateByVF(VPlan &Plan, ElementCount VF) {
             cloneForLane(Plan, Builder, IdxTy, DefR, VPLane(I), Def2LaneDefs));
 
       Def2LaneDefs[DefR] = LaneDefs;
-      // Pack the lanes for vector users.
-      if (!vputils::onlyScalarValuesUsed(DefR)) {
-        DefR->replaceUsesWithIf(
-            Builder.createNaryOp(VPInstruction::BuildVector, LaneDefs),
-            [DefR](VPUser *U) { return !U->usesScalars(DefR); });
+      // Replace the Pack of DefR by a BuildVector of its lanes.
+      if (auto *Pack = findUserOf<VPInstruction::Pack>(DefR)) {
+        Pack->replaceAllUsesWith(
+            VPBuilder(Pack).createNaryOp(VPInstruction::BuildVector, LaneDefs));
+        Pack->setOperand(0, Plan.getPoison(Pack->getScalarType()));
+        ToRemove.push_back(Pack);
       }
+      assert(vputils::onlyScalarValuesUsed(DefR) &&
+             "vector users must be packed explicitly");
       /// Users that only demand the first lane can use the definition for lane
       /// 0.
       DefR->replaceUsesWithIf(LaneDefs[0], [DefR](VPUser *U) {
