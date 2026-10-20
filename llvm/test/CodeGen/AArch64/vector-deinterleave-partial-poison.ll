@@ -8,6 +8,13 @@
 define i32 @deinterleave3_low_poison_v12i32(<4 x i32> %b, <4 x i32> %c) {
 ; CHECK-LABEL: deinterleave3_low_poison_v12i32:
 ; CHECK:       // %bb.0:
+; CHECK-NEXT:    sub sp, sp, #48
+; CHECK-NEXT:    .cfi_def_cfa_offset 48
+; CHECK-NEXT:    mov x8, sp
+; CHECK-NEXT:    stp q0, q1, [sp, #16]
+; CHECK-NEXT:    ld3 { v0.4s, v1.4s, v2.4s }, [x8]
+; CHECK-NEXT:    mov w0, v0.s[3]
+; CHECK-NEXT:    add sp, sp, #48
 ; CHECK-NEXT:    ret
   %v = shufflevector <4 x i32> %b, <4 x i32> %c, <12 x i32> <i32 poison, i32 poison, i32 poison, i32 poison, i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
   %d = call { <4 x i32>, <4 x i32>, <4 x i32> } @llvm.vector.deinterleave3.v12i32(<12 x i32> %v)
@@ -20,6 +27,17 @@ define i32 @deinterleave3_low_poison_v12i32(<4 x i32> %b, <4 x i32> %c) {
 define i32 @deinterleave3_low_poison_v9i32(<3 x i32> %y) {
 ; CHECK-LABEL: deinterleave3_low_poison_v9i32:
 ; CHECK:       // %bb.0:
+; CHECK-NEXT:    sub sp, sp, #112
+; CHECK-NEXT:    .cfi_def_cfa_offset 112
+; CHECK-NEXT:    mov s1, v0.s[2]
+; CHECK-NEXT:    dup v2.2d, v0.d[0]
+; CHECK-NEXT:    mov x8, sp
+; CHECK-NEXT:    str s1, [sp, #80]
+; CHECK-NEXT:    ldr q0, [sp, #80]
+; CHECK-NEXT:    stp q2, q0, [sp, #16]
+; CHECK-NEXT:    ld3 { v0.4s, v1.4s, v2.4s }, [x8]
+; CHECK-NEXT:    mov w0, v0.s[2]
+; CHECK-NEXT:    add sp, sp, #112
 ; CHECK-NEXT:    ret
   %v = shufflevector <3 x i32> %y, <3 x i32> poison, <9 x i32> <i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 0, i32 1, i32 2>
   %d = call { <3 x i32>, <3 x i32>, <3 x i32> } @llvm.vector.deinterleave3.v9i32(<9 x i32> %v)
@@ -32,6 +50,7 @@ define i32 @deinterleave3_low_poison_v9i32(<3 x i32> %y) {
 define <vscale x 4 x i32> @deinterleave2_low_poison_nxv8i32(<vscale x 4 x i32> %b) {
 ; CHECK-LABEL: deinterleave2_low_poison_nxv8i32:
 ; CHECK:       // %bb.0:
+; CHECK-NEXT:    uzp1 z0.s, z0.s, z0.s
 ; CHECK-NEXT:    ret
   %v = call <vscale x 8 x i32> @llvm.vector.insert.nxv8i32.nxv4i32(<vscale x 8 x i32> poison, <vscale x 4 x i32> %b, i64 4)
   %d = call { <vscale x 4 x i32>, <vscale x 4 x i32> } @llvm.vector.deinterleave2.nxv8i32(<vscale x 8 x i32> %v)
