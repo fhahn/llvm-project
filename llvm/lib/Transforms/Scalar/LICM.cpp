@@ -2079,6 +2079,15 @@ static SmallVector<PointersAndHasReadsOutsideSet, 0> collectPromotionCandidates(
     MemorySSA *MSSA, AliasAnalysis *AA, DominatorTree *DT,
     ICFLoopSafetyInfo *SafetyInfo,
     const SmallPtrSetImpl<const MDNode *> &LoopLocalAliasScopes, Loop *L) {
+  // Only sets that contain a store can be promoted, as loads only add Ref.
+  // Avoid building the alias sets if there is no potentially promotable store.
+  bool HasPromotableStore = false;
+  foreachMemoryAccess(MSSA, L, [&](Instruction *I) {
+    HasPromotableStore |= isa<StoreInst>(I) && isPotentiallyPromotable(I, L);
+  });
+  if (!HasPromotableStore)
+    return {};
+
   BatchAAResults BatchAA(*AA);
   AliasSetTracker AST(BatchAA);
 
