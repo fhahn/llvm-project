@@ -7944,8 +7944,10 @@ SDValue SelectionDAG::FoldConstantArithmetic(unsigned Opcode, const SDLoc &DL,
 
   // Handle binops special cases.
   if (NumOps == 2) {
-    if (SDValue CFP = foldConstantFPMath(Opcode, DL, VT, Ops))
-      return CFP;
+    // Only floating-point results can be folded as FP math.
+    if (VT.isFloatingPoint())
+      if (SDValue CFP = foldConstantFPMath(Opcode, DL, VT, Ops))
+        return CFP;
 
     if (auto *C1 = dyn_cast<ConstantSDNode>(Ops[0])) {
       if (auto *C2 = dyn_cast<ConstantSDNode>(Ops[1])) {
