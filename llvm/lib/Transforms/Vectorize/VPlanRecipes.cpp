@@ -49,6 +49,25 @@ using namespace llvm::VPlanPatternMatch;
 #define LV_NAME "loop-vectorize"
 #define DEBUG_TYPE LV_NAME
 
+/// For call VPInstruction operands, return the operand index of the called
+/// function. The function is either the last operand (for unmasked calls) or
+/// the second-to-last operand (for masked calls).
+static unsigned getCalledFnOperandIndex(ArrayRef<VPValue *> Operands) {
+  unsigned NumOps = Operands.size();
+  auto *LastOp = dyn_cast<VPIRValue>(Operands[NumOps - 1]);
+  if (LastOp && isa<Function>(LastOp->getValue()))
+    return NumOps - 1;
+  assert(isa<Function>(cast<VPIRValue>(Operands[NumOps - 2])->getValue()) &&
+         "expected function operand");
+  return NumOps - 2;
+}
+
+/// For call VPInstruction operands, return the called function.
+static Function *getCalledFunction(ArrayRef<VPValue *> Operands) {
+  unsigned Idx = getCalledFnOperandIndex(Operands);
+  return cast<Function>(cast<VPIRValue>(Operands[Idx])->getValue());
+}
+
 bool VPRecipeBase::mayWriteToMemory() const {
   switch (getVPRecipeID()) {
   case VPExpressionSC:
@@ -189,6 +208,13 @@ bool VPRecipeBase::mayHaveSideEffects() const {
     return false;
   case VPInstructionSC: {
     auto *VPI = cast<VPInstruction>(this);
+    if (VPI->getOpcode() == Instruction::Call) {
+      AttributeSet CalleeFnAttrs =
+          getCalledFunction(VPI->operands())->getAttributes().getFnAttrs();
+      return mayWriteToMemory() ||
+             !VPI->hasFnAttr(Attribute::NoUnwind, CalleeFnAttrs) ||
+             !VPI->hasFnAttr(Attribute::WillReturn, CalleeFnAttrs);
+    }
     return mayWriteToMemory() ||
            VPI->getOpcode() == VPInstruction::BranchOnCount ||
            VPI->getOpcode() == VPInstruction::BranchOnCond ||
@@ -440,25 +466,6 @@ VPExpandSCEVRecipe::VPExpandSCEVRecipe(const SCEV *Expr)
     : VPSingleDefRecipe(VPRecipeBase::VPExpandSCEVSC, {}, Expr->getType()),
       Expr(Expr) {}
 
-/// For call VPInstruction operands, return the operand index of the called
-/// function. The function is either the last operand (for unmasked calls) or
-/// the second-to-last operand (for masked calls).
-static unsigned getCalledFnOperandIndex(ArrayRef<VPValue *> Operands) {
-  unsigned NumOps = Operands.size();
-  auto *LastOp = dyn_cast<VPIRValue>(Operands[NumOps - 1]);
-  if (LastOp && isa<Function>(LastOp->getValue()))
-    return NumOps - 1;
-  assert(isa<Function>(cast<VPIRValue>(Operands[NumOps - 2])->getValue()) &&
-         "expected function operand");
-  return NumOps - 2;
-}
-
-/// For call VPInstruction operands, return the called function.
-static Function *getCalledFunction(ArrayRef<VPValue *> Operands) {
-  unsigned Idx = getCalledFnOperandIndex(Operands);
-  return cast<Function>(cast<VPIRValue>(Operands[Idx])->getValue());
-}
-
 static SmallVector<unsigned> getExtractValueIndices(ArrayRef<VPValue *> Ops) {
   return map_to_vector(drop_begin(Ops), [](VPValue *Op) {
     return unsigned(cast<VPConstantInt>(Op)->getZExtValue());
@@ -620,13 +627,15 @@ Type *VPReplicateRecipe::computeScalarType(const Instruction *I,
 
 VPInstruction::VPInstruction(unsigned Opcode, ArrayRef<VPValue *> Operands,
                              const VPIRFlags &Flags, const VPIRMetadata &MD,
-                             DebugLoc DL, const Twine &Name, Type *ResultTy)
+                             DebugLoc DL, const Twine &Name, Type *ResultTy,
+                             const VPIRAttributes &Attrs)
     : VPRecipeWithIRFlags(
           VPRecipeBase::VPInstructionSC, Operands,
           ResultTy ? ResultTy
                    : computeScalarTypeForInstruction(Opcode, Operands),
           Flags, DL),
-      VPIRMetadata(MD), Opcode(Opcode), Name(Name.str()) {
+      VPIRMetadata(MD), VPIRAttributes(Attrs), Opcode(Opcode),
+      Name(Name.str()) {
   assert(flagsValidForOpcode(getOpcode()) &&
          "Set flags not supported for the provided opcode");
   assert(hasRequiredFlagsForOpcode(getOpcode(), getScalarType()) &&
@@ -1781,7 +1790,9 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
     return !Attrs.getMemoryEffects().doesNotAccessMemory();
   }
   case Instruction::Call:
-    return !getCalledFunction(operands())->doesNotAccessMemory();
+    return !getMemoryEffects(
+                getCalledFunction(operands())->getAttributes().getFnAttrs())
+                .doesNotAccessMemory();
   default:
     return true;
   }

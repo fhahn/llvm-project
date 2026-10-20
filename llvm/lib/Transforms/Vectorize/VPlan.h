@@ -1273,13 +1273,16 @@ public:
 #endif
 };
 
-/// Manage IR per-argument and return attributes for call recipes. Only
-/// attributes that are valid to propagate to the widened call are stored.
+/// Manage IR attributes for call recipes. Call VPInstructions store all
+/// call-site attributes. Widened calls only store return and per-argument
+/// attributes that are valid to propagate to the widened call.
 class VPIRAttributes {
   AttributeList CallAttrs;
 
 public:
   VPIRAttributes() = default;
+
+  explicit VPIRAttributes(AttributeList CallAttrs) : CallAttrs(CallAttrs) {}
 
   /// Stores the return and per-arg attributes of \p CI that are valid for a
   /// widened call with type \p WideTy. If \p IsMaskedCall is true, the scalar
@@ -1293,6 +1296,17 @@ public:
   /// Apply the stored attributes to the widened call \p WideCall.
   void applyAttrs(CallInst &WideCall) const {
     WideCall.setAttributes(CallAttrs);
+  }
+
+  /// Returns the memory effects of a call with these attributes to a callee
+  /// with function attributes \p CalleeFnAttrs.
+  MemoryEffects getMemoryEffects(AttributeSet CalleeFnAttrs) const {
+    return CallAttrs.getMemoryEffects() & CalleeFnAttrs.getMemoryEffects();
+  }
+
+  /// Returns true if the call site or \p CalleeFnAttrs has \p Kind.
+  bool hasFnAttr(Attribute::AttrKind Kind, AttributeSet CalleeFnAttrs) const {
+    return CallAttrs.hasFnAttr(Kind) || CalleeFnAttrs.hasAttribute(Kind);
   }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
@@ -1311,7 +1325,8 @@ public:
 /// opcodes can take an optional mask. Masks may be assigned during
 /// predication.
 class LLVM_ABI_FOR_TEST VPInstruction : public VPRecipeWithIRFlags,
-                                        public VPIRMetadata {
+                                        public VPIRMetadata,
+                                        public VPIRAttributes {
 public:
   /// VPlan opcodes, extending LLVM IR with idiomatics instructions.
   enum {
@@ -1485,7 +1500,7 @@ public:
   VPInstruction(unsigned Opcode, ArrayRef<VPValue *> Operands,
                 const VPIRFlags &Flags = {}, const VPIRMetadata &MD = {},
                 DebugLoc DL = DebugLoc::getUnknown(), const Twine &Name = "",
-                Type *ResultTy = nullptr);
+                Type *ResultTy = nullptr, const VPIRAttributes &Attrs = {});
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPInstructionSC)
 
@@ -1496,7 +1511,7 @@ public:
   VPInstruction *cloneWithOperands(ArrayRef<VPValue *> NewOperands,
                                    Type *ResultTy = nullptr) {
     auto *New = new VPInstruction(Opcode, NewOperands, *this, *this,
-                                  getDebugLoc(), Name, ResultTy);
+                                  getDebugLoc(), Name, ResultTy, *this);
     if (getUnderlyingValue())
       New->setUnderlyingValue(getUnderlyingInstr());
     return New;
