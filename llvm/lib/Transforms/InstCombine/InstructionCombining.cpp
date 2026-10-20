@@ -36,6 +36,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -6116,7 +6117,7 @@ public:
 /// whose condition is a known constant, we only visit the reachable successors.
 bool InstCombinerImpl::prepareWorklist(Function &F) {
   bool MadeIRChange = false;
-  SmallPtrSet<BasicBlock *, 32> LiveBlocks;
+  BitVector LiveBlocks(F.getMaxBlockNumber());
   SmallVector<Instruction *, 128> InstrsForInstructionWorklist;
   DenseMap<Constant *, Constant *> FoldedConstants;
   AliasScopeTracker SeenAliasScopes;
@@ -6139,7 +6140,7 @@ bool InstCombinerImpl::prepareWorklist(Function &F) {
       HandleOnlyLiveSuccessor(BB, nullptr);
       continue;
     }
-    LiveBlocks.insert(BB);
+    LiveBlocks.set(BB->getNumber());
 
     for (Instruction &Inst : llvm::make_early_inc_range(*BB)) {
       // ConstantProp instruction if trivially constant.
@@ -6216,7 +6217,7 @@ bool InstCombinerImpl::prepareWorklist(Function &F) {
   // instcombine code from having to deal with some bad special cases, and
   // reduces use counts of instructions.
   for (BasicBlock &BB : F) {
-    if (LiveBlocks.count(&BB))
+    if (LiveBlocks.test(BB.getNumber()))
       continue;
 
     unsigned NumDeadInstInBB;
