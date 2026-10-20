@@ -387,10 +387,52 @@ inner.latch:
   br i1 %ec, label %outer.header, label %inner.header
 }
 
+; Peeling the first 7 iterations exceeds the max peel count due to the already
+; peeled iteration. Make sure we don't fall back to peeling the last iteration.
+define void @already_peeled_first_count_exceeds_max(i32 %n) {
+; CHECK-LABEL: define void @already_peeled_first_count_exceeds_max(
+; CHECK-SAME: i32 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[C:%.*]] = icmp ult i32 [[IV]], 2
+; CHECK-NEXT:    [[SEL:%.*]] = select i1 [[C]], i32 10, i32 20
+; CHECK-NEXT:    call void @foo(i32 [[SEL]])
+; CHECK-NEXT:    [[UMIN:%.*]] = call i32 @llvm.umin.i32(i32 [[IV]], i32 7)
+; CHECK-NEXT:    call void @foo(i32 [[UMIN]])
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw i32 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i32 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]], !llvm.loop [[LOOP5:![0-9]+]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i32 [ 0, %entry ], [ %iv.next, %loop ]
+  %c = icmp ult i32 %iv, 2
+  %sel = select i1 %c, i32 10, i32 20
+  call void @foo(i32 %sel)
+  %umin = call i32 @llvm.umin.i32(i32 %iv, i32 7)
+  call void @foo(i32 %umin)
+  %iv.next = add nuw i32 %iv, 1
+  %ec = icmp eq i32 %iv.next, %n
+  br i1 %ec, label %exit, label %loop, !llvm.loop !0
+
+exit:
+  ret void
+}
+
+!0 = distinct !{!0, !1}
+!1 = !{!"llvm.loop.peeled.count", i32 1}
+
 ;.
 ; CHECK: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]]}
 ; CHECK: [[META1]] = !{!"llvm.loop.peeled.count", i32 1}
 ; CHECK: [[LOOP2]] = distinct !{[[LOOP2]], [[META1]]}
 ; CHECK: [[LOOP3]] = distinct !{[[LOOP3]], [[META1]]}
 ; CHECK: [[LOOP4]] = distinct !{[[LOOP4]], [[META1]]}
+; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META1]]}
 ;.
