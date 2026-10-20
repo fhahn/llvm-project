@@ -3274,6 +3274,11 @@ SDValue DAGCombiner::foldAddToAvg(SDNode *N, const SDLoc &DL) {
   EVT VT = N0.getValueType();
   SDValue A, B;
 
+  // All patterns below add a right shift, directly or through an inner add.
+  auto Shift = m_AnyOf(m_SpecificOpc(ISD::SRL), m_SpecificOpc(ISD::SRA));
+  if (!sd_match(N, m_Add(m_Value(), m_AnyOf(Shift, m_Add(m_Value(), Shift)))))
+    return SDValue();
+
   if ((!LegalOperations || hasOperation(ISD::AVGFLOORU, VT)) &&
       (sd_match(N,
                 m_Add(m_And(m_Value(A), m_Value(B)),
