@@ -1001,8 +1001,9 @@ void MachineCopyPropagation::forwardCopyPropagateBlock(MachineBasicBlock &MBB) {
              "MachineCopyPropagation should be run after register allocation!");
 
       if (MO.isDef() && !MO.isEarlyClobber()) {
-        // Skip invalidating constant registers.
-        if (!MRI->isConstantPhysReg(Reg)) {
+        // Skip invalidating constant registers. MO defines Reg, so only the
+        // target can make it constant.
+        if (!TRI->isConstantPhysReg(Reg)) {
           Defs.push_back(Reg.asMCReg());
           continue;
         }
