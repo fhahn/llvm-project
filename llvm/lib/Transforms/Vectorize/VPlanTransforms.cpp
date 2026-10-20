@@ -180,7 +180,7 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
                    "calls with operand bundles must not be widened");
             NewRecipe = new VPWidenIntrinsicRecipe(
                 *CI, VectorID, drop_end(Ingredient.operands()), CI->getType(),
-                VPIRFlags(*CI), *VPI, CI->getDebugLoc());
+                VPIRFlags(*CI), *VPI, *VPI, CI->getDebugLoc());
           }
         } else if (auto *CI = dyn_cast<CastInst>(Inst)) {
           NewRecipe = new VPWidenCastRecipe(
@@ -6229,7 +6229,7 @@ bool VPlanTransforms::makeCallWideningDecisions(VPlan &Plan, VFRange &Range,
         Intrinsic::ID ID = getVectorIntrinsicIDForCall(CI, &CostCtx.TLI);
         Type *ResultTy = VPI.getScalarType();
         Replacement = new VPWidenIntrinsicRecipe(*CI, ID, Ops, ResultTy, VPI,
-                                                 VPI, VPI.getDebugLoc());
+                                                 VPI, VPI, VPI.getDebugLoc());
         Widened = true;
         break;
       }
