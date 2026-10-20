@@ -3526,13 +3526,13 @@ static bool handleUncountableExitsWithSideEffects(
   return true;
 }
 
-// Returns true if any non-branch recipe in the loop may have side effects.
-// For now this relies on LoopVectorizationLegality::isVectorizableEarlyExitLoop
-// rejecting loops with side effects other than stores.
-static bool loopMayHaveSideEffects(VPBasicBlock *HeaderVPBB) {
+// Returns true if any recipe in the loop may write to memory. Pseudo-probes are
+// modeled as writing inaccessible memory but do not access real memory.
+static bool loopMayWriteToMemory(VPBasicBlock *HeaderVPBB) {
   return any_of(vp_rpo_plain_cfg_loop_body(HeaderVPBB), [](VPBasicBlock *VPBB) {
     return any_of(*VPBB, [](VPRecipeBase &R) {
-      return match(&R, m_VPInstruction<Instruction::Store>());
+      return R.mayWriteToMemory() &&
+             !match(&R, m_Intrinsic<Intrinsic::pseudoprobe>());
     });
   });
 }
@@ -3548,7 +3548,7 @@ bool VPlanTransforms::handleUncountableEarlyExits(
   auto *MiddleVPBB = VPBlockUtils::getPlainCFGMiddleBlock(Plan);
   auto [HeaderVPBB, LatchVPBB] = VPBlockUtils::getPlainCFGHeaderAndLatch(Plan);
 
-  if (loopMayHaveSideEffects(HeaderVPBB))
+  if (loopMayWriteToMemory(HeaderVPBB))
     Style = UncountableExitStyle::MaskedHandleExitInScalarLoop;
 
   // Dereferenceability is checked separately for uncountable exit loops with
