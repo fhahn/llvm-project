@@ -389,3 +389,21 @@ define i8 @load_global_non_canonical_gep(i32 %idx) {
   %add = add i8 %load, %zext
   ret i8 %add
 }
+
+define i8 @load_global_repeated_index_zero_scale(i64 %idx) {
+; CHECK-LABEL: define i8 @load_global_repeated_index_zero_scale(
+; CHECK-SAME: i64 [[IDX:%.*]]) {
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr nuw [1 x [9223372036854775808 x i8]], ptr @g, i64 [[IDX]], i64 [[IDX]]
+; CHECK-NEXT:    [[LOAD:%.*]] = load i8, ptr [[GEP]], align 1
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ult i64 [[IDX]], 5
+; CHECK-NEXT:    [[ZEXT:%.*]] = zext i1 [[CMP]] to i8
+; CHECK-NEXT:    [[ADD:%.*]] = add i8 [[LOAD]], [[ZEXT]]
+; CHECK-NEXT:    ret i8 [[ADD]]
+;
+  %gep = getelementptr nuw [1 x [9223372036854775808 x i8]], ptr @g, i64 %idx, i64 %idx
+  %load = load i8, ptr %gep
+  %cmp = icmp ult i64 %idx, 5
+  %zext = zext i1 %cmp to i8
+  %add = add i8 %load, %zext
+  ret i8 %add
+}

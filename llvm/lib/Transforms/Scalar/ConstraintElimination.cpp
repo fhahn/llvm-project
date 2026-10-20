@@ -1458,7 +1458,7 @@ static bool getConstraintFromMemoryAccess(GetElementPtrInst &GEP,
   uint64_t BitWidth = Offset.ConstantOffset.getBitWidth();
   auto &[Index, Scale] = Offset.VariableOffsets.front();
   // Bail out on non-canonical GEPs.
-  if (Index->getType()->getScalarSizeInBits() != BitWidth)
+  if (Index->getType()->getScalarSizeInBits() != BitWidth || Scale.isZero())
     return false;
 
   // Index * Scale + ConstOffset + AccessSize <= AllocSize
