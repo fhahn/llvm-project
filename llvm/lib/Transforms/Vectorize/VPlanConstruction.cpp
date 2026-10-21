@@ -951,16 +951,57 @@ static bool tryToSinkOrHoistRecurrenceUsers(VPBasicBlock *HeaderVPBB,
   return true;
 }
 
+namespace {
+/// Rewrites affine AddRecs of loop L to their value in the previous iteration.
+struct SCEVShiftRewriter : public SCEVRewriteVisitor<SCEVShiftRewriter> {
+  const Loop &L;
+  bool Valid = true;
+
+  SCEVShiftRewriter(ScalarEvolution &SE, const Loop &L)
+      : SCEVRewriteVisitor(SE), L(L) {}
+
+  const SCEV *visitAddRecExpr(const SCEVAddRecExpr *Expr) {
+    if (Expr->getLoop() != &L)
+      return Expr;
+    Valid &= Expr->isAffine();
+    return SE.getMinusSCEV(Expr, Expr->getStepRecurrence(SE));
+  }
+};
+} // namespace
+
 /// If \p PhiR is an integer induction phi [Start, BackedgeVal], where
 /// BackedgeVal is a chain of adds and subs computing PhiR plus a non-zero
-/// loop-invariant step, return its induction descriptor.
+/// loop-invariant step, or BackedgeVal shifted to the previous iteration is an
+/// affine AddRec {Start, +, Step}, possibly under predicates, return its
+/// induction descriptor.
 static std::optional<InductionDescriptor>
 getIntInductionDescriptor(VPPhi *PhiR, PredicatedScalarEvolution &PSE,
-                          const Loop &L) {
+                          Loop &L) {
   Type *Ty = PhiR->getScalarType();
   if (!Ty->isIntegerTy())
     return std::nullopt;
   ScalarEvolution &SE = *PSE.getSE();
+  // Use a fresh PSE, so predicates already added to PSE don't hide the ones
+  // required by this induction.
+  PredicatedScalarEvolution EmptyPSE(SE, L);
+  const SCEV *BackedgeSCEV =
+      vputils::getSCEVExprForVPValue(PhiR->getOperand(1), EmptyPSE, &L);
+  if (!isa<SCEVCouldNotCompute>(BackedgeSCEV)) {
+    SCEVShiftRewriter Rewriter(SE, L);
+    const SCEV *PhiSCEV = Rewriter.visit(BackedgeSCEV);
+    if (!Rewriter.Valid)
+      return std::nullopt;
+    SmallVector<const SCEVPredicate *> Preds;
+    auto *AR = SE.convertSCEVToAddRecWithPredicates(PhiSCEV, &L, Preds);
+    if (!AR || !AR->isAffine() || AR->getLoop() != &L ||
+        AR->getStart() !=
+            vputils::getSCEVExprForVPValue(PhiR->getOperand(0), EmptyPSE, &L))
+      return std::nullopt;
+    return InductionDescriptor(cast<VPIRValue>(PhiR->getOperand(0))->getValue(),
+                               InductionDescriptor::IK_IntInduction,
+                               AR->getStepRecurrence(SE), nullptr, nullptr,
+                               Preds);
+  }
   SmallVector<SCEVUse> Terms;
   int PhiRCoeff = 0;
   SmallVector<std::pair<VPValue *, bool>> Worklist = {
@@ -1003,7 +1044,6 @@ static bool matchesLegalInduction(const InductionDescriptor &IndDesc,
   // VPlan's descriptor simpler than legality's.
   Instruction::BinaryOps LegalOpcode = LegalDesc.getInductionOpcode();
   return LegalDesc.getKind() == IndDesc.getKind() &&
-         LegalDesc.getNoWrapPredicates().empty() &&
          LegalDesc.getCastInsts().empty() &&
          PSE.getPredicatedSCEV(LegalDesc.getStep()) == IndDesc.getStep() &&
          (LegalOpcode == Opcode ||
@@ -1040,7 +1080,8 @@ bool VPlanTransforms::createHeaderPhiRecipes(
   assert(VPDT.dominates(HeaderVPBB, LatchVPBB) &&
          "header must dominate its latch");
 
-  auto CreateHeaderPhiRecipe = [&](VPPhi *PhiR) -> VPHeaderPHIRecipe * {
+  auto CreateHeaderPhiRecipe = [&](VPPhi *PhiR,
+                                   bool AllowFallback) -> VPHeaderPHIRecipe * {
     // TODO: Gradually replace uses of underlying instruction by analyses on
     // VPlan.
     auto *Phi = cast<PHINode>(PhiR->getUnderlyingInstr());
@@ -1064,8 +1105,10 @@ bool VPlanTransforms::createHeaderPhiRecipes(
     if (!Reductions.contains(Phi))
       IndDesc = getIntInductionDescriptor(PhiR, PSE, OrigLoop);
     if (IndDesc) {
-      auto Opcode = static_cast<Instruction::BinaryOps>(
-          cast<VPInstruction>(BackedgeValue)->getOpcode());
+      auto *Inc = dyn_cast<VPInstruction>(BackedgeValue);
+      auto Opcode = Inc && Instruction::isBinaryOp(Inc->getOpcode())
+                        ? static_cast<Instruction::BinaryOps>(Inc->getOpcode())
+                        : Instruction::BinaryOpsEnd;
       assert(
           InductionIt != Inductions.end() &&
           matchesLegalInduction(*IndDesc, Opcode, InductionIt->second, PSE) &&
@@ -1090,6 +1133,8 @@ bool VPlanTransforms::createHeaderPhiRecipes(
           static_cast<Instruction::BinaryOps>(Inc->getOpcode()),
           Inc->getFastMathFlagsOrNone(), {}, {}, Plan, PhiR->getDebugLoc());
     }
+    if (!AllowFallback && InductionIt != Inductions.end())
+      return nullptr;
     if (InductionIt != Inductions.end())
       return createWidenInductionRecipe(
           Phi, PhiR, Start, InductionIt->second,
@@ -1113,12 +1158,20 @@ bool VPlanTransforms::createHeaderPhiRecipes(
         RdxDesc.hasUsesOutsideReductionChain());
   };
 
-  for (VPRecipeBase &R : make_early_inc_range(HeaderVPBB->phis())) {
-    auto *PhiR = cast<VPPhi>(&R);
-    VPHeaderPHIRecipe *HeaderPhiR = CreateHeaderPhiRecipe(PhiR);
-    HeaderPhiR->insertBefore(PhiR);
-    PhiR->replaceAllUsesWith(HeaderPhiR);
-    PhiR->eraseFromParent();
+  // Integer induction phis depending on other inductions may only be detected
+  // once those have been converted, so only fall back to Inductions in a
+  // second pass.
+  for (bool AllowFallback : {false, true}) {
+    for (VPRecipeBase &R : make_early_inc_range(HeaderVPBB->phis())) {
+      auto *PhiR = dyn_cast<VPPhi>(&R);
+      VPHeaderPHIRecipe *HeaderPhiR =
+          PhiR ? CreateHeaderPhiRecipe(PhiR, AllowFallback) : nullptr;
+      if (!HeaderPhiR)
+        continue;
+      HeaderPhiR->insertBefore(PhiR);
+      PhiR->replaceAllUsesWith(HeaderPhiR);
+      PhiR->eraseFromParent();
+    }
   }
 
   if (!tryToSinkOrHoistRecurrenceUsers(HeaderVPBB, VPDT)) {
