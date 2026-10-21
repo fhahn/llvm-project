@@ -1358,6 +1358,11 @@ bool TargetLowering::SimplifyDemandedBits(
     return false;
   }
 
+  // Nothing is known about a copy from a register and there is nothing to
+  // simplify.
+  if (Op.getOpcode() == ISD::CopyFromReg)
+    return false;
+
   // Before folding to the LHS, recheck bits excluded from its earlier demand
   // using the full result demand. Mask identifies these excluded bits.
   // KnownMask selects the Zero/One member of the recomputed LHS known bits
