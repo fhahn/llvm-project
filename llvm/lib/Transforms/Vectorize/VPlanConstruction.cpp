@@ -969,10 +969,39 @@ struct SCEVShiftRewriter : public SCEVRewriteVisitor<SCEVShiftRewriter> {
 };
 } // namespace
 
+/// If \p V is zext(trunc(PhiR)) as (and PhiR, LowMask) or sext(trunc(PhiR)) as
+/// (ashr (shl PhiR, C), C), return the truncated type, set \p Signed and
+/// collect the cast instructions from \p V to \p PhiR in \p Casts.
+static Type *getCastedPhiTruncTy(VPValue *V, VPPhi *PhiR, bool &Signed,
+                                 SmallVectorImpl<Instruction *> &Casts) {
+  Type *Ty = PhiR->getScalarType();
+  unsigned BW = Ty->getScalarSizeInBits();
+  const APInt *Mask;
+  VPValue *Shl;
+  uint64_t ShlAmt, AShrAmt;
+  if (match(V, m_c_BinaryAnd(m_Specific(PhiR), m_APInt(Mask))) &&
+      Mask->isMask() && !Mask->isAllOnes()) {
+    Signed = false;
+    Casts.push_back(cast<Instruction>(V->getUnderlyingValue()));
+    return IntegerType::get(Ty->getContext(), Mask->countr_one());
+  }
+  if (!match(V, m_AShr(m_VPValue(Shl), m_ConstantInt(AShrAmt))) ||
+      !match(Shl, m_Shl(m_Specific(PhiR), m_ConstantInt(ShlAmt))) ||
+      ShlAmt != AShrAmt || ShlAmt == 0 || ShlAmt >= BW)
+    return nullptr;
+  Signed = true;
+  // Legality only records the casts if the inner cast has a single use.
+  if (Shl->getNumUsers() == 1)
+    Casts.append({cast<Instruction>(V->getUnderlyingValue()),
+                  cast<Instruction>(Shl->getUnderlyingValue())});
+  return IntegerType::get(Ty->getContext(), BW - ShlAmt);
+}
+
 /// If \p PhiR is an integer induction phi [Start, BackedgeVal], where
 /// BackedgeVal is a chain of adds and subs computing PhiR plus a non-zero
 /// loop-invariant step, or BackedgeVal shifted to the previous iteration is an
-/// affine AddRec {Start, +, Step}, possibly under predicates, return its
+/// affine AddRec {Start, +, Step}, possibly under predicates, or BackedgeVal
+/// adds a loop-invariant step to a cast of PhiR, under predicates, return its
 /// induction descriptor.
 static std::optional<InductionDescriptor>
 getIntInductionDescriptor(VPPhi *PhiR, PredicatedScalarEvolution &PSE,
@@ -1001,6 +1030,45 @@ getIntInductionDescriptor(VPPhi *PhiR, PredicatedScalarEvolution &PSE,
                                InductionDescriptor::IK_IntInduction,
                                AR->getStepRecurrence(SE), nullptr, nullptr,
                                Preds);
+  }
+  VPValue *CastV;
+  VPIRValue *InvV;
+  bool Signed;
+  SmallVector<Instruction *> Casts;
+  Type *TruncTy =
+      match(PhiR->getOperand(1), m_c_Add(m_VPValue(CastV), m_VPIRValue(InvV)))
+          ? getCastedPhiTruncTy(CastV, PhiR, Signed, Casts)
+          : nullptr;
+  if (TruncTy) {
+    const SCEV *Start =
+        vputils::getSCEVExprForVPValue(PhiR->getOperand(0), EmptyPSE, &L);
+    const SCEV *Accum = vputils::getSCEVExprForVPValue(InvV, EmptyPSE, &L);
+    auto GetExtended = [&](const SCEV *S, bool SExt) {
+      const SCEV *Trunc = SE.getTruncateExpr(S, TruncTy);
+      return SExt ? SE.getSignExtendExpr(Trunc, Ty)
+                  : SE.getZeroExtendExpr(Trunc, Ty);
+    };
+    const SCEV *AR = SE.getAddRecExpr(Start, Accum, &L, SCEV::FlagNone);
+    auto *NarrowAR = dyn_cast<SCEVAddRecExpr>(SE.getTruncateExpr(AR, TruncTy));
+    SmallVector<const SCEVPredicate *> Preds;
+    // Rejects wrap predicates known to be false.
+    if (!NarrowAR || !SE.convertSCEVToAddRecWithPredicates(
+                         GetExtended(AR, Signed), &L, Preds))
+      return std::nullopt;
+    Preds.assign({SE.getWrapPredicate(
+        NarrowAR, Signed ? SCEVWrapPredicate::IncrementNSSW
+                         : SCEVWrapPredicate::IncrementNUSW)});
+    for (auto [S, SExt] : {std::pair(Start, Signed), std::pair(Accum, true)}) {
+      const SCEV *Ext = GetExtended(S, SExt);
+      if (S == Ext || SE.isKnownPredicate(ICmpInst::ICMP_EQ, S, Ext))
+        continue;
+      if (SE.isKnownPredicate(ICmpInst::ICMP_NE, S, Ext))
+        return std::nullopt;
+      Preds.push_back(SE.getEqualPredicate(S, Ext));
+    }
+    return InductionDescriptor(cast<VPIRValue>(PhiR->getOperand(0))->getValue(),
+                               InductionDescriptor::IK_IntInduction, Accum,
+                               nullptr, &Casts, Preds);
   }
   SmallVector<SCEVUse> Terms;
   int PhiRCoeff = 0;
@@ -1044,8 +1112,10 @@ static bool matchesLegalInduction(const InductionDescriptor &IndDesc,
   // VPlan's descriptor simpler than legality's.
   Instruction::BinaryOps LegalOpcode = LegalDesc.getInductionOpcode();
   return LegalDesc.getKind() == IndDesc.getKind() &&
-         LegalDesc.getCastInsts().empty() &&
-         PSE.getPredicatedSCEV(LegalDesc.getStep()) == IndDesc.getStep() &&
+         (LegalDesc.getCastInsts() == IndDesc.getCastInsts() ||
+          LegalDesc.getCastInsts().empty()) &&
+         PSE.getPredicatedSCEV(LegalDesc.getStep()) ==
+             PSE.getPredicatedSCEV(IndDesc.getStep()) &&
          (LegalOpcode == Opcode ||
           (LegalOpcode != Instruction::Add && LegalOpcode != Instruction::Sub));
 }
