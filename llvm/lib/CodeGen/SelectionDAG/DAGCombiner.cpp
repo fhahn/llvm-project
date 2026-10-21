@@ -2179,8 +2179,11 @@ SDValue DAGCombiner::combine(SDNode *N) {
   if (!DebugCounter::shouldExecute(DAGCombineCounter))
     return SDValue();
 
+  // Generic combines only apply to nodes with operands, except TokenFactor,
+  // whose visitor may queue its user.
   SDValue RV;
-  if (!DisableGenericCombines)
+  if (!DisableGenericCombines &&
+      (N->getNumOperands() != 0 || N->getOpcode() == ISD::TokenFactor))
     RV = visit(N);
 
   // If nothing happened, try a target-specific DAG combine.
