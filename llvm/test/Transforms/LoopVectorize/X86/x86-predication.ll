@@ -267,3 +267,152 @@ for.end:
   %t7 = phi i32 [ %t6, %for.inc ]
   ret i32 %t7
 }
+
+; This test ensures that each lane loads its own pointer if the predicated load
+; accesses the address of the unconditional store via a single-incoming phi and
+; its result is used as address.
+define void @predicated_pointer_load_via_phi_used_as_address(ptr noalias %a, ptr noalias %b, ptr noalias %c, ptr noalias %d, i64 %n) {
+; CHECK-LABEL: define void @predicated_pointer_load_via_phi_used_as_address(
+; CHECK-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], ptr noalias [[C:%.*]], ptr noalias [[D:%.*]], i64 [[N:%.*]]) #[[ATTR0]] {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 2
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = and i64 [[N]], 1
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP0]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x ptr> poison, ptr [[D]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x ptr> [[BROADCAST_SPLATINSERT]], <2 x ptr> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP1]], align 4
+; CHECK-NEXT:    [[TMP2:%.*]] = icmp sgt <2 x i32> [[WIDE_LOAD]], zeroinitializer
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr ptr, ptr [[A]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <2 x ptr> @llvm.masked.load.v2p0.p0(ptr align 8 [[TMP3]], <2 x i1> [[TMP2]], <2 x ptr> poison)
+; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP2]], <2 x ptr> [[WIDE_MASKED_LOAD]], <2 x ptr> [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x ptr> [[PREDPHI]], i64 0
+; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <2 x ptr> [[PREDPHI]], i64 1
+; CHECK-NEXT:    [[TMP7:%.*]] = load i32, ptr [[TMP6]], align 4
+; CHECK-NEXT:    [[TMP8:%.*]] = insertelement <2 x i32> poison, i32 [[TMP5]], i64 0
+; CHECK-NEXT:    [[TMP9:%.*]] = insertelement <2 x i32> [[TMP8]], i32 [[TMP7]], i64 1
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i32, ptr [[C]], i64 [[INDEX]]
+; CHECK-NEXT:    store <2 x i32> [[TMP9]], ptr [[TMP10]], align 4
+; CHECK-NEXT:    store <2 x ptr> [[BROADCAST_SPLAT]], ptr [[TMP3]], align 8
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
+; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP11]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label %[[FOR_END:.*]], label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    br label %[[FOR_BODY:.*]]
+; CHECK:       [[FOR_BODY]]:
+; CHECK-NEXT:    [[I:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[I_NEXT:%.*]], %[[FOR_INC:.*]] ]
+; CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[I]]
+; CHECK-NEXT:    [[T1:%.*]] = load i32, ptr [[T0]], align 4
+; CHECK-NEXT:    [[CMP:%.*]] = icmp sgt i32 [[T1]], 0
+; CHECK-NEXT:    [[T2:%.*]] = getelementptr inbounds ptr, ptr [[A]], i64 [[I]]
+; CHECK-NEXT:    br i1 [[CMP]], label %[[IF_THEN:.*]], label %[[FOR_INC]]
+; CHECK:       [[IF_THEN]]:
+; CHECK-NEXT:    [[T3:%.*]] = phi ptr [ [[T2]], %[[FOR_BODY]] ]
+; CHECK-NEXT:    [[T4:%.*]] = load ptr, ptr [[T3]], align 8
+; CHECK-NEXT:    br label %[[FOR_INC]]
+; CHECK:       [[FOR_INC]]:
+; CHECK-NEXT:    [[T5:%.*]] = phi ptr [ [[T4]], %[[IF_THEN]] ], [ [[D]], %[[FOR_BODY]] ]
+; CHECK-NEXT:    [[T6:%.*]] = load i32, ptr [[T5]], align 4
+; CHECK-NEXT:    [[T7:%.*]] = getelementptr inbounds i32, ptr [[C]], i64 [[I]]
+; CHECK-NEXT:    store i32 [[T6]], ptr [[T7]], align 4
+; CHECK-NEXT:    store ptr [[D]], ptr [[T2]], align 8
+; CHECK-NEXT:    [[I_NEXT]] = add nuw nsw i64 [[I]], 1
+; CHECK-NEXT:    [[COND:%.*]] = icmp eq i64 [[I_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[COND]], label %[[FOR_END]], label %[[FOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
+; CHECK:       [[FOR_END]]:
+; CHECK-NEXT:    ret void
+;
+; SINK-GATHER-LABEL: define void @predicated_pointer_load_via_phi_used_as_address(
+; SINK-GATHER-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], ptr noalias [[C:%.*]], ptr noalias [[D:%.*]], i64 [[N:%.*]]) #[[ATTR0]] {
+; SINK-GATHER-NEXT:  [[ENTRY:.*]]:
+; SINK-GATHER-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 8
+; SINK-GATHER-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; SINK-GATHER:       [[VECTOR_PH]]:
+; SINK-GATHER-NEXT:    [[TMP0:%.*]] = and i64 [[N]], 7
+; SINK-GATHER-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP0]]
+; SINK-GATHER-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <8 x ptr> poison, ptr [[D]], i64 0
+; SINK-GATHER-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <8 x ptr> [[BROADCAST_SPLATINSERT]], <8 x ptr> poison, <8 x i32> zeroinitializer
+; SINK-GATHER-NEXT:    br label %[[VECTOR_BODY:.*]]
+; SINK-GATHER:       [[VECTOR_BODY]]:
+; SINK-GATHER-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; SINK-GATHER-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[INDEX]]
+; SINK-GATHER-NEXT:    [[WIDE_LOAD:%.*]] = load <8 x i32>, ptr [[TMP1]], align 4
+; SINK-GATHER-NEXT:    [[TMP2:%.*]] = icmp sgt <8 x i32> [[WIDE_LOAD]], zeroinitializer
+; SINK-GATHER-NEXT:    [[TMP3:%.*]] = getelementptr ptr, ptr [[A]], i64 [[INDEX]]
+; SINK-GATHER-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <8 x ptr> @llvm.masked.load.v8p0.p0(ptr align 8 [[TMP3]], <8 x i1> [[TMP2]], <8 x ptr> poison)
+; SINK-GATHER-NEXT:    [[PREDPHI:%.*]] = select <8 x i1> [[TMP2]], <8 x ptr> [[WIDE_MASKED_LOAD]], <8 x ptr> [[BROADCAST_SPLAT]]
+; SINK-GATHER-NEXT:    [[WIDE_MASKED_GATHER:%.*]] = call <8 x i32> @llvm.masked.gather.v8i32.v8p0(<8 x ptr> align 4 [[PREDPHI]], <8 x i1> splat (i1 true), <8 x i32> poison)
+; SINK-GATHER-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i32, ptr [[C]], i64 [[INDEX]]
+; SINK-GATHER-NEXT:    store <8 x i32> [[WIDE_MASKED_GATHER]], ptr [[TMP4]], align 4
+; SINK-GATHER-NEXT:    store <8 x ptr> [[BROADCAST_SPLAT]], ptr [[TMP3]], align 8
+; SINK-GATHER-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
+; SINK-GATHER-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; SINK-GATHER-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
+; SINK-GATHER:       [[MIDDLE_BLOCK]]:
+; SINK-GATHER-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; SINK-GATHER-NEXT:    br i1 [[CMP_N]], label %[[FOR_END:.*]], label %[[SCALAR_PH]]
+; SINK-GATHER:       [[SCALAR_PH]]:
+; SINK-GATHER-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
+; SINK-GATHER-NEXT:    br label %[[FOR_BODY:.*]]
+; SINK-GATHER:       [[FOR_BODY]]:
+; SINK-GATHER-NEXT:    [[I:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[I_NEXT:%.*]], %[[FOR_INC:.*]] ]
+; SINK-GATHER-NEXT:    [[T0:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[I]]
+; SINK-GATHER-NEXT:    [[T1:%.*]] = load i32, ptr [[T0]], align 4
+; SINK-GATHER-NEXT:    [[CMP:%.*]] = icmp sgt i32 [[T1]], 0
+; SINK-GATHER-NEXT:    [[T2:%.*]] = getelementptr inbounds ptr, ptr [[A]], i64 [[I]]
+; SINK-GATHER-NEXT:    br i1 [[CMP]], label %[[IF_THEN:.*]], label %[[FOR_INC]]
+; SINK-GATHER:       [[IF_THEN]]:
+; SINK-GATHER-NEXT:    [[T3:%.*]] = phi ptr [ [[T2]], %[[FOR_BODY]] ]
+; SINK-GATHER-NEXT:    [[T4:%.*]] = load ptr, ptr [[T3]], align 8
+; SINK-GATHER-NEXT:    br label %[[FOR_INC]]
+; SINK-GATHER:       [[FOR_INC]]:
+; SINK-GATHER-NEXT:    [[T5:%.*]] = phi ptr [ [[T4]], %[[IF_THEN]] ], [ [[D]], %[[FOR_BODY]] ]
+; SINK-GATHER-NEXT:    [[T6:%.*]] = load i32, ptr [[T5]], align 4
+; SINK-GATHER-NEXT:    [[T7:%.*]] = getelementptr inbounds i32, ptr [[C]], i64 [[I]]
+; SINK-GATHER-NEXT:    store i32 [[T6]], ptr [[T7]], align 4
+; SINK-GATHER-NEXT:    store ptr [[D]], ptr [[T2]], align 8
+; SINK-GATHER-NEXT:    [[I_NEXT]] = add nuw nsw i64 [[I]], 1
+; SINK-GATHER-NEXT:    [[COND:%.*]] = icmp eq i64 [[I_NEXT]], [[N]]
+; SINK-GATHER-NEXT:    br i1 [[COND]], label %[[FOR_END]], label %[[FOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
+; SINK-GATHER:       [[FOR_END]]:
+; SINK-GATHER-NEXT:    ret void
+;
+entry:
+  br label %for.body
+
+for.body:
+  %i = phi i64 [ 0, %entry ], [ %i.next, %for.inc ]
+  %t0 = getelementptr inbounds i32, ptr %b, i64 %i
+  %t1 = load i32, ptr %t0, align 4
+  %cmp = icmp sgt i32 %t1, 0
+  %t2 = getelementptr inbounds ptr, ptr %a, i64 %i
+  br i1 %cmp, label %if.then, label %for.inc
+
+if.then:
+  %t3 = phi ptr [ %t2, %for.body ]
+  %t4 = load ptr, ptr %t3, align 8
+  br label %for.inc
+
+for.inc:
+  %t5 = phi ptr [ %t4, %if.then ], [ %d, %for.body ]
+  %t6 = load i32, ptr %t5, align 4
+  %t7 = getelementptr inbounds i32, ptr %c, i64 %i
+  store i32 %t6, ptr %t7, align 4
+  store ptr %d, ptr %t2, align 8
+  %i.next = add nuw nsw i64 %i, 1
+  %cond = icmp eq i64 %i.next, %n
+  br i1 %cond, label %for.end, label %for.body
+
+for.end:
+  ret void
+}
