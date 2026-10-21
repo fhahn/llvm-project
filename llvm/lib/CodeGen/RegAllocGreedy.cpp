@@ -857,12 +857,12 @@ bool RAGreedy::addThroughConstraints(InterferenceCache::Cursor Intf,
     assert(B < GroupSize && "Array overflow");
     BCS[B].Number = Number;
 
-    // Abort if the spill cannot be inserted at the MBB' start
+    // Abort if the spill cannot be inserted at the MBB' start, i.e. the first
+    // split point is after the first non-debug instruction.
     MachineBasicBlock *MBB = MF->getBlockNumbered(Number);
     auto FirstNonDebugInstr = MBB->getFirstNonDebugInstr();
-    if (FirstNonDebugInstr != MBB->end() &&
-        SlotIndex::isEarlierInstr(LIS->getInstructionIndex(*FirstNonDebugInstr),
-                                  SA->getFirstSplitPoint(Number)))
+    auto FirstSplitPt = MBB->SkipPHIsLabelsAndDebug(FirstNonDebugInstr);
+    if (FirstSplitPt != MBB->end() && FirstSplitPt != FirstNonDebugInstr)
       return false;
 
     // Interference for the live-in value.
