@@ -14017,6 +14017,14 @@ bool llvm::isBitwiseNot(SDValue V, bool AllowUndefs) {
 
 ConstantSDNode *llvm::isConstOrConstSplat(SDValue N, bool AllowUndefs,
                                           bool AllowTruncation) {
+  // Avoid building the demanded elements mask unless N can be a splat.
+  if (auto *CN = dyn_cast<ConstantSDNode>(N))
+    return CN;
+  if (N.getOpcode() != ISD::SPLAT_VECTOR &&
+      N.getOpcode() != ISD::BUILD_VECTOR &&
+      N.getOpcode() != ISD::MERGE_VALUES)
+    return nullptr;
+
   APInt DemandedElts = getDemandAllEltsMask(N);
   return isConstOrConstSplat(N, DemandedElts, AllowUndefs, AllowTruncation);
 }
