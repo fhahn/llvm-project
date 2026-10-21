@@ -986,6 +986,11 @@ void MachineCopyPropagation::forwardCopyPropagateBlock(MachineBasicBlock &MBB) {
       }
     }
 
+    // Without tracked or maybe-dead copies, the rest of the loop is a no-op
+    // for non-copies.
+    if (!CopyOperands && !Tracker.hasAnyCopies() && MaybeDeadCopies.empty())
+      continue;
+
     SmallVector<Register, 4> Defs;
     const MachineOperand *RegMask = nullptr;
     for (const MachineOperand &MO : MI.operands()) {
