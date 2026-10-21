@@ -210,3 +210,166 @@ loop:
 exit:
   ret void
 }
+
+define void @fp_iv_step_defined_outside_loop(ptr %a, float %x, float %y, i64 %n) {
+; CHECK-LABEL: VPlan for loop in 'fp_iv_step_defined_outside_loop'
+; CHECK:  VPlan 'Initial VPlan for VF={8},UF>=1' {
+; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
+; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in ir<%n> = original trip-count
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<entry>:
+; CHECK-NEXT:    IR   %step = fmul fast float %x, %y
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEV %step
+; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    vp<[[VP4:%[0-9]+]]> = DERIVED-IV ir<0.000000e+00> + vp<[[VP2]]> * vp<[[VP3]]>
+; CHECK-NEXT:  Successor(s): vector loop
+; CHECK-EMPTY:
+; CHECK-NEXT:  <x1> vector loop: {
+; CHECK-NEXT:  vp<[[VP5:%[0-9]+]]> = CANONICAL-IV
+; CHECK-EMPTY:
+; CHECK-NEXT:    vector.body:
+; CHECK-NEXT:      ir<%f> = WIDEN-INDUCTION fast ir<0.000000e+00>, vp<[[VP3]]>, vp<[[VP0]]>
+; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5]]>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      CLONE ir<%gep> = getelementptr inbounds ir<%a>, vp<[[VP6]]>
+; CHECK-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer inbounds float, ir<%gep>, ir<1>
+; CHECK-NEXT:      WIDEN store vp<[[VP7]]>, ir<%f>
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:    No successors
+; CHECK-NEXT:  }
+; CHECK-NEXT:  Successor(s): middle.block
+; CHECK-EMPTY:
+; CHECK-NEXT:  middle.block:
+; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
+; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<exit>:
+; CHECK-NEXT:  No successors
+; CHECK-EMPTY:
+; CHECK-NEXT:  scalar.ph:
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP2]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val>.1 = phi [ vp<[[VP4]]>, middle.block ], [ ir<0.000000e+00>, ir-bb<entry> ]
+; CHECK-NEXT:  Successor(s): ir-bb<loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<loop>:
+; CHECK-NEXT:    IR   %i = phi i64 [ 0, %entry ], [ %i.next, %loop ] (extra operand: vp<%bc.resume.val> from scalar.ph)
+; CHECK-NEXT:    IR   %f = phi float [ 0.000000e+00, %entry ], [ %f.next, %loop ] (extra operand: vp<%bc.resume.val>.1 from scalar.ph)
+; CHECK-NEXT:    IR   %gep = getelementptr inbounds float, ptr %a, i64 %i
+; CHECK-NEXT:    IR   store float %f, ptr %gep, align 4
+; CHECK-NEXT:    IR   %f.next = fadd fast float %f, %step
+; CHECK-NEXT:    IR   %i.next = add nuw nsw i64 %i, 1
+; CHECK-NEXT:    IR   %ec = icmp eq i64 %i.next, %n
+; CHECK-NEXT:  No successors
+; CHECK-NEXT:  }
+;
+entry:
+  %step = fmul fast float %x, %y
+  br label %loop
+
+loop:
+  %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
+  %f = phi float [ 0.0, %entry ], [ %f.next, %loop ]
+  %gep = getelementptr inbounds float, ptr %a, i64 %i
+  store float %f, ptr %gep, align 4
+  %f.next = fadd fast float %f, %step
+  %i.next = add nuw nsw i64 %i, 1
+  %ec = icmp eq i64 %i.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The latch value of %j is a single-entry phi, so legality's induction
+; descriptor has no binary operator for it.
+define i64 @early_exit_iv_via_latch_phi(ptr dereferenceable(1024) %a) {
+; CHECK-LABEL: VPlan for loop in 'early_exit_iv_via_latch_phi'
+; CHECK:  VPlan 'Initial VPlan for VF={8},UF>=1' {
+; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
+; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in ir<128> = original trip-count
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<entry>:
+; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    vp<[[VP3:%[0-9]+]]> = DERIVED-IV ir<3> + vp<[[VP2]]> * ir<5>
+; CHECK-NEXT:  Successor(s): vector loop
+; CHECK-EMPTY:
+; CHECK-NEXT:  <x1> vector loop: {
+; CHECK-NEXT:  vp<[[VP4:%[0-9]+]]> = CANONICAL-IV
+; CHECK-EMPTY:
+; CHECK-NEXT:    vector.body:
+; CHECK-NEXT:      ir<%j> = WIDEN-INDUCTION ir<3>, ir<5>, vp<[[VP0]]>
+; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = SCALAR-STEPS vp<[[VP4]]>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      CLONE ir<%gep> = getelementptr ir<%a>, vp<[[VP5]]>
+; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer i8, ir<%gep>, ir<1>
+; CHECK-NEXT:      WIDEN ir<%v> = load vp<[[VP6]]>
+; CHECK-NEXT:      WIDEN ir<%c> = icmp eq ir<%v>, ir<0>
+; CHECK-NEXT:      EMIT vp<[[VP7:%[0-9]+]]> = freeze ir<%c>
+; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = any-of vp<[[VP7]]>
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT vp<[[VP9:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-two-conds vp<[[VP8]]>, vp<[[VP9]]>
+; CHECK-NEXT:    No successors
+; CHECK-NEXT:  }
+; CHECK-NEXT:  Successor(s): vector.early.exit, middle.block
+; CHECK-EMPTY:
+; CHECK-NEXT:  middle.block:
+; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<128>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
+; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  vector.early.exit:
+; CHECK-NEXT:    WIDEN ir<%j.next> = add ir<%j>, ir<5>
+; CHECK-NEXT:    EMIT vp<%first.active.lane> = first-active-lane vp<[[VP7]]>
+; CHECK-NEXT:    EMIT vp<%early.exit.value> = extract-lane vp<%first.active.lane>, ir<%j.next>
+; CHECK-NEXT:  Successor(s): ir-bb<exit>
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<exit>:
+; CHECK-NEXT:    IR   %r = phi i64 [ %j.next, %loop ], [ %j.l, %latch ] (extra operands: vp<[[VP3]]> from middle.block, vp<%early.exit.value> from vector.early.exit)
+; CHECK-NEXT:  No successors
+; CHECK-EMPTY:
+; CHECK-NEXT:  scalar.ph:
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP2]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val>.1 = phi [ vp<[[VP3]]>, middle.block ], [ ir<3>, ir-bb<entry> ]
+; CHECK-NEXT:  Successor(s): ir-bb<loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<loop>:
+; CHECK-NEXT:    IR   %i = phi i64 [ 0, %entry ], [ %i.next, %latch ] (extra operand: vp<%bc.resume.val> from scalar.ph)
+; CHECK-NEXT:    IR   %j = phi i64 [ 3, %entry ], [ %j.l, %latch ] (extra operand: vp<%bc.resume.val>.1 from scalar.ph)
+; CHECK-NEXT:    IR   %gep = getelementptr i8, ptr %a, i64 %i
+; CHECK-NEXT:    IR   %v = load i8, ptr %gep, align 1
+; CHECK-NEXT:    IR   %j.next = add i64 %j, 5
+; CHECK-NEXT:    IR   %c = icmp eq i8 %v, 0
+; CHECK-NEXT:  No successors
+; CHECK-NEXT:  }
+;
+entry:
+  br label %loop
+
+loop:
+  %i = phi i64 [ 0, %entry ], [ %i.next, %latch ]
+  %j = phi i64 [ 3, %entry ], [ %j.l, %latch ]
+  %gep = getelementptr i8, ptr %a, i64 %i
+  %v = load i8, ptr %gep, align 1
+  %j.next = add i64 %j, 5
+  %c = icmp eq i8 %v, 0
+  br i1 %c, label %exit, label %latch
+
+latch:
+  %j.l = phi i64 [ %j.next, %loop ]
+  %i.next = add i64 %i, 1
+  %ec = icmp eq i64 %i.next, 128
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  %r = phi i64 [ %j.next, %loop ], [ %j.l, %latch ]
+  ret i64 %r
+}
