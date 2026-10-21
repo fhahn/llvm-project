@@ -167,6 +167,11 @@ class RegisterCoalescer : private LiveRangeEdit::Delegate {
   /// checked for smaller live intervals.
   bool ShrinkMainRange = false;
 
+  /// True if a join in this function erased an IMPLICIT_DEF value. Uses of
+  /// that value are left without a reaching def until updateRegDefsUses marks
+  /// them undef, possibly in a later join.
+  bool ErasedImplicitDef = false;
+
   /// True if the coalescer should aggressively coalesce global copies
   /// in favor of keeping local copies.
   bool JoinGlobalCopies = false;
@@ -1903,8 +1908,10 @@ void RegisterCoalescer::updateRegDefsUses(Register SrcReg, Register DstReg,
   bool DstIsPhys = DstReg.isPhysical();
   LiveInterval *DstInt = DstIsPhys ? nullptr : &LIS->getInterval(DstReg);
 
-  if (DstInt && DstReg != SrcReg) {
-    bool HasSubRanges = DstInt->hasSubRanges();
+  // Without subranges, full uses of DstReg can only lose their reaching def
+  // if an IMPLICIT_DEF value was erased.
+  bool HasSubRanges = DstInt && DstInt->hasSubRanges();
+  if (DstInt && DstReg != SrcReg && (HasSubRanges || ErasedImplicitDef)) {
     for (MachineOperand &MO : MRI->reg_nodbg_operands(DstReg)) {
       if (MO.isUndef())
         continue;
@@ -2751,8 +2758,8 @@ public:
   /// Erase any machine instructions that have been coalesced away.
   /// Add erased instructions to ErasedInstrs.
   /// Add foreign virtual registers to ShrinkRegs if their live range ended at
-  /// the erased instrs.
-  void eraseInstrs(SmallPtrSetImpl<MachineInstr *> &ErasedInstrs,
+  /// the erased instrs. Returns true if an IMPLICIT_DEF value was erased.
+  bool eraseInstrs(SmallPtrSetImpl<MachineInstr *> &ErasedInstrs,
                    SmallVectorImpl<Register> &ShrinkRegs,
                    LiveInterval *LI = nullptr);
 
@@ -3570,9 +3577,10 @@ void JoinVals::removeImplicitDefs() {
   }
 }
 
-void JoinVals::eraseInstrs(SmallPtrSetImpl<MachineInstr *> &ErasedInstrs,
+bool JoinVals::eraseInstrs(SmallPtrSetImpl<MachineInstr *> &ErasedInstrs,
                            SmallVectorImpl<Register> &ShrinkRegs,
                            LiveInterval *LI) {
+  bool ErasedImplicitDef = false;
   for (unsigned i = 0, e = LR.getNumValNums(); i != e; ++i) {
     // Get the def location before markUnused() below invalidates it.
     VNInfo *VNI = LR.getValNumInfo(i);
@@ -3607,6 +3615,7 @@ void JoinVals::eraseInstrs(SmallPtrSetImpl<MachineInstr *> &ErasedInstrs,
       // Note that this VNInfo is reused and still referenced in NewVNInfo,
       // make it appear like an unused value number.
       VNI->markUnused();
+      ErasedImplicitDef = true;
 
       if (LI != nullptr && LI->hasSubRanges()) {
         assert(static_cast<LiveRange *>(LI) == &LR);
@@ -3662,6 +3671,7 @@ void JoinVals::eraseInstrs(SmallPtrSetImpl<MachineInstr *> &ErasedInstrs,
       break;
     }
   }
+  return ErasedImplicitDef;
 }
 
 void RegisterCoalescer::joinSubRegRanges(LiveRange &LRange, LiveRange &RRange,
@@ -3857,8 +3867,8 @@ RegisterCoalescer::joinVirtRegs(CoalescerPair &CP) {
   // Erase COPY and IMPLICIT_DEF instructions. This may cause some external
   // registers to require trimming.
   SmallVector<Register, 8> ShrinkRegs;
-  LHSVals.eraseInstrs(ErasedInstrs, ShrinkRegs, &LHS);
-  RHSVals.eraseInstrs(ErasedInstrs, ShrinkRegs);
+  ErasedImplicitDef |= LHSVals.eraseInstrs(ErasedInstrs, ShrinkRegs, &LHS);
+  ErasedImplicitDef |= RHSVals.eraseInstrs(ErasedInstrs, ShrinkRegs);
   while (!ShrinkRegs.empty())
     shrinkToUses(&LIS->getInterval(ShrinkRegs.pop_back_val()));
 
