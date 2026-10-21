@@ -15267,9 +15267,8 @@ void SelectionDAG::createOperands(SDNode *Node, ArrayRef<SDValue> Vals) {
     EVT VT = Ops[I].getValueType();
 
     // Skip Chain. It does not carry divergence.
-    if (VT != MVT::Other &&
-        (VT != MVT::Glue || gluePropagatesDivergence(Ops[I].getNode())) &&
-        Ops[I].getNode()->isDivergent()) {
+    if (Ops[I].getNode()->isDivergent() && VT != MVT::Other &&
+        (VT != MVT::Glue || gluePropagatesDivergence(Ops[I].getNode()))) {
       IsDivergent = true;
     }
   }
