@@ -226,3 +226,196 @@ loop.latch:
 exit:
   ret void
 }
+
+; The predicated load accesses the pointer of the unconditional load via a
+; single-incoming phi.
+define void @same_pointer_via_phi(ptr noalias %src, ptr noalias %dst, i64 %n) {
+; CHECK-LABEL: define void @same_pointer_via_phi(
+; CHECK-SAME: ptr noalias [[SRC:%.*]], ptr noalias [[DST:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = and i64 [[N]], 3
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP0]]
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_LOAD_CONTINUE6:.*]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP1]], align 4
+; CHECK-NEXT:    [[TMP2:%.*]] = icmp ne <4 x i32> [[WIDE_LOAD]], zeroinitializer
+; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <4 x i1> [[TMP2]], i64 0
+; CHECK-NEXT:    br i1 [[TMP3]], label %[[PRED_LOAD_IF:.*]], label %[[PRED_LOAD_CONTINUE:.*]]
+; CHECK:       [[PRED_LOAD_IF]]:
+; CHECK-NEXT:    [[TMP4:%.*]] = load i32, ptr [[TMP1]], align 4
+; CHECK-NEXT:    [[TMP5:%.*]] = insertelement <4 x i32> poison, i32 [[TMP4]], i64 0
+; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE]]
+; CHECK:       [[PRED_LOAD_CONTINUE]]:
+; CHECK-NEXT:    [[TMP6:%.*]] = phi <4 x i32> [ poison, %[[VECTOR_BODY]] ], [ [[TMP5]], %[[PRED_LOAD_IF]] ]
+; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i1> [[TMP2]], i64 1
+; CHECK-NEXT:    br i1 [[TMP7]], label %[[PRED_LOAD_IF1:.*]], label %[[PRED_LOAD_CONTINUE2:.*]]
+; CHECK:       [[PRED_LOAD_IF1]]:
+; CHECK-NEXT:    [[TMP24:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[TMP24]]
+; CHECK-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP8]], align 4
+; CHECK-NEXT:    [[TMP10:%.*]] = insertelement <4 x i32> [[TMP6]], i32 [[TMP9]], i64 1
+; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE2]]
+; CHECK:       [[PRED_LOAD_CONTINUE2]]:
+; CHECK-NEXT:    [[TMP11:%.*]] = phi <4 x i32> [ [[TMP6]], %[[PRED_LOAD_CONTINUE]] ], [ [[TMP10]], %[[PRED_LOAD_IF1]] ]
+; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <4 x i1> [[TMP2]], i64 2
+; CHECK-NEXT:    br i1 [[TMP12]], label %[[PRED_LOAD_IF3:.*]], label %[[PRED_LOAD_CONTINUE4:.*]]
+; CHECK:       [[PRED_LOAD_IF3]]:
+; CHECK-NEXT:    [[TMP25:%.*]] = add i64 [[INDEX]], 2
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[TMP25]]
+; CHECK-NEXT:    [[TMP14:%.*]] = load i32, ptr [[TMP13]], align 4
+; CHECK-NEXT:    [[TMP15:%.*]] = insertelement <4 x i32> [[TMP11]], i32 [[TMP14]], i64 2
+; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE4]]
+; CHECK:       [[PRED_LOAD_CONTINUE4]]:
+; CHECK-NEXT:    [[TMP16:%.*]] = phi <4 x i32> [ [[TMP11]], %[[PRED_LOAD_CONTINUE2]] ], [ [[TMP15]], %[[PRED_LOAD_IF3]] ]
+; CHECK-NEXT:    [[TMP17:%.*]] = extractelement <4 x i1> [[TMP2]], i64 3
+; CHECK-NEXT:    br i1 [[TMP17]], label %[[PRED_LOAD_IF5:.*]], label %[[PRED_LOAD_CONTINUE6]]
+; CHECK:       [[PRED_LOAD_IF5]]:
+; CHECK-NEXT:    [[TMP26:%.*]] = add i64 [[INDEX]], 3
+; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[TMP26]]
+; CHECK-NEXT:    [[TMP19:%.*]] = load i32, ptr [[TMP18]], align 4
+; CHECK-NEXT:    [[TMP20:%.*]] = insertelement <4 x i32> [[TMP16]], i32 [[TMP19]], i64 3
+; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE6]]
+; CHECK:       [[PRED_LOAD_CONTINUE6]]:
+; CHECK-NEXT:    [[TMP21:%.*]] = phi <4 x i32> [ [[TMP16]], %[[PRED_LOAD_CONTINUE4]] ], [ [[TMP20]], %[[PRED_LOAD_IF5]] ]
+; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP2]], <4 x i32> [[TMP21]], <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP22:%.*]] = getelementptr i32, ptr [[DST]], i64 [[INDEX]]
+; CHECK-NEXT:    store <4 x i32> [[PREDPHI]], ptr [[TMP22]], align 1
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP23:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP23]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+;
+entry:
+  br label %loop.header
+
+loop.header:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  %p = getelementptr i32, ptr %src, i64 %iv
+  %guard = load i32, ptr %p, align 4
+  %keep = icmp ne i32 %guard, 0
+  br i1 %keep, label %read, label %loop.latch
+
+read:
+  %p.phi = phi ptr [ %p, %loop.header ]
+  %value = load i32, ptr %p.phi, align 4
+  br label %loop.latch
+
+loop.latch:
+  %result = phi i32 [ %value, %read ], [ 0, %loop.header ]
+  %out = getelementptr i32, ptr %dst, i64 %iv
+  store i32 %result, ptr %out, align 1
+  %iv.next = add nuw i64 %iv, 1
+  %done = icmp eq i64 %iv.next, %n
+  br i1 %done, label %exit, label %loop.header
+
+exit:
+  ret void
+}
+
+; The predicated load accesses the pointer of the unconditional load via a
+; single-incoming phi, but is wider than the unconditional load.
+define void @wider_predicated_load_via_phi(ptr noalias %src, ptr noalias %dst, i64 %n) {
+; CHECK-LABEL: define void @wider_predicated_load_via_phi(
+; CHECK-SAME: ptr noalias [[SRC:%.*]], ptr noalias [[DST:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = and i64 [[N]], 3
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP0]]
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_LOAD_CONTINUE6:.*]] ]
+; CHECK-NEXT:    [[TMP32:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP33:%.*]] = add i64 [[INDEX]], 2
+; CHECK-NEXT:    [[TMP34:%.*]] = add i64 [[INDEX]], 3
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[INDEX]]
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[TMP32]]
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[TMP33]]
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[TMP34]]
+; CHECK-NEXT:    [[TMP2:%.*]] = load i8, ptr [[TMP1]], align 1
+; CHECK-NEXT:    [[TMP4:%.*]] = load i8, ptr [[TMP3]], align 1
+; CHECK-NEXT:    [[TMP6:%.*]] = load i8, ptr [[TMP5]], align 1
+; CHECK-NEXT:    [[TMP8:%.*]] = load i8, ptr [[TMP7]], align 1
+; CHECK-NEXT:    [[TMP9:%.*]] = insertelement <4 x i8> poison, i8 [[TMP2]], i64 0
+; CHECK-NEXT:    [[TMP10:%.*]] = insertelement <4 x i8> [[TMP9]], i8 [[TMP4]], i64 1
+; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i8> [[TMP10]], i8 [[TMP6]], i64 2
+; CHECK-NEXT:    [[TMP12:%.*]] = insertelement <4 x i8> [[TMP11]], i8 [[TMP8]], i64 3
+; CHECK-NEXT:    [[TMP13:%.*]] = icmp ne <4 x i8> [[TMP12]], zeroinitializer
+; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <4 x i1> [[TMP13]], i64 0
+; CHECK-NEXT:    br i1 [[TMP14]], label %[[PRED_LOAD_IF:.*]], label %[[PRED_LOAD_CONTINUE:.*]]
+; CHECK:       [[PRED_LOAD_IF]]:
+; CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr [[TMP1]], align 1
+; CHECK-NEXT:    [[TMP16:%.*]] = insertelement <4 x i32> poison, i32 [[TMP15]], i64 0
+; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE]]
+; CHECK:       [[PRED_LOAD_CONTINUE]]:
+; CHECK-NEXT:    [[TMP17:%.*]] = phi <4 x i32> [ poison, %[[VECTOR_BODY]] ], [ [[TMP16]], %[[PRED_LOAD_IF]] ]
+; CHECK-NEXT:    [[TMP18:%.*]] = extractelement <4 x i1> [[TMP13]], i64 1
+; CHECK-NEXT:    br i1 [[TMP18]], label %[[PRED_LOAD_IF1:.*]], label %[[PRED_LOAD_CONTINUE2:.*]]
+; CHECK:       [[PRED_LOAD_IF1]]:
+; CHECK-NEXT:    [[TMP19:%.*]] = load i32, ptr [[TMP3]], align 1
+; CHECK-NEXT:    [[TMP20:%.*]] = insertelement <4 x i32> [[TMP17]], i32 [[TMP19]], i64 1
+; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE2]]
+; CHECK:       [[PRED_LOAD_CONTINUE2]]:
+; CHECK-NEXT:    [[TMP21:%.*]] = phi <4 x i32> [ [[TMP17]], %[[PRED_LOAD_CONTINUE]] ], [ [[TMP20]], %[[PRED_LOAD_IF1]] ]
+; CHECK-NEXT:    [[TMP22:%.*]] = extractelement <4 x i1> [[TMP13]], i64 2
+; CHECK-NEXT:    br i1 [[TMP22]], label %[[PRED_LOAD_IF3:.*]], label %[[PRED_LOAD_CONTINUE4:.*]]
+; CHECK:       [[PRED_LOAD_IF3]]:
+; CHECK-NEXT:    [[TMP23:%.*]] = load i32, ptr [[TMP5]], align 1
+; CHECK-NEXT:    [[TMP24:%.*]] = insertelement <4 x i32> [[TMP21]], i32 [[TMP23]], i64 2
+; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE4]]
+; CHECK:       [[PRED_LOAD_CONTINUE4]]:
+; CHECK-NEXT:    [[TMP25:%.*]] = phi <4 x i32> [ [[TMP21]], %[[PRED_LOAD_CONTINUE2]] ], [ [[TMP24]], %[[PRED_LOAD_IF3]] ]
+; CHECK-NEXT:    [[TMP26:%.*]] = extractelement <4 x i1> [[TMP13]], i64 3
+; CHECK-NEXT:    br i1 [[TMP26]], label %[[PRED_LOAD_IF5:.*]], label %[[PRED_LOAD_CONTINUE6]]
+; CHECK:       [[PRED_LOAD_IF5]]:
+; CHECK-NEXT:    [[TMP27:%.*]] = load i32, ptr [[TMP7]], align 1
+; CHECK-NEXT:    [[TMP28:%.*]] = insertelement <4 x i32> [[TMP25]], i32 [[TMP27]], i64 3
+; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE6]]
+; CHECK:       [[PRED_LOAD_CONTINUE6]]:
+; CHECK-NEXT:    [[TMP29:%.*]] = phi <4 x i32> [ [[TMP25]], %[[PRED_LOAD_CONTINUE4]] ], [ [[TMP28]], %[[PRED_LOAD_IF5]] ]
+; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP13]], <4 x i32> [[TMP29]], <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP30:%.*]] = getelementptr i32, ptr [[DST]], i64 [[INDEX]]
+; CHECK-NEXT:    store <4 x i32> [[PREDPHI]], ptr [[TMP30]], align 1
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP31:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP31]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+;
+entry:
+  br label %loop.header
+
+loop.header:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  %p = getelementptr i32, ptr %src, i64 %iv
+  %guard = load i8, ptr %p, align 1
+  %keep = icmp ne i8 %guard, 0
+  br i1 %keep, label %read, label %loop.latch
+
+read:
+  %p.phi = phi ptr [ %p, %loop.header ]
+  %value = load i32, ptr %p.phi, align 1
+  br label %loop.latch
+
+loop.latch:
+  %result = phi i32 [ %value, %read ], [ 0, %loop.header ]
+  %out = getelementptr i32, ptr %dst, i64 %iv
+  store i32 %result, ptr %out, align 1
+  %iv.next = add nuw i64 %iv, 1
+  %done = icmp eq i64 %iv.next, %n
+  br i1 %done, label %exit, label %loop.header
+
+exit:
+  ret void
+}
