@@ -654,23 +654,12 @@ void VPlanTransforms::recordExecutionFrequencies(VPlan &Plan) {
 }
 
 /// Creates a VPWidenIntOrFpInductionRecipe or VPWidenPointerInductionRecipe
-/// for \p Phi based on \p IndDesc and \p InductionOpcode.
+/// for \p Phi with \p Start, \p Step, \p InductionOpcode and \p Flags.
 static VPHeaderPHIRecipe *createWidenInductionRecipe(
-    PHINode *Phi, VPPhi *PhiR, VPIRValue *Start,
-    const InductionDescriptor &IndDesc, Instruction::BinaryOps InductionOpcode,
-    VPlan &Plan, PredicatedScalarEvolution &PSE, Loop &OrigLoop, DebugLoc DL) {
-  [[maybe_unused]] ScalarEvolution &SE = *PSE.getSE();
-  assert(SE.isLoopInvariant(IndDesc.getStep(), &OrigLoop) &&
-         "step must be loop invariant");
-  assert((Plan.getLiveIn(IndDesc.getStartValue()) == Start ||
-          (SE.isSCEVable(IndDesc.getStartValue()->getType()) &&
-           PSE.getSCEV(IndDesc.getStartValue()) ==
-               vputils::getSCEVExprForVPValue(Start, PSE))) &&
-         "Start VPValue must match IndDesc's start value");
-
-  VPValue *Step =
-      vputils::getOrCreateVPValueForSCEVExpr(Plan, IndDesc.getStep());
-
+    PHINode *Phi, VPPhi *PhiR, VPIRValue *Start, VPValue *Step,
+    Instruction::BinaryOps InductionOpcode, const VPIRFlags &Flags,
+    ArrayRef<const SCEVPredicate *> NoWrapPredicates,
+    ArrayRef<Instruction *> CastInsts, VPlan &Plan, DebugLoc DL) {
   VPValue *BackedgeVal = PhiR->getOperand(1);
   // Replace live-out extracts of WideIV's backedge value by ExitingIVValue
   // recipes. optimizeInductionLiveOutUsers will later compute the proper
@@ -710,16 +699,12 @@ static VPHeaderPHIRecipe *createWidenInductionRecipe(
     }
   };
 
-  if (IndDesc.getKind() == InductionDescriptor::IK_PtrInduction) {
+  if (Start->getScalarType()->isPointerTy()) {
     auto *WideIV = new VPWidenPointerInductionRecipe(
-        Phi, Start, Step, &Plan.getVFxUF(), IndDesc.getNoWrapPredicates(), DL);
+        Phi, Start, Step, &Plan.getVFxUF(), NoWrapPredicates, DL);
     ReplaceExtractsWithExitingIVValueIfPossible(WideIV);
     return WideIV;
   }
-
-  assert((IndDesc.getKind() == InductionDescriptor::IK_IntInduction ||
-          IndDesc.getKind() == InductionDescriptor::IK_FpInduction) &&
-         "must have an integer or float induction at this point");
 
   // Update wide induction increments to use the same step as the corresponding
   // wide induction. This enables detecting induction increments directly in
@@ -727,17 +712,38 @@ static VPHeaderPHIRecipe *createWidenInductionRecipe(
   if (match(BackedgeVal, m_Add(m_Specific(PhiR), m_VPValue())))
     BackedgeVal->getDefiningRecipe()->setOperand(1, Step);
 
+  auto *WideIV = new VPWidenIntOrFpInductionRecipe(
+      Phi, Start, Step, &Plan.getVF(), InductionOpcode, Flags, DL,
+      NoWrapPredicates, CastInsts);
+
+  ReplaceExtractsWithExitingIVValueIfPossible(WideIV);
+  return WideIV;
+}
+
+/// Creates a VPWidenIntOrFpInductionRecipe or VPWidenPointerInductionRecipe
+/// for \p Phi based on \p IndDesc and \p InductionOpcode.
+static VPHeaderPHIRecipe *createWidenInductionRecipe(
+    PHINode *Phi, VPPhi *PhiR, VPIRValue *Start,
+    const InductionDescriptor &IndDesc, Instruction::BinaryOps InductionOpcode,
+    VPlan &Plan, PredicatedScalarEvolution &PSE, Loop &OrigLoop, DebugLoc DL) {
+  [[maybe_unused]] ScalarEvolution &SE = *PSE.getSE();
+  assert(SE.isLoopInvariant(IndDesc.getStep(), &OrigLoop) &&
+         "step must be loop invariant");
+  assert((Plan.getLiveIn(IndDesc.getStartValue()) == Start ||
+          (SE.isSCEVable(IndDesc.getStartValue()->getType()) &&
+           PSE.getSCEV(IndDesc.getStartValue()) ==
+               vputils::getSCEVExprForVPValue(Start, PSE))) &&
+         "Start VPValue must match IndDesc's start value");
+
+  VPValue *Step =
+      vputils::getOrCreateVPValueForSCEVExpr(Plan, IndDesc.getStep());
   // It is always safe to copy over the NoWrap and FastMath flags. In
   // particular, when folding tail by masking, the masked-off lanes are never
   // used, so it is safe.
   VPIRFlags Flags = vputils::getFlagsForInduction(IndDesc, PhiR);
-
-  auto *WideIV = new VPWidenIntOrFpInductionRecipe(
-      Phi, Start, Step, &Plan.getVF(), InductionOpcode, Flags, DL,
-      IndDesc.getNoWrapPredicates(), IndDesc.getCastInsts());
-
-  ReplaceExtractsWithExitingIVValueIfPossible(WideIV);
-  return WideIV;
+  return createWidenInductionRecipe(Phi, PhiR, Start, Step, InductionOpcode,
+                                    Flags, IndDesc.getNoWrapPredicates(),
+                                    IndDesc.getCastInsts(), Plan, DL);
 }
 
 /// Try to sink users of \p FOR after \p Previous. \returns true if sinking
@@ -1003,6 +1009,23 @@ static bool matchesLegalInduction(const InductionDescriptor &IndDesc,
          (LegalOpcode == Opcode ||
           (LegalOpcode != Instruction::Add && LegalOpcode != Instruction::Sub));
 }
+
+/// Returns true if the FP induction \p PhiR with increment \p Inc and step
+/// \p Step, detected on VPlan, matches legality's \p LegalDesc.
+static bool matchesLegalFPInduction(VPPhi *PhiR, VPInstruction *Inc,
+                                    VPValue *Step,
+                                    const InductionDescriptor &LegalDesc,
+                                    VPlan &Plan) {
+  return LegalDesc.getKind() == InductionDescriptor::IK_FpInduction &&
+         Plan.getLiveIn(LegalDesc.getStartValue()) == PhiR->getOperand(0) &&
+         LegalDesc.getNoWrapPredicates().empty() &&
+         LegalDesc.getCastInsts().empty() &&
+         LegalDesc.getInductionOpcode() == Inc->getOpcode() &&
+         LegalDesc.getInductionBinOp()->getFastMathFlags() ==
+             Inc->getFastMathFlagsOrNone() &&
+         Plan.getLiveIn(cast<SCEVUnknown>(LegalDesc.getStep())->getValue()) ==
+             Step;
+}
 #endif
 
 bool VPlanTransforms::createHeaderPhiRecipes(
@@ -1050,6 +1073,22 @@ bool VPlanTransforms::createHeaderPhiRecipes(
       return createWidenInductionRecipe(Phi, PhiR, Start, *IndDesc, Opcode,
                                         Plan, PSE, OrigLoop,
                                         PhiR->getDebugLoc());
+    }
+    VPIRValue *FPStep;
+    if (!Reductions.contains(Phi) &&
+        (match(BackedgeValue,
+               m_c_FAdd(m_Specific(PhiR), m_VPIRValue(FPStep))) ||
+         match(BackedgeValue, m_Binary<Instruction::FSub>(
+                                  m_Specific(PhiR), m_VPIRValue(FPStep))))) {
+      auto *Inc = cast<VPInstruction>(BackedgeValue);
+      assert(InductionIt != Inductions.end() &&
+             matchesLegalFPInduction(PhiR, Inc, FPStep, InductionIt->second,
+                                     Plan) &&
+             "VPlan-detected FP induction must match legality");
+      return createWidenInductionRecipe(
+          Phi, PhiR, Start, FPStep,
+          static_cast<Instruction::BinaryOps>(Inc->getOpcode()),
+          Inc->getFastMathFlagsOrNone(), {}, {}, Plan, PhiR->getDebugLoc());
     }
     if (InductionIt != Inductions.end())
       return createWidenInductionRecipe(
