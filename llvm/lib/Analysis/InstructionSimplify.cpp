@@ -5364,9 +5364,12 @@ static Value *simplifyGEPInst(Type *SrcTy, Value *Ptr,
 
       // The following transforms are only safe if the ptrtoint cast
       // doesn't truncate the address of the pointers. The non-address bits
-      // must be the same, as the underlying objects are the same.
-      if (Indices[0]->getType()->getScalarSizeInBits() >=
-          Q.DL.getAddressSizeInBits(AS)) {
+      // must be the same, as the underlying objects are the same. They all
+      // need a sub, ashr or sdiv index, which is cheaper to check first.
+      if (is_contained({Instruction::Sub, Instruction::AShr, Instruction::SDiv},
+                       Operator::getOpcode(Indices[0])) &&
+          Indices[0]->getType()->getScalarSizeInBits() >=
+              Q.DL.getAddressSizeInBits(AS)) {
         auto CanSimplify = [GEPTy, &P, Ptr]() -> bool {
           return P->getType() == GEPTy &&
                  getUnderlyingObject(P) == getUnderlyingObject(Ptr);
