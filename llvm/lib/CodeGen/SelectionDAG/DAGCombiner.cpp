@@ -3506,6 +3506,16 @@ static SDValue foldAddSubMasked1(bool IsAdd, SDValue N0, SDValue N1,
 /// Helper for doing combines based on N0 and N1 being added to each other.
 SDValue DAGCombiner::visitADDLikeCommutative(SDValue N0, SDValue N1,
                                              const SDLoc &DL) {
+  // Each fold below requires N0 or N1 to have one of these opcodes; new folds
+  // must extend the lists. Bail out early, as this runs twice for every add.
+  if (!is_contained({ISD::ADD, ISD::SUB, ISD::MUL, ISD::SIGN_EXTEND},
+                    N0.getOpcode()) &&
+      !is_contained({ISD::SHL, ISD::SIGN_EXTEND_INREG, ISD::ZERO_EXTEND,
+                     ISD::AND, ISD::TRUNCATE, ISD::UADDO_CARRY,
+                     ISD::USUBO_CARRY, ISD::UADDO, ISD::USUBO},
+                    N1.getOpcode()))
+    return SDValue();
+
   EVT VT = N0.getValueType();
 
   // fold (add x, shl(0 - y, n)) -> sub(x, shl(y, n))
