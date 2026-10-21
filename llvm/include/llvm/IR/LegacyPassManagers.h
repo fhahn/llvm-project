@@ -506,6 +506,12 @@ public:
   PassManagerType getPassManagerType() const override {
     return PMT_FunctionPassManager;
   }
+
+private:
+  /// The number of contained passes whose required analyses have been added to
+  /// their resolvers. They stay there until cleanup(), so this is only done on
+  /// the first function after doInitialization() or cleanup().
+  unsigned NumAnalysisImplsInitialized = 0;
 };
 }
 
