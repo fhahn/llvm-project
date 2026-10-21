@@ -5294,8 +5294,48 @@ LoopVectorizationPlanner::precomputeCosts(VPlan &Plan, ElementCount VF,
   // accounted for here using the legacy cost model. However, some opcodes
   // are excluded from these precomputed scalarization costs and are instead
   // modeled later by the VPlan cost model (see UseVPlanCostModel below).
+  SmallPtrSet<Instruction *, 8> HasRecipe, NotSingleScalar, Replicated;
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_deep(Plan.getVectorLoopRegion()->getEntry())))
+    for (VPSingleDefRecipe &Def : make_isa_range<VPSingleDefRecipe>(*VPBB)) {
+      auto *I = cast_if_present<Instruction>(Def.getUnderlyingValue());
+      if (!I)
+        continue;
+      HasRecipe.insert(I);
+      if (isa<VPReplicateRecipe>(Def))
+        Replicated.insert(I);
+      if (!vputils::isSingleScalar(&Def) ||
+          vputils::doesGeneratePerAllLanes(&Def))
+        NotSingleScalar.insert(I);
+    }
+  // Returns true if a recipe uses \p I, directly or via non-phi instructions
+  // without recipes. Memory accesses without single-def recipes, e.g.
+  // interleave group members, only use their stored value.
+  // TODO: Remove once recipes without underlying instruction are fully costed.
+  auto IsUsedByRecipe = [&](Instruction *I) {
+    SmallSetVector<Instruction *, 8> Worklist;
+    Worklist.insert(I);
+    for (unsigned Idx = 0; Idx != Worklist.size(); ++Idx) {
+      for (Use &U : Worklist[Idx]->uses()) {
+        auto *UI = cast<Instruction>(U.getUser());
+        if (HasRecipe.contains(UI) ||
+            (isa<StoreInst>(UI) && U.getOperandNo() == 0))
+          return true;
+        if (!isa<PHINode, LoadInst>(UI) && OrigLoop->contains(UI))
+          Worklist.insert(UI);
+      }
+    }
+    return false;
+  };
   for (Instruction *ForcedScalar : CostCtx.CM.ForcedScalars[VF]) {
     if (CostCtx.skipCostComputation(ForcedScalar, VF.isVector()))
+      continue;
+    // Forced scalars VPlan narrowed to single scalars or removed are costed by
+    // their recipes, if any. Recipes replacing them without underlying
+    // instruction, e.g. from simplifications, may not be fully costed, so keep
+    // the legacy cost of forced scalars still used by recipes.
+    if (!NotSingleScalar.contains(ForcedScalar) &&
+        (HasRecipe.contains(ForcedScalar) || !IsUsedByRecipe(ForcedScalar)))
       continue;
     CostCtx.SkipCostComputation.insert(ForcedScalar);
     InstructionCost ForcedCost = CostCtx.getLegacyCost(ForcedScalar, VF);
@@ -5323,11 +5363,6 @@ LoopVectorizationPlanner::precomputeCosts(VPlan &Plan, ElementCount VF,
     }
   };
   // Only charge legacy scalarization costs for instructions VPlan replicates.
-  SmallPtrSet<Instruction *, 8> Replicated;
-  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
-           vp_depth_first_deep(Plan.getVectorLoopRegion()->getEntry())))
-    for (VPReplicateRecipe &RepR : make_isa_range<VPReplicateRecipe>(*VPBB))
-      Replicated.insert(RepR.getUnderlyingInstr());
   for (const auto &[Scalarized, ScalarCost] : CostCtx.CM.InstsToScalarize[VF]) {
     if (!Replicated.contains(Scalarized) || UseVPlanCostModel(Scalarized) ||
         CostCtx.skipCostComputation(Scalarized, VF.isVector()))

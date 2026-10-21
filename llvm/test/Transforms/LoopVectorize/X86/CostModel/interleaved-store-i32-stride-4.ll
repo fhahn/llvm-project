@@ -89,7 +89,7 @@ define void @test() {
 ; AVX2:    store ir<%v1> to index 1
 ; AVX2:    store ir<%v2> to index 2
 ; AVX2:    store ir<%v3> to index 3
-; AVX2:  LV: Selecting VF: 32.
+; AVX2:  LV: Selecting VF: 16.
 ;
 ; AVX512-LABEL: 'test'
 ; AVX512:  Cost of 8 for VF 2: INTERLEAVE-GROUP with factor 4, ir<%out0>
