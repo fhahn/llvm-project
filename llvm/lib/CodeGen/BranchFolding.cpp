@@ -2051,6 +2051,14 @@ bool BranchFolder::HoistCommonCodeInSuccs(MachineBasicBlock *MBB) {
   if (TBB->pred_size() > 1 || FBB->pred_size() > 1)
     return false;
 
+  // Nothing can be hoisted unless both successors start with the same
+  // instruction, so check that before collecting dependencies below.
+  auto TFirst = skipDebugInstructionsForward(TBB->begin(), TBB->end(), false);
+  auto FFirst = skipDebugInstructionsForward(FBB->begin(), FBB->end(), false);
+  if (TFirst == TBB->end() || FFirst == FBB->end() ||
+      !TFirst->isIdenticalTo(*FFirst, MachineInstr::CheckKillDead))
+    return false;
+
   // Find a suitable position to hoist the common instructions to. Also figure
   // out which registers are used or defined by instructions from the insertion
   // point to the end of the block.
