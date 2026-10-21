@@ -5941,11 +5941,12 @@ static bool needsPredication(VPInstruction *VPI, VPCostContext &CostCtx) {
     return false;
   // The header mask has its first lane active, so loads only masked by it don't
   // need predication if their address is loop-invariant.
-  if (match(Mask, m_HeaderMask())) {
-    ScalarEvolution &SE = *CostCtx.PSE.getSE();
-    return !SE.isLoopInvariant(SE.getSCEV(LI->getPointerOperand()), CostCtx.L);
-  }
-  return true;
+  if (!match(Mask, m_HeaderMask()))
+    return true;
+  const SCEV *AddrSCEV = vputils::getSCEVExprForVPValue(VPI->getOperand(0),
+                                                        CostCtx.PSE, CostCtx.L);
+  return isa<SCEVCouldNotCompute>(AddrSCEV) ||
+         !CostCtx.PSE.getSE()->isLoopInvariant(AddrSCEV, CostCtx.L);
 }
 
 void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
