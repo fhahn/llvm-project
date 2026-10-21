@@ -90,7 +90,7 @@ define void @masked_call_site_attrs(ptr noalias %in.ptr, ptr noalias %out.ptr) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    then:
 ; CHECK-NEXT:      EMIT ir<%call> = call i64 @bar(ir<%in>), ir<%cmp> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
-; CHECK-NEXT:      EMIT ir<%out.gep> = getelementptr inbounds ir<%out.ptr>, ir<%iv>
+; CHECK-NEXT:      REPLICATE ir<%out.gep> = getelementptr inbounds ir<%out.ptr>, ir<%iv>
 ; CHECK-NEXT:      REPLICATE store ir<%call>, ir<%out.gep>, ir<%cmp> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
 ; CHECK-NEXT:    Successor(s): latch
 ; CHECK-EMPTY:

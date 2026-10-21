@@ -6046,6 +6046,17 @@ void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
           [&](ElementCount VF) { return VF.isScalar(); }, Range))
     return;
 
+  // Returns true if all users of \p VPI only use its scalars. VPInstructions
+  // with underlying instructions are only converted later and may be widened,
+  // unless they only use the first lane.
+  auto OnlyScalarsUsed = [](VPInstruction &VPI) {
+    return all_of(VPI.users(), [&VPI](VPUser *U) {
+      auto *UI = dyn_cast<VPInstruction>(U);
+      return UI && UI->getUnderlyingValue() ? U->usesFirstLaneOnly(&VPI)
+                                            : U->usesScalars(&VPI);
+    });
+  };
+
   PostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> POT(
       Plan.getEntry());
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(POT)) {
@@ -6069,13 +6080,25 @@ void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
       if (VPI.isMasked() && !VPI.isSafeToSpeculativelyExecute())
         continue;
 
-      // Other lanes are needed - can't drop them.
-      if (!vputils::onlyFirstLaneUsed(&VPI))
+      VPSingleDefRecipe *Recipe;
+      if (vputils::onlyFirstLaneUsed(&VPI)) {
+        Recipe = VPBuilder::createSingleScalarOp(
+            VPI.getOpcode(), VPI.operandsWithoutMask(), /*Mask=*/nullptr, VPI,
+            VPI, VPI.getDebugLoc(), VPI.getScalarType(), I);
+      } else if (!Range.Start.isScalable() &&
+                 VPI.getOpcode() == Instruction::GetElementPtr &&
+                 OnlyScalarsUsed(VPI)) {
+        // Replicate GEPs only used as scalars, e.g. by replicated memory
+        // recipes, instead of widening them and extracting each lane. Scalable
+        // vectors cannot be replicated.
+        Recipe = new VPReplicateRecipe(I, VPI.operandsWithoutMask(),
+                                       /*IsSingleScalar=*/false,
+                                       /*Mask=*/nullptr, VPI, VPI,
+                                       VPI.getDebugLoc());
+      } else {
+        // Other lanes are needed - can't drop them.
         continue;
-
-      auto *Recipe = VPBuilder::createSingleScalarOp(
-          VPI.getOpcode(), VPI.operandsWithoutMask(), /*Mask=*/nullptr, VPI,
-          VPI, VPI.getDebugLoc(), VPI.getScalarType(), I);
+      }
       Recipe->insertBefore(&VPI);
       VPI.replaceAllUsesWith(Recipe);
       VPI.eraseFromParent();

@@ -33,16 +33,17 @@ define void @wide_gep_all_lanes_live_only_scalar_users(ptr noalias %dst, ptr noa
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE11:.*]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i64> [ <i64 0, i64 1>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_STORE_CONTINUE11]] ]
+; CHECK-NEXT:    [[TMP23:%.*]] = add i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds float, ptr [[SRC]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x float>, ptr [[TMP13]], align 4
 ; CHECK-NEXT:    [[TMP14:%.*]] = fcmp ogt <2 x float> [[WIDE_LOAD]], zeroinitializer
-; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], <2 x i64> [[VEC_IND]]
+; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], i64 [[INDEX]]
+; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], i64 [[TMP23]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = sitofp <2 x i64> [[VEC_IND]] to <2 x float>
 ; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <2 x i1> [[TMP14]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP16]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; CHECK:       [[PRED_STORE_IF]]:
 ; CHECK-NEXT:    [[TMP17:%.*]] = extractelement <2 x float> [[TMP15]], i64 0
-; CHECK-NEXT:    [[TMP18:%.*]] = extractelement <2 x ptr> [[WIDE_GEP]], i64 0
 ; CHECK-NEXT:    store float [[TMP17]], ptr [[TMP18]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; CHECK:       [[PRED_STORE_CONTINUE]]:
@@ -50,23 +51,20 @@ define void @wide_gep_all_lanes_live_only_scalar_users(ptr noalias %dst, ptr noa
 ; CHECK-NEXT:    br i1 [[TMP19]], label %[[PRED_STORE_IF2:.*]], label %[[PRED_STORE_CONTINUE3:.*]]
 ; CHECK:       [[PRED_STORE_IF2]]:
 ; CHECK-NEXT:    [[TMP20:%.*]] = extractelement <2 x float> [[TMP15]], i64 1
-; CHECK-NEXT:    [[TMP21:%.*]] = extractelement <2 x ptr> [[WIDE_GEP]], i64 1
 ; CHECK-NEXT:    store float [[TMP20]], ptr [[TMP21]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE3]]
 ; CHECK:       [[PRED_STORE_CONTINUE3]]:
 ; CHECK-NEXT:    [[TMP22:%.*]] = fadd <2 x float> [[TMP15]], splat (float 1.000000e+02)
 ; CHECK-NEXT:    br i1 [[TMP16]], label %[[PRED_STORE_IF4:.*]], label %[[PRED_STORE_CONTINUE5:.*]]
 ; CHECK:       [[PRED_STORE_IF4]]:
-; CHECK-NEXT:    [[TMP23:%.*]] = extractelement <2 x ptr> [[WIDE_GEP]], i64 0
-; CHECK-NEXT:    [[TMP24:%.*]] = getelementptr i8, ptr [[TMP23]], i64 4
+; CHECK-NEXT:    [[TMP24:%.*]] = getelementptr i8, ptr [[TMP18]], i64 4
 ; CHECK-NEXT:    [[TMP25:%.*]] = extractelement <2 x float> [[TMP22]], i64 0
 ; CHECK-NEXT:    store float [[TMP25]], ptr [[TMP24]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE5]]
 ; CHECK:       [[PRED_STORE_CONTINUE5]]:
 ; CHECK-NEXT:    br i1 [[TMP19]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7:.*]]
 ; CHECK:       [[PRED_STORE_IF6]]:
-; CHECK-NEXT:    [[TMP26:%.*]] = extractelement <2 x ptr> [[WIDE_GEP]], i64 1
-; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr i8, ptr [[TMP26]], i64 4
+; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr i8, ptr [[TMP21]], i64 4
 ; CHECK-NEXT:    [[TMP28:%.*]] = extractelement <2 x float> [[TMP22]], i64 1
 ; CHECK-NEXT:    store float [[TMP28]], ptr [[TMP27]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE7]]
@@ -74,16 +72,14 @@ define void @wide_gep_all_lanes_live_only_scalar_users(ptr noalias %dst, ptr noa
 ; CHECK-NEXT:    [[TMP29:%.*]] = fadd <2 x float> [[TMP15]], splat (float 2.000000e+02)
 ; CHECK-NEXT:    br i1 [[TMP16]], label %[[PRED_STORE_IF8:.*]], label %[[PRED_STORE_CONTINUE9:.*]]
 ; CHECK:       [[PRED_STORE_IF8]]:
-; CHECK-NEXT:    [[TMP30:%.*]] = extractelement <2 x ptr> [[WIDE_GEP]], i64 0
-; CHECK-NEXT:    [[TMP31:%.*]] = getelementptr i8, ptr [[TMP30]], i64 8
+; CHECK-NEXT:    [[TMP31:%.*]] = getelementptr i8, ptr [[TMP18]], i64 8
 ; CHECK-NEXT:    [[TMP32:%.*]] = extractelement <2 x float> [[TMP29]], i64 0
 ; CHECK-NEXT:    store float [[TMP32]], ptr [[TMP31]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE9]]
 ; CHECK:       [[PRED_STORE_CONTINUE9]]:
 ; CHECK-NEXT:    br i1 [[TMP19]], label %[[PRED_STORE_IF10:.*]], label %[[PRED_STORE_CONTINUE11]]
 ; CHECK:       [[PRED_STORE_IF10]]:
-; CHECK-NEXT:    [[TMP33:%.*]] = extractelement <2 x ptr> [[WIDE_GEP]], i64 1
-; CHECK-NEXT:    [[TMP34:%.*]] = getelementptr i8, ptr [[TMP33]], i64 8
+; CHECK-NEXT:    [[TMP34:%.*]] = getelementptr i8, ptr [[TMP21]], i64 8
 ; CHECK-NEXT:    [[TMP35:%.*]] = extractelement <2 x float> [[TMP29]], i64 1
 ; CHECK-NEXT:    store float [[TMP35]], ptr [[TMP34]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE11]]

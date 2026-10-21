@@ -87,7 +87,7 @@ define void @predicated_block(ptr noalias %a, ptr noalias %idx) {
 ; CONSTRUCT-NEXT:      EMIT ir<%add> = add ir<%i>, ir<1>, ir<%cmp> (!vplan.execution.frequency 4611686018427387903 (25%))
 ; CONSTRUCT-NEXT:      EMIT-SCALAR ir<%t> = trunc ir<%add> to i16
 ; CONSTRUCT-NEXT:      EMIT-SCALAR ir<%ext> = sext ir<%t> to i64
-; CONSTRUCT-NEXT:      EMIT ir<%gep.a> = getelementptr inbounds ir<%a>, ir<%ext>
+; CONSTRUCT-NEXT:      REPLICATE ir<%gep.a> = getelementptr inbounds ir<%a>, ir<%ext>
 ; CONSTRUCT-NEXT:      REPLICATE store ir<%add>, ir<%gep.a>, ir<%cmp> (!vplan.execution.frequency 4611686018427387903 (25%))
 ; CONSTRUCT-NEXT:    Successor(s): latch
 ; CONSTRUCT-EMPTY:
