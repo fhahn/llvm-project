@@ -973,7 +973,7 @@ SDValue RegsForValue::getCopyFromRegs(SelectionDAG &DAG,
     Parts.clear();
   }
 
-  return DAG.getNode(ISD::MERGE_VALUES, dl, DAG.getVTList(ValueVTs), Values);
+  return DAG.getMergeValues(Values, dl);
 }
 
 void RegsForValue::getCopyToRegs(SDValue Val, SelectionDAG &DAG,
@@ -4992,8 +4992,7 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
       PendingLoads.push_back(Chain);
   }
 
-  setValue(&I, DAG.getNode(ISD::MERGE_VALUES, dl,
-                           DAG.getVTList(ValueVTs), Values));
+  setValue(&I, DAG.getMergeValues(Values, dl));
 }
 
 void SelectionDAGBuilder::visitStoreToSwiftError(const StoreInst &I) {
