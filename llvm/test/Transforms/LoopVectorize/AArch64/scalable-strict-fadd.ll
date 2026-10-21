@@ -331,10 +331,10 @@ define float @fadd_strict_unroll(ptr noalias nocapture readonly %a, i64 %n) #0 {
 ; CHECK-ORDERED-TF-NEXT:    [[TMP16]] = call float @llvm.vector.reduce.fadd.nxv8f32(float [[TMP14]], <vscale x 8 x float> [[TMP15]])
 ; CHECK-ORDERED-TF-NEXT:    [[ACTIVE_LANE_MASK_NEXT1:%.*]] = call <vscale x 32 x i1> @llvm.get.active.lane.mask.nxv32i1.i64(i64 [[INDEX]], i64 [[TRIP_COUNT_MINUS_VF]])
 ; CHECK-ORDERED-TF-NEXT:    [[ACTIVE_LANE_MASK_NEXT]] = call <vscale x 8 x i1> @llvm.vector.extract.nxv8i1.nxv32i1(<vscale x 32 x i1> [[ACTIVE_LANE_MASK_NEXT1]], i64 0)
+; CHECK-ORDERED-TF-NEXT:    [[TMP20:%.*]] = extractelement <vscale x 8 x i1> [[ACTIVE_LANE_MASK_NEXT]], i64 0
 ; CHECK-ORDERED-TF-NEXT:    [[TMP22]] = call <vscale x 8 x i1> @llvm.vector.extract.nxv8i1.nxv32i1(<vscale x 32 x i1> [[ACTIVE_LANE_MASK_NEXT1]], i64 8)
 ; CHECK-ORDERED-TF-NEXT:    [[TMP23]] = call <vscale x 8 x i1> @llvm.vector.extract.nxv8i1.nxv32i1(<vscale x 32 x i1> [[ACTIVE_LANE_MASK_NEXT1]], i64 16)
 ; CHECK-ORDERED-TF-NEXT:    [[TMP24]] = call <vscale x 8 x i1> @llvm.vector.extract.nxv8i1.nxv32i1(<vscale x 32 x i1> [[ACTIVE_LANE_MASK_NEXT1]], i64 24)
-; CHECK-ORDERED-TF-NEXT:    [[TMP20:%.*]] = extractelement <vscale x 8 x i1> [[ACTIVE_LANE_MASK_NEXT]], i64 0
 ; CHECK-ORDERED-TF-NEXT:    [[TMP21:%.*]] = xor i1 [[TMP20]], true
 ; CHECK-ORDERED-TF-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[TMP2]]
 ; CHECK-ORDERED-TF-NEXT:    br i1 [[TMP21]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
@@ -1341,10 +1341,10 @@ define float @fmuladd_strict(ptr %a, ptr %b, i64 %n) #0 {
 ; CHECK-ORDERED-TF-NEXT:    [[TMP24]] = call float @llvm.vector.reduce.fadd.nxv8f32(float [[TMP22]], <vscale x 8 x float> [[TMP23]])
 ; CHECK-ORDERED-TF-NEXT:    [[ACTIVE_LANE_MASK_NEXT1:%.*]] = call <vscale x 32 x i1> @llvm.get.active.lane.mask.nxv32i1.i64(i64 [[INDEX]], i64 [[TRIP_COUNT_MINUS_VF]])
 ; CHECK-ORDERED-TF-NEXT:    [[ACTIVE_LANE_MASK_NEXT]] = call <vscale x 8 x i1> @llvm.vector.extract.nxv8i1.nxv32i1(<vscale x 32 x i1> [[ACTIVE_LANE_MASK_NEXT1]], i64 0)
+; CHECK-ORDERED-TF-NEXT:    [[TMP28:%.*]] = extractelement <vscale x 8 x i1> [[ACTIVE_LANE_MASK_NEXT]], i64 0
 ; CHECK-ORDERED-TF-NEXT:    [[TMP30]] = call <vscale x 8 x i1> @llvm.vector.extract.nxv8i1.nxv32i1(<vscale x 32 x i1> [[ACTIVE_LANE_MASK_NEXT1]], i64 8)
 ; CHECK-ORDERED-TF-NEXT:    [[TMP31]] = call <vscale x 8 x i1> @llvm.vector.extract.nxv8i1.nxv32i1(<vscale x 32 x i1> [[ACTIVE_LANE_MASK_NEXT1]], i64 16)
 ; CHECK-ORDERED-TF-NEXT:    [[TMP32]] = call <vscale x 8 x i1> @llvm.vector.extract.nxv8i1.nxv32i1(<vscale x 32 x i1> [[ACTIVE_LANE_MASK_NEXT1]], i64 24)
-; CHECK-ORDERED-TF-NEXT:    [[TMP28:%.*]] = extractelement <vscale x 8 x i1> [[ACTIVE_LANE_MASK_NEXT]], i64 0
 ; CHECK-ORDERED-TF-NEXT:    [[TMP29:%.*]] = xor i1 [[TMP28]], true
 ; CHECK-ORDERED-TF-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[TMP2]]
 ; CHECK-ORDERED-TF-NEXT:    br i1 [[TMP29]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
@@ -1586,10 +1586,10 @@ define float @fmuladd_strict_fmf(ptr %a, ptr %b, i64 %n) #0 {
 ; CHECK-ORDERED-TF-NEXT:    [[TMP24]] = call nnan float @llvm.vector.reduce.fadd.nxv8f32(float [[TMP22]], <vscale x 8 x float> [[TMP23]])
 ; CHECK-ORDERED-TF-NEXT:    [[ACTIVE_LANE_MASK_NEXT1:%.*]] = call <vscale x 32 x i1> @llvm.get.active.lane.mask.nxv32i1.i64(i64 [[INDEX]], i64 [[TRIP_COUNT_MINUS_VF]])
 ; CHECK-ORDERED-TF-NEXT:    [[ACTIVE_LANE_MASK_NEXT]] = call <vscale x 8 x i1> @llvm.vector.extract.nxv8i1.nxv32i1(<vscale x 32 x i1> [[ACTIVE_LANE_MASK_NEXT1]], i64 0)
+; CHECK-ORDERED-TF-NEXT:    [[TMP28:%.*]] = extractelement <vscale x 8 x i1> [[ACTIVE_LANE_MASK_NEXT]], i64 0
 ; CHECK-ORDERED-TF-NEXT:    [[TMP30]] = call <vscale x 8 x i1> @llvm.vector.extract.nxv8i1.nxv32i1(<vscale x 32 x i1> [[ACTIVE_LANE_MASK_NEXT1]], i64 8)
 ; CHECK-ORDERED-TF-NEXT:    [[TMP31]] = call <vscale x 8 x i1> @llvm.vector.extract.nxv8i1.nxv32i1(<vscale x 32 x i1> [[ACTIVE_LANE_MASK_NEXT1]], i64 16)
 ; CHECK-ORDERED-TF-NEXT:    [[TMP32]] = call <vscale x 8 x i1> @llvm.vector.extract.nxv8i1.nxv32i1(<vscale x 32 x i1> [[ACTIVE_LANE_MASK_NEXT1]], i64 24)
-; CHECK-ORDERED-TF-NEXT:    [[TMP28:%.*]] = extractelement <vscale x 8 x i1> [[ACTIVE_LANE_MASK_NEXT]], i64 0
 ; CHECK-ORDERED-TF-NEXT:    [[TMP29:%.*]] = xor i1 [[TMP28]], true
 ; CHECK-ORDERED-TF-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[TMP2]]
 ; CHECK-ORDERED-TF-NEXT:    br i1 [[TMP29]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]

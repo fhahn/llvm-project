@@ -111,8 +111,8 @@ define void @do_not_replace_first_order_recurrence_with_versioned_iv_for_pointer
 ; CHECK-NEXT:    [[TMP10]] = zext <4 x i32> [[TMP11]] to <4 x i64>
 ; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <4 x i64> [[TMP10]], i64 0
 ; CHECK-NEXT:    [[TMP12:%.*]] = shufflevector <4 x i64> [[VECTOR_RECUR]], <4 x i64> [[TMP10]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
-; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds double, ptr [[X]], i64 [[TMP13]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <4 x i64> [[TMP12]], i64 0
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds double, ptr [[X]], i64 [[TMP13]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds double, ptr [[Y]], i64 [[TMP15]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x double>, ptr [[TMP14]], align 8
 ; CHECK-NEXT:    store <4 x double> [[WIDE_LOAD]], ptr [[TMP16]], align 8

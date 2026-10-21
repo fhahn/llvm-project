@@ -23,6 +23,7 @@
 #include "VPlanUtils.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Analysis/IVDescriptors.h"
 #include "llvm/Analysis/LoopAccessAnalysis.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
@@ -809,46 +810,98 @@ void VPlanTransforms::materializeBackedgeTakenCount(VPlan &Plan,
   BTC->replaceAllUsesWith(TCMO);
 }
 
+/// Returns true if \p V is generated as a vector when executing the plan for a
+/// vector VF, i.e. users of its scalars need explicit extracts.
+static bool generatesVector(const VPValue *V) {
+  const VPRecipeBase *R = V->getDefiningRecipe();
+  // Live-ins, symbolic and region values are scalars.
+  if (!R)
+    return false;
+  return TypeSwitch<const VPRecipeBase *, bool>(R)
+      // Single scalars or scalars per lane by construction.
+      .Case<VPReplicateRecipe, VPScalarIVStepsRecipe, VPDerivedIVRecipe,
+            VPExpandSCEVRecipe, VPVectorPointerRecipe, VPVectorEndPointerRecipe,
+            VPPredInstPHIRecipe, VPCurrentIterationPHIRecipe>(
+          [](auto *) { return false; })
+      // Single scalars depending on how the recipe was created.
+      .Case([](const VPReductionRecipe *Red) {
+        return Red->isPartialReduction();
+      })
+      .Case([](const VPReductionPHIRecipe *Phi) { return !Phi->isInLoop(); })
+      .Case([](const VPExpressionRecipe *Expr) {
+        return !Expr->isVectorToScalar();
+      })
+      // Scalars if all lanes are equal or only the first lane is used.
+      .Case([](const VPWidenGEPRecipe *GEP) {
+        return !vputils::isSingleScalar(GEP);
+      })
+      .Case([](const VPBlendRecipe *Blend) {
+        return !vputils::onlyFirstLaneUsed(Blend);
+      })
+      .Case([](const VPInstruction *VPI) {
+        return !VPI->doesGeneratePerAllLanes() &&
+               !VPI->inferGeneratesSingleScalar();
+      })
+      .Default(true);
+}
+
 void VPlanTransforms::materializeUnpacks(VPlan &Plan) {
   if (Plan.hasScalarVFOnly())
     return;
 
-  auto VPBBsInsideLoopRegion = VPBlockUtils::blocksOnly<VPBasicBlock>(
-      vp_depth_first_shallow(Plan.getVectorLoopRegion()->getEntry()));
-  // Create explicit VPInstructions to convert vectors to scalars. The current
-  // implementation is conservative - it may miss some cases that may or may not
-  // be vector values. TODO: introduce Unpacks speculatively - remove them later
-  // if they are known to operate on scalar values.
-  for (VPBasicBlock *VPBB : VPBBsInsideLoopRegion) {
-    for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
-      if (isa<VPReplicateRecipe, VPInstruction, VPScalarIVStepsRecipe,
-              VPDerivedIVRecipe>(&R))
-        continue;
+  // Replace uses of values generated as vectors that only need their first
+  // lane, or any lane if all lanes are equal, by a single extract of the first
+  // lane, placed directly after the definition. Definitions are visited after
+  // their users, as whether a user only needs the first lane of an operand may
+  // depend on its own users, e.g. if it only generates the first lane when
+  // only that is used. Header phis are visited after the definitions of their
+  // backedge values, which is harmless as their uses of operands do not depend
+  // on their users.
+  SmallVector<VPInstruction *> Extracts;
+  PostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> POT(
+      Plan.getEntry());
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(POT)) {
+    for (VPRecipeBase &R : reverse(*VPBB)) {
       for (VPValue *Def : R.definedValues()) {
-        // Skip recipes that are single-scalar.
-        // TODO: The Defs skipped here may or may not be vector values.
-        // Introduce Unpacks, and remove them later, if they are guaranteed to
-        // produce scalar values.
-        if (vputils::isSingleScalar(Def))
+        if (!generatesVector(Def))
           continue;
-
-        // Only introduce an Unpack if some, but not all, users use the first
-        // lane only.
-        unsigned NumFirstLaneUsers = count_if(Def->users(), [&Def](VPUser *U) {
-          return U->usesFirstLaneOnly(Def);
-        });
-        if (!NumFirstLaneUsers || NumFirstLaneUsers == Def->getNumUsers())
-          continue;
-
-        auto *Unpack = new VPInstruction(VPInstruction::Unpack, {Def});
-        if (R.isPhi())
-          Unpack->insertBefore(*VPBB, VPBB->getFirstNonPhi());
-        else
-          Unpack->insertAfter(&R);
-        Def->replaceUsesWithIf(
-            Unpack, [&Def](VPUser *U) { return U->usesFirstLaneOnly(Def); });
+        bool IsSingleScalar = vputils::isSingleScalar(Def);
+        VPInstruction *Extract = nullptr;
+        for (VPUser *U : to_vector(Def->users())) {
+          // Skip existing extracts of the first lane, which already extract the
+          // scalar explicitly.
+          if (match(U, m_ExtractElement(m_VPValue(), m_ZeroInt())))
+            continue;
+          for (const auto &[Idx, Op] : enumerate(U->operands())) {
+            if (Op != Def || !(U->usesFirstLaneOnly(Def) ||
+                               (IsSingleScalar && U->usesScalars(Def))))
+              continue;
+            if (!Extract) {
+              VPBuilder Builder(VPBB, R.isPhi() ? VPBB->getFirstNonPhi()
+                                                : std::next(R.getIterator()));
+              Extract = Builder.createNaryOp(Instruction::ExtractElement,
+                                             {Def, Plan.getConstantInt(64, 0)},
+                                             R.getDebugLoc());
+              Extracts.push_back(Extract);
+            }
+            U->setOperand(Idx, Extract);
+          }
+        }
       }
     }
+  }
+
+  // Some values, like most VPInstructions, are generated as single scalars if
+  // only their first lane is used, making their extract a no-op. Let the users
+  // of such extracts use the values directly. This is done after visiting all
+  // recipes, so that the operands of these values are extracted as for any
+  // single-scalar user.
+  for (VPInstruction *Extract : Extracts) {
+    VPValue *Def = Extract->getOperand(0);
+    if (generatesVector(Def))
+      continue;
+    Extract->replaceAllUsesWith(Def);
+    Extract->eraseFromParent();
   }
 }
 

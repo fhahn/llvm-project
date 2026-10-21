@@ -499,7 +499,8 @@ struct VPlanTransforms {
   static void materializeBackedgeTakenCount(VPlan &Plan,
                                             VPBasicBlock *VectorPH);
 
-  /// Add explicit Unpack recipes to extract scalars from vectors as needed.
+  /// Add explicit extracts of the first lane for recipes only using the first
+  /// lane of values generated as vectors, or any lane of uniform ones.
   static void materializeUnpacks(VPlan &Plan);
 
   /// Materialize UF, VF and VFxUF to be computed explicitly using

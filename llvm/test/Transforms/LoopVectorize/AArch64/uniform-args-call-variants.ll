@@ -64,8 +64,8 @@ define void @test_uniform(ptr noalias %dst, ptr readonly %src, i64 %uniform , i6
 ; INTERLEAVE-NEXT:    call void @llvm.masked.store.nxv2f64.p0(<vscale x 2 x double> [[TMP6]], ptr align 8 [[TMP8]], <vscale x 2 x i1> [[ACTIVE_LANE_MASK2]])
 ; INTERLEAVE-NEXT:    [[ACTIVE_LANE_MASK_NEXT:%.*]] = call <vscale x 4 x i1> @llvm.get.active.lane.mask.nxv4i1.i64(i64 [[INDEX]], i64 [[TRIP_COUNT_MINUS_VF]])
 ; INTERLEAVE-NEXT:    [[EXTRACT_NEXT_ALM_PART]] = call <vscale x 2 x i1> @llvm.vector.extract.nxv2i1.nxv4i1(<vscale x 4 x i1> [[ACTIVE_LANE_MASK_NEXT]], i64 0)
-; INTERLEAVE-NEXT:    [[EXTRACT_NEXT_ALM_PART4]] = call <vscale x 2 x i1> @llvm.vector.extract.nxv2i1.nxv4i1(<vscale x 4 x i1> [[ACTIVE_LANE_MASK_NEXT]], i64 2)
 ; INTERLEAVE-NEXT:    [[TMP9:%.*]] = extractelement <vscale x 2 x i1> [[EXTRACT_NEXT_ALM_PART]], i64 0
+; INTERLEAVE-NEXT:    [[EXTRACT_NEXT_ALM_PART4]] = call <vscale x 2 x i1> @llvm.vector.extract.nxv2i1.nxv4i1(<vscale x 4 x i1> [[ACTIVE_LANE_MASK_NEXT]], i64 2)
 ; INTERLEAVE-NEXT:    [[TMP10:%.*]] = xor i1 [[TMP9]], true
 ; INTERLEAVE-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[TMP2]]
 ; INTERLEAVE-NEXT:    br i1 [[TMP10]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
@@ -150,8 +150,8 @@ define void @test_uniform_smaller_scalar(ptr noalias %dst, ptr readonly %src, i3
 ; INTERLEAVE-NEXT:    call void @llvm.masked.store.nxv2f64.p0(<vscale x 2 x double> [[TMP6]], ptr align 8 [[TMP8]], <vscale x 2 x i1> [[ACTIVE_LANE_MASK2]])
 ; INTERLEAVE-NEXT:    [[ACTIVE_LANE_MASK_NEXT:%.*]] = call <vscale x 4 x i1> @llvm.get.active.lane.mask.nxv4i1.i64(i64 [[INDEX]], i64 [[TRIP_COUNT_MINUS_VF]])
 ; INTERLEAVE-NEXT:    [[EXTRACT_NEXT_ALM_PART]] = call <vscale x 2 x i1> @llvm.vector.extract.nxv2i1.nxv4i1(<vscale x 4 x i1> [[ACTIVE_LANE_MASK_NEXT]], i64 0)
-; INTERLEAVE-NEXT:    [[EXTRACT_NEXT_ALM_PART4]] = call <vscale x 2 x i1> @llvm.vector.extract.nxv2i1.nxv4i1(<vscale x 4 x i1> [[ACTIVE_LANE_MASK_NEXT]], i64 2)
 ; INTERLEAVE-NEXT:    [[TMP9:%.*]] = extractelement <vscale x 2 x i1> [[EXTRACT_NEXT_ALM_PART]], i64 0
+; INTERLEAVE-NEXT:    [[EXTRACT_NEXT_ALM_PART4]] = call <vscale x 2 x i1> @llvm.vector.extract.nxv2i1.nxv4i1(<vscale x 4 x i1> [[ACTIVE_LANE_MASK_NEXT]], i64 2)
 ; INTERLEAVE-NEXT:    [[TMP10:%.*]] = xor i1 [[TMP9]], true
 ; INTERLEAVE-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[TMP2]]
 ; INTERLEAVE-NEXT:    br i1 [[TMP10]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]

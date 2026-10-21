@@ -2232,12 +2232,14 @@ static bool simplifyBranchConditionForVFAndUF(VPlan &Plan, ElementCount BestVF,
       (!Offset || Offset->isDefinedOutsideLoopRegions());
   if (MatchedCanIVInc ||
       match(Term,
-            m_BranchOnCond(m_Not(m_ExtractVectorForPart(
-                m_WideActiveLaneMask(m_VPValue(), m_VPValue(), m_VPValue()),
-                m_ZeroInt()))))) {
+            m_BranchOnCond(
+                m_Not(m_ExtractFirstLaneOrSelf(m_ExtractVectorForPart(
+                    m_WideActiveLaneMask(m_VPValue(), m_VPValue(), m_VPValue()),
+                    m_ZeroInt())))))) {
     // Try to simplify the branch condition if VectorTC <= VF * UF when the
-    // latch terminator is BranchOnCount or
-    // BranchOnCond(Not(ExtractVectorForPart(WideActiveLaneMask), 0))
+    // latch terminator is BranchOnCount or BranchOnCond(Not(Extract)), where
+    // Extract is (an extract of the first lane of)
+    // ExtractVectorForPart(WideActiveLaneMask, 0).
     const SCEV *VectorTripCount =
         vputils::getSCEVExprForVPValue(&Plan.getVectorTripCount(), PSE);
     if (isa<SCEVCouldNotCompute>(VectorTripCount))

@@ -1447,6 +1447,11 @@ public:
   /// Returns true if this recipe produces scalar values for all VF lanes.
   bool doesGeneratePerAllLanes() const;
 
+  /// Returns true if a single scalar is generated, either because the recipe is
+  /// known to generate one or because only its first lane is used.
+  /// TODO: Replace remaining inferred cases with GeneratesSingleScalar.
+  bool inferGeneratesSingleScalar() const;
+
   /// Return the number of operands determined by the opcode of the
   /// VPInstruction, excluding mask. Returns -1u if the number of operands
   /// cannot be determined directly by the opcode.
@@ -1461,11 +1466,6 @@ private:
 
   /// Whether this VPInstruction produces a single scalar value.
   const bool GeneratesSingleScalar;
-
-  /// Returns true if a single scalar is generated, either because the recipe is
-  /// known to generate one or because only its first lane is used.
-  /// TODO: Replace remaining inferred cases with GeneratesSingleScalar.
-  bool inferGeneratesSingleScalar() const;
 
   /// Utility method serving execute: Generates either a single-scalar or vector
   /// value. \p GenerateSingleScalar determines whether to generate a

@@ -1620,9 +1620,9 @@ define void @sink_stores_cse_select_dropping_fmf(ptr %dst, ptr %src, ptr %invar.
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x float> poison, float [[TMP1]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x float> [[BROADCAST_SPLATINSERT]], <2 x float> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP2:%.*]] = fmul <2 x float> [[BROADCAST_SPLAT]], splat (float 3.000000e+00)
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <2 x float> [[TMP2]], i64 0
 ; CHECK-NEXT:    [[TMP3:%.*]] = fmul nnan <2 x float> [[BROADCAST_SPLAT]], splat (float 2.000000e+00)
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x float> [[TMP3]], i64 0
-; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <2 x float> [[TMP2]], i64 0
 ; CHECK-NEXT:    [[TMP6:%.*]] = select i1 [[C]], float [[TMP4]], float [[TMP5]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = fmul nnan float [[TMP6]], 5.000000e+00
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]

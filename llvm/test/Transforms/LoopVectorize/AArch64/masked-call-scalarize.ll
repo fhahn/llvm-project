@@ -148,8 +148,8 @@ define void @test_widen_exp_v2(ptr noalias %p2, ptr noalias %p, i64 %n) #5 {
 ; TFA_INTERLEAVE:       [[PRED_STORE_CONTINUE8]]:
 ; TFA_INTERLEAVE-NEXT:    [[ACTIVE_LANE_MASK_NEXT1:%.*]] = call <4 x i1> @llvm.get.active.lane.mask.v4i1.i64(i64 [[INDEX]], i64 [[TRIP_COUNT_MINUS_VF]])
 ; TFA_INTERLEAVE-NEXT:    [[ACTIVE_LANE_MASK_NEXT]] = call <2 x i1> @llvm.vector.extract.v2i1.v4i1(<4 x i1> [[ACTIVE_LANE_MASK_NEXT1]], i64 0)
-; TFA_INTERLEAVE-NEXT:    [[TMP16]] = call <2 x i1> @llvm.vector.extract.v2i1.v4i1(<4 x i1> [[ACTIVE_LANE_MASK_NEXT1]], i64 2)
 ; TFA_INTERLEAVE-NEXT:    [[TMP14:%.*]] = extractelement <2 x i1> [[ACTIVE_LANE_MASK_NEXT]], i64 0
+; TFA_INTERLEAVE-NEXT:    [[TMP16]] = call <2 x i1> @llvm.vector.extract.v2i1.v4i1(<4 x i1> [[ACTIVE_LANE_MASK_NEXT1]], i64 2)
 ; TFA_INTERLEAVE-NEXT:    [[TMP15:%.*]] = xor i1 [[TMP14]], true
 ; TFA_INTERLEAVE-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
 ; TFA_INTERLEAVE-NEXT:    br i1 [[TMP15]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]

@@ -328,15 +328,13 @@ define void @store_groups_sharing_invariant_ops_swapped(ptr noalias %A, ptr noal
 ; VF2-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <2 x i32> poison, i32 [[X_0]], i64 0
 ; VF2-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT1]], <2 x i32> poison, <2 x i32> zeroinitializer
 ; VF2-NEXT:    [[TMP0:%.*]] = sext <2 x i32> [[BROADCAST_SPLAT2]] to <2 x i64>
-; VF2-NEXT:    [[TMP1:%.*]] = sext <2 x i32> [[BROADCAST_SPLAT]] to <2 x i64>
 ; VF2-NEXT:    [[TMP2:%.*]] = extractelement <2 x i64> [[TMP0]], i64 0
-; VF2-NEXT:    [[TMP3:%.*]] = insertelement <2 x i64> poison, i64 [[TMP2]], i64 0
+; VF2-NEXT:    [[TMP1:%.*]] = sext <2 x i32> [[BROADCAST_SPLAT]] to <2 x i64>
 ; VF2-NEXT:    [[TMP4:%.*]] = extractelement <2 x i64> [[TMP1]], i64 0
+; VF2-NEXT:    [[TMP3:%.*]] = insertelement <2 x i64> poison, i64 [[TMP2]], i64 0
 ; VF2-NEXT:    [[TMP5:%.*]] = insertelement <2 x i64> [[TMP3]], i64 [[TMP4]], i64 1
-; VF2-NEXT:    [[TMP6:%.*]] = extractelement <2 x i64> [[TMP1]], i64 0
-; VF2-NEXT:    [[TMP7:%.*]] = insertelement <2 x i64> poison, i64 [[TMP6]], i64 0
-; VF2-NEXT:    [[TMP8:%.*]] = extractelement <2 x i64> [[TMP0]], i64 0
-; VF2-NEXT:    [[TMP9:%.*]] = insertelement <2 x i64> [[TMP7]], i64 [[TMP8]], i64 1
+; VF2-NEXT:    [[TMP7:%.*]] = insertelement <2 x i64> poison, i64 [[TMP4]], i64 0
+; VF2-NEXT:    [[TMP9:%.*]] = insertelement <2 x i64> [[TMP7]], i64 [[TMP2]], i64 1
 ; VF2-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; VF2:       [[VECTOR_BODY]]:
 ; VF2-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]

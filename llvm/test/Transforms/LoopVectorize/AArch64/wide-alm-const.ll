@@ -30,8 +30,8 @@ define void @scalable_wide_active_lane_mask_double(ptr noalias %dst, ptr readonl
 ; CHECK-UF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-UF4-NEXT:    [[ACTIVE_LANE_MASK_NEXT:%.*]] = call <8 x i1> @llvm.get.active.lane.mask.v8i1.i64(i64 [[INDEX_NEXT]], i64 9)
 ; CHECK-UF4-NEXT:    [[EXTRACT_NEXT_ALM_PART]] = call <4 x i1> @llvm.vector.extract.v4i1.v8i1(<8 x i1> [[ACTIVE_LANE_MASK_NEXT]], i64 0)
-; CHECK-UF4-NEXT:    [[EXTRACT_NEXT_ALM_PART4]] = call <4 x i1> @llvm.vector.extract.v4i1.v8i1(<8 x i1> [[ACTIVE_LANE_MASK_NEXT]], i64 4)
 ; CHECK-UF4-NEXT:    [[TMP6:%.*]] = extractelement <4 x i1> [[EXTRACT_NEXT_ALM_PART]], i64 0
+; CHECK-UF4-NEXT:    [[EXTRACT_NEXT_ALM_PART4]] = call <4 x i1> @llvm.vector.extract.v4i1.v8i1(<8 x i1> [[ACTIVE_LANE_MASK_NEXT]], i64 4)
 ; CHECK-UF4-NEXT:    [[TMP7:%.*]] = xor i1 [[TMP6]], true
 ; CHECK-UF4-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK-UF4:       [[MIDDLE_BLOCK]]:

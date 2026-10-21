@@ -1793,7 +1793,7 @@ bool VPInstruction::usesFirstLaneOnly(const VPValue *Op) const {
   default:
     return false;
   case Instruction::ExtractElement:
-    return Op == getOperand(1);
+    return Op == getOperand(1) || match(getOperand(1), m_ZeroInt());
   case Instruction::InsertElement:
     return Op == getOperand(1) || Op == getOperand(2);
   case VPInstruction::ExtractLastActive:
