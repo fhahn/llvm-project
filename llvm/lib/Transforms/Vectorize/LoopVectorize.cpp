@@ -4625,11 +4625,10 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I,
       // The back-edge branch will remain, as will all scalar branches.
       return TTI.getCFInstrCost(Instruction::UncondBr, Config.CostKind);
 
-    // This branch will be eliminated by if-conversion.
+    // The branch is either eliminated by if-conversion, or remains as the
+    // unconditional branch of a predicated block in a replicate region, which
+    // is costed by VPlan.
     return 0;
-    // Note: We currently assume zero cost for an unconditional branch inside
-    // a predicated block since it will become a fall-through, although we
-    // may decide in the future to call TTI for all branches.
   }
   case Instruction::Switch: {
     if (VF.isScalar())
@@ -5270,25 +5269,21 @@ LoopVectorizationPlanner::precomputeCosts(VPlan &Plan, ElementCount VF,
     addFullyUnrolledInstructionsToIgnore(OrigLoop, Legal->getInductionVars(),
                                          CostCtx.SkipCostComputation);
 
-  // Pre-compute the costs for branches except for the backedge, as the number
-  // of replicate regions in a VPlan may not directly match the number of
-  // branches, which would lead to different decisions.
-  // TODO: Compute cost of branches for each replicate region in the VPlan,
-  // which is more accurate than the legacy cost model.
-  for (BasicBlock *BB : OrigLoop->blocks()) {
-    if (CostCtx.skipCostComputation(BB->getTerminator(), VF.isVector()))
-      continue;
-    CostCtx.SkipCostComputation.insert(BB->getTerminator());
-    if (BB == OrigLoop->getLoopLatch())
-      continue;
-    auto BranchCost = CostCtx.getLegacyCost(BB->getTerminator(), VF);
-    Cost += BranchCost;
-  }
-
   // Don't apply special costs when instruction cost is forced to make sure the
   // forced cost is used for each recipe.
   if (Opts.force_target_instruction_cost)
     return Cost;
+
+  // Branches are costed by VPlan. For vector VFs, the legacy cost model assigns
+  // no cost to unconditional branches other than the backedge.
+  assert((VF.isScalar() ||
+          all_of(OrigLoop->blocks(),
+                 [&](BasicBlock *BB) {
+                   return BB == OrigLoop->getLoopLatch() ||
+                          !isa<UncondBrInst>(BB->getTerminator()) ||
+                          CostCtx.getLegacyCost(BB->getTerminator(), VF) == 0;
+                 })) &&
+         "legacy cost model must not charge unconditional branches");
 
   // Pre-compute costs for instructions that are forced-scalar or profitable to
   // scalarize. For most such instructions, their scalarization costs are
