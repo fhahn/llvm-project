@@ -945,28 +945,52 @@ static bool tryToSinkOrHoistRecurrenceUsers(VPBasicBlock *HeaderVPBB,
   return true;
 }
 
-/// If \p PhiR is an integer induction of the form phi [Start, add(phi, Step)]
-/// with a non-zero loop-invariant Step, return its induction descriptor.
+/// If \p PhiR is an integer induction phi [Start, BackedgeVal], where
+/// BackedgeVal is a chain of adds and subs computing PhiR plus a non-zero
+/// loop-invariant step, return its induction descriptor.
 static std::optional<InductionDescriptor>
 getIntInductionDescriptor(VPPhi *PhiR, PredicatedScalarEvolution &PSE,
                           const Loop &L) {
-  VPValue *BackedgeVal = PhiR->getOperand(1);
-  VPValue *StepV;
-  if (!match(BackedgeVal, m_c_Add(m_Specific(PhiR), m_VPValue(StepV))))
+  Type *Ty = PhiR->getScalarType();
+  if (!Ty->isIntegerTy())
     return std::nullopt;
-  const SCEV *Step =
-      PSE.getPredicatedSCEV(vputils::getSCEVExprForVPValue(StepV, PSE, &L));
-  if (isa<SCEVCouldNotCompute>(Step) || Step->isZero() ||
-      !PSE.getSE()->isLoopInvariant(Step, &L))
+  ScalarEvolution &SE = *PSE.getSE();
+  SmallVector<SCEVUse> Terms;
+  int PhiRCoeff = 0;
+  SmallVector<std::pair<VPValue *, bool>> Worklist = {
+      {PhiR->getOperand(1), false}};
+  unsigned NumVisited = 0;
+  while (!Worklist.empty()) {
+    if (++NumVisited > 16)
+      return std::nullopt;
+    auto [V, Negate] = Worklist.pop_back_val();
+    const SCEV *S = vputils::getSCEVExprForVPValue(V, PSE, &L);
+    VPValue *X, *Y;
+    if (!isa<SCEVCouldNotCompute>(S))
+      Terms.push_back(Negate ? SE.getNegativeSCEV(S) : S);
+    else if (V == PhiR)
+      PhiRCoeff += Negate ? -1 : 1;
+    else if (match(V, m_Add(m_VPValue(X), m_VPValue(Y))))
+      Worklist.append({{X, Negate}, {Y, Negate}});
+    else if (match(V, m_Sub(m_VPValue(X), m_VPValue(Y))))
+      Worklist.append({{X, Negate}, {Y, !Negate}});
+    else
+      return std::nullopt;
+  }
+  if (Terms.empty())
+    return std::nullopt;
+  const SCEV *Step = PSE.getPredicatedSCEV(SE.getAddExpr(Terms));
+  if (PhiRCoeff != 1 || Step->isZero() || !SE.isLoopInvariant(Step, &L))
     return std::nullopt;
   return InductionDescriptor(cast<VPIRValue>(PhiR->getOperand(0))->getValue(),
                              InductionDescriptor::IK_IntInduction, Step);
 }
 
 #ifndef NDEBUG
-/// Returns true if \p IndDesc, detected on VPlan, matches legality's
-/// \p LegalDesc.
+/// Returns true if \p IndDesc with \p Opcode, detected on VPlan, matches
+/// legality's \p LegalDesc.
 static bool matchesLegalInduction(const InductionDescriptor &IndDesc,
+                                  Instruction::BinaryOps Opcode,
                                   const InductionDescriptor &LegalDesc,
                                   PredicatedScalarEvolution &PSE) {
   // VPlan0 simplifications (stride replacement, combineRecipes, DCE) may make
@@ -974,8 +998,10 @@ static bool matchesLegalInduction(const InductionDescriptor &IndDesc,
   Instruction::BinaryOps LegalOpcode = LegalDesc.getInductionOpcode();
   return LegalDesc.getKind() == IndDesc.getKind() &&
          LegalDesc.getNoWrapPredicates().empty() &&
+         LegalDesc.getCastInsts().empty() &&
          PSE.getPredicatedSCEV(LegalDesc.getStep()) == IndDesc.getStep() &&
-         LegalOpcode != Instruction::Sub;
+         (LegalOpcode == Opcode ||
+          (LegalOpcode != Instruction::Add && LegalOpcode != Instruction::Sub));
 }
 #endif
 
@@ -1015,11 +1041,14 @@ bool VPlanTransforms::createHeaderPhiRecipes(
     if (!Reductions.contains(Phi))
       IndDesc = getIntInductionDescriptor(PhiR, PSE, OrigLoop);
     if (IndDesc) {
-      assert(InductionIt != Inductions.end() &&
-             matchesLegalInduction(*IndDesc, InductionIt->second, PSE) &&
-             "VPlan-detected induction must match legality");
-      return createWidenInductionRecipe(Phi, PhiR, Start, *IndDesc,
-                                        Instruction::Add, Plan, PSE, OrigLoop,
+      auto Opcode = static_cast<Instruction::BinaryOps>(
+          cast<VPInstruction>(BackedgeValue)->getOpcode());
+      assert(
+          InductionIt != Inductions.end() &&
+          matchesLegalInduction(*IndDesc, Opcode, InductionIt->second, PSE) &&
+          "VPlan-detected induction must match legality");
+      return createWidenInductionRecipe(Phi, PhiR, Start, *IndDesc, Opcode,
+                                        Plan, PSE, OrigLoop,
                                         PhiR->getDebugLoc());
     }
     if (InductionIt != Inductions.end())
