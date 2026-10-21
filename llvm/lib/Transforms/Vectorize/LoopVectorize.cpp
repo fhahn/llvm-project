@@ -5767,10 +5767,6 @@ BasicBlock *EpilogueVectorizerEpilogueLoop::createVectorizedLoopSkeleton() {
   return OriginalScalarPH;
 }
 
-bool VPRecipeBuilder::isPredicatedInst(Instruction *I) const {
-  return CM.isPredicatedInst(I);
-}
-
 bool VPRecipeBuilder::prefersVectorizedAddressing() const {
   return CM.TTI.prefersVectorizedAddressing();
 }

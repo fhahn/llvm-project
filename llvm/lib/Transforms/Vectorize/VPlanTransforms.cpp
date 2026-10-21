@@ -33,6 +33,7 @@
 #include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/Analysis/ScopedNoAliasAA.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Analysis/VectorUtils.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/MDBuilder.h"
@@ -5927,6 +5928,26 @@ void VPlanTransforms::createPartialReductions(VPlan &Plan,
   }
 }
 
+/// Returns true if the load or store \p VPI needs to be predicated.
+static bool needsPredication(VPInstruction *VPI, VPCostContext &CostCtx) {
+  VPValue *Mask = VPI->getMask();
+  if (!Mask)
+    return false;
+  if (VPI->getOpcode() == Instruction::Store)
+    return true;
+  // TODO: Replace the legacy checks below with VPlan-based reasoning.
+  auto *LI = cast<LoadInst>(VPI->getUnderlyingInstr());
+  if (isSafeToSpeculativelyExecute(LI) || !CostCtx.isMaskRequired(LI))
+    return false;
+  // The header mask has its first lane active, so loads only masked by it don't
+  // need predication if their address is loop-invariant.
+  if (match(Mask, m_HeaderMask())) {
+    ScalarEvolution &SE = *CostCtx.PSE.getSE();
+    return !SE.isLoopInvariant(SE.getSCEV(LI->getPointerOperand()), CostCtx.L);
+  }
+  return true;
+}
+
 void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
                                                  VPRecipeBuilder &RecipeBuilder,
                                                  VPCostContext &CostCtx) {
@@ -5944,6 +5965,12 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         MemOps.push_back(&VPI);
     }
   }
+
+  // Decide predication before the sub-passes below modify the plan.
+  SmallPtrSet<VPInstruction *, 8> PredicatedMemOps;
+  for (VPInstruction *VPI : MemOps)
+    if (needsPredication(VPI, CostCtx))
+      PredicatedMemOps.insert(VPI);
 
   // Few helpers to process different kinds of memory operations.
 
@@ -6016,7 +6043,7 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         "makeVPlanMemOpDecision", ProcessSubset, Plan, [&](VPInstruction *VPI) {
           Instruction *I = VPI->getUnderlyingInstr();
           bool IsLoad = VPI->getOpcode() == Instruction::Load;
-          if (RecipeBuilder.isPredicatedInst(I) || !IsLoad ||
+          if (PredicatedMemOps.contains(VPI) || !IsLoad ||
               !vputils::isUsedByLoadStoreAddress(VPI))
             return false;
 
@@ -6056,8 +6083,7 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
 
         // A predicated access can only be widened (rather than scalarized) if
         // the target supports a masked load/store for it.
-        // TODO: Determine if a load/store needs predication directly in VPlan.
-        bool IsPredicated = RecipeBuilder.isPredicatedInst(I);
+        bool IsPredicated = PredicatedMemOps.contains(VPI);
         if (IsPredicated && !CostCtx.Config.isLegalMaskedLoadOrStore(
                                 IsLoad, ScalarTy, getLoadStoreAlignment(I),
                                 getLoadStoreAddressSpace(I)))
