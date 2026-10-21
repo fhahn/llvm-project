@@ -176,9 +176,6 @@ void MachineLateInstrsCleanup::removeRedundantDef(MachineInstr *MI) {
 static bool isCandidate(const MachineInstr *MI, Register &DefedReg,
                         Register FrameReg) {
   DefedReg = MCRegister::NoRegister;
-  bool SawStore = true;
-  if (!MI->isSafeToMove(SawStore) || MI->isImplicitDef() || MI->isInlineAsm())
-    return false;
   for (unsigned i = 0, e = MI->getNumOperands(); i != e; ++i) {
     const MachineOperand &MO = MI->getOperand(i);
     if (MO.isReg()) {
@@ -193,7 +190,10 @@ static bool isCandidate(const MachineInstr *MI, Register &DefedReg,
                  MO.isGlobal() || MO.isSymbol()))
       return false;
   }
-  return DefedReg.isValid();
+  // The operand checks above are cheaper and reject most instructions.
+  bool SawStore = true;
+  return DefedReg.isValid() && MI->isSafeToMove(SawStore) &&
+         !MI->isImplicitDef() && !MI->isInlineAsm();
 }
 
 bool MachineLateInstrsCleanup::processBlock(MachineBasicBlock *MBB) {
