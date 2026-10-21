@@ -6285,7 +6285,7 @@ static CallWideningDecision decideCallWidening(VPInstruction &VPI,
   auto *CI = cast<CallInst>(VPI.getUnderlyingInstr());
 
   // Scalar VFs and calls forced or known to scalarize always replicate.
-  if (VF.isScalar() || CostCtx.willBeScalarized(CI, VF))
+  if (VF.isScalar() || CostCtx.willBeScalarized(&VPI, VF))
     return CallWideningDecision::KindTy::Scalarize;
 
   auto *CalledFn = cast<Function>(

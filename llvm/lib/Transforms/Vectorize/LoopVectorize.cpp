@@ -882,14 +882,6 @@ public:
     return FS != ForcedScalars.end() && FS->second.contains(I);
   }
 
-private:
-  const VectorizeOptions &Opts;
-
-  unsigned NumPredStores = 0;
-
-  /// VF selection state independent of cost-modeling decisions.
-  VFSelectionContext &Config;
-
   /// Wrapper around LoopVectorizationLegality::isUniform() that takes into
   /// account if alias-masking is enabled. We consider the VF to be unknown when
   /// alias masking.
@@ -916,6 +908,14 @@ private:
                                         ? std::optional(VF)
                                         : std::nullopt);
   }
+
+private:
+  const VectorizeOptions &Opts;
+
+  unsigned NumPredStores = 0;
+
+  /// VF selection state independent of cost-modeling decisions.
+  VFSelectionContext &Config;
 
   /// Calculate vectorization cost of memory instruction \p I.
   InstructionCost getMemoryInstructionCost(Instruction *I, ElementCount VF);
@@ -5290,9 +5290,30 @@ void VPCostContext::invalidateWideningDecision(Instruction *I,
                          LoopVectorizationCostModel::CM_InvalidatedDecision, 0);
 }
 
-bool VPCostContext::willBeScalarized(Instruction *I, ElementCount VF) const {
+/// Returns true if \p VPI is uniform after vectorization for \p VF. The legacy
+/// uniformity analysis also treats values only used by their first lane as
+/// uniform, assuming the legacy decisions for their users. Only trust it for
+/// values that are equal in all lanes or if the VPlan users only use the first
+/// lane.
+/// TODO: Remove once collectLoopUniforms no longer seeds memop addresses.
+static bool isTrustedUniform(VPInstruction *VPI, ElementCount VF,
+                             const LoopVectorizationCostModel &CM) {
+  Instruction *I = VPI->getUnderlyingInstr();
+  return VF.isScalar() ||
+         (CM.isUniformAfterVectorization(I, VF) &&
+          (CM.isUniform(I, VF) || CM.isUniformMemOp(*I, VF) ||
+           vputils::onlyFirstLaneUsed(VPI)));
+}
+
+bool VPCostContext::willBeScalarized(VPInstruction *VPI,
+                                     ElementCount VF) const {
+  Instruction *I = VPI->getUnderlyingInstr();
+  // For scalable VFs, which cannot replicate per lane, only treat trusted
+  // legacy uniforms as scalar, as in shouldWiden.
   return CM.isScalarWithPredication(I, VF) ||
-         CM.isUniformAfterVectorization(I, VF) || CM.isForcedScalar(I, VF) ||
+         (VF.isScalable() ? isTrustedUniform(VPI, VF, CM)
+                          : CM.isUniformAfterVectorization(I, VF)) ||
+         CM.isForcedScalar(I, VF) ||
          (VF.isVector() && CM.isProfitableToScalarize(I, VF));
 }
 
@@ -5863,13 +5884,17 @@ VPRecipeBase *VPRecipeBuilder::tryToWidenMemory(VPInstruction *VPI,
                                   Store->getDebugLoc());
 }
 
-bool VPRecipeBuilder::shouldWiden(Instruction *I, VFRange &Range) const {
+bool VPRecipeBuilder::shouldWiden(VPInstruction *VPI, VFRange &Range) const {
+  Instruction *I = VPI->getUnderlyingInstr();
   assert((!isa<UncondBrInst, CondBrInst, PHINode, LoadInst, StoreInst>(I)) &&
          "Instruction should have been handled earlier");
   // Instruction should be widened, unless it is scalar after vectorization,
-  // scalarization is profitable or it is predicated.
-  auto WillScalarize = [this, I](ElementCount VF) -> bool {
-    return CM.isScalarAfterVectorization(I, VF) ||
+  // scalarization is profitable or it is predicated. Scalable VFs cannot
+  // replicate per lane and their legacy scalars are the legacy uniforms, so
+  // widen those whose legacy uniformity is not trusted.
+  auto WillScalarize = [this, I, VPI](ElementCount VF) -> bool {
+    return (VF.isScalable() ? isTrustedUniform(VPI, VF, CM)
+                            : CM.isScalarAfterVectorization(I, VF)) ||
            CM.isProfitableToScalarize(I, VF) ||
            CM.isScalarWithPredication(I, VF);
   };
@@ -6011,7 +6036,7 @@ VPSingleDefRecipe *VPRecipeBuilder::handleReplication(VPInstruction *VPI,
                                                       VFRange &Range) {
   auto *I = VPI->getUnderlyingInstr();
   bool IsUniform = LoopVectorizationPlanner::getDecisionAndClampRange(
-      [&](ElementCount VF) { return CM.isUniformAfterVectorization(I, VF); },
+      [&](ElementCount VF) { return isTrustedUniform(VPI, VF, CM); },
       Range);
 
   bool IsPredicated = CM.isPredicatedInst(I);
@@ -6107,7 +6132,7 @@ VPRecipeBuilder::tryToCreateWidenNonPhiRecipe(VPSingleDefRecipe *R,
                                  /*Mask=*/nullptr, *VPI, *VPI,
                                  VPI->getDebugLoc());
 
-  if (!shouldWiden(Instr, Range))
+  if (!shouldWiden(VPI, Range))
     return nullptr;
 
   if (VPI->getOpcode() == Instruction::GetElementPtr) {

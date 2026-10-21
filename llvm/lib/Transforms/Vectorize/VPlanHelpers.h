@@ -337,8 +337,8 @@ struct VPCostContext {
   /// \p Freq should be divided by.
   uint64_t getCostDivisor(std::optional<VPExecutionFrequency> Freq) const;
 
-  /// Returns true if \p I is known to be scalarized at \p VF.
-  bool willBeScalarized(Instruction *I, ElementCount VF) const;
+  /// Returns true if \p VPI is known to be scalarized at \p VF.
+  bool willBeScalarized(VPInstruction *VPI, ElementCount VF) const;
 
   /// Returns true if the vector loop body of \p Plan is known to execute at
   /// most once at \p VF, i.e. its trip count is a constant not greater than
