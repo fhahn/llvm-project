@@ -4732,7 +4732,8 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
           Flags.setNoUnsignedWrap(true);
         Flags.setInBounds(NW.isInBounds());
 
-        OffsVal = DAG.getSExtOrTrunc(OffsVal, dl, N.getValueType());
+        if (OffsVal.getValueType() != N.getValueType())
+          OffsVal = DAG.getSExtOrTrunc(OffsVal, dl, N.getValueType());
 
         N = DAG.getMemBasePlusOffset(N, OffsVal, dl, Flags);
         continue;
