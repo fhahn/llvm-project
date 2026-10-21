@@ -26,6 +26,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/MDBuilder.h"
+#include "llvm/Transforms/Utils/LoopUtils.h"
 #include <numeric>
 
 using namespace llvm;
@@ -262,6 +263,16 @@ void UnrollState::unrollHeaderPHIByUF(VPHeaderPHIRecipe *R,
     Copy->insertBefore(*R->getParent(), InsertPt);
     addRecipeForPart(R, Copy, Part);
     if (RdxPhi) {
+      // Unrolled parts of in-loop reductions start at the identity value,
+      // except for min/max reductions.
+      if (RdxPhi->isInLoop()) {
+        RecurKind RK = RdxPhi->getRecurrenceKind();
+        if (!RecurrenceDescriptor::isMinMaxRecurrenceKind(RK))
+          Copy->setOperand(0, Plan.getOrAddLiveIn(getRecurrenceIdentity(
+                                  RK, RdxPhi->getScalarType(),
+                                  RdxPhi->getFastMathFlagsOrNone())));
+        continue;
+      }
       // If the start value is a ReductionStartVector, use the identity value
       // (second operand) for unrolled parts. If the scaling factor is > 1,
       // create a new ReductionStartVector with the scale factor and both

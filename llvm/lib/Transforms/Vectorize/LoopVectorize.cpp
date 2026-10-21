@@ -6641,11 +6641,12 @@ void LoopVectorizationPlanner::addReductionResultComputation(
         cast<VPInstruction>(U)->replaceAllUsesWith(FinalReductionResult);
     }
 
+    // In-loop reductions use the scalar start value directly.
     RecurKind RK = PhiR->getRecurrenceKind();
-    if ((!RecurrenceDescriptor::isAnyOfRecurrenceKind(RK) &&
-         !RecurrenceDescriptor::isFindIVRecurrenceKind(RK) &&
-         !RecurrenceDescriptor::isMinMaxRecurrenceKind(RK) &&
-         !RecurrenceDescriptor::isFindLastRecurrenceKind(RK))) {
+    if (!PhiR->isInLoop() && !RecurrenceDescriptor::isAnyOfRecurrenceKind(RK) &&
+        !RecurrenceDescriptor::isFindIVRecurrenceKind(RK) &&
+        !RecurrenceDescriptor::isMinMaxRecurrenceKind(RK) &&
+        !RecurrenceDescriptor::isFindLastRecurrenceKind(RK)) {
       VPBuilder PHBuilder(Plan->getVectorPreheader());
       VPValue *Iden = Plan->getOrAddLiveIn(
           getRecurrenceIdentity(RK, PhiTy, PhiR->getFastMathFlagsOrNone()));

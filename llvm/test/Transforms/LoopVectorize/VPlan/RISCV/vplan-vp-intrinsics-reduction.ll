@@ -122,7 +122,6 @@ define i32 @reduction(ptr %a, i64 %n, i32 %start) {
 ; IF-EVL-INLOOP-NEXT:  Successor(s): scalar.ph, vector.ph
 ; IF-EVL-INLOOP-EMPTY:
 ; IF-EVL-INLOOP-NEXT:  vector.ph:
-; IF-EVL-INLOOP-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = reduction-start-vector ir<%start>, ir<0>, ir<1>
 ; IF-EVL-INLOOP-NEXT:  Successor(s): vector loop
 ; IF-EVL-INLOOP-EMPTY:
 ; IF-EVL-INLOOP-NEXT:  <x1> vector loop: {
@@ -130,7 +129,7 @@ define i32 @reduction(ptr %a, i64 %n, i32 %start) {
 ; IF-EVL-INLOOP-EMPTY:
 ; IF-EVL-INLOOP-NEXT:    vector.body:
 ; IF-EVL-INLOOP-NEXT:      CURRENT-ITERATION-PHI vp<[[VP5:%[0-9]+]]> = phi ir<0>, vp<%current.iteration.next>
-; IF-EVL-INLOOP-NEXT:      WIDEN-REDUCTION-PHI ir<%rdx> = phi (add) vp<[[VP2]]>, ir<%add>
+; IF-EVL-INLOOP-NEXT:      WIDEN-REDUCTION-PHI ir<%rdx> = phi (add) ir<%start>, ir<%add>
 ; IF-EVL-INLOOP-NEXT:      EMIT-SCALAR vp<%avl> = phi [ ir<%n>, vector.ph ], [ vp<%avl.next>, vector.body ]
 ; IF-EVL-INLOOP-NEXT:      EMIT-SCALAR vp<%evl> = EXPLICIT-VECTOR-LENGTH vp<%avl>
 ; IF-EVL-INLOOP-NEXT:      EMIT-SCALAR vp<[[VP6:%[0-9]+]]> = zext vp<%evl> to i64
@@ -211,14 +210,13 @@ define i32 @reduction(ptr %a, i64 %n, i32 %start) {
 ; NO-VP-INLOOP-NEXT:  Successor(s): scalar.ph, vector.ph
 ; NO-VP-INLOOP-EMPTY:
 ; NO-VP-INLOOP-NEXT:  vector.ph:
-; NO-VP-INLOOP-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = reduction-start-vector ir<%start>, ir<0>, ir<1>
 ; NO-VP-INLOOP-NEXT:  Successor(s): vector loop
 ; NO-VP-INLOOP-EMPTY:
 ; NO-VP-INLOOP-NEXT:  <x1> vector loop: {
 ; NO-VP-INLOOP-NEXT:  vp<[[VP4:%[0-9]+]]> = CANONICAL-IV
 ; NO-VP-INLOOP-EMPTY:
 ; NO-VP-INLOOP-NEXT:    vector.body:
-; NO-VP-INLOOP-NEXT:      WIDEN-REDUCTION-PHI ir<%rdx> = phi (add) vp<[[VP3]]>, ir<%add>
+; NO-VP-INLOOP-NEXT:      WIDEN-REDUCTION-PHI ir<%rdx> = phi (add) ir<%start>, ir<%add>
 ; NO-VP-INLOOP-NEXT:      vp<[[VP5:%[0-9]+]]> = SCALAR-STEPS vp<[[VP4]]>, ir<1>, vp<[[VP0]]>
 ; NO-VP-INLOOP-NEXT:      CLONE ir<%arrayidx> = getelementptr inbounds ir<%a>, vp<[[VP5]]>
 ; NO-VP-INLOOP-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds i32, ir<%arrayidx>, ir<1>
