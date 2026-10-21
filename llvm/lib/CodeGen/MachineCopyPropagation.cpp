@@ -1117,9 +1117,6 @@ void MachineCopyPropagation::forwardCopyPropagateBlock(MachineBasicBlock &MBB) {
 }
 
 void MachineCopyPropagation::propagateDefs(MachineInstr &MI) {
-  if (!Tracker.hasAnyCopies())
-    return;
-
   for (unsigned OpIdx = 0, OpEnd = MI.getNumOperands(); OpIdx != OpEnd;
        ++OpIdx) {
     MachineOperand &MODef = MI.getOperand(OpIdx);
@@ -1207,6 +1204,10 @@ void MachineCopyPropagation::backwardCopyPropagateBlock(
         }
       }
     }
+
+    // Without tracked copies, there is nothing to invalidate or propagate.
+    if (!Tracker.hasAnyCopies())
+      continue;
 
     // Invalidate any earlyclobber regs first.
     for (const MachineOperand &MO : MI.operands())
