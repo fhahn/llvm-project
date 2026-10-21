@@ -176,7 +176,6 @@ void UnrollState::unrollWidenInductionByUF(
   VPBasicBlock *PH = cast<VPBasicBlock>(
       IV->getParent()->getEnclosingLoopRegion()->getSinglePredecessor());
   Type *IVTy = IV->getScalarType();
-  auto &ID = IV->getInductionDescriptor();
   FastMathFlags FMF;
   VPIRFlags::WrapFlagsTy WrapFlags(false, false);
   if (auto *IntOrFPInd = dyn_cast<VPWidenIntOrFpInductionRecipe>(IV)) {
@@ -213,7 +212,7 @@ void UnrollState::unrollWidenInductionByUF(
     AddOpc = VPInstruction::WidePtrAdd;
     AddFlags = GEPNoWrapFlags::none();
   } else if (IVTy->isFloatingPointTy()) {
-    AddOpc = ID.getInductionOpcode();
+    AddOpc = IV->getInductionOpcode();
     AddFlags = FMF;
   } else {
     AddOpc = Instruction::Add;

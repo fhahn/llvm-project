@@ -729,7 +729,7 @@ static void removeRedundantInductionCasts(VPlan &Plan) {
     // replace it with the original IV. Note that only the final cast is
     // expected to have users outside the cast-chain and the dead casts left
     // over will be cleaned up later.
-    ArrayRef<Instruction *> Casts = IV.getInductionDescriptor().getCastInsts();
+    ArrayRef<Instruction *> Casts = IV.getCastInsts();
     VPValue *FindMyCast = &IV;
     for (Instruction *IRCast : reverse(Casts)) {
       VPSingleDefRecipe *FoundUserCast = nullptr;
@@ -884,17 +884,16 @@ static void legalizeAndOptimizeInductions(VPlan &Plan) {
         }))
       continue;
 
-    const InductionDescriptor &ID = WideIV->getInductionDescriptor();
     VPIRFlags::WrapFlagsTy WrapFlags;
     // We can preserve nuw when the step is non-negative.
     const APInt *Step;
     if (match(WideIV->getStepValue(), m_APInt(Step)) && Step->isNonNegative())
       WrapFlags = WideIV->getNoWrapFlagsOrNone().withoutNoSignedWrap();
     VPScalarIVStepsRecipe *Steps = vputils::createScalarIVSteps(
-        Plan, ID.getKind(), ID.getInductionOpcode(),
-        dyn_cast_or_null<FPMathOperator>(ID.getInductionBinOp()),
-        WideIV->getScalarType(), WideIV->getStartValue(),
-        WideIV->getStepValue(), WideIV->getDebugLoc(), Builder, WrapFlags);
+        Plan, WideIV->getInductionKind(), WideIV->getInductionOpcode(),
+        WideIV->getFastMathFlagsOrNone(), WideIV->getScalarType(),
+        WideIV->getStartValue(), WideIV->getStepValue(), WideIV->getDebugLoc(),
+        Builder, WrapFlags);
 
     // Update scalar users of IV to use Step instead.
     if (!HasOnlyVectorVFs) {
@@ -936,11 +935,9 @@ getOptimizableIVOf(VPValue *VPV, PredicatedScalarEvolution &PSE) {
     return nullptr;
 
   auto IsWideIVInc = [&]() {
-    auto &ID = WideIV->getInductionDescriptor();
-
     // Check if VPV increments the induction by the induction step.
     VPValue *IVStep = WideIV->getStepValue();
-    switch (ID.getInductionOpcode()) {
+    switch (WideIV->getInductionOpcode()) {
     case Instruction::Add:
       return match(VPV, m_c_Add(m_Specific(WideIV), m_Specific(IVStep)));
     case Instruction::FAdd:
@@ -962,13 +959,24 @@ getOptimizableIVOf(VPValue *VPV, PredicatedScalarEvolution &PSE) {
              IVStepSCEV == SE.getNegativeSCEV(StepSCEV);
     }
     default:
-      return ID.getKind() == InductionDescriptor::IK_PtrInduction &&
+      return isa<VPWidenPointerInductionRecipe>(WideIV) &&
              match(VPV, m_GetElementPtr(m_Specific(WideIV),
                                         m_Specific(WideIV->getStepValue())));
     }
     llvm_unreachable("should have been covered by switch above");
   };
   return IsWideIVInc() ? WideIV : nullptr;
+}
+
+/// Create a VPDerivedIVRecipe computing \p WideIV's value at \p Index.
+static VPValue *createDerivedIVFor(VPBuilder &B, VPWidenInductionRecipe *WideIV,
+                                   VPValue *Index) {
+  auto *IntOrFpIV = dyn_cast<VPWidenIntOrFpInductionRecipe>(WideIV);
+  FastMathFlags FMF =
+      IntOrFpIV ? IntOrFpIV->getFastMathFlagsOrNone() : FastMathFlags();
+  return B.createDerivedIV(
+      WideIV->getInductionKind(), WideIV->getInductionOpcode(), FMF,
+      WideIV->getStartValue(), Index, WideIV->getStepValue());
 }
 
 /// Attempts to optimize the induction variable exit values for users in the
@@ -1005,14 +1013,8 @@ static VPValue *optimizeEarlyExitInductionUser(VPlan &Plan, VPValue *Op,
     EndValue = B.createAdd(EndValue, One, DL);
   }
 
-  if (!match(WideIV, m_CanonicalWidenIV())) {
-    const InductionDescriptor &ID = WideIV->getInductionDescriptor();
-    VPValue *Start = WideIV->getStartValue();
-    VPValue *Step = WideIV->getStepValue();
-    EndValue = B.createDerivedIV(
-        ID.getKind(), dyn_cast_or_null<FPMathOperator>(ID.getInductionBinOp()),
-        Start, EndValue, Step);
-  }
+  if (!match(WideIV, m_CanonicalWidenIV()))
+    EndValue = createDerivedIVFor(B, WideIV, EndValue);
 
   return EndValue;
 }
@@ -1028,15 +1030,9 @@ static VPValue *tryToComputeEndValueForInduction(VPWidenInductionRecipe *WideIV,
   if (WideIntOrFp && WideIntOrFp->isTruncated())
     return nullptr;
 
-  VPValue *Start = WideIV->getStartValue();
-  VPValue *Step = WideIV->getStepValue();
-  const InductionDescriptor &ID = WideIV->getInductionDescriptor();
   VPValue *EndValue = VectorTC;
-  if (!match(WideIV, m_CanonicalWidenIV())) {
-    EndValue = VectorPHBuilder.createDerivedIV(
-        ID.getKind(), dyn_cast_or_null<FPMathOperator>(ID.getInductionBinOp()),
-        Start, VectorTC, Step);
-  }
+  if (!match(WideIV, m_CanonicalWidenIV()))
+    EndValue = createDerivedIVFor(VectorPHBuilder, WideIV, VectorTC);
 
   // EndValue is derived from the vector trip count (which has the same type as
   // the widest induction) and thus may be wider than the induction here.
@@ -1089,12 +1085,12 @@ optimizeLatchExitInductionUser(VPlan &Plan, VPValue *Op,
                           DebugLoc::getUnknown(), "ind.escape");
   }
   if (ScalarTy->isFloatingPointTy()) {
-    const auto &ID = WideIV->getInductionDescriptor();
-    return B.createNaryOp(
-        ID.getInductionBinOp()->getOpcode() == Instruction::FAdd
-            ? Instruction::FSub
-            : Instruction::FAdd,
-        {EndValue, Step}, {ID.getInductionBinOp()->getFastMathFlags()});
+    return B.createNaryOp(WideIV->getInductionOpcode() == Instruction::FAdd
+                              ? Instruction::FSub
+                              : Instruction::FAdd,
+                          {EndValue, Step},
+                          {cast<VPWidenIntOrFpInductionRecipe>(WideIV)
+                               ->getFastMathFlagsOrNone()});
   }
   llvm_unreachable("all possible induction types must be handled");
   return nullptr;
@@ -1132,8 +1128,8 @@ static VPValue *optimizeLatchExitIVUserViaSCEV(VPlan &Plan, VPValue *Op,
   VPValue *ExitCount = Builder.createOverflowingOp(
       Instruction::Sub, {ResumeTC, Plan.getConstantInt(TCTy, 1)},
       {/*HasNUW=*/true, /*HasNSW=*/false}, DebugLoc::getUnknown());
-  return Builder.createDerivedIV(Kind, /*FPBinOp=*/nullptr, StartVPV, ExitCount,
-                                 StepVPV);
+  return Builder.createDerivedIV(Kind, Instruction::Add, {}, StartVPV,
+                                 ExitCount, StepVPV);
 }
 
 void VPlanTransforms::optimizeInductionLiveOutUsers(
@@ -2126,7 +2122,7 @@ static bool optimizeVectorInductionWidthForTCAndVFUF(VPlan &Plan,
     auto *NewWideIV = new VPWidenIntOrFpInductionRecipe(
         WideIV->getPHINode(), Plan.getZero(NewIVTy),
         Plan.getConstantInt(NewIVTy, 1), WideIV->getVFValue(),
-        WideIV->getInductionDescriptor(), *WideIV, WideIV->getDebugLoc());
+        WideIV->getInductionOpcode(), *WideIV, WideIV->getDebugLoc());
     NewWideIV->insertBefore(WideIV);
 
     auto *NewBTC = new VPWidenCastRecipe(
@@ -6308,9 +6304,9 @@ void VPlanTransforms::narrowInductionTruncates(VPlan &Plan, VFRange &Range,
       // type, so do not propagate them.
       auto *NarrowIV = new VPWidenIntOrFpInductionRecipe(
           WideIV->getPHINode(), WideIV->getStartValue(), WideIV->getStepValue(),
-          WideIV->getVFValue(), WideIV->getInductionDescriptor(),
+          WideIV->getVFValue(), WideIV->getInductionOpcode(),
           VPI.getScalarType(), VPIRFlags::WrapFlagsTy(false, false),
-          VPI.getDebugLoc());
+          VPI.getDebugLoc(), WideIV->getNoWrapPredicates());
       NarrowIV->insertBefore(*HeaderVPBB, HeaderVPBB->getFirstNonPhi());
       VPI.replaceAllUsesWith(NarrowIV);
       VPI.eraseFromParent();

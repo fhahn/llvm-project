@@ -2557,15 +2557,18 @@ protected:
 
 /// Base class for widened induction (VPWidenIntOrFpInductionRecipe and
 /// VPWidenPointerInductionRecipe), providing shared functionality, including
-/// retrieving the step value, induction descriptor and original phi node.
+/// retrieving the step value, induction opcode and original phi node.
 class VPWidenInductionRecipe : public VPHeaderPHIRecipe {
-  InductionDescriptor IndDesc;
+  Instruction::BinaryOps InductionOpcode;
+  SmallVector<const SCEVPredicate *> NoWrapPredicates;
 
 public:
   VPWidenInductionRecipe(VPRecipeTy Kind, PHINode *IV, VPValue *Start,
-                         VPValue *Step, const InductionDescriptor &IndDesc,
+                         VPValue *Step, Instruction::BinaryOps InductionOpcode,
+                         ArrayRef<const SCEVPredicate *> NoWrapPredicates,
                          Type *ResultTy, DebugLoc DL)
-      : VPHeaderPHIRecipe(Kind, IV, Start, ResultTy, DL), IndDesc(IndDesc) {
+      : VPHeaderPHIRecipe(Kind, IV, Start, ResultTy, DL),
+        InductionOpcode(InductionOpcode), NoWrapPredicates(NoWrapPredicates) {
     addOperand(Step);
   }
 
@@ -2616,12 +2619,19 @@ public:
     return cast_if_present<PHINode>(getUnderlyingValue());
   }
 
-  /// Returns the induction descriptor for the recipe.
-  const InductionDescriptor &getInductionDescriptor() const { return IndDesc; }
+  InductionDescriptor::InductionKind getInductionKind() const {
+    Type *Ty = getScalarType();
+    if (Ty->isPointerTy())
+      return InductionDescriptor::IK_PtrInduction;
+    return Ty->isFloatingPointTy() ? InductionDescriptor::IK_FpInduction
+                                   : InductionDescriptor::IK_IntInduction;
+  }
+
+  Instruction::BinaryOps getInductionOpcode() const { return InductionOpcode; }
 
   /// Returns the SCEV predicates associated with this induction.
   ArrayRef<const SCEVPredicate *> getNoWrapPredicates() const {
-    return IndDesc.getNoWrapPredicates();
+    return NoWrapPredicates;
   }
 
   VPValue *getBackedgeValue() override {
@@ -2647,27 +2657,31 @@ public:
 /// converted to concrete recipes before executing.
 class VPWidenIntOrFpInductionRecipe : public VPWidenInductionRecipe,
                                       public VPIRFlags {
+  SmallVector<Instruction *> CastInsts;
+
   // If this recipe is unrolled it will have 2 additional operands.
   bool isUnrolled() const { return getNumOperands() == 5; }
 
 public:
-  VPWidenIntOrFpInductionRecipe(PHINode *IV, VPValue *Start, VPValue *Step,
-                                VPValue *VF, const InductionDescriptor &IndDesc,
-                                const VPIRFlags &Flags, DebugLoc DL)
-      : VPWidenInductionRecipe(VPRecipeBase::VPWidenIntOrFpInductionSC, IV,
-                               Start, Step, IndDesc, Start->getScalarType(),
-                               DL),
-        VPIRFlags(Flags) {
-    addOperand(VF);
-  }
+  VPWidenIntOrFpInductionRecipe(
+      PHINode *IV, VPValue *Start, VPValue *Step, VPValue *VF,
+      Instruction::BinaryOps InductionOpcode, const VPIRFlags &Flags,
+      DebugLoc DL, ArrayRef<const SCEVPredicate *> NoWrapPredicates = {},
+      ArrayRef<Instruction *> CastInsts = {})
+      : VPWidenIntOrFpInductionRecipe(IV, Start, Step, VF, InductionOpcode,
+                                      Start->getScalarType(), Flags, DL,
+                                      NoWrapPredicates, CastInsts) {}
 
-  VPWidenIntOrFpInductionRecipe(PHINode *IV, VPValue *Start, VPValue *Step,
-                                VPValue *VF, const InductionDescriptor &IndDesc,
-                                Type *ResultTy, const VPIRFlags &Flags,
-                                DebugLoc DL)
+  VPWidenIntOrFpInductionRecipe(
+      PHINode *IV, VPValue *Start, VPValue *Step, VPValue *VF,
+      Instruction::BinaryOps InductionOpcode, Type *ResultTy,
+      const VPIRFlags &Flags, DebugLoc DL,
+      ArrayRef<const SCEVPredicate *> NoWrapPredicates = {},
+      ArrayRef<Instruction *> CastInsts = {})
       : VPWidenInductionRecipe(VPRecipeBase::VPWidenIntOrFpInductionSC, IV,
-                               Start, Step, IndDesc, ResultTy, DL),
-        VPIRFlags(Flags) {
+                               Start, Step, InductionOpcode, NoWrapPredicates,
+                               ResultTy, DL),
+        VPIRFlags(Flags), CastInsts(CastInsts) {
     addOperand(VF);
   }
 
@@ -2676,8 +2690,11 @@ public:
   VPWidenIntOrFpInductionRecipe *clone() override {
     return new VPWidenIntOrFpInductionRecipe(
         getPHINode(), getStartValue(), getStepValue(), getVFValue(),
-        getInductionDescriptor(), getScalarType(), *this, getDebugLoc());
+        getInductionOpcode(), getScalarType(), *this, getDebugLoc(),
+        getNoWrapPredicates(), getCastInsts());
   }
+
+  ArrayRef<Instruction *> getCastInsts() const { return CastInsts; }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPWidenIntOrFpInductionSC)
 
@@ -2734,12 +2751,12 @@ public:
   /// Create a new VPWidenPointerInductionRecipe for \p Phi with start value \p
   /// Start and the number of elements unrolled \p NumUnrolledElems, typically
   /// VF*UF.
-  VPWidenPointerInductionRecipe(PHINode *Phi, VPValue *Start, VPValue *Step,
-                                VPValue *NumUnrolledElems,
-                                const InductionDescriptor &IndDesc, DebugLoc DL)
+  VPWidenPointerInductionRecipe(
+      PHINode *Phi, VPValue *Start, VPValue *Step, VPValue *NumUnrolledElems,
+      ArrayRef<const SCEVPredicate *> NoWrapPredicates, DebugLoc DL)
       : VPWidenInductionRecipe(VPRecipeBase::VPWidenPointerInductionSC, Phi,
-                               Start, Step, IndDesc, Start->getScalarType(),
-                               DL) {
+                               Start, Step, Instruction::BinaryOpsEnd,
+                               NoWrapPredicates, Start->getScalarType(), DL) {
     addOperand(NumUnrolledElems);
   }
 
@@ -2748,7 +2765,7 @@ public:
   VPWidenPointerInductionRecipe *clone() override {
     return new VPWidenPointerInductionRecipe(
         cast<PHINode>(getUnderlyingInstr()), getOperand(0), getOperand(1),
-        getOperand(2), getInductionDescriptor(), getDebugLoc());
+        getOperand(2), getNoWrapPredicates(), getDebugLoc());
   }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPWidenPointerInductionSC)
@@ -4239,29 +4256,29 @@ protected:
 };
 
 /// A recipe for converting \p Current into \p Start + \p Current * \p Step.
-/// FastMathFlags are derived from the \p FPBinOp in the case of FP inductions,
+/// For FP inductions, \p InductionOpcode (FAdd or FSub) and \p FMF are used,
 /// and the passed NoWrap \p Flags apply in the case of Ptr and Int inductions.
 class LLVM_ABI_FOR_TEST VPDerivedIVRecipe : public VPRecipeWithIRFlags {
   /// Kind of the induction.
   const InductionDescriptor::InductionKind Kind;
-  /// If not nullptr, the floating point induction binary operator. Must be set
-  /// for floating point inductions.
-  const FPMathOperator *FPBinOp;
+  const Instruction::BinaryOps InductionOpcode;
+  const FastMathFlags FMF;
 
 public:
   VPDerivedIVRecipe(InductionDescriptor::InductionKind Kind,
-                    const FPMathOperator *FPBinOp, VPValue *Start,
-                    VPValue *Current, VPValue *Step,
+                    Instruction::BinaryOps InductionOpcode, FastMathFlags FMF,
+                    VPValue *Start, VPValue *Current, VPValue *Step,
                     const VPIRFlags::WrapFlagsTy &Flags = {})
       : VPRecipeWithIRFlags(VPRecipeBase::VPDerivedIVSC, {Start, Current, Step},
                             Start->getScalarType(), Flags),
-        Kind(Kind), FPBinOp(FPBinOp) {}
+        Kind(Kind), InductionOpcode(InductionOpcode), FMF(FMF) {}
 
   ~VPDerivedIVRecipe() override = default;
 
   VPDerivedIVRecipe *clone() override {
-    return new VPDerivedIVRecipe(Kind, FPBinOp, getStartValue(), getOperand(1),
-                                 getStepValue(), getNoWrapFlags());
+    return new VPDerivedIVRecipe(Kind, InductionOpcode, FMF, getStartValue(),
+                                 getOperand(1), getStepValue(),
+                                 getNoWrapFlags());
   }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPDerivedIVSC)
@@ -4277,8 +4294,9 @@ public:
   VPValue *getStartValue() const { return getOperand(0); }
   VPValue *getIndex() const { return getOperand(1); }
   VPValue *getStepValue() const { return getOperand(2); }
-  const FPMathOperator *getFPBinOp() const { return FPBinOp; }
   InductionDescriptor::InductionKind getInductionKind() const { return Kind; }
+  Instruction::BinaryOps getInductionOpcode() const { return InductionOpcode; }
+  FastMathFlags getFPFastMathFlags() const { return FMF; }
 
   /// Returns true if the recipe only uses the first lane of operand \p Op.
   bool usesFirstLaneOnly(const VPValue *Op) const override {

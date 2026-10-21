@@ -57,7 +57,7 @@ void VPlanTransforms::replaceWideCanonicalIVWithWideIV(
   if (Plan.hasScalarVFOnly() || vputils::onlyFirstLaneUsed(WideCanIV)) {
     VPBuilder Builder(WideCanIV);
     WideCanIV->replaceAllUsesWith(vputils::createScalarIVSteps(
-        Plan, InductionDescriptor::IK_IntInduction, Instruction::Add, nullptr,
+        Plan, InductionDescriptor::IK_IntInduction, Instruction::Add, {},
         CanIVTy, Plan.getZero(CanIVTy), Plan.getConstantInt(CanIVTy, 1),
         WideCanIV->getDebugLoc(), Builder,
         WideCanIV->getNoWrapFlags().withoutNoSignedWrap()));
@@ -104,12 +104,11 @@ void VPlanTransforms::replaceWideCanonicalIVWithWideIV(
       UnrolledBase.spillCost(TTI, CostKind))
     return;
 
-  InductionDescriptor ID =
-      InductionDescriptor::getCanonicalIntInduction(CanIVTy, SE);
   VPValue *StepV = Plan.getConstantInt(CanIVTy, 1);
   auto *NewWideIV = new VPWidenIntOrFpInductionRecipe(
-      /*IV=*/nullptr, Plan.getZero(CanIVTy), StepV, &Plan.getVF(), ID,
-      WideCanIV->getNoWrapFlags(), WideCanIV->getDebugLoc());
+      /*IV=*/nullptr, Plan.getZero(CanIVTy), StepV, &Plan.getVF(),
+      Instruction::BinaryOpsEnd, WideCanIV->getNoWrapFlags(),
+      WideCanIV->getDebugLoc());
   NewWideIV->insertBefore(&*Header->getFirstNonPhi());
   WideCanIV->replaceAllUsesWith(NewWideIV);
   WideCanIV->eraseFromParent();
@@ -271,15 +270,14 @@ expandVPWidenIntOrFpInduction(VPWidenIntOrFpInductionRecipe *WidenIVR) {
   // variable.
   Type *Ty = WidenIVR->getScalarType();
 
-  const InductionDescriptor &ID = WidenIVR->getInductionDescriptor();
   Instruction::BinaryOps AddOp;
   Instruction::BinaryOps MulOp;
   VPIRFlags Flags = *WidenIVR;
-  if (ID.getKind() == InductionDescriptor::IK_IntInduction) {
+  if (Ty->isIntegerTy()) {
     AddOp = Instruction::Add;
     MulOp = Instruction::Mul;
   } else {
-    AddOp = ID.getInductionOpcode();
+    AddOp = WidenIVR->getInductionOpcode();
     MulOp = Instruction::FMul;
   }
 
@@ -375,9 +373,6 @@ static void expandVPWidenPointerInduction(VPWidenPointerInductionRecipe *R) {
   VPValue *Step = R->getStepValue();
   VPValue *VF = R->getVFValue();
 
-  assert(R->getInductionDescriptor().getKind() ==
-             InductionDescriptor::IK_PtrInduction &&
-         "Not a pointer induction according to InductionDescriptor!");
   assert(R->getScalarType()->isPointerTy() && "Unexpected type.");
   assert(!R->onlyScalarsGenerated(Plan->hasScalableVF()) &&
          "Recipe should have been replaced");
@@ -437,15 +432,13 @@ static void expandVPDerivedIV(VPDerivedIVRecipe *R) {
         Builder.createOverflowingOp(Instruction::Mul, {Index, Step}, Flags)));
   case InductionDescriptor::IK_FpInduction: {
     assert(StepTy->isFloatingPointTy() && "Expected FP Step value");
-    const FPMathOperator *FPBinOp = R->getFPBinOp();
-    assert(FPBinOp &&
-           (FPBinOp->getOpcode() == Instruction::FAdd ||
-            FPBinOp->getOpcode() == Instruction::FSub) &&
-           "Original BinOp should be defined for FP induction");
-    FastMathFlags FMF = FPBinOp->getFastMathFlags();
+    Instruction::BinaryOps Opcode = R->getInductionOpcode();
+    assert((Opcode == Instruction::FAdd || Opcode == Instruction::FSub) &&
+           "FP induction must use FAdd or FSub");
+    FastMathFlags FMF = R->getFPFastMathFlags();
     VPValue *FMul = Builder.createNaryOp(Instruction::FMul, {Step, Index}, FMF);
     return R->replaceAllUsesWith(
-        Builder.createNaryOp(FPBinOp->getOpcode(), {Start, FMul}, FMF));
+        Builder.createNaryOp(Opcode, {Start, FMul}, FMF));
   }
   case InductionDescriptor::IK_NoInduction:
     return;

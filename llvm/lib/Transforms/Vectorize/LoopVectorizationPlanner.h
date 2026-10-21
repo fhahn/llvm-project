@@ -429,11 +429,12 @@ public:
 
   /// Convert \p Current to \p Start + \p Current * \p Step.
   VPDerivedIVRecipe *createDerivedIV(InductionDescriptor::InductionKind Kind,
-                                     FPMathOperator *FPBinOp, VPValue *Start,
+                                     Instruction::BinaryOps InductionOpcode,
+                                     FastMathFlags FMF, VPValue *Start,
                                      VPValue *Current, VPValue *Step,
                                      const VPIRFlags::WrapFlagsTy &Flags = {}) {
-    return tryInsertInstruction(
-        new VPDerivedIVRecipe(Kind, FPBinOp, Start, Current, Step, Flags));
+    return tryInsertInstruction(new VPDerivedIVRecipe(
+        Kind, InductionOpcode, FMF, Start, Current, Step, Flags));
   }
 
   VPInstruction *createScalarCast(Instruction::CastOps Opcode, VPValue *Op,
@@ -520,12 +521,10 @@ public:
   }
 
   VPScalarIVStepsRecipe *
-  createScalarIVSteps(Instruction::BinaryOps InductionOpcode,
-                      FPMathOperator *FPBinOp, VPValue *IV, VPValue *Step,
-                      VPValue *VF, DebugLoc DL) {
-    return tryInsertInstruction(new VPScalarIVStepsRecipe(
-        IV, Step, VF, InductionOpcode,
-        FPBinOp ? FPBinOp->getFastMathFlags() : FastMathFlags(), DL));
+  createScalarIVSteps(Instruction::BinaryOps InductionOpcode, FastMathFlags FMF,
+                      VPValue *IV, VPValue *Step, VPValue *VF, DebugLoc DL) {
+    return tryInsertInstruction(
+        new VPScalarIVStepsRecipe(IV, Step, VF, InductionOpcode, FMF, DL));
   }
 
   VPExpandSCEVRecipe *createExpandSCEV(const SCEV *Expr) {

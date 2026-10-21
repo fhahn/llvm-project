@@ -654,12 +654,11 @@ void VPlanTransforms::recordExecutionFrequencies(VPlan &Plan) {
 }
 
 /// Creates a VPWidenIntOrFpInductionRecipe or VPWidenPointerInductionRecipe
-/// for \p Phi based on \p IndDesc.
-static VPHeaderPHIRecipe *
-createWidenInductionRecipe(PHINode *Phi, VPPhi *PhiR, VPIRValue *Start,
-                           const InductionDescriptor &IndDesc, VPlan &Plan,
-                           PredicatedScalarEvolution &PSE, Loop &OrigLoop,
-                           DebugLoc DL) {
+/// for \p Phi based on \p IndDesc and \p InductionOpcode.
+static VPHeaderPHIRecipe *createWidenInductionRecipe(
+    PHINode *Phi, VPPhi *PhiR, VPIRValue *Start,
+    const InductionDescriptor &IndDesc, Instruction::BinaryOps InductionOpcode,
+    VPlan &Plan, PredicatedScalarEvolution &PSE, Loop &OrigLoop, DebugLoc DL) {
   [[maybe_unused]] ScalarEvolution &SE = *PSE.getSE();
   assert(SE.isLoopInvariant(IndDesc.getStep(), &OrigLoop) &&
          "step must be loop invariant");
@@ -713,7 +712,7 @@ createWidenInductionRecipe(PHINode *Phi, VPPhi *PhiR, VPIRValue *Start,
 
   if (IndDesc.getKind() == InductionDescriptor::IK_PtrInduction) {
     auto *WideIV = new VPWidenPointerInductionRecipe(
-        Phi, Start, Step, &Plan.getVFxUF(), IndDesc, DL);
+        Phi, Start, Step, &Plan.getVFxUF(), IndDesc.getNoWrapPredicates(), DL);
     ReplaceExtractsWithExitingIVValueIfPossible(WideIV);
     return WideIV;
   }
@@ -734,7 +733,8 @@ createWidenInductionRecipe(PHINode *Phi, VPPhi *PhiR, VPIRValue *Start,
   VPIRFlags Flags = vputils::getFlagsForInduction(IndDesc, PhiR);
 
   auto *WideIV = new VPWidenIntOrFpInductionRecipe(
-      Phi, Start, Step, &Plan.getVF(), IndDesc, Flags, DL);
+      Phi, Start, Step, &Plan.getVF(), InductionOpcode, Flags, DL,
+      IndDesc.getNoWrapPredicates(), IndDesc.getCastInsts());
 
   ReplaceExtractsWithExitingIVValueIfPossible(WideIV);
   return WideIV;
@@ -959,10 +959,8 @@ getIntInductionDescriptor(VPPhi *PhiR, PredicatedScalarEvolution &PSE,
   if (isa<SCEVCouldNotCompute>(Step) || Step->isZero() ||
       !PSE.getSE()->isLoopInvariant(Step, &L))
     return std::nullopt;
-  return InductionDescriptor(
-      cast<VPIRValue>(PhiR->getOperand(0))->getValue(),
-      InductionDescriptor::IK_IntInduction, Step,
-      cast<BinaryOperator>(BackedgeVal->getUnderlyingValue()));
+  return InductionDescriptor(cast<VPIRValue>(PhiR->getOperand(0))->getValue(),
+                             InductionDescriptor::IK_IntInduction, Step);
 }
 
 #ifndef NDEBUG
@@ -977,8 +975,7 @@ static bool matchesLegalInduction(const InductionDescriptor &IndDesc,
   return LegalDesc.getKind() == IndDesc.getKind() &&
          LegalDesc.getNoWrapPredicates().empty() &&
          PSE.getPredicatedSCEV(LegalDesc.getStep()) == IndDesc.getStep() &&
-         (LegalOpcode == IndDesc.getInductionOpcode() ||
-          (LegalOpcode != Instruction::Add && LegalOpcode != Instruction::Sub));
+         LegalOpcode != Instruction::Sub;
 }
 #endif
 
@@ -1021,13 +1018,15 @@ bool VPlanTransforms::createHeaderPhiRecipes(
       assert(InductionIt != Inductions.end() &&
              matchesLegalInduction(*IndDesc, InductionIt->second, PSE) &&
              "VPlan-detected induction must match legality");
-      return createWidenInductionRecipe(Phi, PhiR, Start, *IndDesc, Plan, PSE,
-                                        OrigLoop, PhiR->getDebugLoc());
+      return createWidenInductionRecipe(Phi, PhiR, Start, *IndDesc,
+                                        Instruction::Add, Plan, PSE, OrigLoop,
+                                        PhiR->getDebugLoc());
     }
     if (InductionIt != Inductions.end())
-      return createWidenInductionRecipe(Phi, PhiR, Start, InductionIt->second,
-                                        Plan, PSE, OrigLoop,
-                                        PhiR->getDebugLoc());
+      return createWidenInductionRecipe(
+          Phi, PhiR, Start, InductionIt->second,
+          InductionIt->second.getInductionOpcode(), Plan, PSE, OrigLoop,
+          PhiR->getDebugLoc());
 
     assert(Reductions.contains(Phi) && "only reductions are expected now");
     const RecurrenceDescriptor &RdxDesc = Reductions.lookup(Phi);
@@ -2202,8 +2201,7 @@ static bool handleFirstArgMinOrMax(
     VPIRValue *Zero = Plan.getConstantInt(Ty, 0);
     VPIRValue *One = Plan.getConstantInt(Ty, 1);
     auto *WidenCanIV = new VPWidenIntOrFpInductionRecipe(
-        nullptr, Zero, One, WideIV->getVFValue(),
-        WideIV->getInductionDescriptor(),
+        nullptr, Zero, One, WideIV->getVFValue(), WideIV->getInductionOpcode(),
         VPIRFlags::WrapFlagsTy(/*HasNUW=*/true, /*HasNSW=*/false),
         WideIV->getDebugLoc());
     WidenCanIV->insertBefore(WideIV);
@@ -2282,8 +2280,7 @@ static bool handleFirstArgMinOrMax(
   // original IV scale before the final select.
   if (!WideIV->isCanonical()) {
     auto *DerivedIVRecipe = new VPDerivedIVRecipe(
-        InductionDescriptor::IK_IntInduction,
-        nullptr, // No FPBinOp for integer induction
+        InductionDescriptor::IK_IntInduction, Instruction::Add, {},
         WideIV->getStartValue(), FinalCanIV, WideIV->getStepValue());
     DerivedIVRecipe->insertBefore(Builder.getRecipeAtInsertPoint());
     FinalCanIV = DerivedIVRecipe;

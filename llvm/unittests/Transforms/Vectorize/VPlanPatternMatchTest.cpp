@@ -33,12 +33,12 @@ TEST_F(VPPatternMatchTest, ScalarIVSteps) {
 
   VPValue *Inc = Plan.getOrAddLiveIn(ConstantInt::get(I64Ty, 1));
   VPValue *VF = &Plan.getVF();
-  VPValue *Steps = Builder.createScalarIVSteps(Instruction::Add, nullptr, CanIV,
-                                               Inc, VF, DebugLoc());
+  VPValue *Steps = Builder.createScalarIVSteps(Instruction::Add, {}, CanIV, Inc,
+                                               VF, DebugLoc());
 
   VPValue *Inc2 = Plan.getOrAddLiveIn(ConstantInt::get(I64Ty, 2));
-  VPValue *Steps2 = Builder.createScalarIVSteps(Instruction::Add, nullptr,
-                                                CanIV, Inc2, VF, DebugLoc());
+  VPValue *Steps2 = Builder.createScalarIVSteps(Instruction::Add, {}, CanIV,
+                                                Inc2, VF, DebugLoc());
 
   ASSERT_TRUE(match(Steps, m_ScalarIVSteps(m_Specific(CanIV), m_SpecificInt(1),
                                            m_Specific(VF))));

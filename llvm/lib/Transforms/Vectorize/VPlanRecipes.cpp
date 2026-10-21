@@ -3193,12 +3193,10 @@ VPWidenIntOrFpInductionRecipe::computeCost(ElementCount VF,
                                            VPCostContext &Ctx) const {
   // A widened induction generates a vector phi and increments it by the
   // splatted step each iteration.
-  const InductionDescriptor &ID = getInductionDescriptor();
   InstructionCost Cost = Ctx.TTI.getCFInstrCost(Instruction::PHI, Ctx.CostKind);
   Type *StepTy = getScalarType();
-  unsigned IncOpc = ID.getKind() == InductionDescriptor::IK_IntInduction
-                        ? Instruction::Add
-                        : ID.getInductionOpcode();
+  unsigned IncOpc =
+      StepTy->isIntegerTy() ? Instruction::Add : getInductionOpcode();
   assert(IncOpc != Instruction::BinaryOpsEnd &&
          "induction must have a valid increment opcode");
   return Cost + Ctx.TTI.getArithmeticInstrCost(IncOpc, toVectorTy(StepTy, VF),
@@ -3306,17 +3304,16 @@ InstructionCost VPDerivedIVRecipe::computeCost(ElementCount VF,
     // "fadd -0.0, X" folds to X unconditionally, but "fadd 0.0, X" only folds
     // to X without nsz if X can be proven to never be -0.0, which we cannot, as
     // Step may be -0.0.
-    // TODO: Consider fast-math flags when they are available in
-    // VPDerivedIVRecipe.
+    // TODO: Consider fast-math flags.
     const ConstantFP *StartC = getConstantFP(getStartValue());
-    bool AddFolds = getFPBinOp()->getOpcode() == Instruction::FAdd && StartC &&
+    bool AddFolds = getInductionOpcode() == Instruction::FAdd && StartC &&
                     StartC->isZero() && (StartC->isNegZero() || !NeedsMul);
 
     if (NeedsMul)
       Cost += Ctx.TTI.getArithmeticInstrCost(Instruction::FMul, StepTy,
                                              Ctx.CostKind);
     if (!AddFolds)
-      Cost += Ctx.TTI.getArithmeticInstrCost(getFPBinOp()->getOpcode(), StepTy,
+      Cost += Ctx.TTI.getArithmeticInstrCost(getInductionOpcode(), StepTy,
                                              Ctx.CostKind);
     return Cost;
   }

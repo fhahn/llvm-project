@@ -628,14 +628,14 @@ vputils::getEarlyExits(const VPlan &Plan, const VPBlockBase *MiddleVPBB) {
 
 VPScalarIVStepsRecipe *vputils::createScalarIVSteps(
     VPlan &Plan, InductionDescriptor::InductionKind Kind,
-    Instruction::BinaryOps InductionOpcode, FPMathOperator *FPBinOp,
-    Type *ResultTy, VPValue *StartV, VPValue *Step, DebugLoc DL,
-    VPBuilder &Builder, const VPIRFlags::WrapFlagsTy &Flags) {
+    Instruction::BinaryOps InductionOpcode, FastMathFlags FMF, Type *ResultTy,
+    VPValue *StartV, VPValue *Step, DebugLoc DL, VPBuilder &Builder,
+    const VPIRFlags::WrapFlagsTy &Flags) {
   VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
   VPBasicBlock *HeaderVPBB = LoopRegion->getEntryBasicBlock();
   VPValue *CanonicalIV = LoopRegion->getCanonicalIV();
-  VPValue *BaseIV =
-      Builder.createDerivedIV(Kind, FPBinOp, StartV, CanonicalIV, Step, Flags);
+  VPValue *BaseIV = Builder.createDerivedIV(Kind, InductionOpcode, FMF, StartV,
+                                            CanonicalIV, Step, Flags);
 
   // Truncate BaseIV and Step to ResultTy.
   if (ResultTy->isIntegerTy()) {
@@ -656,18 +656,17 @@ VPScalarIVStepsRecipe *vputils::createScalarIVSteps(
     Builder.setInsertPoint(VecPreheader);
     Step = Builder.createScalarZExtOrTrunc(Step, ResultTy, DL);
   }
-  return Builder.createScalarIVSteps(InductionOpcode, FPBinOp, BaseIV, Step,
+  return Builder.createScalarIVSteps(InductionOpcode, FMF, BaseIV, Step,
                                      &Plan.getVF(), DL);
 }
 
 VPValue *
 vputils::scalarizeVPWidenPointerInduction(VPWidenPointerInductionRecipe *PtrIV,
                                           VPlan &Plan, VPBuilder &Builder) {
-  const InductionDescriptor &ID = PtrIV->getInductionDescriptor();
-  VPIRValue *StartV = Plan.getZero(ID.getStep()->getType());
   VPValue *StepV = PtrIV->getOperand(1);
+  VPIRValue *StartV = Plan.getZero(StepV->getScalarType());
   VPScalarIVStepsRecipe *Steps = createScalarIVSteps(
-      Plan, InductionDescriptor::IK_IntInduction, Instruction::Add, nullptr,
+      Plan, InductionDescriptor::IK_IntInduction, Instruction::Add, {},
       StartV->getScalarType(), StartV, StepV, PtrIV->getDebugLoc(), Builder);
 
   return Builder.createPtrAdd(PtrIV->getStartValue(), Steps,
