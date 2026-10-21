@@ -717,6 +717,13 @@ static void convertRecipesInRegionBlocksToSingleScalar(VPlan &Plan, Type *IdxTy,
   VPValue *Idx0 = Plan.getZero(IdxTy);
   for (VPBlockBase *VPB : vp_depth_first_shallow(Entry)) {
     for (VPRecipeBase &OldR : make_early_inc_range(cast<VPBasicBlock>(*VPB))) {
+      // Unpacks are replaced by the extracts of the lane the region is executed
+      // for, created for operands of their users below.
+      if (match(&OldR, m_VPInstruction<VPInstruction::Unpack>())) {
+        OldR.getVPSingleValue()->replaceAllUsesWith(OldR.getOperand(0));
+        OldR.eraseFromParent();
+        continue;
+      }
       assert(
           !isa<VPWidenPHIRecipe>(&OldR) &&
           !match(&OldR,

@@ -539,12 +539,12 @@ define i64 @ivopt_widen_ptr_indvar_2(ptr noalias %a, i64 %stride, i64 %n) {
 ; STRIDED-NEXT:    [[TMP11:%.*]] = getelementptr i64, ptr [[A:%.*]], i64 [[INDEX]]
 ; STRIDED-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i64>, ptr [[TMP11]], align 8
 ; STRIDED-NEXT:    [[TMP12:%.*]] = extractelement <4 x i64> [[WIDE_LOAD]], i64 0
-; STRIDED-NEXT:    store i64 [[TMP12]], ptr [[NEXT_GEP]], align 8
 ; STRIDED-NEXT:    [[TMP13:%.*]] = extractelement <4 x i64> [[WIDE_LOAD]], i64 1
-; STRIDED-NEXT:    store i64 [[TMP13]], ptr [[NEXT_GEP1]], align 8
 ; STRIDED-NEXT:    [[TMP14:%.*]] = extractelement <4 x i64> [[WIDE_LOAD]], i64 2
-; STRIDED-NEXT:    store i64 [[TMP14]], ptr [[NEXT_GEP2]], align 8
 ; STRIDED-NEXT:    [[TMP15:%.*]] = extractelement <4 x i64> [[WIDE_LOAD]], i64 3
+; STRIDED-NEXT:    store i64 [[TMP12]], ptr [[NEXT_GEP]], align 8
+; STRIDED-NEXT:    store i64 [[TMP13]], ptr [[NEXT_GEP1]], align 8
+; STRIDED-NEXT:    store i64 [[TMP14]], ptr [[NEXT_GEP2]], align 8
 ; STRIDED-NEXT:    store i64 [[TMP15]], ptr [[NEXT_GEP3]], align 8
 ; STRIDED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; STRIDED-NEXT:    [[TMP16:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]

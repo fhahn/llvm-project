@@ -88,12 +88,12 @@ define void @call_range_attr(ptr noalias %src, ptr noalias %dst.1, ptr noalias %
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP1]], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <4 x i32> [[WIDE_LOAD]], i64 0
-; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @g(i32 [[TMP2]]) #[[ATTR1:[0-9]+]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <4 x i32> [[WIDE_LOAD]], i64 1
-; CHECK-NEXT:    [[TMP5:%.*]] = call i32 @g(i32 [[TMP4]]) #[[ATTR1]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i32> [[WIDE_LOAD]], i64 2
-; CHECK-NEXT:    [[TMP7:%.*]] = call i32 @g(i32 [[TMP6]]) #[[ATTR1]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x i32> [[WIDE_LOAD]], i64 3
+; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @g(i32 [[TMP2]]) #[[ATTR1:[0-9]+]]
+; CHECK-NEXT:    [[TMP5:%.*]] = call i32 @g(i32 [[TMP4]]) #[[ATTR1]]
+; CHECK-NEXT:    [[TMP7:%.*]] = call i32 @g(i32 [[TMP6]]) #[[ATTR1]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = call i32 @g(i32 [[TMP8]]) #[[ATTR1]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = insertelement <4 x i32> poison, i32 [[TMP3]], i64 0
 ; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i32> [[TMP10]], i32 [[TMP5]], i64 1
@@ -166,12 +166,12 @@ define void @call_range_md(ptr noalias %src, ptr noalias %dst.1, ptr noalias %ds
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP1]], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <4 x i32> [[WIDE_LOAD]], i64 0
-; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @g(i32 [[TMP2]]) #[[ATTR1]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <4 x i32> [[WIDE_LOAD]], i64 1
-; CHECK-NEXT:    [[TMP5:%.*]] = call i32 @g(i32 [[TMP4]]) #[[ATTR1]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i32> [[WIDE_LOAD]], i64 2
-; CHECK-NEXT:    [[TMP7:%.*]] = call i32 @g(i32 [[TMP6]]) #[[ATTR1]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x i32> [[WIDE_LOAD]], i64 3
+; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @g(i32 [[TMP2]]) #[[ATTR1]]
+; CHECK-NEXT:    [[TMP5:%.*]] = call i32 @g(i32 [[TMP4]]) #[[ATTR1]]
+; CHECK-NEXT:    [[TMP7:%.*]] = call i32 @g(i32 [[TMP6]]) #[[ATTR1]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = call i32 @g(i32 [[TMP8]]) #[[ATTR1]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = insertelement <4 x i32> poison, i32 [[TMP3]], i64 0
 ; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i32> [[TMP10]], i32 [[TMP5]], i64 1
@@ -183,7 +183,7 @@ define void @call_range_md(ptr noalias %src, ptr noalias %dst.1, ptr noalias %ds
 ; CHECK-NEXT:    store <4 x i32> [[TMP13]], ptr [[TMP15]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP16:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP16]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP16]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
@@ -194,7 +194,7 @@ define void @call_range_md(ptr noalias %src, ptr noalias %dst.1, ptr noalias %ds
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[IV]]
 ; CHECK-NEXT:    [[L:%.*]] = load i32, ptr [[GEP_SRC]], align 4
-; CHECK-NEXT:    [[C_1:%.*]] = call i32 @g(i32 [[L]]) #[[ATTR1]], !range [[RNG6:![0-9]+]]
+; CHECK-NEXT:    [[C_1:%.*]] = call i32 @g(i32 [[L]]) #[[ATTR1]], !range [[RNG7:![0-9]+]]
 ; CHECK-NEXT:    [[GEP_DST_1:%.*]] = getelementptr inbounds i32, ptr [[DST_1]], i64 [[IV]]
 ; CHECK-NEXT:    store i32 [[C_1]], ptr [[GEP_DST_1]], align 4
 ; CHECK-NEXT:    [[C_2:%.*]] = call i32 @g(i32 [[L]]) #[[ATTR1]]
@@ -241,7 +241,7 @@ attributes #1 = { nounwind willreturn memory(none) }
 ; CHECK: [[LOOP3]] = distinct !{[[LOOP3]], [[META2]], [[META1]]}
 ; CHECK: [[LOOP4]] = distinct !{[[LOOP4]], [[META1]], [[META2]]}
 ; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META2]], [[META1]]}
-; CHECK: [[LOOP7]] = distinct !{[[LOOP7]], [[META1]], [[META2]]}
-; CHECK: [[RNG6]] = !{i32 0, i32 10}
+; CHECK: [[LOOP6]] = distinct !{[[LOOP6]], [[META1]], [[META2]]}
+; CHECK: [[RNG7]] = !{i32 0, i32 10}
 ; CHECK: [[LOOP8]] = distinct !{[[LOOP8]], [[META2]], [[META1]]}
 ;.

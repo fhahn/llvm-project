@@ -293,36 +293,36 @@ define void @multiple_pointer_ivs_with_scalar_uses_only(ptr %A, ptr %B) #0 {
 ; CHECK-NEXT:    [[TMP21:%.*]] = lshr <16 x i32> [[TMP20]], splat (i32 1)
 ; CHECK-NEXT:    [[TMP22:%.*]] = trunc <16 x i32> [[TMP21]] to <16 x i8>
 ; CHECK-NEXT:    [[TMP23:%.*]] = extractelement <16 x i8> [[TMP22]], i64 0
-; CHECK-NEXT:    store i8 [[TMP23]], ptr [[NEXT_GEP]], align 1, !alias.scope [[META18:![0-9]+]], !noalias [[META15]]
 ; CHECK-NEXT:    [[TMP24:%.*]] = extractelement <16 x i8> [[TMP22]], i64 1
-; CHECK-NEXT:    store i8 [[TMP24]], ptr [[NEXT_GEP2]], align 1, !alias.scope [[META18]], !noalias [[META15]]
 ; CHECK-NEXT:    [[TMP25:%.*]] = extractelement <16 x i8> [[TMP22]], i64 2
-; CHECK-NEXT:    store i8 [[TMP25]], ptr [[NEXT_GEP3]], align 1, !alias.scope [[META18]], !noalias [[META15]]
 ; CHECK-NEXT:    [[TMP26:%.*]] = extractelement <16 x i8> [[TMP22]], i64 3
-; CHECK-NEXT:    store i8 [[TMP26]], ptr [[NEXT_GEP4]], align 1, !alias.scope [[META18]], !noalias [[META15]]
 ; CHECK-NEXT:    [[TMP27:%.*]] = extractelement <16 x i8> [[TMP22]], i64 4
-; CHECK-NEXT:    store i8 [[TMP27]], ptr [[NEXT_GEP5]], align 1, !alias.scope [[META18]], !noalias [[META15]]
 ; CHECK-NEXT:    [[TMP28:%.*]] = extractelement <16 x i8> [[TMP22]], i64 5
-; CHECK-NEXT:    store i8 [[TMP28]], ptr [[NEXT_GEP6]], align 1, !alias.scope [[META18]], !noalias [[META15]]
 ; CHECK-NEXT:    [[TMP29:%.*]] = extractelement <16 x i8> [[TMP22]], i64 6
-; CHECK-NEXT:    store i8 [[TMP29]], ptr [[NEXT_GEP7]], align 1, !alias.scope [[META18]], !noalias [[META15]]
 ; CHECK-NEXT:    [[TMP30:%.*]] = extractelement <16 x i8> [[TMP22]], i64 7
-; CHECK-NEXT:    store i8 [[TMP30]], ptr [[NEXT_GEP8]], align 1, !alias.scope [[META18]], !noalias [[META15]]
 ; CHECK-NEXT:    [[TMP31:%.*]] = extractelement <16 x i8> [[TMP22]], i64 8
-; CHECK-NEXT:    store i8 [[TMP31]], ptr [[NEXT_GEP9]], align 1, !alias.scope [[META18]], !noalias [[META15]]
 ; CHECK-NEXT:    [[TMP32:%.*]] = extractelement <16 x i8> [[TMP22]], i64 9
-; CHECK-NEXT:    store i8 [[TMP32]], ptr [[NEXT_GEP10]], align 1, !alias.scope [[META18]], !noalias [[META15]]
 ; CHECK-NEXT:    [[TMP33:%.*]] = extractelement <16 x i8> [[TMP22]], i64 10
-; CHECK-NEXT:    store i8 [[TMP33]], ptr [[NEXT_GEP11]], align 1, !alias.scope [[META18]], !noalias [[META15]]
 ; CHECK-NEXT:    [[TMP34:%.*]] = extractelement <16 x i8> [[TMP22]], i64 11
-; CHECK-NEXT:    store i8 [[TMP34]], ptr [[NEXT_GEP12]], align 1, !alias.scope [[META18]], !noalias [[META15]]
 ; CHECK-NEXT:    [[TMP35:%.*]] = extractelement <16 x i8> [[TMP22]], i64 12
-; CHECK-NEXT:    store i8 [[TMP35]], ptr [[NEXT_GEP13]], align 1, !alias.scope [[META18]], !noalias [[META15]]
 ; CHECK-NEXT:    [[TMP36:%.*]] = extractelement <16 x i8> [[TMP22]], i64 13
-; CHECK-NEXT:    store i8 [[TMP36]], ptr [[NEXT_GEP14]], align 1, !alias.scope [[META18]], !noalias [[META15]]
 ; CHECK-NEXT:    [[TMP37:%.*]] = extractelement <16 x i8> [[TMP22]], i64 14
-; CHECK-NEXT:    store i8 [[TMP37]], ptr [[NEXT_GEP15]], align 1, !alias.scope [[META18]], !noalias [[META15]]
 ; CHECK-NEXT:    [[TMP38:%.*]] = extractelement <16 x i8> [[TMP22]], i64 15
+; CHECK-NEXT:    store i8 [[TMP23]], ptr [[NEXT_GEP]], align 1, !alias.scope [[META18:![0-9]+]], !noalias [[META15]]
+; CHECK-NEXT:    store i8 [[TMP24]], ptr [[NEXT_GEP2]], align 1, !alias.scope [[META18]], !noalias [[META15]]
+; CHECK-NEXT:    store i8 [[TMP25]], ptr [[NEXT_GEP3]], align 1, !alias.scope [[META18]], !noalias [[META15]]
+; CHECK-NEXT:    store i8 [[TMP26]], ptr [[NEXT_GEP4]], align 1, !alias.scope [[META18]], !noalias [[META15]]
+; CHECK-NEXT:    store i8 [[TMP27]], ptr [[NEXT_GEP5]], align 1, !alias.scope [[META18]], !noalias [[META15]]
+; CHECK-NEXT:    store i8 [[TMP28]], ptr [[NEXT_GEP6]], align 1, !alias.scope [[META18]], !noalias [[META15]]
+; CHECK-NEXT:    store i8 [[TMP29]], ptr [[NEXT_GEP7]], align 1, !alias.scope [[META18]], !noalias [[META15]]
+; CHECK-NEXT:    store i8 [[TMP30]], ptr [[NEXT_GEP8]], align 1, !alias.scope [[META18]], !noalias [[META15]]
+; CHECK-NEXT:    store i8 [[TMP31]], ptr [[NEXT_GEP9]], align 1, !alias.scope [[META18]], !noalias [[META15]]
+; CHECK-NEXT:    store i8 [[TMP32]], ptr [[NEXT_GEP10]], align 1, !alias.scope [[META18]], !noalias [[META15]]
+; CHECK-NEXT:    store i8 [[TMP33]], ptr [[NEXT_GEP11]], align 1, !alias.scope [[META18]], !noalias [[META15]]
+; CHECK-NEXT:    store i8 [[TMP34]], ptr [[NEXT_GEP12]], align 1, !alias.scope [[META18]], !noalias [[META15]]
+; CHECK-NEXT:    store i8 [[TMP35]], ptr [[NEXT_GEP13]], align 1, !alias.scope [[META18]], !noalias [[META15]]
+; CHECK-NEXT:    store i8 [[TMP36]], ptr [[NEXT_GEP14]], align 1, !alias.scope [[META18]], !noalias [[META15]]
+; CHECK-NEXT:    store i8 [[TMP37]], ptr [[NEXT_GEP15]], align 1, !alias.scope [[META18]], !noalias [[META15]]
 ; CHECK-NEXT:    store i8 [[TMP38]], ptr [[NEXT_GEP16]], align 1, !alias.scope [[META18]], !noalias [[META15]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; CHECK-NEXT:    [[TMP39:%.*]] = icmp eq i64 [[INDEX_NEXT]], 4294967184

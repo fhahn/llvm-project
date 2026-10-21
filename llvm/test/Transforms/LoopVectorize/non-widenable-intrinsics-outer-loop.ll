@@ -22,8 +22,8 @@ define void @test_assume(ptr %arr, i64 %n) {
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i64> [ <i64 0, i64 1>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_LATCH]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp sgt <2 x i64> [[VEC_IND]], zeroinitializer
 ; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <2 x i1> [[TMP0]], i64 0
-; CHECK-NEXT:    call void @llvm.assume(i1 [[TMP9]])
 ; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <2 x i1> [[TMP0]], i64 1
+; CHECK-NEXT:    call void @llvm.assume(i1 [[TMP9]])
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[TMP8]])
 ; CHECK-NEXT:    br label %[[INNER1:.*]]
 ; CHECK:       [[INNER1]]:
@@ -113,8 +113,8 @@ define void @test_assume_non_canonical_iv(ptr %arr, i64 %n) {
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i64> [ <i64 10, i64 13>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_LATCH]] ]
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp sge <2 x i64> [[VEC_IND]], zeroinitializer
 ; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <2 x i1> [[TMP2]], i64 0
-; CHECK-NEXT:    call void @llvm.assume(i1 [[TMP3]])
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x i1> [[TMP2]], i64 1
+; CHECK-NEXT:    call void @llvm.assume(i1 [[TMP3]])
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[TMP4]])
 ; CHECK-NEXT:    br label %[[INNER1:.*]]
 ; CHECK:       [[INNER1]]:

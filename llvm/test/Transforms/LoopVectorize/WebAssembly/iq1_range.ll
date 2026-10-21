@@ -27,12 +27,12 @@ define void @iq1_range(ptr noalias readonly captures(none) %records,
 ; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <8 x i32>, ptr [[TMP13]], align 4
 ; CHECK-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <8 x i32> [[WIDE_VEC]], <8 x i32> poison, <4 x i32> <i32 0, i32 2, i32 4, i32 6>
 ; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <4 x i32> [[STRIDED_VEC]], i64 0
-; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i8, ptr [[CLASSES]], i32 [[TMP14]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <4 x i32> [[STRIDED_VEC]], i64 1
-; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i8, ptr [[CLASSES]], i32 [[TMP15]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <4 x i32> [[STRIDED_VEC]], i64 2
-; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i8, ptr [[CLASSES]], i32 [[TMP16]]
 ; CHECK-NEXT:    [[TMP17:%.*]] = extractelement <4 x i32> [[STRIDED_VEC]], i64 3
+; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i8, ptr [[CLASSES]], i32 [[TMP14]]
+; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i8, ptr [[CLASSES]], i32 [[TMP15]]
+; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i8, ptr [[CLASSES]], i32 [[TMP16]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr inbounds i8, ptr [[CLASSES]], i32 [[TMP17]]
 ; CHECK-NEXT:    store i8 [[VALUE]], ptr [[TMP18]], align 1
 ; CHECK-NEXT:    store i8 [[VALUE]], ptr [[TMP19]], align 1
@@ -85,12 +85,12 @@ define void @iq1_range(ptr noalias readonly captures(none) %records,
 ; MAXIMIZE-NEXT:    [[WIDE_VEC:%.*]] = load <8 x i32>, ptr [[TMP7]], align 4
 ; MAXIMIZE-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <8 x i32> [[WIDE_VEC]], <8 x i32> poison, <4 x i32> <i32 0, i32 2, i32 4, i32 6>
 ; MAXIMIZE-NEXT:    [[TMP32:%.*]] = extractelement <4 x i32> [[STRIDED_VEC]], i64 0
-; MAXIMIZE-NEXT:    [[TMP33:%.*]] = getelementptr inbounds i8, ptr [[CLASSES]], i32 [[TMP32]]
 ; MAXIMIZE-NEXT:    [[TMP34:%.*]] = extractelement <4 x i32> [[STRIDED_VEC]], i64 1
-; MAXIMIZE-NEXT:    [[TMP35:%.*]] = getelementptr inbounds i8, ptr [[CLASSES]], i32 [[TMP34]]
 ; MAXIMIZE-NEXT:    [[TMP36:%.*]] = extractelement <4 x i32> [[STRIDED_VEC]], i64 2
-; MAXIMIZE-NEXT:    [[TMP37:%.*]] = getelementptr inbounds i8, ptr [[CLASSES]], i32 [[TMP36]]
 ; MAXIMIZE-NEXT:    [[TMP38:%.*]] = extractelement <4 x i32> [[STRIDED_VEC]], i64 3
+; MAXIMIZE-NEXT:    [[TMP33:%.*]] = getelementptr inbounds i8, ptr [[CLASSES]], i32 [[TMP32]]
+; MAXIMIZE-NEXT:    [[TMP35:%.*]] = getelementptr inbounds i8, ptr [[CLASSES]], i32 [[TMP34]]
+; MAXIMIZE-NEXT:    [[TMP37:%.*]] = getelementptr inbounds i8, ptr [[CLASSES]], i32 [[TMP36]]
 ; MAXIMIZE-NEXT:    [[TMP39:%.*]] = getelementptr inbounds i8, ptr [[CLASSES]], i32 [[TMP38]]
 ; MAXIMIZE-NEXT:    store i8 [[VALUE]], ptr [[TMP33]], align 1
 ; MAXIMIZE-NEXT:    store i8 [[VALUE]], ptr [[TMP35]], align 1

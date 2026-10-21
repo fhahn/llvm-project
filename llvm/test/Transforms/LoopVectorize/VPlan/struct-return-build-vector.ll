@@ -25,8 +25,8 @@ define void @struct_return_replicate(ptr noalias %in, ptr noalias %out_a, ptr no
 ; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds float, ir<%gep.in>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%in_val> = load vp<[[VP6]]>
 ; CHECK-NEXT:      EMIT vp<[[VP7:%[0-9]+]]> = extractelement ir<%in_val>, ir<0>
-; CHECK-NEXT:      CLONE ir<%call> = call @foo(vp<[[VP7]]>)
 ; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = extractelement ir<%in_val>, ir<1>
+; CHECK-NEXT:      CLONE ir<%call> = call @foo(vp<[[VP7]]>)
 ; CHECK-NEXT:      CLONE ir<%call>.1 = call @foo(vp<[[VP8]]>)
 ; CHECK-NEXT:      CLONE ir<%extract_a> = extractvalue ir<%call>, ir<0>
 ; CHECK-NEXT:      CLONE ir<%extract_a>.1 = extractvalue ir<%call>.1, ir<0>

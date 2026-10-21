@@ -36,12 +36,12 @@ define void @test0(ptr noalias %M3, ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i16, ptr [[M3]], i64 [[TMP15]]
 ; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i16, ptr [[M3]], i64 [[TMP16]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = extractelement <4 x i16> [[TMP4]], i64 0
-; CHECK-NEXT:    store i16 [[TMP21]], ptr [[TMP17]], align 2
 ; CHECK-NEXT:    [[TMP22:%.*]] = extractelement <4 x i16> [[TMP4]], i64 1
-; CHECK-NEXT:    store i16 [[TMP22]], ptr [[TMP18]], align 2
 ; CHECK-NEXT:    [[TMP23:%.*]] = extractelement <4 x i16> [[TMP4]], i64 2
-; CHECK-NEXT:    store i16 [[TMP23]], ptr [[TMP19]], align 2
 ; CHECK-NEXT:    [[TMP24:%.*]] = extractelement <4 x i16> [[TMP4]], i64 3
+; CHECK-NEXT:    store i16 [[TMP21]], ptr [[TMP17]], align 2
+; CHECK-NEXT:    store i16 [[TMP22]], ptr [[TMP18]], align 2
+; CHECK-NEXT:    store i16 [[TMP23]], ptr [[TMP19]], align 2
 ; CHECK-NEXT:    store i16 [[TMP24]], ptr [[TMP20]], align 2
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP25:%.*]] = icmp eq i64 [[INDEX_NEXT]], 16
@@ -110,12 +110,12 @@ define void @test1(ptr noalias %M3, ptr noalias %A, ptr noalias %B, ptr noalias 
 ; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr inbounds i16, ptr [[M3]], i64 [[TMP17]]
 ; CHECK-NEXT:    [[TMP22:%.*]] = getelementptr inbounds i16, ptr [[M3]], i64 [[TMP18]]
 ; CHECK-NEXT:    [[TMP23:%.*]] = extractelement <4 x i16> [[TMP6]], i64 0
-; CHECK-NEXT:    store i16 [[TMP23]], ptr [[TMP19]], align 2
 ; CHECK-NEXT:    [[TMP24:%.*]] = extractelement <4 x i16> [[TMP6]], i64 1
-; CHECK-NEXT:    store i16 [[TMP24]], ptr [[TMP20]], align 2
 ; CHECK-NEXT:    [[TMP25:%.*]] = extractelement <4 x i16> [[TMP6]], i64 2
-; CHECK-NEXT:    store i16 [[TMP25]], ptr [[TMP21]], align 2
 ; CHECK-NEXT:    [[TMP26:%.*]] = extractelement <4 x i16> [[TMP6]], i64 3
+; CHECK-NEXT:    store i16 [[TMP23]], ptr [[TMP19]], align 2
+; CHECK-NEXT:    store i16 [[TMP24]], ptr [[TMP20]], align 2
+; CHECK-NEXT:    store i16 [[TMP25]], ptr [[TMP21]], align 2
 ; CHECK-NEXT:    store i16 [[TMP26]], ptr [[TMP22]], align 2
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP27:%.*]] = icmp eq i64 [[INDEX_NEXT]], 16

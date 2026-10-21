@@ -31,12 +31,12 @@ define i8 @recurrence_phi_with_same_incoming_values_after_simplifications(i8 %fo
 ; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i8, ptr [[DST]], i32 [[TMP7]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds i8, ptr [[DST]], i32 [[TMP8]]
 ; CHECK-NEXT:    [[TMP17:%.*]] = extractelement <4 x i8> [[TMP0]], i64 0
-; CHECK-NEXT:    store i8 [[TMP17]], ptr [[TMP9]], align 1
 ; CHECK-NEXT:    [[TMP18:%.*]] = extractelement <4 x i8> [[TMP0]], i64 1
-; CHECK-NEXT:    store i8 [[TMP18]], ptr [[TMP10]], align 1
 ; CHECK-NEXT:    [[TMP19:%.*]] = extractelement <4 x i8> [[TMP0]], i64 2
-; CHECK-NEXT:    store i8 [[TMP19]], ptr [[TMP11]], align 1
 ; CHECK-NEXT:    [[TMP20:%.*]] = extractelement <4 x i8> [[TMP0]], i64 3
+; CHECK-NEXT:    store i8 [[TMP17]], ptr [[TMP9]], align 1
+; CHECK-NEXT:    store i8 [[TMP18]], ptr [[TMP10]], align 1
+; CHECK-NEXT:    store i8 [[TMP19]], ptr [[TMP11]], align 1
 ; CHECK-NEXT:    store i8 [[TMP20]], ptr [[TMP12]], align 1
 ; CHECK-NEXT:    store i8 [[TMP17]], ptr [[TMP13]], align 1
 ; CHECK-NEXT:    store i8 [[TMP18]], ptr [[TMP14]], align 1

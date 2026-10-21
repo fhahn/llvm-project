@@ -58,12 +58,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP36:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP7]], i32 2
 ; CHECK-NEXT:    [[TMP37:%.*]] = shl nsw <4 x i32> [[VEC_IND]], splat (i32 7)
 ; CHECK-NEXT:    [[TMP38:%.*]] = extractelement <4 x i32> [[TMP37]], i64 0
-; CHECK-NEXT:    [[TMP39:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP38]]
 ; CHECK-NEXT:    [[TMP40:%.*]] = extractelement <4 x i32> [[TMP37]], i64 1
-; CHECK-NEXT:    [[TMP41:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP40]]
 ; CHECK-NEXT:    [[TMP42:%.*]] = extractelement <4 x i32> [[TMP37]], i64 2
-; CHECK-NEXT:    [[TMP43:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP42]]
 ; CHECK-NEXT:    [[TMP44:%.*]] = extractelement <4 x i32> [[TMP37]], i64 3
+; CHECK-NEXT:    [[TMP39:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP38]]
+; CHECK-NEXT:    [[TMP41:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP40]]
+; CHECK-NEXT:    [[TMP43:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP42]]
 ; CHECK-NEXT:    [[TMP45:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP44]]
 ; CHECK-NEXT:    [[TMP46:%.*]] = load i8, ptr [[TMP33]], align 1
 ; CHECK-NEXT:    [[TMP47:%.*]] = load i8, ptr [[TMP34]], align 1
@@ -81,12 +81,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP59:%.*]] = sitofp <4 x i32> [[TMP56]] to <4 x float>
 ; CHECK-NEXT:    [[TMP60:%.*]] = fmul <4 x float> [[TMP32]], [[TMP59]]
 ; CHECK-NEXT:    [[TMP61:%.*]] = extractelement <4 x float> [[TMP60]], i64 0
-; CHECK-NEXT:    store float [[TMP61]], ptr [[TMP39]], align 4
 ; CHECK-NEXT:    [[TMP62:%.*]] = extractelement <4 x float> [[TMP60]], i64 1
-; CHECK-NEXT:    store float [[TMP62]], ptr [[TMP41]], align 4
 ; CHECK-NEXT:    [[TMP63:%.*]] = extractelement <4 x float> [[TMP60]], i64 2
-; CHECK-NEXT:    store float [[TMP63]], ptr [[TMP43]], align 4
 ; CHECK-NEXT:    [[TMP64:%.*]] = extractelement <4 x float> [[TMP60]], i64 3
+; CHECK-NEXT:    store float [[TMP61]], ptr [[TMP39]], align 4
+; CHECK-NEXT:    store float [[TMP62]], ptr [[TMP41]], align 4
+; CHECK-NEXT:    store float [[TMP63]], ptr [[TMP43]], align 4
 ; CHECK-NEXT:    store float [[TMP64]], ptr [[TMP45]], align 4
 ; CHECK-NEXT:    [[TMP65:%.*]] = sitofp <4 x i32> [[TMP58]] to <4 x float>
 ; CHECK-NEXT:    [[TMP66:%.*]] = fmul <4 x float> [[TMP32]], [[TMP65]]
@@ -95,12 +95,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP69:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 64
 ; CHECK-NEXT:    [[TMP70:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 64
 ; CHECK-NEXT:    [[TMP71:%.*]] = extractelement <4 x float> [[TMP66]], i64 0
-; CHECK-NEXT:    store float [[TMP71]], ptr [[TMP67]], align 4
 ; CHECK-NEXT:    [[TMP72:%.*]] = extractelement <4 x float> [[TMP66]], i64 1
-; CHECK-NEXT:    store float [[TMP72]], ptr [[TMP68]], align 4
 ; CHECK-NEXT:    [[TMP73:%.*]] = extractelement <4 x float> [[TMP66]], i64 2
-; CHECK-NEXT:    store float [[TMP73]], ptr [[TMP69]], align 4
 ; CHECK-NEXT:    [[TMP74:%.*]] = extractelement <4 x float> [[TMP66]], i64 3
+; CHECK-NEXT:    store float [[TMP71]], ptr [[TMP67]], align 4
+; CHECK-NEXT:    store float [[TMP72]], ptr [[TMP68]], align 4
+; CHECK-NEXT:    store float [[TMP73]], ptr [[TMP69]], align 4
 ; CHECK-NEXT:    store float [[TMP74]], ptr [[TMP70]], align 4
 ; CHECK-NEXT:    [[TMP75:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP4]], i32 3
 ; CHECK-NEXT:    [[TMP76:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP5]], i32 3
@@ -126,12 +126,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP96:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 4
 ; CHECK-NEXT:    [[TMP97:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 4
 ; CHECK-NEXT:    [[TMP98:%.*]] = extractelement <4 x float> [[TMP93]], i64 0
-; CHECK-NEXT:    store float [[TMP98]], ptr [[TMP94]], align 4
 ; CHECK-NEXT:    [[TMP99:%.*]] = extractelement <4 x float> [[TMP93]], i64 1
-; CHECK-NEXT:    store float [[TMP99]], ptr [[TMP95]], align 4
 ; CHECK-NEXT:    [[TMP100:%.*]] = extractelement <4 x float> [[TMP93]], i64 2
-; CHECK-NEXT:    store float [[TMP100]], ptr [[TMP96]], align 4
 ; CHECK-NEXT:    [[TMP101:%.*]] = extractelement <4 x float> [[TMP93]], i64 3
+; CHECK-NEXT:    store float [[TMP98]], ptr [[TMP94]], align 4
+; CHECK-NEXT:    store float [[TMP99]], ptr [[TMP95]], align 4
+; CHECK-NEXT:    store float [[TMP100]], ptr [[TMP96]], align 4
 ; CHECK-NEXT:    store float [[TMP101]], ptr [[TMP97]], align 4
 ; CHECK-NEXT:    [[TMP102:%.*]] = sitofp <4 x i32> [[TMP91]] to <4 x float>
 ; CHECK-NEXT:    [[TMP103:%.*]] = fmul <4 x float> [[TMP32]], [[TMP102]]
@@ -140,12 +140,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP106:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 68
 ; CHECK-NEXT:    [[TMP107:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 68
 ; CHECK-NEXT:    [[TMP108:%.*]] = extractelement <4 x float> [[TMP103]], i64 0
-; CHECK-NEXT:    store float [[TMP108]], ptr [[TMP104]], align 4
 ; CHECK-NEXT:    [[TMP109:%.*]] = extractelement <4 x float> [[TMP103]], i64 1
-; CHECK-NEXT:    store float [[TMP109]], ptr [[TMP105]], align 4
 ; CHECK-NEXT:    [[TMP110:%.*]] = extractelement <4 x float> [[TMP103]], i64 2
-; CHECK-NEXT:    store float [[TMP110]], ptr [[TMP106]], align 4
 ; CHECK-NEXT:    [[TMP111:%.*]] = extractelement <4 x float> [[TMP103]], i64 3
+; CHECK-NEXT:    store float [[TMP108]], ptr [[TMP104]], align 4
+; CHECK-NEXT:    store float [[TMP109]], ptr [[TMP105]], align 4
+; CHECK-NEXT:    store float [[TMP110]], ptr [[TMP106]], align 4
 ; CHECK-NEXT:    store float [[TMP111]], ptr [[TMP107]], align 4
 ; CHECK-NEXT:    [[TMP112:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP4]], i32 4
 ; CHECK-NEXT:    [[TMP113:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP5]], i32 4
@@ -171,12 +171,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP133:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 8
 ; CHECK-NEXT:    [[TMP134:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 8
 ; CHECK-NEXT:    [[TMP135:%.*]] = extractelement <4 x float> [[TMP130]], i64 0
-; CHECK-NEXT:    store float [[TMP135]], ptr [[TMP131]], align 4
 ; CHECK-NEXT:    [[TMP136:%.*]] = extractelement <4 x float> [[TMP130]], i64 1
-; CHECK-NEXT:    store float [[TMP136]], ptr [[TMP132]], align 4
 ; CHECK-NEXT:    [[TMP137:%.*]] = extractelement <4 x float> [[TMP130]], i64 2
-; CHECK-NEXT:    store float [[TMP137]], ptr [[TMP133]], align 4
 ; CHECK-NEXT:    [[TMP138:%.*]] = extractelement <4 x float> [[TMP130]], i64 3
+; CHECK-NEXT:    store float [[TMP135]], ptr [[TMP131]], align 4
+; CHECK-NEXT:    store float [[TMP136]], ptr [[TMP132]], align 4
+; CHECK-NEXT:    store float [[TMP137]], ptr [[TMP133]], align 4
 ; CHECK-NEXT:    store float [[TMP138]], ptr [[TMP134]], align 4
 ; CHECK-NEXT:    [[TMP139:%.*]] = sitofp <4 x i32> [[TMP128]] to <4 x float>
 ; CHECK-NEXT:    [[TMP140:%.*]] = fmul <4 x float> [[TMP32]], [[TMP139]]
@@ -185,12 +185,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP143:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 72
 ; CHECK-NEXT:    [[TMP144:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 72
 ; CHECK-NEXT:    [[TMP145:%.*]] = extractelement <4 x float> [[TMP140]], i64 0
-; CHECK-NEXT:    store float [[TMP145]], ptr [[TMP141]], align 4
 ; CHECK-NEXT:    [[TMP146:%.*]] = extractelement <4 x float> [[TMP140]], i64 1
-; CHECK-NEXT:    store float [[TMP146]], ptr [[TMP142]], align 4
 ; CHECK-NEXT:    [[TMP147:%.*]] = extractelement <4 x float> [[TMP140]], i64 2
-; CHECK-NEXT:    store float [[TMP147]], ptr [[TMP143]], align 4
 ; CHECK-NEXT:    [[TMP148:%.*]] = extractelement <4 x float> [[TMP140]], i64 3
+; CHECK-NEXT:    store float [[TMP145]], ptr [[TMP141]], align 4
+; CHECK-NEXT:    store float [[TMP146]], ptr [[TMP142]], align 4
+; CHECK-NEXT:    store float [[TMP147]], ptr [[TMP143]], align 4
 ; CHECK-NEXT:    store float [[TMP148]], ptr [[TMP144]], align 4
 ; CHECK-NEXT:    [[TMP149:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP4]], i32 5
 ; CHECK-NEXT:    [[TMP150:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP5]], i32 5
@@ -216,12 +216,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP170:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 12
 ; CHECK-NEXT:    [[TMP171:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 12
 ; CHECK-NEXT:    [[TMP172:%.*]] = extractelement <4 x float> [[TMP167]], i64 0
-; CHECK-NEXT:    store float [[TMP172]], ptr [[TMP168]], align 4
 ; CHECK-NEXT:    [[TMP173:%.*]] = extractelement <4 x float> [[TMP167]], i64 1
-; CHECK-NEXT:    store float [[TMP173]], ptr [[TMP169]], align 4
 ; CHECK-NEXT:    [[TMP174:%.*]] = extractelement <4 x float> [[TMP167]], i64 2
-; CHECK-NEXT:    store float [[TMP174]], ptr [[TMP170]], align 4
 ; CHECK-NEXT:    [[TMP175:%.*]] = extractelement <4 x float> [[TMP167]], i64 3
+; CHECK-NEXT:    store float [[TMP172]], ptr [[TMP168]], align 4
+; CHECK-NEXT:    store float [[TMP173]], ptr [[TMP169]], align 4
+; CHECK-NEXT:    store float [[TMP174]], ptr [[TMP170]], align 4
 ; CHECK-NEXT:    store float [[TMP175]], ptr [[TMP171]], align 4
 ; CHECK-NEXT:    [[TMP176:%.*]] = sitofp <4 x i32> [[TMP165]] to <4 x float>
 ; CHECK-NEXT:    [[TMP177:%.*]] = fmul <4 x float> [[TMP32]], [[TMP176]]
@@ -230,12 +230,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP180:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 76
 ; CHECK-NEXT:    [[TMP181:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 76
 ; CHECK-NEXT:    [[TMP182:%.*]] = extractelement <4 x float> [[TMP177]], i64 0
-; CHECK-NEXT:    store float [[TMP182]], ptr [[TMP178]], align 4
 ; CHECK-NEXT:    [[TMP183:%.*]] = extractelement <4 x float> [[TMP177]], i64 1
-; CHECK-NEXT:    store float [[TMP183]], ptr [[TMP179]], align 4
 ; CHECK-NEXT:    [[TMP184:%.*]] = extractelement <4 x float> [[TMP177]], i64 2
-; CHECK-NEXT:    store float [[TMP184]], ptr [[TMP180]], align 4
 ; CHECK-NEXT:    [[TMP185:%.*]] = extractelement <4 x float> [[TMP177]], i64 3
+; CHECK-NEXT:    store float [[TMP182]], ptr [[TMP178]], align 4
+; CHECK-NEXT:    store float [[TMP183]], ptr [[TMP179]], align 4
+; CHECK-NEXT:    store float [[TMP184]], ptr [[TMP180]], align 4
 ; CHECK-NEXT:    store float [[TMP185]], ptr [[TMP181]], align 4
 ; CHECK-NEXT:    [[TMP186:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP4]], i32 6
 ; CHECK-NEXT:    [[TMP187:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP5]], i32 6
@@ -261,12 +261,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP207:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 16
 ; CHECK-NEXT:    [[TMP208:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 16
 ; CHECK-NEXT:    [[TMP209:%.*]] = extractelement <4 x float> [[TMP204]], i64 0
-; CHECK-NEXT:    store float [[TMP209]], ptr [[TMP205]], align 4
 ; CHECK-NEXT:    [[TMP210:%.*]] = extractelement <4 x float> [[TMP204]], i64 1
-; CHECK-NEXT:    store float [[TMP210]], ptr [[TMP206]], align 4
 ; CHECK-NEXT:    [[TMP211:%.*]] = extractelement <4 x float> [[TMP204]], i64 2
-; CHECK-NEXT:    store float [[TMP211]], ptr [[TMP207]], align 4
 ; CHECK-NEXT:    [[TMP212:%.*]] = extractelement <4 x float> [[TMP204]], i64 3
+; CHECK-NEXT:    store float [[TMP209]], ptr [[TMP205]], align 4
+; CHECK-NEXT:    store float [[TMP210]], ptr [[TMP206]], align 4
+; CHECK-NEXT:    store float [[TMP211]], ptr [[TMP207]], align 4
 ; CHECK-NEXT:    store float [[TMP212]], ptr [[TMP208]], align 4
 ; CHECK-NEXT:    [[TMP213:%.*]] = sitofp <4 x i32> [[TMP202]] to <4 x float>
 ; CHECK-NEXT:    [[TMP214:%.*]] = fmul <4 x float> [[TMP32]], [[TMP213]]
@@ -275,12 +275,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP217:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 80
 ; CHECK-NEXT:    [[TMP218:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 80
 ; CHECK-NEXT:    [[TMP219:%.*]] = extractelement <4 x float> [[TMP214]], i64 0
-; CHECK-NEXT:    store float [[TMP219]], ptr [[TMP215]], align 4
 ; CHECK-NEXT:    [[TMP220:%.*]] = extractelement <4 x float> [[TMP214]], i64 1
-; CHECK-NEXT:    store float [[TMP220]], ptr [[TMP216]], align 4
 ; CHECK-NEXT:    [[TMP221:%.*]] = extractelement <4 x float> [[TMP214]], i64 2
-; CHECK-NEXT:    store float [[TMP221]], ptr [[TMP217]], align 4
 ; CHECK-NEXT:    [[TMP222:%.*]] = extractelement <4 x float> [[TMP214]], i64 3
+; CHECK-NEXT:    store float [[TMP219]], ptr [[TMP215]], align 4
+; CHECK-NEXT:    store float [[TMP220]], ptr [[TMP216]], align 4
+; CHECK-NEXT:    store float [[TMP221]], ptr [[TMP217]], align 4
 ; CHECK-NEXT:    store float [[TMP222]], ptr [[TMP218]], align 4
 ; CHECK-NEXT:    [[TMP223:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP4]], i32 7
 ; CHECK-NEXT:    [[TMP224:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP5]], i32 7
@@ -306,12 +306,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP244:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 20
 ; CHECK-NEXT:    [[TMP245:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 20
 ; CHECK-NEXT:    [[TMP246:%.*]] = extractelement <4 x float> [[TMP241]], i64 0
-; CHECK-NEXT:    store float [[TMP246]], ptr [[TMP242]], align 4
 ; CHECK-NEXT:    [[TMP247:%.*]] = extractelement <4 x float> [[TMP241]], i64 1
-; CHECK-NEXT:    store float [[TMP247]], ptr [[TMP243]], align 4
 ; CHECK-NEXT:    [[TMP248:%.*]] = extractelement <4 x float> [[TMP241]], i64 2
-; CHECK-NEXT:    store float [[TMP248]], ptr [[TMP244]], align 4
 ; CHECK-NEXT:    [[TMP249:%.*]] = extractelement <4 x float> [[TMP241]], i64 3
+; CHECK-NEXT:    store float [[TMP246]], ptr [[TMP242]], align 4
+; CHECK-NEXT:    store float [[TMP247]], ptr [[TMP243]], align 4
+; CHECK-NEXT:    store float [[TMP248]], ptr [[TMP244]], align 4
 ; CHECK-NEXT:    store float [[TMP249]], ptr [[TMP245]], align 4
 ; CHECK-NEXT:    [[TMP250:%.*]] = sitofp <4 x i32> [[TMP239]] to <4 x float>
 ; CHECK-NEXT:    [[TMP251:%.*]] = fmul <4 x float> [[TMP32]], [[TMP250]]
@@ -320,12 +320,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP254:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 84
 ; CHECK-NEXT:    [[TMP255:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 84
 ; CHECK-NEXT:    [[TMP256:%.*]] = extractelement <4 x float> [[TMP251]], i64 0
-; CHECK-NEXT:    store float [[TMP256]], ptr [[TMP252]], align 4
 ; CHECK-NEXT:    [[TMP257:%.*]] = extractelement <4 x float> [[TMP251]], i64 1
-; CHECK-NEXT:    store float [[TMP257]], ptr [[TMP253]], align 4
 ; CHECK-NEXT:    [[TMP258:%.*]] = extractelement <4 x float> [[TMP251]], i64 2
-; CHECK-NEXT:    store float [[TMP258]], ptr [[TMP254]], align 4
 ; CHECK-NEXT:    [[TMP259:%.*]] = extractelement <4 x float> [[TMP251]], i64 3
+; CHECK-NEXT:    store float [[TMP256]], ptr [[TMP252]], align 4
+; CHECK-NEXT:    store float [[TMP257]], ptr [[TMP253]], align 4
+; CHECK-NEXT:    store float [[TMP258]], ptr [[TMP254]], align 4
 ; CHECK-NEXT:    store float [[TMP259]], ptr [[TMP255]], align 4
 ; CHECK-NEXT:    [[TMP260:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP4]], i32 8
 ; CHECK-NEXT:    [[TMP261:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP5]], i32 8
@@ -351,12 +351,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP281:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 24
 ; CHECK-NEXT:    [[TMP282:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 24
 ; CHECK-NEXT:    [[TMP283:%.*]] = extractelement <4 x float> [[TMP278]], i64 0
-; CHECK-NEXT:    store float [[TMP283]], ptr [[TMP279]], align 4
 ; CHECK-NEXT:    [[TMP284:%.*]] = extractelement <4 x float> [[TMP278]], i64 1
-; CHECK-NEXT:    store float [[TMP284]], ptr [[TMP280]], align 4
 ; CHECK-NEXT:    [[TMP285:%.*]] = extractelement <4 x float> [[TMP278]], i64 2
-; CHECK-NEXT:    store float [[TMP285]], ptr [[TMP281]], align 4
 ; CHECK-NEXT:    [[TMP286:%.*]] = extractelement <4 x float> [[TMP278]], i64 3
+; CHECK-NEXT:    store float [[TMP283]], ptr [[TMP279]], align 4
+; CHECK-NEXT:    store float [[TMP284]], ptr [[TMP280]], align 4
+; CHECK-NEXT:    store float [[TMP285]], ptr [[TMP281]], align 4
 ; CHECK-NEXT:    store float [[TMP286]], ptr [[TMP282]], align 4
 ; CHECK-NEXT:    [[TMP287:%.*]] = sitofp <4 x i32> [[TMP276]] to <4 x float>
 ; CHECK-NEXT:    [[TMP288:%.*]] = fmul <4 x float> [[TMP32]], [[TMP287]]
@@ -365,12 +365,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP291:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 88
 ; CHECK-NEXT:    [[TMP292:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 88
 ; CHECK-NEXT:    [[TMP293:%.*]] = extractelement <4 x float> [[TMP288]], i64 0
-; CHECK-NEXT:    store float [[TMP293]], ptr [[TMP289]], align 4
 ; CHECK-NEXT:    [[TMP294:%.*]] = extractelement <4 x float> [[TMP288]], i64 1
-; CHECK-NEXT:    store float [[TMP294]], ptr [[TMP290]], align 4
 ; CHECK-NEXT:    [[TMP295:%.*]] = extractelement <4 x float> [[TMP288]], i64 2
-; CHECK-NEXT:    store float [[TMP295]], ptr [[TMP291]], align 4
 ; CHECK-NEXT:    [[TMP296:%.*]] = extractelement <4 x float> [[TMP288]], i64 3
+; CHECK-NEXT:    store float [[TMP293]], ptr [[TMP289]], align 4
+; CHECK-NEXT:    store float [[TMP294]], ptr [[TMP290]], align 4
+; CHECK-NEXT:    store float [[TMP295]], ptr [[TMP291]], align 4
 ; CHECK-NEXT:    store float [[TMP296]], ptr [[TMP292]], align 4
 ; CHECK-NEXT:    [[TMP297:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP4]], i32 9
 ; CHECK-NEXT:    [[TMP298:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP5]], i32 9
@@ -396,12 +396,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP318:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 28
 ; CHECK-NEXT:    [[TMP319:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 28
 ; CHECK-NEXT:    [[TMP320:%.*]] = extractelement <4 x float> [[TMP315]], i64 0
-; CHECK-NEXT:    store float [[TMP320]], ptr [[TMP316]], align 4
 ; CHECK-NEXT:    [[TMP321:%.*]] = extractelement <4 x float> [[TMP315]], i64 1
-; CHECK-NEXT:    store float [[TMP321]], ptr [[TMP317]], align 4
 ; CHECK-NEXT:    [[TMP322:%.*]] = extractelement <4 x float> [[TMP315]], i64 2
-; CHECK-NEXT:    store float [[TMP322]], ptr [[TMP318]], align 4
 ; CHECK-NEXT:    [[TMP323:%.*]] = extractelement <4 x float> [[TMP315]], i64 3
+; CHECK-NEXT:    store float [[TMP320]], ptr [[TMP316]], align 4
+; CHECK-NEXT:    store float [[TMP321]], ptr [[TMP317]], align 4
+; CHECK-NEXT:    store float [[TMP322]], ptr [[TMP318]], align 4
 ; CHECK-NEXT:    store float [[TMP323]], ptr [[TMP319]], align 4
 ; CHECK-NEXT:    [[TMP324:%.*]] = sitofp <4 x i32> [[TMP313]] to <4 x float>
 ; CHECK-NEXT:    [[TMP325:%.*]] = fmul <4 x float> [[TMP32]], [[TMP324]]
@@ -410,12 +410,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP328:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 92
 ; CHECK-NEXT:    [[TMP329:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 92
 ; CHECK-NEXT:    [[TMP330:%.*]] = extractelement <4 x float> [[TMP325]], i64 0
-; CHECK-NEXT:    store float [[TMP330]], ptr [[TMP326]], align 4
 ; CHECK-NEXT:    [[TMP331:%.*]] = extractelement <4 x float> [[TMP325]], i64 1
-; CHECK-NEXT:    store float [[TMP331]], ptr [[TMP327]], align 4
 ; CHECK-NEXT:    [[TMP332:%.*]] = extractelement <4 x float> [[TMP325]], i64 2
-; CHECK-NEXT:    store float [[TMP332]], ptr [[TMP328]], align 4
 ; CHECK-NEXT:    [[TMP333:%.*]] = extractelement <4 x float> [[TMP325]], i64 3
+; CHECK-NEXT:    store float [[TMP330]], ptr [[TMP326]], align 4
+; CHECK-NEXT:    store float [[TMP331]], ptr [[TMP327]], align 4
+; CHECK-NEXT:    store float [[TMP332]], ptr [[TMP328]], align 4
 ; CHECK-NEXT:    store float [[TMP333]], ptr [[TMP329]], align 4
 ; CHECK-NEXT:    [[TMP334:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP4]], i32 10
 ; CHECK-NEXT:    [[TMP335:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP5]], i32 10
@@ -441,12 +441,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP355:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 32
 ; CHECK-NEXT:    [[TMP356:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 32
 ; CHECK-NEXT:    [[TMP357:%.*]] = extractelement <4 x float> [[TMP352]], i64 0
-; CHECK-NEXT:    store float [[TMP357]], ptr [[TMP353]], align 4
 ; CHECK-NEXT:    [[TMP358:%.*]] = extractelement <4 x float> [[TMP352]], i64 1
-; CHECK-NEXT:    store float [[TMP358]], ptr [[TMP354]], align 4
 ; CHECK-NEXT:    [[TMP359:%.*]] = extractelement <4 x float> [[TMP352]], i64 2
-; CHECK-NEXT:    store float [[TMP359]], ptr [[TMP355]], align 4
 ; CHECK-NEXT:    [[TMP360:%.*]] = extractelement <4 x float> [[TMP352]], i64 3
+; CHECK-NEXT:    store float [[TMP357]], ptr [[TMP353]], align 4
+; CHECK-NEXT:    store float [[TMP358]], ptr [[TMP354]], align 4
+; CHECK-NEXT:    store float [[TMP359]], ptr [[TMP355]], align 4
 ; CHECK-NEXT:    store float [[TMP360]], ptr [[TMP356]], align 4
 ; CHECK-NEXT:    [[TMP361:%.*]] = sitofp <4 x i32> [[TMP350]] to <4 x float>
 ; CHECK-NEXT:    [[TMP362:%.*]] = fmul <4 x float> [[TMP32]], [[TMP361]]
@@ -455,12 +455,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP365:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 96
 ; CHECK-NEXT:    [[TMP366:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 96
 ; CHECK-NEXT:    [[TMP367:%.*]] = extractelement <4 x float> [[TMP362]], i64 0
-; CHECK-NEXT:    store float [[TMP367]], ptr [[TMP363]], align 4
 ; CHECK-NEXT:    [[TMP368:%.*]] = extractelement <4 x float> [[TMP362]], i64 1
-; CHECK-NEXT:    store float [[TMP368]], ptr [[TMP364]], align 4
 ; CHECK-NEXT:    [[TMP369:%.*]] = extractelement <4 x float> [[TMP362]], i64 2
-; CHECK-NEXT:    store float [[TMP369]], ptr [[TMP365]], align 4
 ; CHECK-NEXT:    [[TMP370:%.*]] = extractelement <4 x float> [[TMP362]], i64 3
+; CHECK-NEXT:    store float [[TMP367]], ptr [[TMP363]], align 4
+; CHECK-NEXT:    store float [[TMP368]], ptr [[TMP364]], align 4
+; CHECK-NEXT:    store float [[TMP369]], ptr [[TMP365]], align 4
 ; CHECK-NEXT:    store float [[TMP370]], ptr [[TMP366]], align 4
 ; CHECK-NEXT:    [[TMP371:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP4]], i32 11
 ; CHECK-NEXT:    [[TMP372:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP5]], i32 11
@@ -486,12 +486,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP392:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 36
 ; CHECK-NEXT:    [[TMP393:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 36
 ; CHECK-NEXT:    [[TMP394:%.*]] = extractelement <4 x float> [[TMP389]], i64 0
-; CHECK-NEXT:    store float [[TMP394]], ptr [[TMP390]], align 4
 ; CHECK-NEXT:    [[TMP395:%.*]] = extractelement <4 x float> [[TMP389]], i64 1
-; CHECK-NEXT:    store float [[TMP395]], ptr [[TMP391]], align 4
 ; CHECK-NEXT:    [[TMP396:%.*]] = extractelement <4 x float> [[TMP389]], i64 2
-; CHECK-NEXT:    store float [[TMP396]], ptr [[TMP392]], align 4
 ; CHECK-NEXT:    [[TMP397:%.*]] = extractelement <4 x float> [[TMP389]], i64 3
+; CHECK-NEXT:    store float [[TMP394]], ptr [[TMP390]], align 4
+; CHECK-NEXT:    store float [[TMP395]], ptr [[TMP391]], align 4
+; CHECK-NEXT:    store float [[TMP396]], ptr [[TMP392]], align 4
 ; CHECK-NEXT:    store float [[TMP397]], ptr [[TMP393]], align 4
 ; CHECK-NEXT:    [[TMP398:%.*]] = sitofp <4 x i32> [[TMP387]] to <4 x float>
 ; CHECK-NEXT:    [[TMP399:%.*]] = fmul <4 x float> [[TMP32]], [[TMP398]]
@@ -500,12 +500,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP402:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 100
 ; CHECK-NEXT:    [[TMP403:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 100
 ; CHECK-NEXT:    [[TMP404:%.*]] = extractelement <4 x float> [[TMP399]], i64 0
-; CHECK-NEXT:    store float [[TMP404]], ptr [[TMP400]], align 4
 ; CHECK-NEXT:    [[TMP405:%.*]] = extractelement <4 x float> [[TMP399]], i64 1
-; CHECK-NEXT:    store float [[TMP405]], ptr [[TMP401]], align 4
 ; CHECK-NEXT:    [[TMP406:%.*]] = extractelement <4 x float> [[TMP399]], i64 2
-; CHECK-NEXT:    store float [[TMP406]], ptr [[TMP402]], align 4
 ; CHECK-NEXT:    [[TMP407:%.*]] = extractelement <4 x float> [[TMP399]], i64 3
+; CHECK-NEXT:    store float [[TMP404]], ptr [[TMP400]], align 4
+; CHECK-NEXT:    store float [[TMP405]], ptr [[TMP401]], align 4
+; CHECK-NEXT:    store float [[TMP406]], ptr [[TMP402]], align 4
 ; CHECK-NEXT:    store float [[TMP407]], ptr [[TMP403]], align 4
 ; CHECK-NEXT:    [[TMP408:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP4]], i32 12
 ; CHECK-NEXT:    [[TMP409:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP5]], i32 12
@@ -531,12 +531,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP429:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 40
 ; CHECK-NEXT:    [[TMP430:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 40
 ; CHECK-NEXT:    [[TMP431:%.*]] = extractelement <4 x float> [[TMP426]], i64 0
-; CHECK-NEXT:    store float [[TMP431]], ptr [[TMP427]], align 4
 ; CHECK-NEXT:    [[TMP432:%.*]] = extractelement <4 x float> [[TMP426]], i64 1
-; CHECK-NEXT:    store float [[TMP432]], ptr [[TMP428]], align 4
 ; CHECK-NEXT:    [[TMP433:%.*]] = extractelement <4 x float> [[TMP426]], i64 2
-; CHECK-NEXT:    store float [[TMP433]], ptr [[TMP429]], align 4
 ; CHECK-NEXT:    [[TMP434:%.*]] = extractelement <4 x float> [[TMP426]], i64 3
+; CHECK-NEXT:    store float [[TMP431]], ptr [[TMP427]], align 4
+; CHECK-NEXT:    store float [[TMP432]], ptr [[TMP428]], align 4
+; CHECK-NEXT:    store float [[TMP433]], ptr [[TMP429]], align 4
 ; CHECK-NEXT:    store float [[TMP434]], ptr [[TMP430]], align 4
 ; CHECK-NEXT:    [[TMP435:%.*]] = sitofp <4 x i32> [[TMP424]] to <4 x float>
 ; CHECK-NEXT:    [[TMP436:%.*]] = fmul <4 x float> [[TMP32]], [[TMP435]]
@@ -545,12 +545,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP439:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 104
 ; CHECK-NEXT:    [[TMP440:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 104
 ; CHECK-NEXT:    [[TMP441:%.*]] = extractelement <4 x float> [[TMP436]], i64 0
-; CHECK-NEXT:    store float [[TMP441]], ptr [[TMP437]], align 4
 ; CHECK-NEXT:    [[TMP442:%.*]] = extractelement <4 x float> [[TMP436]], i64 1
-; CHECK-NEXT:    store float [[TMP442]], ptr [[TMP438]], align 4
 ; CHECK-NEXT:    [[TMP443:%.*]] = extractelement <4 x float> [[TMP436]], i64 2
-; CHECK-NEXT:    store float [[TMP443]], ptr [[TMP439]], align 4
 ; CHECK-NEXT:    [[TMP444:%.*]] = extractelement <4 x float> [[TMP436]], i64 3
+; CHECK-NEXT:    store float [[TMP441]], ptr [[TMP437]], align 4
+; CHECK-NEXT:    store float [[TMP442]], ptr [[TMP438]], align 4
+; CHECK-NEXT:    store float [[TMP443]], ptr [[TMP439]], align 4
 ; CHECK-NEXT:    store float [[TMP444]], ptr [[TMP440]], align 4
 ; CHECK-NEXT:    [[TMP445:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP4]], i32 13
 ; CHECK-NEXT:    [[TMP446:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP5]], i32 13
@@ -576,12 +576,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP466:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 44
 ; CHECK-NEXT:    [[TMP467:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 44
 ; CHECK-NEXT:    [[TMP468:%.*]] = extractelement <4 x float> [[TMP463]], i64 0
-; CHECK-NEXT:    store float [[TMP468]], ptr [[TMP464]], align 4
 ; CHECK-NEXT:    [[TMP469:%.*]] = extractelement <4 x float> [[TMP463]], i64 1
-; CHECK-NEXT:    store float [[TMP469]], ptr [[TMP465]], align 4
 ; CHECK-NEXT:    [[TMP470:%.*]] = extractelement <4 x float> [[TMP463]], i64 2
-; CHECK-NEXT:    store float [[TMP470]], ptr [[TMP466]], align 4
 ; CHECK-NEXT:    [[TMP471:%.*]] = extractelement <4 x float> [[TMP463]], i64 3
+; CHECK-NEXT:    store float [[TMP468]], ptr [[TMP464]], align 4
+; CHECK-NEXT:    store float [[TMP469]], ptr [[TMP465]], align 4
+; CHECK-NEXT:    store float [[TMP470]], ptr [[TMP466]], align 4
 ; CHECK-NEXT:    store float [[TMP471]], ptr [[TMP467]], align 4
 ; CHECK-NEXT:    [[TMP472:%.*]] = sitofp <4 x i32> [[TMP461]] to <4 x float>
 ; CHECK-NEXT:    [[TMP473:%.*]] = fmul <4 x float> [[TMP32]], [[TMP472]]
@@ -590,12 +590,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP476:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 108
 ; CHECK-NEXT:    [[TMP477:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 108
 ; CHECK-NEXT:    [[TMP478:%.*]] = extractelement <4 x float> [[TMP473]], i64 0
-; CHECK-NEXT:    store float [[TMP478]], ptr [[TMP474]], align 4
 ; CHECK-NEXT:    [[TMP479:%.*]] = extractelement <4 x float> [[TMP473]], i64 1
-; CHECK-NEXT:    store float [[TMP479]], ptr [[TMP475]], align 4
 ; CHECK-NEXT:    [[TMP480:%.*]] = extractelement <4 x float> [[TMP473]], i64 2
-; CHECK-NEXT:    store float [[TMP480]], ptr [[TMP476]], align 4
 ; CHECK-NEXT:    [[TMP481:%.*]] = extractelement <4 x float> [[TMP473]], i64 3
+; CHECK-NEXT:    store float [[TMP478]], ptr [[TMP474]], align 4
+; CHECK-NEXT:    store float [[TMP479]], ptr [[TMP475]], align 4
+; CHECK-NEXT:    store float [[TMP480]], ptr [[TMP476]], align 4
 ; CHECK-NEXT:    store float [[TMP481]], ptr [[TMP477]], align 4
 ; CHECK-NEXT:    [[TMP482:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP4]], i32 14
 ; CHECK-NEXT:    [[TMP483:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP5]], i32 14
@@ -621,12 +621,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP503:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 48
 ; CHECK-NEXT:    [[TMP504:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 48
 ; CHECK-NEXT:    [[TMP505:%.*]] = extractelement <4 x float> [[TMP500]], i64 0
-; CHECK-NEXT:    store float [[TMP505]], ptr [[TMP501]], align 4
 ; CHECK-NEXT:    [[TMP506:%.*]] = extractelement <4 x float> [[TMP500]], i64 1
-; CHECK-NEXT:    store float [[TMP506]], ptr [[TMP502]], align 4
 ; CHECK-NEXT:    [[TMP507:%.*]] = extractelement <4 x float> [[TMP500]], i64 2
-; CHECK-NEXT:    store float [[TMP507]], ptr [[TMP503]], align 4
 ; CHECK-NEXT:    [[TMP508:%.*]] = extractelement <4 x float> [[TMP500]], i64 3
+; CHECK-NEXT:    store float [[TMP505]], ptr [[TMP501]], align 4
+; CHECK-NEXT:    store float [[TMP506]], ptr [[TMP502]], align 4
+; CHECK-NEXT:    store float [[TMP507]], ptr [[TMP503]], align 4
 ; CHECK-NEXT:    store float [[TMP508]], ptr [[TMP504]], align 4
 ; CHECK-NEXT:    [[TMP509:%.*]] = sitofp <4 x i32> [[TMP498]] to <4 x float>
 ; CHECK-NEXT:    [[TMP510:%.*]] = fmul <4 x float> [[TMP32]], [[TMP509]]
@@ -635,12 +635,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP513:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 112
 ; CHECK-NEXT:    [[TMP514:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 112
 ; CHECK-NEXT:    [[TMP515:%.*]] = extractelement <4 x float> [[TMP510]], i64 0
-; CHECK-NEXT:    store float [[TMP515]], ptr [[TMP511]], align 4
 ; CHECK-NEXT:    [[TMP516:%.*]] = extractelement <4 x float> [[TMP510]], i64 1
-; CHECK-NEXT:    store float [[TMP516]], ptr [[TMP512]], align 4
 ; CHECK-NEXT:    [[TMP517:%.*]] = extractelement <4 x float> [[TMP510]], i64 2
-; CHECK-NEXT:    store float [[TMP517]], ptr [[TMP513]], align 4
 ; CHECK-NEXT:    [[TMP518:%.*]] = extractelement <4 x float> [[TMP510]], i64 3
+; CHECK-NEXT:    store float [[TMP515]], ptr [[TMP511]], align 4
+; CHECK-NEXT:    store float [[TMP516]], ptr [[TMP512]], align 4
+; CHECK-NEXT:    store float [[TMP517]], ptr [[TMP513]], align 4
 ; CHECK-NEXT:    store float [[TMP518]], ptr [[TMP514]], align 4
 ; CHECK-NEXT:    [[TMP519:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP4]], i32 15
 ; CHECK-NEXT:    [[TMP520:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP5]], i32 15
@@ -666,12 +666,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP540:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 52
 ; CHECK-NEXT:    [[TMP541:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 52
 ; CHECK-NEXT:    [[TMP542:%.*]] = extractelement <4 x float> [[TMP537]], i64 0
-; CHECK-NEXT:    store float [[TMP542]], ptr [[TMP538]], align 4
 ; CHECK-NEXT:    [[TMP543:%.*]] = extractelement <4 x float> [[TMP537]], i64 1
-; CHECK-NEXT:    store float [[TMP543]], ptr [[TMP539]], align 4
 ; CHECK-NEXT:    [[TMP544:%.*]] = extractelement <4 x float> [[TMP537]], i64 2
-; CHECK-NEXT:    store float [[TMP544]], ptr [[TMP540]], align 4
 ; CHECK-NEXT:    [[TMP545:%.*]] = extractelement <4 x float> [[TMP537]], i64 3
+; CHECK-NEXT:    store float [[TMP542]], ptr [[TMP538]], align 4
+; CHECK-NEXT:    store float [[TMP543]], ptr [[TMP539]], align 4
+; CHECK-NEXT:    store float [[TMP544]], ptr [[TMP540]], align 4
 ; CHECK-NEXT:    store float [[TMP545]], ptr [[TMP541]], align 4
 ; CHECK-NEXT:    [[TMP546:%.*]] = sitofp <4 x i32> [[TMP535]] to <4 x float>
 ; CHECK-NEXT:    [[TMP547:%.*]] = fmul <4 x float> [[TMP32]], [[TMP546]]
@@ -680,12 +680,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP550:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 116
 ; CHECK-NEXT:    [[TMP551:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 116
 ; CHECK-NEXT:    [[TMP552:%.*]] = extractelement <4 x float> [[TMP547]], i64 0
-; CHECK-NEXT:    store float [[TMP552]], ptr [[TMP548]], align 4
 ; CHECK-NEXT:    [[TMP553:%.*]] = extractelement <4 x float> [[TMP547]], i64 1
-; CHECK-NEXT:    store float [[TMP553]], ptr [[TMP549]], align 4
 ; CHECK-NEXT:    [[TMP554:%.*]] = extractelement <4 x float> [[TMP547]], i64 2
-; CHECK-NEXT:    store float [[TMP554]], ptr [[TMP550]], align 4
 ; CHECK-NEXT:    [[TMP555:%.*]] = extractelement <4 x float> [[TMP547]], i64 3
+; CHECK-NEXT:    store float [[TMP552]], ptr [[TMP548]], align 4
+; CHECK-NEXT:    store float [[TMP553]], ptr [[TMP549]], align 4
+; CHECK-NEXT:    store float [[TMP554]], ptr [[TMP550]], align 4
 ; CHECK-NEXT:    store float [[TMP555]], ptr [[TMP551]], align 4
 ; CHECK-NEXT:    [[TMP556:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP4]], i32 16
 ; CHECK-NEXT:    [[TMP557:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP5]], i32 16
@@ -711,12 +711,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP577:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 56
 ; CHECK-NEXT:    [[TMP578:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 56
 ; CHECK-NEXT:    [[TMP579:%.*]] = extractelement <4 x float> [[TMP574]], i64 0
-; CHECK-NEXT:    store float [[TMP579]], ptr [[TMP575]], align 4
 ; CHECK-NEXT:    [[TMP580:%.*]] = extractelement <4 x float> [[TMP574]], i64 1
-; CHECK-NEXT:    store float [[TMP580]], ptr [[TMP576]], align 4
 ; CHECK-NEXT:    [[TMP581:%.*]] = extractelement <4 x float> [[TMP574]], i64 2
-; CHECK-NEXT:    store float [[TMP581]], ptr [[TMP577]], align 4
 ; CHECK-NEXT:    [[TMP582:%.*]] = extractelement <4 x float> [[TMP574]], i64 3
+; CHECK-NEXT:    store float [[TMP579]], ptr [[TMP575]], align 4
+; CHECK-NEXT:    store float [[TMP580]], ptr [[TMP576]], align 4
+; CHECK-NEXT:    store float [[TMP581]], ptr [[TMP577]], align 4
 ; CHECK-NEXT:    store float [[TMP582]], ptr [[TMP578]], align 4
 ; CHECK-NEXT:    [[TMP583:%.*]] = sitofp <4 x i32> [[TMP572]] to <4 x float>
 ; CHECK-NEXT:    [[TMP584:%.*]] = fmul <4 x float> [[TMP32]], [[TMP583]]
@@ -725,12 +725,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP587:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 120
 ; CHECK-NEXT:    [[TMP588:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 120
 ; CHECK-NEXT:    [[TMP589:%.*]] = extractelement <4 x float> [[TMP584]], i64 0
-; CHECK-NEXT:    store float [[TMP589]], ptr [[TMP585]], align 4
 ; CHECK-NEXT:    [[TMP590:%.*]] = extractelement <4 x float> [[TMP584]], i64 1
-; CHECK-NEXT:    store float [[TMP590]], ptr [[TMP586]], align 4
 ; CHECK-NEXT:    [[TMP591:%.*]] = extractelement <4 x float> [[TMP584]], i64 2
-; CHECK-NEXT:    store float [[TMP591]], ptr [[TMP587]], align 4
 ; CHECK-NEXT:    [[TMP592:%.*]] = extractelement <4 x float> [[TMP584]], i64 3
+; CHECK-NEXT:    store float [[TMP589]], ptr [[TMP585]], align 4
+; CHECK-NEXT:    store float [[TMP590]], ptr [[TMP586]], align 4
+; CHECK-NEXT:    store float [[TMP591]], ptr [[TMP587]], align 4
 ; CHECK-NEXT:    store float [[TMP592]], ptr [[TMP588]], align 4
 ; CHECK-NEXT:    [[TMP593:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP4]], i32 17
 ; CHECK-NEXT:    [[TMP594:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP5]], i32 17
@@ -756,12 +756,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP614:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 60
 ; CHECK-NEXT:    [[TMP615:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 60
 ; CHECK-NEXT:    [[TMP616:%.*]] = extractelement <4 x float> [[TMP611]], i64 0
-; CHECK-NEXT:    store float [[TMP616]], ptr [[TMP612]], align 4
 ; CHECK-NEXT:    [[TMP617:%.*]] = extractelement <4 x float> [[TMP611]], i64 1
-; CHECK-NEXT:    store float [[TMP617]], ptr [[TMP613]], align 4
 ; CHECK-NEXT:    [[TMP618:%.*]] = extractelement <4 x float> [[TMP611]], i64 2
-; CHECK-NEXT:    store float [[TMP618]], ptr [[TMP614]], align 4
 ; CHECK-NEXT:    [[TMP619:%.*]] = extractelement <4 x float> [[TMP611]], i64 3
+; CHECK-NEXT:    store float [[TMP616]], ptr [[TMP612]], align 4
+; CHECK-NEXT:    store float [[TMP617]], ptr [[TMP613]], align 4
+; CHECK-NEXT:    store float [[TMP618]], ptr [[TMP614]], align 4
 ; CHECK-NEXT:    store float [[TMP619]], ptr [[TMP615]], align 4
 ; CHECK-NEXT:    [[TMP620:%.*]] = sitofp <4 x i32> [[TMP609]] to <4 x float>
 ; CHECK-NEXT:    [[TMP621:%.*]] = fmul <4 x float> [[TMP32]], [[TMP620]]
@@ -770,12 +770,12 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; CHECK-NEXT:    [[TMP624:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP43]], i32 124
 ; CHECK-NEXT:    [[TMP625:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP45]], i32 124
 ; CHECK-NEXT:    [[TMP626:%.*]] = extractelement <4 x float> [[TMP621]], i64 0
-; CHECK-NEXT:    store float [[TMP626]], ptr [[TMP622]], align 4
 ; CHECK-NEXT:    [[TMP627:%.*]] = extractelement <4 x float> [[TMP621]], i64 1
-; CHECK-NEXT:    store float [[TMP627]], ptr [[TMP623]], align 4
 ; CHECK-NEXT:    [[TMP628:%.*]] = extractelement <4 x float> [[TMP621]], i64 2
-; CHECK-NEXT:    store float [[TMP628]], ptr [[TMP624]], align 4
 ; CHECK-NEXT:    [[TMP629:%.*]] = extractelement <4 x float> [[TMP621]], i64 3
+; CHECK-NEXT:    store float [[TMP626]], ptr [[TMP622]], align 4
+; CHECK-NEXT:    store float [[TMP627]], ptr [[TMP623]], align 4
+; CHECK-NEXT:    store float [[TMP628]], ptr [[TMP624]], align 4
 ; CHECK-NEXT:    store float [[TMP629]], ptr [[TMP625]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i32> [[VEC_IND]], splat (i32 4)
@@ -1170,36 +1170,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP96:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP31]], i32 2
 ; MAXIMIZE-NEXT:    [[TMP97:%.*]] = shl nsw <16 x i32> [[VEC_IND]], splat (i32 7)
 ; MAXIMIZE-NEXT:    [[TMP98:%.*]] = extractelement <16 x i32> [[TMP97]], i64 0
-; MAXIMIZE-NEXT:    [[TMP99:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP98]]
 ; MAXIMIZE-NEXT:    [[TMP100:%.*]] = extractelement <16 x i32> [[TMP97]], i64 1
-; MAXIMIZE-NEXT:    [[TMP101:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP100]]
 ; MAXIMIZE-NEXT:    [[TMP102:%.*]] = extractelement <16 x i32> [[TMP97]], i64 2
-; MAXIMIZE-NEXT:    [[TMP103:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP102]]
 ; MAXIMIZE-NEXT:    [[TMP104:%.*]] = extractelement <16 x i32> [[TMP97]], i64 3
-; MAXIMIZE-NEXT:    [[TMP105:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP104]]
 ; MAXIMIZE-NEXT:    [[TMP106:%.*]] = extractelement <16 x i32> [[TMP97]], i64 4
-; MAXIMIZE-NEXT:    [[TMP107:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP106]]
 ; MAXIMIZE-NEXT:    [[TMP108:%.*]] = extractelement <16 x i32> [[TMP97]], i64 5
-; MAXIMIZE-NEXT:    [[TMP109:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP108]]
 ; MAXIMIZE-NEXT:    [[TMP110:%.*]] = extractelement <16 x i32> [[TMP97]], i64 6
-; MAXIMIZE-NEXT:    [[TMP111:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP110]]
 ; MAXIMIZE-NEXT:    [[TMP112:%.*]] = extractelement <16 x i32> [[TMP97]], i64 7
-; MAXIMIZE-NEXT:    [[TMP113:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP112]]
 ; MAXIMIZE-NEXT:    [[TMP114:%.*]] = extractelement <16 x i32> [[TMP97]], i64 8
-; MAXIMIZE-NEXT:    [[TMP115:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP114]]
 ; MAXIMIZE-NEXT:    [[TMP116:%.*]] = extractelement <16 x i32> [[TMP97]], i64 9
-; MAXIMIZE-NEXT:    [[TMP117:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP116]]
 ; MAXIMIZE-NEXT:    [[TMP118:%.*]] = extractelement <16 x i32> [[TMP97]], i64 10
-; MAXIMIZE-NEXT:    [[TMP119:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP118]]
 ; MAXIMIZE-NEXT:    [[TMP120:%.*]] = extractelement <16 x i32> [[TMP97]], i64 11
-; MAXIMIZE-NEXT:    [[TMP121:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP120]]
 ; MAXIMIZE-NEXT:    [[TMP122:%.*]] = extractelement <16 x i32> [[TMP97]], i64 12
-; MAXIMIZE-NEXT:    [[TMP123:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP122]]
 ; MAXIMIZE-NEXT:    [[TMP124:%.*]] = extractelement <16 x i32> [[TMP97]], i64 13
-; MAXIMIZE-NEXT:    [[TMP125:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP124]]
 ; MAXIMIZE-NEXT:    [[TMP126:%.*]] = extractelement <16 x i32> [[TMP97]], i64 14
-; MAXIMIZE-NEXT:    [[TMP127:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP126]]
 ; MAXIMIZE-NEXT:    [[TMP128:%.*]] = extractelement <16 x i32> [[TMP97]], i64 15
+; MAXIMIZE-NEXT:    [[TMP99:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP98]]
+; MAXIMIZE-NEXT:    [[TMP101:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP100]]
+; MAXIMIZE-NEXT:    [[TMP103:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP102]]
+; MAXIMIZE-NEXT:    [[TMP105:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP104]]
+; MAXIMIZE-NEXT:    [[TMP107:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP106]]
+; MAXIMIZE-NEXT:    [[TMP109:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP108]]
+; MAXIMIZE-NEXT:    [[TMP111:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP110]]
+; MAXIMIZE-NEXT:    [[TMP113:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP112]]
+; MAXIMIZE-NEXT:    [[TMP115:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP114]]
+; MAXIMIZE-NEXT:    [[TMP117:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP116]]
+; MAXIMIZE-NEXT:    [[TMP119:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP118]]
+; MAXIMIZE-NEXT:    [[TMP121:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP120]]
+; MAXIMIZE-NEXT:    [[TMP123:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP122]]
+; MAXIMIZE-NEXT:    [[TMP125:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP124]]
+; MAXIMIZE-NEXT:    [[TMP127:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP126]]
 ; MAXIMIZE-NEXT:    [[TMP129:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG1]], i32 [[TMP128]]
 ; MAXIMIZE-NEXT:    [[TMP130:%.*]] = load i8, ptr [[TMP81]], align 1
 ; MAXIMIZE-NEXT:    [[TMP131:%.*]] = load i8, ptr [[TMP82]], align 1
@@ -1241,36 +1241,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP167:%.*]] = sitofp <16 x i32> [[TMP164]] to <16 x float>
 ; MAXIMIZE-NEXT:    [[TMP168:%.*]] = fmul <16 x float> [[TMP80]], [[TMP167]]
 ; MAXIMIZE-NEXT:    [[TMP169:%.*]] = extractelement <16 x float> [[TMP168]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP169]], ptr [[TMP99]], align 4
 ; MAXIMIZE-NEXT:    [[TMP170:%.*]] = extractelement <16 x float> [[TMP168]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP170]], ptr [[TMP101]], align 4
 ; MAXIMIZE-NEXT:    [[TMP171:%.*]] = extractelement <16 x float> [[TMP168]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP171]], ptr [[TMP103]], align 4
 ; MAXIMIZE-NEXT:    [[TMP172:%.*]] = extractelement <16 x float> [[TMP168]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP172]], ptr [[TMP105]], align 4
 ; MAXIMIZE-NEXT:    [[TMP173:%.*]] = extractelement <16 x float> [[TMP168]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP173]], ptr [[TMP107]], align 4
 ; MAXIMIZE-NEXT:    [[TMP174:%.*]] = extractelement <16 x float> [[TMP168]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP174]], ptr [[TMP109]], align 4
 ; MAXIMIZE-NEXT:    [[TMP175:%.*]] = extractelement <16 x float> [[TMP168]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP175]], ptr [[TMP111]], align 4
 ; MAXIMIZE-NEXT:    [[TMP176:%.*]] = extractelement <16 x float> [[TMP168]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP176]], ptr [[TMP113]], align 4
 ; MAXIMIZE-NEXT:    [[TMP177:%.*]] = extractelement <16 x float> [[TMP168]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP177]], ptr [[TMP115]], align 4
 ; MAXIMIZE-NEXT:    [[TMP178:%.*]] = extractelement <16 x float> [[TMP168]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP178]], ptr [[TMP117]], align 4
 ; MAXIMIZE-NEXT:    [[TMP179:%.*]] = extractelement <16 x float> [[TMP168]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP179]], ptr [[TMP119]], align 4
 ; MAXIMIZE-NEXT:    [[TMP180:%.*]] = extractelement <16 x float> [[TMP168]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP180]], ptr [[TMP121]], align 4
 ; MAXIMIZE-NEXT:    [[TMP181:%.*]] = extractelement <16 x float> [[TMP168]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP181]], ptr [[TMP123]], align 4
 ; MAXIMIZE-NEXT:    [[TMP182:%.*]] = extractelement <16 x float> [[TMP168]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP182]], ptr [[TMP125]], align 4
 ; MAXIMIZE-NEXT:    [[TMP183:%.*]] = extractelement <16 x float> [[TMP168]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP183]], ptr [[TMP127]], align 4
 ; MAXIMIZE-NEXT:    [[TMP184:%.*]] = extractelement <16 x float> [[TMP168]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP169]], ptr [[TMP99]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP170]], ptr [[TMP101]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP171]], ptr [[TMP103]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP172]], ptr [[TMP105]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP173]], ptr [[TMP107]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP174]], ptr [[TMP109]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP175]], ptr [[TMP111]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP176]], ptr [[TMP113]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP177]], ptr [[TMP115]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP178]], ptr [[TMP117]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP179]], ptr [[TMP119]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP180]], ptr [[TMP121]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP181]], ptr [[TMP123]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP182]], ptr [[TMP125]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP183]], ptr [[TMP127]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP184]], ptr [[TMP129]], align 4
 ; MAXIMIZE-NEXT:    [[TMP185:%.*]] = sitofp <16 x i32> [[TMP166]] to <16 x float>
 ; MAXIMIZE-NEXT:    [[TMP186:%.*]] = fmul <16 x float> [[TMP80]], [[TMP185]]
@@ -1291,36 +1291,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP201:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 64
 ; MAXIMIZE-NEXT:    [[TMP202:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 64
 ; MAXIMIZE-NEXT:    [[TMP203:%.*]] = extractelement <16 x float> [[TMP186]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP203]], ptr [[TMP187]], align 4
 ; MAXIMIZE-NEXT:    [[TMP204:%.*]] = extractelement <16 x float> [[TMP186]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP204]], ptr [[TMP188]], align 4
 ; MAXIMIZE-NEXT:    [[TMP205:%.*]] = extractelement <16 x float> [[TMP186]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP205]], ptr [[TMP189]], align 4
 ; MAXIMIZE-NEXT:    [[TMP206:%.*]] = extractelement <16 x float> [[TMP186]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP206]], ptr [[TMP190]], align 4
 ; MAXIMIZE-NEXT:    [[TMP207:%.*]] = extractelement <16 x float> [[TMP186]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP207]], ptr [[TMP191]], align 4
 ; MAXIMIZE-NEXT:    [[TMP208:%.*]] = extractelement <16 x float> [[TMP186]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP208]], ptr [[TMP192]], align 4
 ; MAXIMIZE-NEXT:    [[TMP209:%.*]] = extractelement <16 x float> [[TMP186]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP209]], ptr [[TMP193]], align 4
 ; MAXIMIZE-NEXT:    [[TMP210:%.*]] = extractelement <16 x float> [[TMP186]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP210]], ptr [[TMP194]], align 4
 ; MAXIMIZE-NEXT:    [[TMP211:%.*]] = extractelement <16 x float> [[TMP186]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP211]], ptr [[TMP195]], align 4
 ; MAXIMIZE-NEXT:    [[TMP212:%.*]] = extractelement <16 x float> [[TMP186]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP212]], ptr [[TMP196]], align 4
 ; MAXIMIZE-NEXT:    [[TMP213:%.*]] = extractelement <16 x float> [[TMP186]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP213]], ptr [[TMP197]], align 4
 ; MAXIMIZE-NEXT:    [[TMP214:%.*]] = extractelement <16 x float> [[TMP186]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP214]], ptr [[TMP198]], align 4
 ; MAXIMIZE-NEXT:    [[TMP215:%.*]] = extractelement <16 x float> [[TMP186]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP215]], ptr [[TMP199]], align 4
 ; MAXIMIZE-NEXT:    [[TMP216:%.*]] = extractelement <16 x float> [[TMP186]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP216]], ptr [[TMP200]], align 4
 ; MAXIMIZE-NEXT:    [[TMP217:%.*]] = extractelement <16 x float> [[TMP186]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP217]], ptr [[TMP201]], align 4
 ; MAXIMIZE-NEXT:    [[TMP218:%.*]] = extractelement <16 x float> [[TMP186]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP203]], ptr [[TMP187]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP204]], ptr [[TMP188]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP205]], ptr [[TMP189]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP206]], ptr [[TMP190]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP207]], ptr [[TMP191]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP208]], ptr [[TMP192]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP209]], ptr [[TMP193]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP210]], ptr [[TMP194]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP211]], ptr [[TMP195]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP212]], ptr [[TMP196]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP213]], ptr [[TMP197]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP214]], ptr [[TMP198]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP215]], ptr [[TMP199]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP216]], ptr [[TMP200]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP217]], ptr [[TMP201]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP218]], ptr [[TMP202]], align 4
 ; MAXIMIZE-NEXT:    [[TMP219:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP16]], i32 3
 ; MAXIMIZE-NEXT:    [[TMP220:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP17]], i32 3
@@ -1394,36 +1394,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP288:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 4
 ; MAXIMIZE-NEXT:    [[TMP289:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 4
 ; MAXIMIZE-NEXT:    [[TMP290:%.*]] = extractelement <16 x float> [[TMP273]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP290]], ptr [[TMP274]], align 4
 ; MAXIMIZE-NEXT:    [[TMP291:%.*]] = extractelement <16 x float> [[TMP273]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP291]], ptr [[TMP275]], align 4
 ; MAXIMIZE-NEXT:    [[TMP292:%.*]] = extractelement <16 x float> [[TMP273]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP292]], ptr [[TMP276]], align 4
 ; MAXIMIZE-NEXT:    [[TMP293:%.*]] = extractelement <16 x float> [[TMP273]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP293]], ptr [[TMP277]], align 4
 ; MAXIMIZE-NEXT:    [[TMP294:%.*]] = extractelement <16 x float> [[TMP273]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP294]], ptr [[TMP278]], align 4
 ; MAXIMIZE-NEXT:    [[TMP295:%.*]] = extractelement <16 x float> [[TMP273]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP295]], ptr [[TMP279]], align 4
 ; MAXIMIZE-NEXT:    [[TMP296:%.*]] = extractelement <16 x float> [[TMP273]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP296]], ptr [[TMP280]], align 4
 ; MAXIMIZE-NEXT:    [[TMP297:%.*]] = extractelement <16 x float> [[TMP273]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP297]], ptr [[TMP281]], align 4
 ; MAXIMIZE-NEXT:    [[TMP298:%.*]] = extractelement <16 x float> [[TMP273]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP298]], ptr [[TMP282]], align 4
 ; MAXIMIZE-NEXT:    [[TMP299:%.*]] = extractelement <16 x float> [[TMP273]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP299]], ptr [[TMP283]], align 4
 ; MAXIMIZE-NEXT:    [[TMP300:%.*]] = extractelement <16 x float> [[TMP273]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP300]], ptr [[TMP284]], align 4
 ; MAXIMIZE-NEXT:    [[TMP301:%.*]] = extractelement <16 x float> [[TMP273]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP301]], ptr [[TMP285]], align 4
 ; MAXIMIZE-NEXT:    [[TMP302:%.*]] = extractelement <16 x float> [[TMP273]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP302]], ptr [[TMP286]], align 4
 ; MAXIMIZE-NEXT:    [[TMP303:%.*]] = extractelement <16 x float> [[TMP273]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP303]], ptr [[TMP287]], align 4
 ; MAXIMIZE-NEXT:    [[TMP304:%.*]] = extractelement <16 x float> [[TMP273]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP304]], ptr [[TMP288]], align 4
 ; MAXIMIZE-NEXT:    [[TMP305:%.*]] = extractelement <16 x float> [[TMP273]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP290]], ptr [[TMP274]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP291]], ptr [[TMP275]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP292]], ptr [[TMP276]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP293]], ptr [[TMP277]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP294]], ptr [[TMP278]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP295]], ptr [[TMP279]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP296]], ptr [[TMP280]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP297]], ptr [[TMP281]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP298]], ptr [[TMP282]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP299]], ptr [[TMP283]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP300]], ptr [[TMP284]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP301]], ptr [[TMP285]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP302]], ptr [[TMP286]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP303]], ptr [[TMP287]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP304]], ptr [[TMP288]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP305]], ptr [[TMP289]], align 4
 ; MAXIMIZE-NEXT:    [[TMP306:%.*]] = sitofp <16 x i32> [[TMP271]] to <16 x float>
 ; MAXIMIZE-NEXT:    [[TMP307:%.*]] = fmul <16 x float> [[TMP80]], [[TMP306]]
@@ -1444,36 +1444,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP322:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 68
 ; MAXIMIZE-NEXT:    [[TMP323:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 68
 ; MAXIMIZE-NEXT:    [[TMP324:%.*]] = extractelement <16 x float> [[TMP307]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP324]], ptr [[TMP308]], align 4
 ; MAXIMIZE-NEXT:    [[TMP325:%.*]] = extractelement <16 x float> [[TMP307]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP325]], ptr [[TMP309]], align 4
 ; MAXIMIZE-NEXT:    [[TMP326:%.*]] = extractelement <16 x float> [[TMP307]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP326]], ptr [[TMP310]], align 4
 ; MAXIMIZE-NEXT:    [[TMP327:%.*]] = extractelement <16 x float> [[TMP307]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP327]], ptr [[TMP311]], align 4
 ; MAXIMIZE-NEXT:    [[TMP328:%.*]] = extractelement <16 x float> [[TMP307]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP328]], ptr [[TMP312]], align 4
 ; MAXIMIZE-NEXT:    [[TMP329:%.*]] = extractelement <16 x float> [[TMP307]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP329]], ptr [[TMP313]], align 4
 ; MAXIMIZE-NEXT:    [[TMP330:%.*]] = extractelement <16 x float> [[TMP307]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP330]], ptr [[TMP314]], align 4
 ; MAXIMIZE-NEXT:    [[TMP331:%.*]] = extractelement <16 x float> [[TMP307]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP331]], ptr [[TMP315]], align 4
 ; MAXIMIZE-NEXT:    [[TMP332:%.*]] = extractelement <16 x float> [[TMP307]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP332]], ptr [[TMP316]], align 4
 ; MAXIMIZE-NEXT:    [[TMP333:%.*]] = extractelement <16 x float> [[TMP307]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP333]], ptr [[TMP317]], align 4
 ; MAXIMIZE-NEXT:    [[TMP334:%.*]] = extractelement <16 x float> [[TMP307]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP334]], ptr [[TMP318]], align 4
 ; MAXIMIZE-NEXT:    [[TMP335:%.*]] = extractelement <16 x float> [[TMP307]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP335]], ptr [[TMP319]], align 4
 ; MAXIMIZE-NEXT:    [[TMP336:%.*]] = extractelement <16 x float> [[TMP307]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP336]], ptr [[TMP320]], align 4
 ; MAXIMIZE-NEXT:    [[TMP337:%.*]] = extractelement <16 x float> [[TMP307]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP337]], ptr [[TMP321]], align 4
 ; MAXIMIZE-NEXT:    [[TMP338:%.*]] = extractelement <16 x float> [[TMP307]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP338]], ptr [[TMP322]], align 4
 ; MAXIMIZE-NEXT:    [[TMP339:%.*]] = extractelement <16 x float> [[TMP307]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP324]], ptr [[TMP308]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP325]], ptr [[TMP309]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP326]], ptr [[TMP310]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP327]], ptr [[TMP311]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP328]], ptr [[TMP312]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP329]], ptr [[TMP313]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP330]], ptr [[TMP314]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP331]], ptr [[TMP315]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP332]], ptr [[TMP316]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP333]], ptr [[TMP317]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP334]], ptr [[TMP318]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP335]], ptr [[TMP319]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP336]], ptr [[TMP320]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP337]], ptr [[TMP321]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP338]], ptr [[TMP322]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP339]], ptr [[TMP323]], align 4
 ; MAXIMIZE-NEXT:    [[TMP340:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP16]], i32 4
 ; MAXIMIZE-NEXT:    [[TMP341:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP17]], i32 4
@@ -1547,36 +1547,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP409:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 8
 ; MAXIMIZE-NEXT:    [[TMP410:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 8
 ; MAXIMIZE-NEXT:    [[TMP411:%.*]] = extractelement <16 x float> [[TMP394]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP411]], ptr [[TMP395]], align 4
 ; MAXIMIZE-NEXT:    [[TMP412:%.*]] = extractelement <16 x float> [[TMP394]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP412]], ptr [[TMP396]], align 4
 ; MAXIMIZE-NEXT:    [[TMP413:%.*]] = extractelement <16 x float> [[TMP394]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP413]], ptr [[TMP397]], align 4
 ; MAXIMIZE-NEXT:    [[TMP414:%.*]] = extractelement <16 x float> [[TMP394]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP414]], ptr [[TMP398]], align 4
 ; MAXIMIZE-NEXT:    [[TMP415:%.*]] = extractelement <16 x float> [[TMP394]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP415]], ptr [[TMP399]], align 4
 ; MAXIMIZE-NEXT:    [[TMP416:%.*]] = extractelement <16 x float> [[TMP394]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP416]], ptr [[TMP400]], align 4
 ; MAXIMIZE-NEXT:    [[TMP417:%.*]] = extractelement <16 x float> [[TMP394]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP417]], ptr [[TMP401]], align 4
 ; MAXIMIZE-NEXT:    [[TMP418:%.*]] = extractelement <16 x float> [[TMP394]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP418]], ptr [[TMP402]], align 4
 ; MAXIMIZE-NEXT:    [[TMP419:%.*]] = extractelement <16 x float> [[TMP394]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP419]], ptr [[TMP403]], align 4
 ; MAXIMIZE-NEXT:    [[TMP420:%.*]] = extractelement <16 x float> [[TMP394]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP420]], ptr [[TMP404]], align 4
 ; MAXIMIZE-NEXT:    [[TMP421:%.*]] = extractelement <16 x float> [[TMP394]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP421]], ptr [[TMP405]], align 4
 ; MAXIMIZE-NEXT:    [[TMP422:%.*]] = extractelement <16 x float> [[TMP394]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP422]], ptr [[TMP406]], align 4
 ; MAXIMIZE-NEXT:    [[TMP423:%.*]] = extractelement <16 x float> [[TMP394]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP423]], ptr [[TMP407]], align 4
 ; MAXIMIZE-NEXT:    [[TMP424:%.*]] = extractelement <16 x float> [[TMP394]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP424]], ptr [[TMP408]], align 4
 ; MAXIMIZE-NEXT:    [[TMP425:%.*]] = extractelement <16 x float> [[TMP394]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP425]], ptr [[TMP409]], align 4
 ; MAXIMIZE-NEXT:    [[TMP426:%.*]] = extractelement <16 x float> [[TMP394]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP411]], ptr [[TMP395]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP412]], ptr [[TMP396]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP413]], ptr [[TMP397]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP414]], ptr [[TMP398]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP415]], ptr [[TMP399]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP416]], ptr [[TMP400]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP417]], ptr [[TMP401]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP418]], ptr [[TMP402]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP419]], ptr [[TMP403]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP420]], ptr [[TMP404]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP421]], ptr [[TMP405]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP422]], ptr [[TMP406]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP423]], ptr [[TMP407]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP424]], ptr [[TMP408]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP425]], ptr [[TMP409]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP426]], ptr [[TMP410]], align 4
 ; MAXIMIZE-NEXT:    [[TMP427:%.*]] = sitofp <16 x i32> [[TMP392]] to <16 x float>
 ; MAXIMIZE-NEXT:    [[TMP428:%.*]] = fmul <16 x float> [[TMP80]], [[TMP427]]
@@ -1597,36 +1597,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP443:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 72
 ; MAXIMIZE-NEXT:    [[TMP444:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 72
 ; MAXIMIZE-NEXT:    [[TMP445:%.*]] = extractelement <16 x float> [[TMP428]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP445]], ptr [[TMP429]], align 4
 ; MAXIMIZE-NEXT:    [[TMP446:%.*]] = extractelement <16 x float> [[TMP428]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP446]], ptr [[TMP430]], align 4
 ; MAXIMIZE-NEXT:    [[TMP447:%.*]] = extractelement <16 x float> [[TMP428]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP447]], ptr [[TMP431]], align 4
 ; MAXIMIZE-NEXT:    [[TMP448:%.*]] = extractelement <16 x float> [[TMP428]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP448]], ptr [[TMP432]], align 4
 ; MAXIMIZE-NEXT:    [[TMP449:%.*]] = extractelement <16 x float> [[TMP428]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP449]], ptr [[TMP433]], align 4
 ; MAXIMIZE-NEXT:    [[TMP450:%.*]] = extractelement <16 x float> [[TMP428]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP450]], ptr [[TMP434]], align 4
 ; MAXIMIZE-NEXT:    [[TMP451:%.*]] = extractelement <16 x float> [[TMP428]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP451]], ptr [[TMP435]], align 4
 ; MAXIMIZE-NEXT:    [[TMP452:%.*]] = extractelement <16 x float> [[TMP428]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP452]], ptr [[TMP436]], align 4
 ; MAXIMIZE-NEXT:    [[TMP453:%.*]] = extractelement <16 x float> [[TMP428]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP453]], ptr [[TMP437]], align 4
 ; MAXIMIZE-NEXT:    [[TMP454:%.*]] = extractelement <16 x float> [[TMP428]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP454]], ptr [[TMP438]], align 4
 ; MAXIMIZE-NEXT:    [[TMP455:%.*]] = extractelement <16 x float> [[TMP428]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP455]], ptr [[TMP439]], align 4
 ; MAXIMIZE-NEXT:    [[TMP456:%.*]] = extractelement <16 x float> [[TMP428]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP456]], ptr [[TMP440]], align 4
 ; MAXIMIZE-NEXT:    [[TMP457:%.*]] = extractelement <16 x float> [[TMP428]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP457]], ptr [[TMP441]], align 4
 ; MAXIMIZE-NEXT:    [[TMP458:%.*]] = extractelement <16 x float> [[TMP428]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP458]], ptr [[TMP442]], align 4
 ; MAXIMIZE-NEXT:    [[TMP459:%.*]] = extractelement <16 x float> [[TMP428]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP459]], ptr [[TMP443]], align 4
 ; MAXIMIZE-NEXT:    [[TMP460:%.*]] = extractelement <16 x float> [[TMP428]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP445]], ptr [[TMP429]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP446]], ptr [[TMP430]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP447]], ptr [[TMP431]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP448]], ptr [[TMP432]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP449]], ptr [[TMP433]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP450]], ptr [[TMP434]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP451]], ptr [[TMP435]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP452]], ptr [[TMP436]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP453]], ptr [[TMP437]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP454]], ptr [[TMP438]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP455]], ptr [[TMP439]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP456]], ptr [[TMP440]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP457]], ptr [[TMP441]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP458]], ptr [[TMP442]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP459]], ptr [[TMP443]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP460]], ptr [[TMP444]], align 4
 ; MAXIMIZE-NEXT:    [[TMP461:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP16]], i32 5
 ; MAXIMIZE-NEXT:    [[TMP462:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP17]], i32 5
@@ -1700,36 +1700,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP530:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 12
 ; MAXIMIZE-NEXT:    [[TMP531:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 12
 ; MAXIMIZE-NEXT:    [[TMP532:%.*]] = extractelement <16 x float> [[TMP515]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP532]], ptr [[TMP516]], align 4
 ; MAXIMIZE-NEXT:    [[TMP533:%.*]] = extractelement <16 x float> [[TMP515]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP533]], ptr [[TMP517]], align 4
 ; MAXIMIZE-NEXT:    [[TMP534:%.*]] = extractelement <16 x float> [[TMP515]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP534]], ptr [[TMP518]], align 4
 ; MAXIMIZE-NEXT:    [[TMP535:%.*]] = extractelement <16 x float> [[TMP515]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP535]], ptr [[TMP519]], align 4
 ; MAXIMIZE-NEXT:    [[TMP536:%.*]] = extractelement <16 x float> [[TMP515]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP536]], ptr [[TMP520]], align 4
 ; MAXIMIZE-NEXT:    [[TMP537:%.*]] = extractelement <16 x float> [[TMP515]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP537]], ptr [[TMP521]], align 4
 ; MAXIMIZE-NEXT:    [[TMP538:%.*]] = extractelement <16 x float> [[TMP515]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP538]], ptr [[TMP522]], align 4
 ; MAXIMIZE-NEXT:    [[TMP539:%.*]] = extractelement <16 x float> [[TMP515]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP539]], ptr [[TMP523]], align 4
 ; MAXIMIZE-NEXT:    [[TMP540:%.*]] = extractelement <16 x float> [[TMP515]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP540]], ptr [[TMP524]], align 4
 ; MAXIMIZE-NEXT:    [[TMP541:%.*]] = extractelement <16 x float> [[TMP515]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP541]], ptr [[TMP525]], align 4
 ; MAXIMIZE-NEXT:    [[TMP542:%.*]] = extractelement <16 x float> [[TMP515]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP542]], ptr [[TMP526]], align 4
 ; MAXIMIZE-NEXT:    [[TMP543:%.*]] = extractelement <16 x float> [[TMP515]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP543]], ptr [[TMP527]], align 4
 ; MAXIMIZE-NEXT:    [[TMP544:%.*]] = extractelement <16 x float> [[TMP515]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP544]], ptr [[TMP528]], align 4
 ; MAXIMIZE-NEXT:    [[TMP545:%.*]] = extractelement <16 x float> [[TMP515]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP545]], ptr [[TMP529]], align 4
 ; MAXIMIZE-NEXT:    [[TMP546:%.*]] = extractelement <16 x float> [[TMP515]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP546]], ptr [[TMP530]], align 4
 ; MAXIMIZE-NEXT:    [[TMP547:%.*]] = extractelement <16 x float> [[TMP515]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP532]], ptr [[TMP516]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP533]], ptr [[TMP517]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP534]], ptr [[TMP518]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP535]], ptr [[TMP519]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP536]], ptr [[TMP520]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP537]], ptr [[TMP521]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP538]], ptr [[TMP522]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP539]], ptr [[TMP523]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP540]], ptr [[TMP524]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP541]], ptr [[TMP525]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP542]], ptr [[TMP526]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP543]], ptr [[TMP527]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP544]], ptr [[TMP528]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP545]], ptr [[TMP529]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP546]], ptr [[TMP530]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP547]], ptr [[TMP531]], align 4
 ; MAXIMIZE-NEXT:    [[TMP548:%.*]] = sitofp <16 x i32> [[TMP513]] to <16 x float>
 ; MAXIMIZE-NEXT:    [[TMP549:%.*]] = fmul <16 x float> [[TMP80]], [[TMP548]]
@@ -1750,36 +1750,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP564:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 76
 ; MAXIMIZE-NEXT:    [[TMP565:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 76
 ; MAXIMIZE-NEXT:    [[TMP566:%.*]] = extractelement <16 x float> [[TMP549]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP566]], ptr [[TMP550]], align 4
 ; MAXIMIZE-NEXT:    [[TMP567:%.*]] = extractelement <16 x float> [[TMP549]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP567]], ptr [[TMP551]], align 4
 ; MAXIMIZE-NEXT:    [[TMP568:%.*]] = extractelement <16 x float> [[TMP549]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP568]], ptr [[TMP552]], align 4
 ; MAXIMIZE-NEXT:    [[TMP569:%.*]] = extractelement <16 x float> [[TMP549]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP569]], ptr [[TMP553]], align 4
 ; MAXIMIZE-NEXT:    [[TMP570:%.*]] = extractelement <16 x float> [[TMP549]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP570]], ptr [[TMP554]], align 4
 ; MAXIMIZE-NEXT:    [[TMP571:%.*]] = extractelement <16 x float> [[TMP549]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP571]], ptr [[TMP555]], align 4
 ; MAXIMIZE-NEXT:    [[TMP572:%.*]] = extractelement <16 x float> [[TMP549]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP572]], ptr [[TMP556]], align 4
 ; MAXIMIZE-NEXT:    [[TMP573:%.*]] = extractelement <16 x float> [[TMP549]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP573]], ptr [[TMP557]], align 4
 ; MAXIMIZE-NEXT:    [[TMP574:%.*]] = extractelement <16 x float> [[TMP549]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP574]], ptr [[TMP558]], align 4
 ; MAXIMIZE-NEXT:    [[TMP575:%.*]] = extractelement <16 x float> [[TMP549]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP575]], ptr [[TMP559]], align 4
 ; MAXIMIZE-NEXT:    [[TMP576:%.*]] = extractelement <16 x float> [[TMP549]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP576]], ptr [[TMP560]], align 4
 ; MAXIMIZE-NEXT:    [[TMP577:%.*]] = extractelement <16 x float> [[TMP549]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP577]], ptr [[TMP561]], align 4
 ; MAXIMIZE-NEXT:    [[TMP578:%.*]] = extractelement <16 x float> [[TMP549]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP578]], ptr [[TMP562]], align 4
 ; MAXIMIZE-NEXT:    [[TMP579:%.*]] = extractelement <16 x float> [[TMP549]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP579]], ptr [[TMP563]], align 4
 ; MAXIMIZE-NEXT:    [[TMP580:%.*]] = extractelement <16 x float> [[TMP549]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP580]], ptr [[TMP564]], align 4
 ; MAXIMIZE-NEXT:    [[TMP581:%.*]] = extractelement <16 x float> [[TMP549]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP566]], ptr [[TMP550]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP567]], ptr [[TMP551]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP568]], ptr [[TMP552]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP569]], ptr [[TMP553]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP570]], ptr [[TMP554]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP571]], ptr [[TMP555]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP572]], ptr [[TMP556]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP573]], ptr [[TMP557]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP574]], ptr [[TMP558]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP575]], ptr [[TMP559]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP576]], ptr [[TMP560]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP577]], ptr [[TMP561]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP578]], ptr [[TMP562]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP579]], ptr [[TMP563]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP580]], ptr [[TMP564]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP581]], ptr [[TMP565]], align 4
 ; MAXIMIZE-NEXT:    [[TMP582:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP16]], i32 6
 ; MAXIMIZE-NEXT:    [[TMP583:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP17]], i32 6
@@ -1853,36 +1853,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP651:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 16
 ; MAXIMIZE-NEXT:    [[TMP652:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 16
 ; MAXIMIZE-NEXT:    [[TMP653:%.*]] = extractelement <16 x float> [[TMP636]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP653]], ptr [[TMP637]], align 4
 ; MAXIMIZE-NEXT:    [[TMP654:%.*]] = extractelement <16 x float> [[TMP636]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP654]], ptr [[TMP638]], align 4
 ; MAXIMIZE-NEXT:    [[TMP655:%.*]] = extractelement <16 x float> [[TMP636]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP655]], ptr [[TMP639]], align 4
 ; MAXIMIZE-NEXT:    [[TMP656:%.*]] = extractelement <16 x float> [[TMP636]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP656]], ptr [[TMP640]], align 4
 ; MAXIMIZE-NEXT:    [[TMP657:%.*]] = extractelement <16 x float> [[TMP636]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP657]], ptr [[TMP641]], align 4
 ; MAXIMIZE-NEXT:    [[TMP658:%.*]] = extractelement <16 x float> [[TMP636]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP658]], ptr [[TMP642]], align 4
 ; MAXIMIZE-NEXT:    [[TMP659:%.*]] = extractelement <16 x float> [[TMP636]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP659]], ptr [[TMP643]], align 4
 ; MAXIMIZE-NEXT:    [[TMP660:%.*]] = extractelement <16 x float> [[TMP636]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP660]], ptr [[TMP644]], align 4
 ; MAXIMIZE-NEXT:    [[TMP661:%.*]] = extractelement <16 x float> [[TMP636]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP661]], ptr [[TMP645]], align 4
 ; MAXIMIZE-NEXT:    [[TMP662:%.*]] = extractelement <16 x float> [[TMP636]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP662]], ptr [[TMP646]], align 4
 ; MAXIMIZE-NEXT:    [[TMP663:%.*]] = extractelement <16 x float> [[TMP636]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP663]], ptr [[TMP647]], align 4
 ; MAXIMIZE-NEXT:    [[TMP664:%.*]] = extractelement <16 x float> [[TMP636]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP664]], ptr [[TMP648]], align 4
 ; MAXIMIZE-NEXT:    [[TMP665:%.*]] = extractelement <16 x float> [[TMP636]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP665]], ptr [[TMP649]], align 4
 ; MAXIMIZE-NEXT:    [[TMP666:%.*]] = extractelement <16 x float> [[TMP636]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP666]], ptr [[TMP650]], align 4
 ; MAXIMIZE-NEXT:    [[TMP667:%.*]] = extractelement <16 x float> [[TMP636]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP667]], ptr [[TMP651]], align 4
 ; MAXIMIZE-NEXT:    [[TMP668:%.*]] = extractelement <16 x float> [[TMP636]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP653]], ptr [[TMP637]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP654]], ptr [[TMP638]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP655]], ptr [[TMP639]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP656]], ptr [[TMP640]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP657]], ptr [[TMP641]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP658]], ptr [[TMP642]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP659]], ptr [[TMP643]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP660]], ptr [[TMP644]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP661]], ptr [[TMP645]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP662]], ptr [[TMP646]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP663]], ptr [[TMP647]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP664]], ptr [[TMP648]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP665]], ptr [[TMP649]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP666]], ptr [[TMP650]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP667]], ptr [[TMP651]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP668]], ptr [[TMP652]], align 4
 ; MAXIMIZE-NEXT:    [[TMP669:%.*]] = sitofp <16 x i32> [[TMP634]] to <16 x float>
 ; MAXIMIZE-NEXT:    [[TMP670:%.*]] = fmul <16 x float> [[TMP80]], [[TMP669]]
@@ -1903,36 +1903,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP685:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 80
 ; MAXIMIZE-NEXT:    [[TMP686:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 80
 ; MAXIMIZE-NEXT:    [[TMP687:%.*]] = extractelement <16 x float> [[TMP670]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP687]], ptr [[TMP671]], align 4
 ; MAXIMIZE-NEXT:    [[TMP688:%.*]] = extractelement <16 x float> [[TMP670]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP688]], ptr [[TMP672]], align 4
 ; MAXIMIZE-NEXT:    [[TMP689:%.*]] = extractelement <16 x float> [[TMP670]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP689]], ptr [[TMP673]], align 4
 ; MAXIMIZE-NEXT:    [[TMP690:%.*]] = extractelement <16 x float> [[TMP670]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP690]], ptr [[TMP674]], align 4
 ; MAXIMIZE-NEXT:    [[TMP691:%.*]] = extractelement <16 x float> [[TMP670]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP691]], ptr [[TMP675]], align 4
 ; MAXIMIZE-NEXT:    [[TMP692:%.*]] = extractelement <16 x float> [[TMP670]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP692]], ptr [[TMP676]], align 4
 ; MAXIMIZE-NEXT:    [[TMP693:%.*]] = extractelement <16 x float> [[TMP670]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP693]], ptr [[TMP677]], align 4
 ; MAXIMIZE-NEXT:    [[TMP694:%.*]] = extractelement <16 x float> [[TMP670]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP694]], ptr [[TMP678]], align 4
 ; MAXIMIZE-NEXT:    [[TMP695:%.*]] = extractelement <16 x float> [[TMP670]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP695]], ptr [[TMP679]], align 4
 ; MAXIMIZE-NEXT:    [[TMP696:%.*]] = extractelement <16 x float> [[TMP670]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP696]], ptr [[TMP680]], align 4
 ; MAXIMIZE-NEXT:    [[TMP697:%.*]] = extractelement <16 x float> [[TMP670]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP697]], ptr [[TMP681]], align 4
 ; MAXIMIZE-NEXT:    [[TMP698:%.*]] = extractelement <16 x float> [[TMP670]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP698]], ptr [[TMP682]], align 4
 ; MAXIMIZE-NEXT:    [[TMP699:%.*]] = extractelement <16 x float> [[TMP670]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP699]], ptr [[TMP683]], align 4
 ; MAXIMIZE-NEXT:    [[TMP700:%.*]] = extractelement <16 x float> [[TMP670]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP700]], ptr [[TMP684]], align 4
 ; MAXIMIZE-NEXT:    [[TMP701:%.*]] = extractelement <16 x float> [[TMP670]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP701]], ptr [[TMP685]], align 4
 ; MAXIMIZE-NEXT:    [[TMP702:%.*]] = extractelement <16 x float> [[TMP670]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP687]], ptr [[TMP671]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP688]], ptr [[TMP672]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP689]], ptr [[TMP673]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP690]], ptr [[TMP674]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP691]], ptr [[TMP675]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP692]], ptr [[TMP676]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP693]], ptr [[TMP677]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP694]], ptr [[TMP678]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP695]], ptr [[TMP679]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP696]], ptr [[TMP680]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP697]], ptr [[TMP681]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP698]], ptr [[TMP682]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP699]], ptr [[TMP683]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP700]], ptr [[TMP684]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP701]], ptr [[TMP685]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP702]], ptr [[TMP686]], align 4
 ; MAXIMIZE-NEXT:    [[TMP703:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP16]], i32 7
 ; MAXIMIZE-NEXT:    [[TMP704:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP17]], i32 7
@@ -2006,36 +2006,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP772:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 20
 ; MAXIMIZE-NEXT:    [[TMP773:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 20
 ; MAXIMIZE-NEXT:    [[TMP774:%.*]] = extractelement <16 x float> [[TMP757]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP774]], ptr [[TMP758]], align 4
 ; MAXIMIZE-NEXT:    [[TMP775:%.*]] = extractelement <16 x float> [[TMP757]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP775]], ptr [[TMP759]], align 4
 ; MAXIMIZE-NEXT:    [[TMP776:%.*]] = extractelement <16 x float> [[TMP757]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP776]], ptr [[TMP760]], align 4
 ; MAXIMIZE-NEXT:    [[TMP777:%.*]] = extractelement <16 x float> [[TMP757]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP777]], ptr [[TMP761]], align 4
 ; MAXIMIZE-NEXT:    [[TMP778:%.*]] = extractelement <16 x float> [[TMP757]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP778]], ptr [[TMP762]], align 4
 ; MAXIMIZE-NEXT:    [[TMP779:%.*]] = extractelement <16 x float> [[TMP757]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP779]], ptr [[TMP763]], align 4
 ; MAXIMIZE-NEXT:    [[TMP780:%.*]] = extractelement <16 x float> [[TMP757]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP780]], ptr [[TMP764]], align 4
 ; MAXIMIZE-NEXT:    [[TMP781:%.*]] = extractelement <16 x float> [[TMP757]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP781]], ptr [[TMP765]], align 4
 ; MAXIMIZE-NEXT:    [[TMP782:%.*]] = extractelement <16 x float> [[TMP757]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP782]], ptr [[TMP766]], align 4
 ; MAXIMIZE-NEXT:    [[TMP783:%.*]] = extractelement <16 x float> [[TMP757]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP783]], ptr [[TMP767]], align 4
 ; MAXIMIZE-NEXT:    [[TMP784:%.*]] = extractelement <16 x float> [[TMP757]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP784]], ptr [[TMP768]], align 4
 ; MAXIMIZE-NEXT:    [[TMP785:%.*]] = extractelement <16 x float> [[TMP757]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP785]], ptr [[TMP769]], align 4
 ; MAXIMIZE-NEXT:    [[TMP786:%.*]] = extractelement <16 x float> [[TMP757]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP786]], ptr [[TMP770]], align 4
 ; MAXIMIZE-NEXT:    [[TMP787:%.*]] = extractelement <16 x float> [[TMP757]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP787]], ptr [[TMP771]], align 4
 ; MAXIMIZE-NEXT:    [[TMP788:%.*]] = extractelement <16 x float> [[TMP757]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP788]], ptr [[TMP772]], align 4
 ; MAXIMIZE-NEXT:    [[TMP789:%.*]] = extractelement <16 x float> [[TMP757]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP774]], ptr [[TMP758]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP775]], ptr [[TMP759]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP776]], ptr [[TMP760]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP777]], ptr [[TMP761]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP778]], ptr [[TMP762]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP779]], ptr [[TMP763]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP780]], ptr [[TMP764]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP781]], ptr [[TMP765]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP782]], ptr [[TMP766]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP783]], ptr [[TMP767]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP784]], ptr [[TMP768]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP785]], ptr [[TMP769]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP786]], ptr [[TMP770]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP787]], ptr [[TMP771]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP788]], ptr [[TMP772]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP789]], ptr [[TMP773]], align 4
 ; MAXIMIZE-NEXT:    [[TMP790:%.*]] = sitofp <16 x i32> [[TMP755]] to <16 x float>
 ; MAXIMIZE-NEXT:    [[TMP791:%.*]] = fmul <16 x float> [[TMP80]], [[TMP790]]
@@ -2056,36 +2056,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP806:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 84
 ; MAXIMIZE-NEXT:    [[TMP807:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 84
 ; MAXIMIZE-NEXT:    [[TMP808:%.*]] = extractelement <16 x float> [[TMP791]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP808]], ptr [[TMP792]], align 4
 ; MAXIMIZE-NEXT:    [[TMP809:%.*]] = extractelement <16 x float> [[TMP791]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP809]], ptr [[TMP793]], align 4
 ; MAXIMIZE-NEXT:    [[TMP810:%.*]] = extractelement <16 x float> [[TMP791]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP810]], ptr [[TMP794]], align 4
 ; MAXIMIZE-NEXT:    [[TMP811:%.*]] = extractelement <16 x float> [[TMP791]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP811]], ptr [[TMP795]], align 4
 ; MAXIMIZE-NEXT:    [[TMP812:%.*]] = extractelement <16 x float> [[TMP791]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP812]], ptr [[TMP796]], align 4
 ; MAXIMIZE-NEXT:    [[TMP813:%.*]] = extractelement <16 x float> [[TMP791]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP813]], ptr [[TMP797]], align 4
 ; MAXIMIZE-NEXT:    [[TMP814:%.*]] = extractelement <16 x float> [[TMP791]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP814]], ptr [[TMP798]], align 4
 ; MAXIMIZE-NEXT:    [[TMP815:%.*]] = extractelement <16 x float> [[TMP791]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP815]], ptr [[TMP799]], align 4
 ; MAXIMIZE-NEXT:    [[TMP816:%.*]] = extractelement <16 x float> [[TMP791]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP816]], ptr [[TMP800]], align 4
 ; MAXIMIZE-NEXT:    [[TMP817:%.*]] = extractelement <16 x float> [[TMP791]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP817]], ptr [[TMP801]], align 4
 ; MAXIMIZE-NEXT:    [[TMP818:%.*]] = extractelement <16 x float> [[TMP791]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP818]], ptr [[TMP802]], align 4
 ; MAXIMIZE-NEXT:    [[TMP819:%.*]] = extractelement <16 x float> [[TMP791]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP819]], ptr [[TMP803]], align 4
 ; MAXIMIZE-NEXT:    [[TMP820:%.*]] = extractelement <16 x float> [[TMP791]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP820]], ptr [[TMP804]], align 4
 ; MAXIMIZE-NEXT:    [[TMP821:%.*]] = extractelement <16 x float> [[TMP791]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP821]], ptr [[TMP805]], align 4
 ; MAXIMIZE-NEXT:    [[TMP822:%.*]] = extractelement <16 x float> [[TMP791]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP822]], ptr [[TMP806]], align 4
 ; MAXIMIZE-NEXT:    [[TMP823:%.*]] = extractelement <16 x float> [[TMP791]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP808]], ptr [[TMP792]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP809]], ptr [[TMP793]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP810]], ptr [[TMP794]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP811]], ptr [[TMP795]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP812]], ptr [[TMP796]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP813]], ptr [[TMP797]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP814]], ptr [[TMP798]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP815]], ptr [[TMP799]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP816]], ptr [[TMP800]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP817]], ptr [[TMP801]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP818]], ptr [[TMP802]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP819]], ptr [[TMP803]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP820]], ptr [[TMP804]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP821]], ptr [[TMP805]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP822]], ptr [[TMP806]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP823]], ptr [[TMP807]], align 4
 ; MAXIMIZE-NEXT:    [[TMP824:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP16]], i32 8
 ; MAXIMIZE-NEXT:    [[TMP825:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP17]], i32 8
@@ -2159,36 +2159,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP893:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 24
 ; MAXIMIZE-NEXT:    [[TMP894:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 24
 ; MAXIMIZE-NEXT:    [[TMP895:%.*]] = extractelement <16 x float> [[TMP878]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP895]], ptr [[TMP879]], align 4
 ; MAXIMIZE-NEXT:    [[TMP896:%.*]] = extractelement <16 x float> [[TMP878]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP896]], ptr [[TMP880]], align 4
 ; MAXIMIZE-NEXT:    [[TMP897:%.*]] = extractelement <16 x float> [[TMP878]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP897]], ptr [[TMP881]], align 4
 ; MAXIMIZE-NEXT:    [[TMP898:%.*]] = extractelement <16 x float> [[TMP878]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP898]], ptr [[TMP882]], align 4
 ; MAXIMIZE-NEXT:    [[TMP899:%.*]] = extractelement <16 x float> [[TMP878]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP899]], ptr [[TMP883]], align 4
 ; MAXIMIZE-NEXT:    [[TMP900:%.*]] = extractelement <16 x float> [[TMP878]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP900]], ptr [[TMP884]], align 4
 ; MAXIMIZE-NEXT:    [[TMP901:%.*]] = extractelement <16 x float> [[TMP878]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP901]], ptr [[TMP885]], align 4
 ; MAXIMIZE-NEXT:    [[TMP902:%.*]] = extractelement <16 x float> [[TMP878]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP902]], ptr [[TMP886]], align 4
 ; MAXIMIZE-NEXT:    [[TMP903:%.*]] = extractelement <16 x float> [[TMP878]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP903]], ptr [[TMP887]], align 4
 ; MAXIMIZE-NEXT:    [[TMP904:%.*]] = extractelement <16 x float> [[TMP878]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP904]], ptr [[TMP888]], align 4
 ; MAXIMIZE-NEXT:    [[TMP905:%.*]] = extractelement <16 x float> [[TMP878]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP905]], ptr [[TMP889]], align 4
 ; MAXIMIZE-NEXT:    [[TMP906:%.*]] = extractelement <16 x float> [[TMP878]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP906]], ptr [[TMP890]], align 4
 ; MAXIMIZE-NEXT:    [[TMP907:%.*]] = extractelement <16 x float> [[TMP878]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP907]], ptr [[TMP891]], align 4
 ; MAXIMIZE-NEXT:    [[TMP908:%.*]] = extractelement <16 x float> [[TMP878]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP908]], ptr [[TMP892]], align 4
 ; MAXIMIZE-NEXT:    [[TMP909:%.*]] = extractelement <16 x float> [[TMP878]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP909]], ptr [[TMP893]], align 4
 ; MAXIMIZE-NEXT:    [[TMP910:%.*]] = extractelement <16 x float> [[TMP878]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP895]], ptr [[TMP879]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP896]], ptr [[TMP880]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP897]], ptr [[TMP881]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP898]], ptr [[TMP882]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP899]], ptr [[TMP883]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP900]], ptr [[TMP884]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP901]], ptr [[TMP885]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP902]], ptr [[TMP886]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP903]], ptr [[TMP887]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP904]], ptr [[TMP888]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP905]], ptr [[TMP889]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP906]], ptr [[TMP890]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP907]], ptr [[TMP891]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP908]], ptr [[TMP892]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP909]], ptr [[TMP893]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP910]], ptr [[TMP894]], align 4
 ; MAXIMIZE-NEXT:    [[TMP911:%.*]] = sitofp <16 x i32> [[TMP876]] to <16 x float>
 ; MAXIMIZE-NEXT:    [[TMP912:%.*]] = fmul <16 x float> [[TMP80]], [[TMP911]]
@@ -2209,36 +2209,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP927:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 88
 ; MAXIMIZE-NEXT:    [[TMP928:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 88
 ; MAXIMIZE-NEXT:    [[TMP929:%.*]] = extractelement <16 x float> [[TMP912]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP929]], ptr [[TMP913]], align 4
 ; MAXIMIZE-NEXT:    [[TMP930:%.*]] = extractelement <16 x float> [[TMP912]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP930]], ptr [[TMP914]], align 4
 ; MAXIMIZE-NEXT:    [[TMP931:%.*]] = extractelement <16 x float> [[TMP912]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP931]], ptr [[TMP915]], align 4
 ; MAXIMIZE-NEXT:    [[TMP932:%.*]] = extractelement <16 x float> [[TMP912]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP932]], ptr [[TMP916]], align 4
 ; MAXIMIZE-NEXT:    [[TMP933:%.*]] = extractelement <16 x float> [[TMP912]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP933]], ptr [[TMP917]], align 4
 ; MAXIMIZE-NEXT:    [[TMP934:%.*]] = extractelement <16 x float> [[TMP912]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP934]], ptr [[TMP918]], align 4
 ; MAXIMIZE-NEXT:    [[TMP935:%.*]] = extractelement <16 x float> [[TMP912]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP935]], ptr [[TMP919]], align 4
 ; MAXIMIZE-NEXT:    [[TMP936:%.*]] = extractelement <16 x float> [[TMP912]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP936]], ptr [[TMP920]], align 4
 ; MAXIMIZE-NEXT:    [[TMP937:%.*]] = extractelement <16 x float> [[TMP912]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP937]], ptr [[TMP921]], align 4
 ; MAXIMIZE-NEXT:    [[TMP938:%.*]] = extractelement <16 x float> [[TMP912]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP938]], ptr [[TMP922]], align 4
 ; MAXIMIZE-NEXT:    [[TMP939:%.*]] = extractelement <16 x float> [[TMP912]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP939]], ptr [[TMP923]], align 4
 ; MAXIMIZE-NEXT:    [[TMP940:%.*]] = extractelement <16 x float> [[TMP912]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP940]], ptr [[TMP924]], align 4
 ; MAXIMIZE-NEXT:    [[TMP941:%.*]] = extractelement <16 x float> [[TMP912]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP941]], ptr [[TMP925]], align 4
 ; MAXIMIZE-NEXT:    [[TMP942:%.*]] = extractelement <16 x float> [[TMP912]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP942]], ptr [[TMP926]], align 4
 ; MAXIMIZE-NEXT:    [[TMP943:%.*]] = extractelement <16 x float> [[TMP912]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP943]], ptr [[TMP927]], align 4
 ; MAXIMIZE-NEXT:    [[TMP944:%.*]] = extractelement <16 x float> [[TMP912]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP929]], ptr [[TMP913]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP930]], ptr [[TMP914]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP931]], ptr [[TMP915]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP932]], ptr [[TMP916]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP933]], ptr [[TMP917]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP934]], ptr [[TMP918]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP935]], ptr [[TMP919]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP936]], ptr [[TMP920]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP937]], ptr [[TMP921]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP938]], ptr [[TMP922]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP939]], ptr [[TMP923]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP940]], ptr [[TMP924]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP941]], ptr [[TMP925]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP942]], ptr [[TMP926]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP943]], ptr [[TMP927]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP944]], ptr [[TMP928]], align 4
 ; MAXIMIZE-NEXT:    [[TMP945:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP16]], i32 9
 ; MAXIMIZE-NEXT:    [[TMP946:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP17]], i32 9
@@ -2312,36 +2312,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP1014:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 28
 ; MAXIMIZE-NEXT:    [[TMP1015:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 28
 ; MAXIMIZE-NEXT:    [[TMP1016:%.*]] = extractelement <16 x float> [[TMP999]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP1016]], ptr [[TMP1000]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1017:%.*]] = extractelement <16 x float> [[TMP999]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP1017]], ptr [[TMP1001]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1018:%.*]] = extractelement <16 x float> [[TMP999]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP1018]], ptr [[TMP1002]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1019:%.*]] = extractelement <16 x float> [[TMP999]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP1019]], ptr [[TMP1003]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1020:%.*]] = extractelement <16 x float> [[TMP999]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP1020]], ptr [[TMP1004]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1021:%.*]] = extractelement <16 x float> [[TMP999]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP1021]], ptr [[TMP1005]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1022:%.*]] = extractelement <16 x float> [[TMP999]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP1022]], ptr [[TMP1006]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1023:%.*]] = extractelement <16 x float> [[TMP999]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP1023]], ptr [[TMP1007]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1024:%.*]] = extractelement <16 x float> [[TMP999]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP1024]], ptr [[TMP1008]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1025:%.*]] = extractelement <16 x float> [[TMP999]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP1025]], ptr [[TMP1009]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1026:%.*]] = extractelement <16 x float> [[TMP999]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP1026]], ptr [[TMP1010]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1027:%.*]] = extractelement <16 x float> [[TMP999]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP1027]], ptr [[TMP1011]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1028:%.*]] = extractelement <16 x float> [[TMP999]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP1028]], ptr [[TMP1012]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1029:%.*]] = extractelement <16 x float> [[TMP999]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP1029]], ptr [[TMP1013]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1030:%.*]] = extractelement <16 x float> [[TMP999]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP1030]], ptr [[TMP1014]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1031:%.*]] = extractelement <16 x float> [[TMP999]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP1016]], ptr [[TMP1000]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1017]], ptr [[TMP1001]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1018]], ptr [[TMP1002]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1019]], ptr [[TMP1003]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1020]], ptr [[TMP1004]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1021]], ptr [[TMP1005]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1022]], ptr [[TMP1006]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1023]], ptr [[TMP1007]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1024]], ptr [[TMP1008]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1025]], ptr [[TMP1009]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1026]], ptr [[TMP1010]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1027]], ptr [[TMP1011]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1028]], ptr [[TMP1012]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1029]], ptr [[TMP1013]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1030]], ptr [[TMP1014]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP1031]], ptr [[TMP1015]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1032:%.*]] = sitofp <16 x i32> [[TMP997]] to <16 x float>
 ; MAXIMIZE-NEXT:    [[TMP1033:%.*]] = fmul <16 x float> [[TMP80]], [[TMP1032]]
@@ -2362,36 +2362,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP1048:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 92
 ; MAXIMIZE-NEXT:    [[TMP1049:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 92
 ; MAXIMIZE-NEXT:    [[TMP1050:%.*]] = extractelement <16 x float> [[TMP1033]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP1050]], ptr [[TMP1034]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1051:%.*]] = extractelement <16 x float> [[TMP1033]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP1051]], ptr [[TMP1035]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1052:%.*]] = extractelement <16 x float> [[TMP1033]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP1052]], ptr [[TMP1036]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1053:%.*]] = extractelement <16 x float> [[TMP1033]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP1053]], ptr [[TMP1037]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1054:%.*]] = extractelement <16 x float> [[TMP1033]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP1054]], ptr [[TMP1038]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1055:%.*]] = extractelement <16 x float> [[TMP1033]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP1055]], ptr [[TMP1039]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1056:%.*]] = extractelement <16 x float> [[TMP1033]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP1056]], ptr [[TMP1040]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1057:%.*]] = extractelement <16 x float> [[TMP1033]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP1057]], ptr [[TMP1041]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1058:%.*]] = extractelement <16 x float> [[TMP1033]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP1058]], ptr [[TMP1042]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1059:%.*]] = extractelement <16 x float> [[TMP1033]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP1059]], ptr [[TMP1043]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1060:%.*]] = extractelement <16 x float> [[TMP1033]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP1060]], ptr [[TMP1044]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1061:%.*]] = extractelement <16 x float> [[TMP1033]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP1061]], ptr [[TMP1045]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1062:%.*]] = extractelement <16 x float> [[TMP1033]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP1062]], ptr [[TMP1046]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1063:%.*]] = extractelement <16 x float> [[TMP1033]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP1063]], ptr [[TMP1047]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1064:%.*]] = extractelement <16 x float> [[TMP1033]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP1064]], ptr [[TMP1048]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1065:%.*]] = extractelement <16 x float> [[TMP1033]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP1050]], ptr [[TMP1034]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1051]], ptr [[TMP1035]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1052]], ptr [[TMP1036]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1053]], ptr [[TMP1037]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1054]], ptr [[TMP1038]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1055]], ptr [[TMP1039]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1056]], ptr [[TMP1040]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1057]], ptr [[TMP1041]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1058]], ptr [[TMP1042]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1059]], ptr [[TMP1043]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1060]], ptr [[TMP1044]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1061]], ptr [[TMP1045]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1062]], ptr [[TMP1046]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1063]], ptr [[TMP1047]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1064]], ptr [[TMP1048]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP1065]], ptr [[TMP1049]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1066:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP16]], i32 10
 ; MAXIMIZE-NEXT:    [[TMP1067:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP17]], i32 10
@@ -2465,36 +2465,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP1135:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 32
 ; MAXIMIZE-NEXT:    [[TMP1136:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 32
 ; MAXIMIZE-NEXT:    [[TMP1137:%.*]] = extractelement <16 x float> [[TMP1120]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP1137]], ptr [[TMP1121]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1138:%.*]] = extractelement <16 x float> [[TMP1120]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP1138]], ptr [[TMP1122]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1139:%.*]] = extractelement <16 x float> [[TMP1120]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP1139]], ptr [[TMP1123]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1140:%.*]] = extractelement <16 x float> [[TMP1120]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP1140]], ptr [[TMP1124]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1141:%.*]] = extractelement <16 x float> [[TMP1120]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP1141]], ptr [[TMP1125]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1142:%.*]] = extractelement <16 x float> [[TMP1120]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP1142]], ptr [[TMP1126]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1143:%.*]] = extractelement <16 x float> [[TMP1120]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP1143]], ptr [[TMP1127]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1144:%.*]] = extractelement <16 x float> [[TMP1120]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP1144]], ptr [[TMP1128]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1145:%.*]] = extractelement <16 x float> [[TMP1120]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP1145]], ptr [[TMP1129]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1146:%.*]] = extractelement <16 x float> [[TMP1120]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP1146]], ptr [[TMP1130]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1147:%.*]] = extractelement <16 x float> [[TMP1120]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP1147]], ptr [[TMP1131]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1148:%.*]] = extractelement <16 x float> [[TMP1120]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP1148]], ptr [[TMP1132]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1149:%.*]] = extractelement <16 x float> [[TMP1120]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP1149]], ptr [[TMP1133]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1150:%.*]] = extractelement <16 x float> [[TMP1120]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP1150]], ptr [[TMP1134]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1151:%.*]] = extractelement <16 x float> [[TMP1120]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP1151]], ptr [[TMP1135]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1152:%.*]] = extractelement <16 x float> [[TMP1120]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP1137]], ptr [[TMP1121]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1138]], ptr [[TMP1122]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1139]], ptr [[TMP1123]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1140]], ptr [[TMP1124]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1141]], ptr [[TMP1125]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1142]], ptr [[TMP1126]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1143]], ptr [[TMP1127]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1144]], ptr [[TMP1128]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1145]], ptr [[TMP1129]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1146]], ptr [[TMP1130]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1147]], ptr [[TMP1131]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1148]], ptr [[TMP1132]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1149]], ptr [[TMP1133]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1150]], ptr [[TMP1134]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1151]], ptr [[TMP1135]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP1152]], ptr [[TMP1136]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1153:%.*]] = sitofp <16 x i32> [[TMP1118]] to <16 x float>
 ; MAXIMIZE-NEXT:    [[TMP1154:%.*]] = fmul <16 x float> [[TMP80]], [[TMP1153]]
@@ -2515,36 +2515,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP1169:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 96
 ; MAXIMIZE-NEXT:    [[TMP1170:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 96
 ; MAXIMIZE-NEXT:    [[TMP1171:%.*]] = extractelement <16 x float> [[TMP1154]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP1171]], ptr [[TMP1155]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1172:%.*]] = extractelement <16 x float> [[TMP1154]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP1172]], ptr [[TMP1156]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1173:%.*]] = extractelement <16 x float> [[TMP1154]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP1173]], ptr [[TMP1157]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1174:%.*]] = extractelement <16 x float> [[TMP1154]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP1174]], ptr [[TMP1158]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1175:%.*]] = extractelement <16 x float> [[TMP1154]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP1175]], ptr [[TMP1159]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1176:%.*]] = extractelement <16 x float> [[TMP1154]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP1176]], ptr [[TMP1160]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1177:%.*]] = extractelement <16 x float> [[TMP1154]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP1177]], ptr [[TMP1161]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1178:%.*]] = extractelement <16 x float> [[TMP1154]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP1178]], ptr [[TMP1162]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1179:%.*]] = extractelement <16 x float> [[TMP1154]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP1179]], ptr [[TMP1163]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1180:%.*]] = extractelement <16 x float> [[TMP1154]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP1180]], ptr [[TMP1164]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1181:%.*]] = extractelement <16 x float> [[TMP1154]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP1181]], ptr [[TMP1165]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1182:%.*]] = extractelement <16 x float> [[TMP1154]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP1182]], ptr [[TMP1166]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1183:%.*]] = extractelement <16 x float> [[TMP1154]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP1183]], ptr [[TMP1167]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1184:%.*]] = extractelement <16 x float> [[TMP1154]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP1184]], ptr [[TMP1168]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1185:%.*]] = extractelement <16 x float> [[TMP1154]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP1185]], ptr [[TMP1169]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1186:%.*]] = extractelement <16 x float> [[TMP1154]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP1171]], ptr [[TMP1155]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1172]], ptr [[TMP1156]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1173]], ptr [[TMP1157]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1174]], ptr [[TMP1158]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1175]], ptr [[TMP1159]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1176]], ptr [[TMP1160]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1177]], ptr [[TMP1161]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1178]], ptr [[TMP1162]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1179]], ptr [[TMP1163]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1180]], ptr [[TMP1164]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1181]], ptr [[TMP1165]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1182]], ptr [[TMP1166]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1183]], ptr [[TMP1167]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1184]], ptr [[TMP1168]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1185]], ptr [[TMP1169]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP1186]], ptr [[TMP1170]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1187:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP16]], i32 11
 ; MAXIMIZE-NEXT:    [[TMP1188:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP17]], i32 11
@@ -2618,36 +2618,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP1256:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 36
 ; MAXIMIZE-NEXT:    [[TMP1257:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 36
 ; MAXIMIZE-NEXT:    [[TMP1258:%.*]] = extractelement <16 x float> [[TMP1241]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP1258]], ptr [[TMP1242]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1259:%.*]] = extractelement <16 x float> [[TMP1241]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP1259]], ptr [[TMP1243]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1260:%.*]] = extractelement <16 x float> [[TMP1241]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP1260]], ptr [[TMP1244]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1261:%.*]] = extractelement <16 x float> [[TMP1241]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP1261]], ptr [[TMP1245]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1262:%.*]] = extractelement <16 x float> [[TMP1241]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP1262]], ptr [[TMP1246]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1263:%.*]] = extractelement <16 x float> [[TMP1241]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP1263]], ptr [[TMP1247]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1264:%.*]] = extractelement <16 x float> [[TMP1241]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP1264]], ptr [[TMP1248]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1265:%.*]] = extractelement <16 x float> [[TMP1241]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP1265]], ptr [[TMP1249]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1266:%.*]] = extractelement <16 x float> [[TMP1241]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP1266]], ptr [[TMP1250]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1267:%.*]] = extractelement <16 x float> [[TMP1241]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP1267]], ptr [[TMP1251]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1268:%.*]] = extractelement <16 x float> [[TMP1241]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP1268]], ptr [[TMP1252]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1269:%.*]] = extractelement <16 x float> [[TMP1241]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP1269]], ptr [[TMP1253]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1270:%.*]] = extractelement <16 x float> [[TMP1241]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP1270]], ptr [[TMP1254]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1271:%.*]] = extractelement <16 x float> [[TMP1241]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP1271]], ptr [[TMP1255]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1272:%.*]] = extractelement <16 x float> [[TMP1241]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP1272]], ptr [[TMP1256]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1273:%.*]] = extractelement <16 x float> [[TMP1241]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP1258]], ptr [[TMP1242]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1259]], ptr [[TMP1243]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1260]], ptr [[TMP1244]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1261]], ptr [[TMP1245]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1262]], ptr [[TMP1246]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1263]], ptr [[TMP1247]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1264]], ptr [[TMP1248]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1265]], ptr [[TMP1249]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1266]], ptr [[TMP1250]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1267]], ptr [[TMP1251]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1268]], ptr [[TMP1252]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1269]], ptr [[TMP1253]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1270]], ptr [[TMP1254]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1271]], ptr [[TMP1255]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1272]], ptr [[TMP1256]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP1273]], ptr [[TMP1257]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1274:%.*]] = sitofp <16 x i32> [[TMP1239]] to <16 x float>
 ; MAXIMIZE-NEXT:    [[TMP1275:%.*]] = fmul <16 x float> [[TMP80]], [[TMP1274]]
@@ -2668,36 +2668,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP1290:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 100
 ; MAXIMIZE-NEXT:    [[TMP1291:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 100
 ; MAXIMIZE-NEXT:    [[TMP1292:%.*]] = extractelement <16 x float> [[TMP1275]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP1292]], ptr [[TMP1276]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1293:%.*]] = extractelement <16 x float> [[TMP1275]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP1293]], ptr [[TMP1277]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1294:%.*]] = extractelement <16 x float> [[TMP1275]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP1294]], ptr [[TMP1278]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1295:%.*]] = extractelement <16 x float> [[TMP1275]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP1295]], ptr [[TMP1279]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1296:%.*]] = extractelement <16 x float> [[TMP1275]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP1296]], ptr [[TMP1280]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1297:%.*]] = extractelement <16 x float> [[TMP1275]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP1297]], ptr [[TMP1281]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1298:%.*]] = extractelement <16 x float> [[TMP1275]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP1298]], ptr [[TMP1282]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1299:%.*]] = extractelement <16 x float> [[TMP1275]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP1299]], ptr [[TMP1283]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1300:%.*]] = extractelement <16 x float> [[TMP1275]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP1300]], ptr [[TMP1284]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1301:%.*]] = extractelement <16 x float> [[TMP1275]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP1301]], ptr [[TMP1285]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1302:%.*]] = extractelement <16 x float> [[TMP1275]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP1302]], ptr [[TMP1286]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1303:%.*]] = extractelement <16 x float> [[TMP1275]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP1303]], ptr [[TMP1287]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1304:%.*]] = extractelement <16 x float> [[TMP1275]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP1304]], ptr [[TMP1288]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1305:%.*]] = extractelement <16 x float> [[TMP1275]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP1305]], ptr [[TMP1289]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1306:%.*]] = extractelement <16 x float> [[TMP1275]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP1306]], ptr [[TMP1290]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1307:%.*]] = extractelement <16 x float> [[TMP1275]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP1292]], ptr [[TMP1276]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1293]], ptr [[TMP1277]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1294]], ptr [[TMP1278]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1295]], ptr [[TMP1279]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1296]], ptr [[TMP1280]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1297]], ptr [[TMP1281]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1298]], ptr [[TMP1282]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1299]], ptr [[TMP1283]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1300]], ptr [[TMP1284]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1301]], ptr [[TMP1285]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1302]], ptr [[TMP1286]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1303]], ptr [[TMP1287]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1304]], ptr [[TMP1288]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1305]], ptr [[TMP1289]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1306]], ptr [[TMP1290]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP1307]], ptr [[TMP1291]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1308:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP16]], i32 12
 ; MAXIMIZE-NEXT:    [[TMP1309:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP17]], i32 12
@@ -2771,36 +2771,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP1377:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 40
 ; MAXIMIZE-NEXT:    [[TMP1378:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 40
 ; MAXIMIZE-NEXT:    [[TMP1379:%.*]] = extractelement <16 x float> [[TMP1362]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP1379]], ptr [[TMP1363]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1380:%.*]] = extractelement <16 x float> [[TMP1362]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP1380]], ptr [[TMP1364]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1381:%.*]] = extractelement <16 x float> [[TMP1362]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP1381]], ptr [[TMP1365]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1382:%.*]] = extractelement <16 x float> [[TMP1362]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP1382]], ptr [[TMP1366]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1383:%.*]] = extractelement <16 x float> [[TMP1362]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP1383]], ptr [[TMP1367]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1384:%.*]] = extractelement <16 x float> [[TMP1362]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP1384]], ptr [[TMP1368]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1385:%.*]] = extractelement <16 x float> [[TMP1362]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP1385]], ptr [[TMP1369]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1386:%.*]] = extractelement <16 x float> [[TMP1362]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP1386]], ptr [[TMP1370]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1387:%.*]] = extractelement <16 x float> [[TMP1362]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP1387]], ptr [[TMP1371]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1388:%.*]] = extractelement <16 x float> [[TMP1362]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP1388]], ptr [[TMP1372]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1389:%.*]] = extractelement <16 x float> [[TMP1362]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP1389]], ptr [[TMP1373]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1390:%.*]] = extractelement <16 x float> [[TMP1362]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP1390]], ptr [[TMP1374]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1391:%.*]] = extractelement <16 x float> [[TMP1362]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP1391]], ptr [[TMP1375]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1392:%.*]] = extractelement <16 x float> [[TMP1362]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP1392]], ptr [[TMP1376]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1393:%.*]] = extractelement <16 x float> [[TMP1362]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP1393]], ptr [[TMP1377]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1394:%.*]] = extractelement <16 x float> [[TMP1362]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP1379]], ptr [[TMP1363]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1380]], ptr [[TMP1364]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1381]], ptr [[TMP1365]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1382]], ptr [[TMP1366]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1383]], ptr [[TMP1367]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1384]], ptr [[TMP1368]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1385]], ptr [[TMP1369]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1386]], ptr [[TMP1370]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1387]], ptr [[TMP1371]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1388]], ptr [[TMP1372]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1389]], ptr [[TMP1373]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1390]], ptr [[TMP1374]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1391]], ptr [[TMP1375]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1392]], ptr [[TMP1376]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1393]], ptr [[TMP1377]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP1394]], ptr [[TMP1378]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1395:%.*]] = sitofp <16 x i32> [[TMP1360]] to <16 x float>
 ; MAXIMIZE-NEXT:    [[TMP1396:%.*]] = fmul <16 x float> [[TMP80]], [[TMP1395]]
@@ -2821,36 +2821,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP1411:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 104
 ; MAXIMIZE-NEXT:    [[TMP1412:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 104
 ; MAXIMIZE-NEXT:    [[TMP1413:%.*]] = extractelement <16 x float> [[TMP1396]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP1413]], ptr [[TMP1397]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1414:%.*]] = extractelement <16 x float> [[TMP1396]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP1414]], ptr [[TMP1398]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1415:%.*]] = extractelement <16 x float> [[TMP1396]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP1415]], ptr [[TMP1399]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1416:%.*]] = extractelement <16 x float> [[TMP1396]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP1416]], ptr [[TMP1400]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1417:%.*]] = extractelement <16 x float> [[TMP1396]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP1417]], ptr [[TMP1401]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1418:%.*]] = extractelement <16 x float> [[TMP1396]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP1418]], ptr [[TMP1402]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1419:%.*]] = extractelement <16 x float> [[TMP1396]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP1419]], ptr [[TMP1403]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1420:%.*]] = extractelement <16 x float> [[TMP1396]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP1420]], ptr [[TMP1404]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1421:%.*]] = extractelement <16 x float> [[TMP1396]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP1421]], ptr [[TMP1405]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1422:%.*]] = extractelement <16 x float> [[TMP1396]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP1422]], ptr [[TMP1406]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1423:%.*]] = extractelement <16 x float> [[TMP1396]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP1423]], ptr [[TMP1407]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1424:%.*]] = extractelement <16 x float> [[TMP1396]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP1424]], ptr [[TMP1408]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1425:%.*]] = extractelement <16 x float> [[TMP1396]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP1425]], ptr [[TMP1409]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1426:%.*]] = extractelement <16 x float> [[TMP1396]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP1426]], ptr [[TMP1410]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1427:%.*]] = extractelement <16 x float> [[TMP1396]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP1427]], ptr [[TMP1411]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1428:%.*]] = extractelement <16 x float> [[TMP1396]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP1413]], ptr [[TMP1397]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1414]], ptr [[TMP1398]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1415]], ptr [[TMP1399]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1416]], ptr [[TMP1400]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1417]], ptr [[TMP1401]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1418]], ptr [[TMP1402]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1419]], ptr [[TMP1403]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1420]], ptr [[TMP1404]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1421]], ptr [[TMP1405]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1422]], ptr [[TMP1406]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1423]], ptr [[TMP1407]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1424]], ptr [[TMP1408]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1425]], ptr [[TMP1409]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1426]], ptr [[TMP1410]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1427]], ptr [[TMP1411]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP1428]], ptr [[TMP1412]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1429:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP16]], i32 13
 ; MAXIMIZE-NEXT:    [[TMP1430:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP17]], i32 13
@@ -2924,36 +2924,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP1498:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 44
 ; MAXIMIZE-NEXT:    [[TMP1499:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 44
 ; MAXIMIZE-NEXT:    [[TMP1500:%.*]] = extractelement <16 x float> [[TMP1483]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP1500]], ptr [[TMP1484]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1501:%.*]] = extractelement <16 x float> [[TMP1483]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP1501]], ptr [[TMP1485]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1502:%.*]] = extractelement <16 x float> [[TMP1483]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP1502]], ptr [[TMP1486]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1503:%.*]] = extractelement <16 x float> [[TMP1483]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP1503]], ptr [[TMP1487]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1504:%.*]] = extractelement <16 x float> [[TMP1483]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP1504]], ptr [[TMP1488]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1505:%.*]] = extractelement <16 x float> [[TMP1483]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP1505]], ptr [[TMP1489]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1506:%.*]] = extractelement <16 x float> [[TMP1483]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP1506]], ptr [[TMP1490]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1507:%.*]] = extractelement <16 x float> [[TMP1483]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP1507]], ptr [[TMP1491]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1508:%.*]] = extractelement <16 x float> [[TMP1483]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP1508]], ptr [[TMP1492]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1509:%.*]] = extractelement <16 x float> [[TMP1483]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP1509]], ptr [[TMP1493]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1510:%.*]] = extractelement <16 x float> [[TMP1483]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP1510]], ptr [[TMP1494]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1511:%.*]] = extractelement <16 x float> [[TMP1483]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP1511]], ptr [[TMP1495]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1512:%.*]] = extractelement <16 x float> [[TMP1483]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP1512]], ptr [[TMP1496]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1513:%.*]] = extractelement <16 x float> [[TMP1483]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP1513]], ptr [[TMP1497]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1514:%.*]] = extractelement <16 x float> [[TMP1483]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP1514]], ptr [[TMP1498]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1515:%.*]] = extractelement <16 x float> [[TMP1483]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP1500]], ptr [[TMP1484]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1501]], ptr [[TMP1485]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1502]], ptr [[TMP1486]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1503]], ptr [[TMP1487]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1504]], ptr [[TMP1488]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1505]], ptr [[TMP1489]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1506]], ptr [[TMP1490]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1507]], ptr [[TMP1491]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1508]], ptr [[TMP1492]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1509]], ptr [[TMP1493]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1510]], ptr [[TMP1494]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1511]], ptr [[TMP1495]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1512]], ptr [[TMP1496]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1513]], ptr [[TMP1497]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1514]], ptr [[TMP1498]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP1515]], ptr [[TMP1499]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1516:%.*]] = sitofp <16 x i32> [[TMP1481]] to <16 x float>
 ; MAXIMIZE-NEXT:    [[TMP1517:%.*]] = fmul <16 x float> [[TMP80]], [[TMP1516]]
@@ -2974,36 +2974,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP1532:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 108
 ; MAXIMIZE-NEXT:    [[TMP1533:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 108
 ; MAXIMIZE-NEXT:    [[TMP1534:%.*]] = extractelement <16 x float> [[TMP1517]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP1534]], ptr [[TMP1518]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1535:%.*]] = extractelement <16 x float> [[TMP1517]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP1535]], ptr [[TMP1519]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1536:%.*]] = extractelement <16 x float> [[TMP1517]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP1536]], ptr [[TMP1520]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1537:%.*]] = extractelement <16 x float> [[TMP1517]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP1537]], ptr [[TMP1521]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1538:%.*]] = extractelement <16 x float> [[TMP1517]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP1538]], ptr [[TMP1522]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1539:%.*]] = extractelement <16 x float> [[TMP1517]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP1539]], ptr [[TMP1523]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1540:%.*]] = extractelement <16 x float> [[TMP1517]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP1540]], ptr [[TMP1524]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1541:%.*]] = extractelement <16 x float> [[TMP1517]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP1541]], ptr [[TMP1525]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1542:%.*]] = extractelement <16 x float> [[TMP1517]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP1542]], ptr [[TMP1526]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1543:%.*]] = extractelement <16 x float> [[TMP1517]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP1543]], ptr [[TMP1527]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1544:%.*]] = extractelement <16 x float> [[TMP1517]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP1544]], ptr [[TMP1528]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1545:%.*]] = extractelement <16 x float> [[TMP1517]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP1545]], ptr [[TMP1529]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1546:%.*]] = extractelement <16 x float> [[TMP1517]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP1546]], ptr [[TMP1530]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1547:%.*]] = extractelement <16 x float> [[TMP1517]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP1547]], ptr [[TMP1531]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1548:%.*]] = extractelement <16 x float> [[TMP1517]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP1548]], ptr [[TMP1532]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1549:%.*]] = extractelement <16 x float> [[TMP1517]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP1534]], ptr [[TMP1518]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1535]], ptr [[TMP1519]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1536]], ptr [[TMP1520]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1537]], ptr [[TMP1521]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1538]], ptr [[TMP1522]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1539]], ptr [[TMP1523]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1540]], ptr [[TMP1524]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1541]], ptr [[TMP1525]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1542]], ptr [[TMP1526]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1543]], ptr [[TMP1527]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1544]], ptr [[TMP1528]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1545]], ptr [[TMP1529]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1546]], ptr [[TMP1530]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1547]], ptr [[TMP1531]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1548]], ptr [[TMP1532]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP1549]], ptr [[TMP1533]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1550:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP16]], i32 14
 ; MAXIMIZE-NEXT:    [[TMP1551:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP17]], i32 14
@@ -3077,36 +3077,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP1619:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 48
 ; MAXIMIZE-NEXT:    [[TMP1620:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 48
 ; MAXIMIZE-NEXT:    [[TMP1621:%.*]] = extractelement <16 x float> [[TMP1604]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP1621]], ptr [[TMP1605]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1622:%.*]] = extractelement <16 x float> [[TMP1604]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP1622]], ptr [[TMP1606]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1623:%.*]] = extractelement <16 x float> [[TMP1604]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP1623]], ptr [[TMP1607]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1624:%.*]] = extractelement <16 x float> [[TMP1604]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP1624]], ptr [[TMP1608]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1625:%.*]] = extractelement <16 x float> [[TMP1604]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP1625]], ptr [[TMP1609]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1626:%.*]] = extractelement <16 x float> [[TMP1604]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP1626]], ptr [[TMP1610]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1627:%.*]] = extractelement <16 x float> [[TMP1604]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP1627]], ptr [[TMP1611]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1628:%.*]] = extractelement <16 x float> [[TMP1604]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP1628]], ptr [[TMP1612]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1629:%.*]] = extractelement <16 x float> [[TMP1604]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP1629]], ptr [[TMP1613]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1630:%.*]] = extractelement <16 x float> [[TMP1604]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP1630]], ptr [[TMP1614]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1631:%.*]] = extractelement <16 x float> [[TMP1604]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP1631]], ptr [[TMP1615]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1632:%.*]] = extractelement <16 x float> [[TMP1604]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP1632]], ptr [[TMP1616]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1633:%.*]] = extractelement <16 x float> [[TMP1604]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP1633]], ptr [[TMP1617]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1634:%.*]] = extractelement <16 x float> [[TMP1604]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP1634]], ptr [[TMP1618]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1635:%.*]] = extractelement <16 x float> [[TMP1604]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP1635]], ptr [[TMP1619]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1636:%.*]] = extractelement <16 x float> [[TMP1604]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP1621]], ptr [[TMP1605]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1622]], ptr [[TMP1606]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1623]], ptr [[TMP1607]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1624]], ptr [[TMP1608]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1625]], ptr [[TMP1609]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1626]], ptr [[TMP1610]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1627]], ptr [[TMP1611]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1628]], ptr [[TMP1612]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1629]], ptr [[TMP1613]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1630]], ptr [[TMP1614]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1631]], ptr [[TMP1615]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1632]], ptr [[TMP1616]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1633]], ptr [[TMP1617]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1634]], ptr [[TMP1618]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1635]], ptr [[TMP1619]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP1636]], ptr [[TMP1620]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1637:%.*]] = sitofp <16 x i32> [[TMP1602]] to <16 x float>
 ; MAXIMIZE-NEXT:    [[TMP1638:%.*]] = fmul <16 x float> [[TMP80]], [[TMP1637]]
@@ -3127,36 +3127,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP1653:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 112
 ; MAXIMIZE-NEXT:    [[TMP1654:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 112
 ; MAXIMIZE-NEXT:    [[TMP1655:%.*]] = extractelement <16 x float> [[TMP1638]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP1655]], ptr [[TMP1639]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1656:%.*]] = extractelement <16 x float> [[TMP1638]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP1656]], ptr [[TMP1640]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1657:%.*]] = extractelement <16 x float> [[TMP1638]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP1657]], ptr [[TMP1641]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1658:%.*]] = extractelement <16 x float> [[TMP1638]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP1658]], ptr [[TMP1642]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1659:%.*]] = extractelement <16 x float> [[TMP1638]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP1659]], ptr [[TMP1643]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1660:%.*]] = extractelement <16 x float> [[TMP1638]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP1660]], ptr [[TMP1644]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1661:%.*]] = extractelement <16 x float> [[TMP1638]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP1661]], ptr [[TMP1645]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1662:%.*]] = extractelement <16 x float> [[TMP1638]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP1662]], ptr [[TMP1646]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1663:%.*]] = extractelement <16 x float> [[TMP1638]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP1663]], ptr [[TMP1647]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1664:%.*]] = extractelement <16 x float> [[TMP1638]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP1664]], ptr [[TMP1648]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1665:%.*]] = extractelement <16 x float> [[TMP1638]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP1665]], ptr [[TMP1649]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1666:%.*]] = extractelement <16 x float> [[TMP1638]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP1666]], ptr [[TMP1650]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1667:%.*]] = extractelement <16 x float> [[TMP1638]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP1667]], ptr [[TMP1651]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1668:%.*]] = extractelement <16 x float> [[TMP1638]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP1668]], ptr [[TMP1652]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1669:%.*]] = extractelement <16 x float> [[TMP1638]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP1669]], ptr [[TMP1653]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1670:%.*]] = extractelement <16 x float> [[TMP1638]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP1655]], ptr [[TMP1639]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1656]], ptr [[TMP1640]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1657]], ptr [[TMP1641]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1658]], ptr [[TMP1642]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1659]], ptr [[TMP1643]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1660]], ptr [[TMP1644]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1661]], ptr [[TMP1645]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1662]], ptr [[TMP1646]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1663]], ptr [[TMP1647]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1664]], ptr [[TMP1648]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1665]], ptr [[TMP1649]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1666]], ptr [[TMP1650]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1667]], ptr [[TMP1651]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1668]], ptr [[TMP1652]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1669]], ptr [[TMP1653]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP1670]], ptr [[TMP1654]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1671:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP16]], i32 15
 ; MAXIMIZE-NEXT:    [[TMP1672:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP17]], i32 15
@@ -3230,36 +3230,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP1740:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 52
 ; MAXIMIZE-NEXT:    [[TMP1741:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 52
 ; MAXIMIZE-NEXT:    [[TMP1742:%.*]] = extractelement <16 x float> [[TMP1725]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP1742]], ptr [[TMP1726]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1743:%.*]] = extractelement <16 x float> [[TMP1725]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP1743]], ptr [[TMP1727]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1744:%.*]] = extractelement <16 x float> [[TMP1725]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP1744]], ptr [[TMP1728]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1745:%.*]] = extractelement <16 x float> [[TMP1725]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP1745]], ptr [[TMP1729]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1746:%.*]] = extractelement <16 x float> [[TMP1725]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP1746]], ptr [[TMP1730]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1747:%.*]] = extractelement <16 x float> [[TMP1725]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP1747]], ptr [[TMP1731]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1748:%.*]] = extractelement <16 x float> [[TMP1725]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP1748]], ptr [[TMP1732]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1749:%.*]] = extractelement <16 x float> [[TMP1725]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP1749]], ptr [[TMP1733]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1750:%.*]] = extractelement <16 x float> [[TMP1725]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP1750]], ptr [[TMP1734]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1751:%.*]] = extractelement <16 x float> [[TMP1725]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP1751]], ptr [[TMP1735]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1752:%.*]] = extractelement <16 x float> [[TMP1725]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP1752]], ptr [[TMP1736]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1753:%.*]] = extractelement <16 x float> [[TMP1725]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP1753]], ptr [[TMP1737]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1754:%.*]] = extractelement <16 x float> [[TMP1725]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP1754]], ptr [[TMP1738]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1755:%.*]] = extractelement <16 x float> [[TMP1725]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP1755]], ptr [[TMP1739]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1756:%.*]] = extractelement <16 x float> [[TMP1725]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP1756]], ptr [[TMP1740]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1757:%.*]] = extractelement <16 x float> [[TMP1725]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP1742]], ptr [[TMP1726]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1743]], ptr [[TMP1727]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1744]], ptr [[TMP1728]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1745]], ptr [[TMP1729]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1746]], ptr [[TMP1730]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1747]], ptr [[TMP1731]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1748]], ptr [[TMP1732]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1749]], ptr [[TMP1733]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1750]], ptr [[TMP1734]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1751]], ptr [[TMP1735]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1752]], ptr [[TMP1736]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1753]], ptr [[TMP1737]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1754]], ptr [[TMP1738]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1755]], ptr [[TMP1739]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1756]], ptr [[TMP1740]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP1757]], ptr [[TMP1741]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1758:%.*]] = sitofp <16 x i32> [[TMP1723]] to <16 x float>
 ; MAXIMIZE-NEXT:    [[TMP1759:%.*]] = fmul <16 x float> [[TMP80]], [[TMP1758]]
@@ -3280,36 +3280,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP1774:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 116
 ; MAXIMIZE-NEXT:    [[TMP1775:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 116
 ; MAXIMIZE-NEXT:    [[TMP1776:%.*]] = extractelement <16 x float> [[TMP1759]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP1776]], ptr [[TMP1760]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1777:%.*]] = extractelement <16 x float> [[TMP1759]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP1777]], ptr [[TMP1761]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1778:%.*]] = extractelement <16 x float> [[TMP1759]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP1778]], ptr [[TMP1762]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1779:%.*]] = extractelement <16 x float> [[TMP1759]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP1779]], ptr [[TMP1763]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1780:%.*]] = extractelement <16 x float> [[TMP1759]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP1780]], ptr [[TMP1764]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1781:%.*]] = extractelement <16 x float> [[TMP1759]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP1781]], ptr [[TMP1765]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1782:%.*]] = extractelement <16 x float> [[TMP1759]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP1782]], ptr [[TMP1766]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1783:%.*]] = extractelement <16 x float> [[TMP1759]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP1783]], ptr [[TMP1767]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1784:%.*]] = extractelement <16 x float> [[TMP1759]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP1784]], ptr [[TMP1768]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1785:%.*]] = extractelement <16 x float> [[TMP1759]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP1785]], ptr [[TMP1769]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1786:%.*]] = extractelement <16 x float> [[TMP1759]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP1786]], ptr [[TMP1770]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1787:%.*]] = extractelement <16 x float> [[TMP1759]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP1787]], ptr [[TMP1771]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1788:%.*]] = extractelement <16 x float> [[TMP1759]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP1788]], ptr [[TMP1772]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1789:%.*]] = extractelement <16 x float> [[TMP1759]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP1789]], ptr [[TMP1773]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1790:%.*]] = extractelement <16 x float> [[TMP1759]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP1790]], ptr [[TMP1774]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1791:%.*]] = extractelement <16 x float> [[TMP1759]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP1776]], ptr [[TMP1760]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1777]], ptr [[TMP1761]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1778]], ptr [[TMP1762]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1779]], ptr [[TMP1763]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1780]], ptr [[TMP1764]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1781]], ptr [[TMP1765]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1782]], ptr [[TMP1766]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1783]], ptr [[TMP1767]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1784]], ptr [[TMP1768]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1785]], ptr [[TMP1769]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1786]], ptr [[TMP1770]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1787]], ptr [[TMP1771]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1788]], ptr [[TMP1772]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1789]], ptr [[TMP1773]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1790]], ptr [[TMP1774]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP1791]], ptr [[TMP1775]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1792:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP16]], i32 16
 ; MAXIMIZE-NEXT:    [[TMP1793:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP17]], i32 16
@@ -3383,36 +3383,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP1861:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 56
 ; MAXIMIZE-NEXT:    [[TMP1862:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 56
 ; MAXIMIZE-NEXT:    [[TMP1863:%.*]] = extractelement <16 x float> [[TMP1846]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP1863]], ptr [[TMP1847]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1864:%.*]] = extractelement <16 x float> [[TMP1846]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP1864]], ptr [[TMP1848]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1865:%.*]] = extractelement <16 x float> [[TMP1846]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP1865]], ptr [[TMP1849]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1866:%.*]] = extractelement <16 x float> [[TMP1846]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP1866]], ptr [[TMP1850]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1867:%.*]] = extractelement <16 x float> [[TMP1846]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP1867]], ptr [[TMP1851]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1868:%.*]] = extractelement <16 x float> [[TMP1846]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP1868]], ptr [[TMP1852]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1869:%.*]] = extractelement <16 x float> [[TMP1846]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP1869]], ptr [[TMP1853]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1870:%.*]] = extractelement <16 x float> [[TMP1846]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP1870]], ptr [[TMP1854]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1871:%.*]] = extractelement <16 x float> [[TMP1846]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP1871]], ptr [[TMP1855]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1872:%.*]] = extractelement <16 x float> [[TMP1846]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP1872]], ptr [[TMP1856]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1873:%.*]] = extractelement <16 x float> [[TMP1846]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP1873]], ptr [[TMP1857]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1874:%.*]] = extractelement <16 x float> [[TMP1846]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP1874]], ptr [[TMP1858]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1875:%.*]] = extractelement <16 x float> [[TMP1846]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP1875]], ptr [[TMP1859]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1876:%.*]] = extractelement <16 x float> [[TMP1846]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP1876]], ptr [[TMP1860]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1877:%.*]] = extractelement <16 x float> [[TMP1846]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP1877]], ptr [[TMP1861]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1878:%.*]] = extractelement <16 x float> [[TMP1846]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP1863]], ptr [[TMP1847]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1864]], ptr [[TMP1848]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1865]], ptr [[TMP1849]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1866]], ptr [[TMP1850]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1867]], ptr [[TMP1851]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1868]], ptr [[TMP1852]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1869]], ptr [[TMP1853]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1870]], ptr [[TMP1854]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1871]], ptr [[TMP1855]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1872]], ptr [[TMP1856]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1873]], ptr [[TMP1857]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1874]], ptr [[TMP1858]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1875]], ptr [[TMP1859]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1876]], ptr [[TMP1860]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1877]], ptr [[TMP1861]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP1878]], ptr [[TMP1862]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1879:%.*]] = sitofp <16 x i32> [[TMP1844]] to <16 x float>
 ; MAXIMIZE-NEXT:    [[TMP1880:%.*]] = fmul <16 x float> [[TMP80]], [[TMP1879]]
@@ -3433,36 +3433,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP1895:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 120
 ; MAXIMIZE-NEXT:    [[TMP1896:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 120
 ; MAXIMIZE-NEXT:    [[TMP1897:%.*]] = extractelement <16 x float> [[TMP1880]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP1897]], ptr [[TMP1881]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1898:%.*]] = extractelement <16 x float> [[TMP1880]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP1898]], ptr [[TMP1882]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1899:%.*]] = extractelement <16 x float> [[TMP1880]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP1899]], ptr [[TMP1883]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1900:%.*]] = extractelement <16 x float> [[TMP1880]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP1900]], ptr [[TMP1884]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1901:%.*]] = extractelement <16 x float> [[TMP1880]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP1901]], ptr [[TMP1885]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1902:%.*]] = extractelement <16 x float> [[TMP1880]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP1902]], ptr [[TMP1886]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1903:%.*]] = extractelement <16 x float> [[TMP1880]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP1903]], ptr [[TMP1887]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1904:%.*]] = extractelement <16 x float> [[TMP1880]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP1904]], ptr [[TMP1888]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1905:%.*]] = extractelement <16 x float> [[TMP1880]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP1905]], ptr [[TMP1889]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1906:%.*]] = extractelement <16 x float> [[TMP1880]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP1906]], ptr [[TMP1890]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1907:%.*]] = extractelement <16 x float> [[TMP1880]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP1907]], ptr [[TMP1891]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1908:%.*]] = extractelement <16 x float> [[TMP1880]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP1908]], ptr [[TMP1892]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1909:%.*]] = extractelement <16 x float> [[TMP1880]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP1909]], ptr [[TMP1893]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1910:%.*]] = extractelement <16 x float> [[TMP1880]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP1910]], ptr [[TMP1894]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1911:%.*]] = extractelement <16 x float> [[TMP1880]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP1911]], ptr [[TMP1895]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1912:%.*]] = extractelement <16 x float> [[TMP1880]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP1897]], ptr [[TMP1881]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1898]], ptr [[TMP1882]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1899]], ptr [[TMP1883]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1900]], ptr [[TMP1884]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1901]], ptr [[TMP1885]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1902]], ptr [[TMP1886]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1903]], ptr [[TMP1887]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1904]], ptr [[TMP1888]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1905]], ptr [[TMP1889]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1906]], ptr [[TMP1890]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1907]], ptr [[TMP1891]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1908]], ptr [[TMP1892]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1909]], ptr [[TMP1893]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1910]], ptr [[TMP1894]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1911]], ptr [[TMP1895]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP1912]], ptr [[TMP1896]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1913:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP16]], i32 17
 ; MAXIMIZE-NEXT:    [[TMP1914:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP17]], i32 17
@@ -3536,36 +3536,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP1982:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 60
 ; MAXIMIZE-NEXT:    [[TMP1983:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 60
 ; MAXIMIZE-NEXT:    [[TMP1984:%.*]] = extractelement <16 x float> [[TMP1967]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP1984]], ptr [[TMP1968]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1985:%.*]] = extractelement <16 x float> [[TMP1967]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP1985]], ptr [[TMP1969]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1986:%.*]] = extractelement <16 x float> [[TMP1967]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP1986]], ptr [[TMP1970]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1987:%.*]] = extractelement <16 x float> [[TMP1967]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP1987]], ptr [[TMP1971]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1988:%.*]] = extractelement <16 x float> [[TMP1967]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP1988]], ptr [[TMP1972]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1989:%.*]] = extractelement <16 x float> [[TMP1967]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP1989]], ptr [[TMP1973]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1990:%.*]] = extractelement <16 x float> [[TMP1967]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP1990]], ptr [[TMP1974]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1991:%.*]] = extractelement <16 x float> [[TMP1967]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP1991]], ptr [[TMP1975]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1992:%.*]] = extractelement <16 x float> [[TMP1967]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP1992]], ptr [[TMP1976]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1993:%.*]] = extractelement <16 x float> [[TMP1967]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP1993]], ptr [[TMP1977]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1994:%.*]] = extractelement <16 x float> [[TMP1967]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP1994]], ptr [[TMP1978]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1995:%.*]] = extractelement <16 x float> [[TMP1967]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP1995]], ptr [[TMP1979]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1996:%.*]] = extractelement <16 x float> [[TMP1967]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP1996]], ptr [[TMP1980]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1997:%.*]] = extractelement <16 x float> [[TMP1967]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP1997]], ptr [[TMP1981]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1998:%.*]] = extractelement <16 x float> [[TMP1967]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP1998]], ptr [[TMP1982]], align 4
 ; MAXIMIZE-NEXT:    [[TMP1999:%.*]] = extractelement <16 x float> [[TMP1967]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP1984]], ptr [[TMP1968]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1985]], ptr [[TMP1969]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1986]], ptr [[TMP1970]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1987]], ptr [[TMP1971]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1988]], ptr [[TMP1972]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1989]], ptr [[TMP1973]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1990]], ptr [[TMP1974]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1991]], ptr [[TMP1975]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1992]], ptr [[TMP1976]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1993]], ptr [[TMP1977]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1994]], ptr [[TMP1978]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1995]], ptr [[TMP1979]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1996]], ptr [[TMP1980]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1997]], ptr [[TMP1981]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP1998]], ptr [[TMP1982]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP1999]], ptr [[TMP1983]], align 4
 ; MAXIMIZE-NEXT:    [[TMP2000:%.*]] = sitofp <16 x i32> [[TMP1965]] to <16 x float>
 ; MAXIMIZE-NEXT:    [[TMP2001:%.*]] = fmul <16 x float> [[TMP80]], [[TMP2000]]
@@ -3586,36 +3586,36 @@ define void @dequantize_row_q4_0(ptr noalias %arg, ptr %arg1, i64 %arg2) {
 ; MAXIMIZE-NEXT:    [[TMP2016:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP127]], i32 124
 ; MAXIMIZE-NEXT:    [[TMP2017:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP129]], i32 124
 ; MAXIMIZE-NEXT:    [[TMP2018:%.*]] = extractelement <16 x float> [[TMP2001]], i64 0
-; MAXIMIZE-NEXT:    store float [[TMP2018]], ptr [[TMP2002]], align 4
 ; MAXIMIZE-NEXT:    [[TMP2019:%.*]] = extractelement <16 x float> [[TMP2001]], i64 1
-; MAXIMIZE-NEXT:    store float [[TMP2019]], ptr [[TMP2003]], align 4
 ; MAXIMIZE-NEXT:    [[TMP2020:%.*]] = extractelement <16 x float> [[TMP2001]], i64 2
-; MAXIMIZE-NEXT:    store float [[TMP2020]], ptr [[TMP2004]], align 4
 ; MAXIMIZE-NEXT:    [[TMP2021:%.*]] = extractelement <16 x float> [[TMP2001]], i64 3
-; MAXIMIZE-NEXT:    store float [[TMP2021]], ptr [[TMP2005]], align 4
 ; MAXIMIZE-NEXT:    [[TMP2022:%.*]] = extractelement <16 x float> [[TMP2001]], i64 4
-; MAXIMIZE-NEXT:    store float [[TMP2022]], ptr [[TMP2006]], align 4
 ; MAXIMIZE-NEXT:    [[TMP2023:%.*]] = extractelement <16 x float> [[TMP2001]], i64 5
-; MAXIMIZE-NEXT:    store float [[TMP2023]], ptr [[TMP2007]], align 4
 ; MAXIMIZE-NEXT:    [[TMP2024:%.*]] = extractelement <16 x float> [[TMP2001]], i64 6
-; MAXIMIZE-NEXT:    store float [[TMP2024]], ptr [[TMP2008]], align 4
 ; MAXIMIZE-NEXT:    [[TMP2025:%.*]] = extractelement <16 x float> [[TMP2001]], i64 7
-; MAXIMIZE-NEXT:    store float [[TMP2025]], ptr [[TMP2009]], align 4
 ; MAXIMIZE-NEXT:    [[TMP2026:%.*]] = extractelement <16 x float> [[TMP2001]], i64 8
-; MAXIMIZE-NEXT:    store float [[TMP2026]], ptr [[TMP2010]], align 4
 ; MAXIMIZE-NEXT:    [[TMP2027:%.*]] = extractelement <16 x float> [[TMP2001]], i64 9
-; MAXIMIZE-NEXT:    store float [[TMP2027]], ptr [[TMP2011]], align 4
 ; MAXIMIZE-NEXT:    [[TMP2028:%.*]] = extractelement <16 x float> [[TMP2001]], i64 10
-; MAXIMIZE-NEXT:    store float [[TMP2028]], ptr [[TMP2012]], align 4
 ; MAXIMIZE-NEXT:    [[TMP2029:%.*]] = extractelement <16 x float> [[TMP2001]], i64 11
-; MAXIMIZE-NEXT:    store float [[TMP2029]], ptr [[TMP2013]], align 4
 ; MAXIMIZE-NEXT:    [[TMP2030:%.*]] = extractelement <16 x float> [[TMP2001]], i64 12
-; MAXIMIZE-NEXT:    store float [[TMP2030]], ptr [[TMP2014]], align 4
 ; MAXIMIZE-NEXT:    [[TMP2031:%.*]] = extractelement <16 x float> [[TMP2001]], i64 13
-; MAXIMIZE-NEXT:    store float [[TMP2031]], ptr [[TMP2015]], align 4
 ; MAXIMIZE-NEXT:    [[TMP2032:%.*]] = extractelement <16 x float> [[TMP2001]], i64 14
-; MAXIMIZE-NEXT:    store float [[TMP2032]], ptr [[TMP2016]], align 4
 ; MAXIMIZE-NEXT:    [[TMP2033:%.*]] = extractelement <16 x float> [[TMP2001]], i64 15
+; MAXIMIZE-NEXT:    store float [[TMP2018]], ptr [[TMP2002]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP2019]], ptr [[TMP2003]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP2020]], ptr [[TMP2004]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP2021]], ptr [[TMP2005]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP2022]], ptr [[TMP2006]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP2023]], ptr [[TMP2007]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP2024]], ptr [[TMP2008]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP2025]], ptr [[TMP2009]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP2026]], ptr [[TMP2010]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP2027]], ptr [[TMP2011]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP2028]], ptr [[TMP2012]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP2029]], ptr [[TMP2013]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP2030]], ptr [[TMP2014]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP2031]], ptr [[TMP2015]], align 4
+; MAXIMIZE-NEXT:    store float [[TMP2032]], ptr [[TMP2016]], align 4
 ; MAXIMIZE-NEXT:    store float [[TMP2033]], ptr [[TMP2017]], align 4
 ; MAXIMIZE-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 16
 ; MAXIMIZE-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <16 x i32> [[VEC_IND]], splat (i32 16)

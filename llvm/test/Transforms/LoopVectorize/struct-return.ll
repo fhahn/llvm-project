@@ -799,8 +799,8 @@ define void @struct_return_replicate_extractvalue_cse(ptr noalias %in, ptr noali
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i64, ptr [[IN]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i64>, ptr [[TMP0]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = extractelement <2 x i64> [[WIDE_LOAD]], i64 0
-; CHECK-NEXT:    [[TMP2:%.*]] = tail call { i64, i64 } @bar_i64(i64 [[TMP1]]) #[[ATTR4]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <2 x i64> [[WIDE_LOAD]], i64 1
+; CHECK-NEXT:    [[TMP2:%.*]] = tail call { i64, i64 } @bar_i64(i64 [[TMP1]]) #[[ATTR4]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = tail call { i64, i64 } @bar_i64(i64 [[TMP3]]) #[[ATTR4]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = extractvalue { i64, i64 } [[TMP2]], 0
 ; CHECK-NEXT:    [[TMP16:%.*]] = extractvalue { i64, i64 } [[TMP4]], 0

@@ -119,8 +119,8 @@ define void @test(ptr noalias %src, ptr noalias %dst) {
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds float, ptr [[DST:%.*]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds float, ptr [[DST]], i64 [[TMP1]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <2 x double> [[TMP5]], i64 0
-; CHECK-NEXT:    store double [[TMP8]], ptr [[TMP6]], align 8
 ; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <2 x double> [[TMP5]], i64 1
+; CHECK-NEXT:    store double [[TMP8]], ptr [[TMP6]], align 8
 ; CHECK-NEXT:    store double [[TMP9]], ptr [[TMP7]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024

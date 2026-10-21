@@ -77,8 +77,8 @@ define void @byte_type_uniform(ptr noalias %dst, ptr readonly %src, b64 %uniform
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr b64, ptr [[SRC]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x b64>, ptr [[TMP0]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = extractelement <2 x b64> [[WIDE_LOAD]], i64 0
-; CHECK-NEXT:    [[TMP3:%.*]] = call b64 @bar(b64 [[TMP1]], b64 [[UNIFORM]]) #[[ATTR1:[0-9]+]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <2 x b64> [[WIDE_LOAD]], i64 1
+; CHECK-NEXT:    [[TMP3:%.*]] = call b64 @bar(b64 [[TMP1]], b64 [[UNIFORM]]) #[[ATTR1:[0-9]+]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = call b64 @bar(b64 [[TMP2]], b64 [[UNIFORM]]) #[[ATTR1]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = insertelement <2 x b64> poison, b64 [[TMP3]], i64 0
 ; CHECK-NEXT:    [[TMP6:%.*]] = insertelement <2 x b64> [[TMP5]], b64 [[TMP4]], i64 1
@@ -144,10 +144,10 @@ define void @byte_type_linear(ptr noalias %dst, ptr readonly %src, i64 %n) {
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x b64>, ptr [[TMP0]], align 8
 ; CHECK-NEXT:    [[TMP3:%.*]] = bitcast <2 x i64> [[VEC_IND]] to <2 x b64>
 ; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <2 x b64> [[WIDE_LOAD]], i64 0
-; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x b64> [[TMP3]], i64 0
-; CHECK-NEXT:    [[TMP6:%.*]] = call b64 @baz(b64 [[TMP2]], b64 [[TMP4]]) #[[ATTR2:[0-9]+]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <2 x b64> [[WIDE_LOAD]], i64 1
+; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x b64> [[TMP3]], i64 0
 ; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <2 x b64> [[TMP3]], i64 1
+; CHECK-NEXT:    [[TMP6:%.*]] = call b64 @baz(b64 [[TMP2]], b64 [[TMP4]]) #[[ATTR2:[0-9]+]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = call b64 @baz(b64 [[TMP12]], b64 [[TMP5]]) #[[ATTR2]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = insertelement <2 x b64> poison, b64 [[TMP6]], i64 0
 ; CHECK-NEXT:    [[TMP9:%.*]] = insertelement <2 x b64> [[TMP8]], b64 [[TMP7]], i64 1

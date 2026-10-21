@@ -979,24 +979,24 @@ define void @pointer_iv_non_uniform_0(ptr %a, i64 %n) {
 ; CHECK-NEXT:    [[TMP28:%.*]] = getelementptr inbounds i32, ptr [[NEXT_GEP2]], i32 2
 ; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr inbounds i32, ptr [[NEXT_GEP3]], i32 2
 ; CHECK-NEXT:    [[TMP30:%.*]] = extractelement <4 x i32> [[TMP25]], i64 0
-; CHECK-NEXT:    store i32 [[TMP30]], ptr [[TMP26]], align 8
 ; CHECK-NEXT:    [[TMP31:%.*]] = extractelement <4 x i32> [[TMP25]], i64 1
-; CHECK-NEXT:    store i32 [[TMP31]], ptr [[TMP27]], align 8
 ; CHECK-NEXT:    [[TMP32:%.*]] = extractelement <4 x i32> [[TMP25]], i64 2
-; CHECK-NEXT:    store i32 [[TMP32]], ptr [[TMP28]], align 8
 ; CHECK-NEXT:    [[TMP33:%.*]] = extractelement <4 x i32> [[TMP25]], i64 3
+; CHECK-NEXT:    store i32 [[TMP30]], ptr [[TMP26]], align 8
+; CHECK-NEXT:    store i32 [[TMP31]], ptr [[TMP27]], align 8
+; CHECK-NEXT:    store i32 [[TMP32]], ptr [[TMP28]], align 8
 ; CHECK-NEXT:    store i32 [[TMP33]], ptr [[TMP29]], align 8
 ; CHECK-NEXT:    [[TMP48:%.*]] = getelementptr inbounds i32, ptr [[NEXT_GEP]], i32 3
 ; CHECK-NEXT:    [[TMP49:%.*]] = getelementptr inbounds i32, ptr [[NEXT_GEP1]], i32 3
 ; CHECK-NEXT:    [[TMP50:%.*]] = getelementptr inbounds i32, ptr [[NEXT_GEP2]], i32 3
 ; CHECK-NEXT:    [[TMP51:%.*]] = getelementptr inbounds i32, ptr [[NEXT_GEP3]], i32 3
 ; CHECK-NEXT:    [[TMP52:%.*]] = extractelement <4 x i32> [[TMP39]], i64 0
-; CHECK-NEXT:    store i32 [[TMP52]], ptr [[TMP48]], align 8
 ; CHECK-NEXT:    [[TMP53:%.*]] = extractelement <4 x i32> [[TMP39]], i64 1
-; CHECK-NEXT:    store i32 [[TMP53]], ptr [[TMP49]], align 8
 ; CHECK-NEXT:    [[TMP54:%.*]] = extractelement <4 x i32> [[TMP39]], i64 2
-; CHECK-NEXT:    store i32 [[TMP54]], ptr [[TMP50]], align 8
 ; CHECK-NEXT:    [[TMP55:%.*]] = extractelement <4 x i32> [[TMP39]], i64 3
+; CHECK-NEXT:    store i32 [[TMP52]], ptr [[TMP48]], align 8
+; CHECK-NEXT:    store i32 [[TMP53]], ptr [[TMP49]], align 8
+; CHECK-NEXT:    store i32 [[TMP54]], ptr [[TMP50]], align 8
 ; CHECK-NEXT:    store i32 [[TMP55]], ptr [[TMP51]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP38:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
@@ -1068,24 +1068,24 @@ define void @pointer_iv_non_uniform_0(ptr %a, i64 %n) {
 ; INTER-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i32, ptr [[NEXT_GEP2]], i32 2
 ; INTER-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i32, ptr [[NEXT_GEP3]], i32 2
 ; INTER-NEXT:    [[TMP13:%.*]] = extractelement <4 x i32> [[TMP17]], i64 0
-; INTER-NEXT:    store i32 [[TMP13]], ptr [[TMP9]], align 8
 ; INTER-NEXT:    [[TMP14:%.*]] = extractelement <4 x i32> [[TMP17]], i64 1
-; INTER-NEXT:    store i32 [[TMP14]], ptr [[TMP10]], align 8
 ; INTER-NEXT:    [[TMP15:%.*]] = extractelement <4 x i32> [[TMP17]], i64 2
-; INTER-NEXT:    store i32 [[TMP15]], ptr [[TMP11]], align 8
 ; INTER-NEXT:    [[TMP16:%.*]] = extractelement <4 x i32> [[TMP17]], i64 3
+; INTER-NEXT:    store i32 [[TMP13]], ptr [[TMP9]], align 8
+; INTER-NEXT:    store i32 [[TMP14]], ptr [[TMP10]], align 8
+; INTER-NEXT:    store i32 [[TMP15]], ptr [[TMP11]], align 8
 ; INTER-NEXT:    store i32 [[TMP16]], ptr [[TMP12]], align 8
 ; INTER-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i32, ptr [[NEXT_GEP]], i32 3
 ; INTER-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i32, ptr [[NEXT_GEP1]], i32 3
 ; INTER-NEXT:    [[TMP27:%.*]] = getelementptr inbounds i32, ptr [[NEXT_GEP2]], i32 3
 ; INTER-NEXT:    [[TMP22:%.*]] = getelementptr inbounds i32, ptr [[NEXT_GEP3]], i32 3
 ; INTER-NEXT:    [[TMP23:%.*]] = extractelement <4 x i32> [[TMP18]], i64 0
-; INTER-NEXT:    store i32 [[TMP23]], ptr [[TMP19]], align 8
 ; INTER-NEXT:    [[TMP24:%.*]] = extractelement <4 x i32> [[TMP18]], i64 1
-; INTER-NEXT:    store i32 [[TMP24]], ptr [[TMP20]], align 8
 ; INTER-NEXT:    [[TMP25:%.*]] = extractelement <4 x i32> [[TMP18]], i64 2
-; INTER-NEXT:    store i32 [[TMP25]], ptr [[TMP27]], align 8
 ; INTER-NEXT:    [[TMP26:%.*]] = extractelement <4 x i32> [[TMP18]], i64 3
+; INTER-NEXT:    store i32 [[TMP23]], ptr [[TMP19]], align 8
+; INTER-NEXT:    store i32 [[TMP24]], ptr [[TMP20]], align 8
+; INTER-NEXT:    store i32 [[TMP25]], ptr [[TMP27]], align 8
 ; INTER-NEXT:    store i32 [[TMP26]], ptr [[TMP22]], align 8
 ; INTER-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; INTER-NEXT:    [[TMP21:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]

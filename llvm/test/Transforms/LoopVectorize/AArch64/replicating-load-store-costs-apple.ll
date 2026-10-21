@@ -443,20 +443,20 @@ define void @scalar_store_cost_after_discarding_interleave_group(ptr %dst, i32 %
 ; CHECK-NEXT:    [[TMP45:%.*]] = getelementptr i8, ptr [[TMP29]], i64 2
 ; CHECK-NEXT:    [[TMP47:%.*]] = getelementptr i8, ptr [[TMP31]], i64 2
 ; CHECK-NEXT:    [[TMP54:%.*]] = extractelement <8 x i16> [[TMP6]], i64 0
-; CHECK-NEXT:    store i16 [[TMP54]], ptr [[TMP46]], align 2
 ; CHECK-NEXT:    [[TMP48:%.*]] = extractelement <8 x i16> [[TMP6]], i64 1
-; CHECK-NEXT:    store i16 [[TMP48]], ptr [[TMP40]], align 2
 ; CHECK-NEXT:    [[TMP49:%.*]] = extractelement <8 x i16> [[TMP6]], i64 2
-; CHECK-NEXT:    store i16 [[TMP49]], ptr [[TMP41]], align 2
 ; CHECK-NEXT:    [[TMP50:%.*]] = extractelement <8 x i16> [[TMP6]], i64 3
-; CHECK-NEXT:    store i16 [[TMP50]], ptr [[TMP42]], align 2
 ; CHECK-NEXT:    [[TMP51:%.*]] = extractelement <8 x i16> [[TMP6]], i64 4
-; CHECK-NEXT:    store i16 [[TMP51]], ptr [[TMP43]], align 2
 ; CHECK-NEXT:    [[TMP52:%.*]] = extractelement <8 x i16> [[TMP6]], i64 5
-; CHECK-NEXT:    store i16 [[TMP52]], ptr [[TMP44]], align 2
 ; CHECK-NEXT:    [[TMP53:%.*]] = extractelement <8 x i16> [[TMP6]], i64 6
-; CHECK-NEXT:    store i16 [[TMP53]], ptr [[TMP45]], align 2
 ; CHECK-NEXT:    [[TMP55:%.*]] = extractelement <8 x i16> [[TMP6]], i64 7
+; CHECK-NEXT:    store i16 [[TMP54]], ptr [[TMP46]], align 2
+; CHECK-NEXT:    store i16 [[TMP48]], ptr [[TMP40]], align 2
+; CHECK-NEXT:    store i16 [[TMP49]], ptr [[TMP41]], align 2
+; CHECK-NEXT:    store i16 [[TMP50]], ptr [[TMP42]], align 2
+; CHECK-NEXT:    store i16 [[TMP51]], ptr [[TMP43]], align 2
+; CHECK-NEXT:    store i16 [[TMP52]], ptr [[TMP44]], align 2
+; CHECK-NEXT:    store i16 [[TMP53]], ptr [[TMP45]], align 2
 ; CHECK-NEXT:    store i16 [[TMP55]], ptr [[TMP47]], align 2
 ; CHECK-NEXT:    [[TMP62:%.*]] = getelementptr i8, ptr [[TMP30]], i64 12
 ; CHECK-NEXT:    [[TMP56:%.*]] = getelementptr i8, ptr [[TMP24]], i64 12
@@ -467,20 +467,20 @@ define void @scalar_store_cost_after_discarding_interleave_group(ptr %dst, i32 %
 ; CHECK-NEXT:    [[TMP61:%.*]] = getelementptr i8, ptr [[TMP29]], i64 12
 ; CHECK-NEXT:    [[TMP63:%.*]] = getelementptr i8, ptr [[TMP31]], i64 12
 ; CHECK-NEXT:    [[TMP70:%.*]] = extractelement <8 x i16> [[TMP9]], i64 0
-; CHECK-NEXT:    store i16 [[TMP70]], ptr [[TMP62]], align 2
 ; CHECK-NEXT:    [[TMP64:%.*]] = extractelement <8 x i16> [[TMP9]], i64 1
-; CHECK-NEXT:    store i16 [[TMP64]], ptr [[TMP56]], align 2
 ; CHECK-NEXT:    [[TMP65:%.*]] = extractelement <8 x i16> [[TMP9]], i64 2
-; CHECK-NEXT:    store i16 [[TMP65]], ptr [[TMP57]], align 2
 ; CHECK-NEXT:    [[TMP66:%.*]] = extractelement <8 x i16> [[TMP9]], i64 3
-; CHECK-NEXT:    store i16 [[TMP66]], ptr [[TMP58]], align 2
 ; CHECK-NEXT:    [[TMP67:%.*]] = extractelement <8 x i16> [[TMP9]], i64 4
-; CHECK-NEXT:    store i16 [[TMP67]], ptr [[TMP59]], align 2
 ; CHECK-NEXT:    [[TMP68:%.*]] = extractelement <8 x i16> [[TMP9]], i64 5
-; CHECK-NEXT:    store i16 [[TMP68]], ptr [[TMP60]], align 2
 ; CHECK-NEXT:    [[TMP69:%.*]] = extractelement <8 x i16> [[TMP9]], i64 6
-; CHECK-NEXT:    store i16 [[TMP69]], ptr [[TMP61]], align 2
 ; CHECK-NEXT:    [[TMP71:%.*]] = extractelement <8 x i16> [[TMP9]], i64 7
+; CHECK-NEXT:    store i16 [[TMP70]], ptr [[TMP62]], align 2
+; CHECK-NEXT:    store i16 [[TMP64]], ptr [[TMP56]], align 2
+; CHECK-NEXT:    store i16 [[TMP65]], ptr [[TMP57]], align 2
+; CHECK-NEXT:    store i16 [[TMP66]], ptr [[TMP58]], align 2
+; CHECK-NEXT:    store i16 [[TMP67]], ptr [[TMP59]], align 2
+; CHECK-NEXT:    store i16 [[TMP68]], ptr [[TMP60]], align 2
+; CHECK-NEXT:    store i16 [[TMP69]], ptr [[TMP61]], align 2
 ; CHECK-NEXT:    store i16 [[TMP71]], ptr [[TMP63]], align 2
 ; CHECK-NEXT:    [[TMP78:%.*]] = getelementptr i8, ptr [[TMP30]], i64 4
 ; CHECK-NEXT:    [[TMP72:%.*]] = getelementptr i8, ptr [[TMP24]], i64 4
@@ -491,20 +491,20 @@ define void @scalar_store_cost_after_discarding_interleave_group(ptr %dst, i32 %
 ; CHECK-NEXT:    [[TMP77:%.*]] = getelementptr i8, ptr [[TMP29]], i64 4
 ; CHECK-NEXT:    [[TMP79:%.*]] = getelementptr i8, ptr [[TMP31]], i64 4
 ; CHECK-NEXT:    [[TMP86:%.*]] = extractelement <8 x i16> [[TMP13]], i64 0
-; CHECK-NEXT:    store i16 [[TMP86]], ptr [[TMP78]], align 2
 ; CHECK-NEXT:    [[TMP80:%.*]] = extractelement <8 x i16> [[TMP13]], i64 1
-; CHECK-NEXT:    store i16 [[TMP80]], ptr [[TMP72]], align 2
 ; CHECK-NEXT:    [[TMP81:%.*]] = extractelement <8 x i16> [[TMP13]], i64 2
-; CHECK-NEXT:    store i16 [[TMP81]], ptr [[TMP73]], align 2
 ; CHECK-NEXT:    [[TMP82:%.*]] = extractelement <8 x i16> [[TMP13]], i64 3
-; CHECK-NEXT:    store i16 [[TMP82]], ptr [[TMP74]], align 2
 ; CHECK-NEXT:    [[TMP83:%.*]] = extractelement <8 x i16> [[TMP13]], i64 4
-; CHECK-NEXT:    store i16 [[TMP83]], ptr [[TMP75]], align 2
 ; CHECK-NEXT:    [[TMP84:%.*]] = extractelement <8 x i16> [[TMP13]], i64 5
-; CHECK-NEXT:    store i16 [[TMP84]], ptr [[TMP76]], align 2
 ; CHECK-NEXT:    [[TMP85:%.*]] = extractelement <8 x i16> [[TMP13]], i64 6
-; CHECK-NEXT:    store i16 [[TMP85]], ptr [[TMP77]], align 2
 ; CHECK-NEXT:    [[TMP87:%.*]] = extractelement <8 x i16> [[TMP13]], i64 7
+; CHECK-NEXT:    store i16 [[TMP86]], ptr [[TMP78]], align 2
+; CHECK-NEXT:    store i16 [[TMP80]], ptr [[TMP72]], align 2
+; CHECK-NEXT:    store i16 [[TMP81]], ptr [[TMP73]], align 2
+; CHECK-NEXT:    store i16 [[TMP82]], ptr [[TMP74]], align 2
+; CHECK-NEXT:    store i16 [[TMP83]], ptr [[TMP75]], align 2
+; CHECK-NEXT:    store i16 [[TMP84]], ptr [[TMP76]], align 2
+; CHECK-NEXT:    store i16 [[TMP85]], ptr [[TMP77]], align 2
 ; CHECK-NEXT:    store i16 [[TMP87]], ptr [[TMP79]], align 2
 ; CHECK-NEXT:    [[TMP94:%.*]] = getelementptr i8, ptr [[TMP30]], i64 10
 ; CHECK-NEXT:    [[TMP88:%.*]] = getelementptr i8, ptr [[TMP24]], i64 10
@@ -534,20 +534,20 @@ define void @scalar_store_cost_after_discarding_interleave_group(ptr %dst, i32 %
 ; CHECK-NEXT:    [[TMP104:%.*]] = getelementptr i8, ptr [[TMP29]], i64 8
 ; CHECK-NEXT:    [[TMP106:%.*]] = getelementptr i8, ptr [[TMP31]], i64 8
 ; CHECK-NEXT:    [[TMP113:%.*]] = extractelement <8 x i16> [[TMP97]], i64 0
-; CHECK-NEXT:    store i16 [[TMP113]], ptr [[TMP105]], align 2
 ; CHECK-NEXT:    [[TMP107:%.*]] = extractelement <8 x i16> [[TMP97]], i64 1
-; CHECK-NEXT:    store i16 [[TMP107]], ptr [[TMP99]], align 2
 ; CHECK-NEXT:    [[TMP108:%.*]] = extractelement <8 x i16> [[TMP97]], i64 2
-; CHECK-NEXT:    store i16 [[TMP108]], ptr [[TMP100]], align 2
 ; CHECK-NEXT:    [[TMP109:%.*]] = extractelement <8 x i16> [[TMP97]], i64 3
-; CHECK-NEXT:    store i16 [[TMP109]], ptr [[TMP101]], align 2
 ; CHECK-NEXT:    [[TMP110:%.*]] = extractelement <8 x i16> [[TMP97]], i64 4
-; CHECK-NEXT:    store i16 [[TMP110]], ptr [[TMP102]], align 2
 ; CHECK-NEXT:    [[TMP111:%.*]] = extractelement <8 x i16> [[TMP97]], i64 5
-; CHECK-NEXT:    store i16 [[TMP111]], ptr [[TMP103]], align 2
 ; CHECK-NEXT:    [[TMP112:%.*]] = extractelement <8 x i16> [[TMP97]], i64 6
-; CHECK-NEXT:    store i16 [[TMP112]], ptr [[TMP104]], align 2
 ; CHECK-NEXT:    [[TMP114:%.*]] = extractelement <8 x i16> [[TMP97]], i64 7
+; CHECK-NEXT:    store i16 [[TMP113]], ptr [[TMP105]], align 2
+; CHECK-NEXT:    store i16 [[TMP107]], ptr [[TMP99]], align 2
+; CHECK-NEXT:    store i16 [[TMP108]], ptr [[TMP100]], align 2
+; CHECK-NEXT:    store i16 [[TMP109]], ptr [[TMP101]], align 2
+; CHECK-NEXT:    store i16 [[TMP110]], ptr [[TMP102]], align 2
+; CHECK-NEXT:    store i16 [[TMP111]], ptr [[TMP103]], align 2
+; CHECK-NEXT:    store i16 [[TMP112]], ptr [[TMP104]], align 2
 ; CHECK-NEXT:    store i16 [[TMP114]], ptr [[TMP106]], align 2
 ; CHECK-NEXT:    [[TMP121:%.*]] = getelementptr i8, ptr [[TMP30]], i64 6
 ; CHECK-NEXT:    [[TMP115:%.*]] = getelementptr i8, ptr [[TMP24]], i64 6

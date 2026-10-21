@@ -1877,12 +1877,12 @@ define void @fp_iv_used_in_gep_fadd(float %init, ptr noalias nocapture %A, float
 ; VEC4_INTERL1-NEXT:    [[TMP20:%.*]] = fadd fast float [[OFFSET_IDX]], [[TMP18]]
 ; VEC4_INTERL1-NEXT:    [[TMP13:%.*]] = fptoui <4 x float> [[VEC_IND]] to <4 x i32>
 ; VEC4_INTERL1-NEXT:    [[TMP14:%.*]] = extractelement <4 x i32> [[TMP13]], i64 0
-; VEC4_INTERL1-NEXT:    [[TMP19:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP14]]
 ; VEC4_INTERL1-NEXT:    [[TMP15:%.*]] = extractelement <4 x i32> [[TMP13]], i64 1
-; VEC4_INTERL1-NEXT:    [[TMP23:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP15]]
 ; VEC4_INTERL1-NEXT:    [[TMP16:%.*]] = extractelement <4 x i32> [[TMP13]], i64 2
-; VEC4_INTERL1-NEXT:    [[TMP25:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP16]]
 ; VEC4_INTERL1-NEXT:    [[TMP17:%.*]] = extractelement <4 x i32> [[TMP13]], i64 3
+; VEC4_INTERL1-NEXT:    [[TMP19:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP14]]
+; VEC4_INTERL1-NEXT:    [[TMP23:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP15]]
+; VEC4_INTERL1-NEXT:    [[TMP25:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP16]]
 ; VEC4_INTERL1-NEXT:    [[TMP27:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP17]]
 ; VEC4_INTERL1-NEXT:    store float [[OFFSET_IDX]], ptr [[TMP19]], align 4
 ; VEC4_INTERL1-NEXT:    store float [[TMP10]], ptr [[TMP23]], align 4
@@ -1959,20 +1959,20 @@ define void @fp_iv_used_in_gep_fadd(float %init, ptr noalias nocapture %A, float
 ; VEC4_INTERL2-NEXT:    [[TMP21:%.*]] = fptoui <4 x float> [[VEC_IND]] to <4 x i32>
 ; VEC4_INTERL2-NEXT:    [[TMP26:%.*]] = fptoui <4 x float> [[STEP_ADD]] to <4 x i32>
 ; VEC4_INTERL2-NEXT:    [[TMP22:%.*]] = extractelement <4 x i32> [[TMP21]], i64 0
-; VEC4_INTERL2-NEXT:    [[TMP32:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP22]]
 ; VEC4_INTERL2-NEXT:    [[TMP23:%.*]] = extractelement <4 x i32> [[TMP21]], i64 1
-; VEC4_INTERL2-NEXT:    [[TMP36:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP23]]
 ; VEC4_INTERL2-NEXT:    [[TMP24:%.*]] = extractelement <4 x i32> [[TMP21]], i64 2
-; VEC4_INTERL2-NEXT:    [[TMP38:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP24]]
 ; VEC4_INTERL2-NEXT:    [[TMP25:%.*]] = extractelement <4 x i32> [[TMP21]], i64 3
+; VEC4_INTERL2-NEXT:    [[TMP32:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP22]]
+; VEC4_INTERL2-NEXT:    [[TMP36:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP23]]
+; VEC4_INTERL2-NEXT:    [[TMP38:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP24]]
 ; VEC4_INTERL2-NEXT:    [[TMP40:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP25]]
 ; VEC4_INTERL2-NEXT:    [[TMP27:%.*]] = extractelement <4 x i32> [[TMP26]], i64 0
-; VEC4_INTERL2-NEXT:    [[TMP42:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP27]]
 ; VEC4_INTERL2-NEXT:    [[TMP28:%.*]] = extractelement <4 x i32> [[TMP26]], i64 1
-; VEC4_INTERL2-NEXT:    [[TMP44:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP28]]
 ; VEC4_INTERL2-NEXT:    [[TMP29:%.*]] = extractelement <4 x i32> [[TMP26]], i64 2
-; VEC4_INTERL2-NEXT:    [[TMP46:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP29]]
 ; VEC4_INTERL2-NEXT:    [[TMP30:%.*]] = extractelement <4 x i32> [[TMP26]], i64 3
+; VEC4_INTERL2-NEXT:    [[TMP42:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP27]]
+; VEC4_INTERL2-NEXT:    [[TMP44:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP28]]
+; VEC4_INTERL2-NEXT:    [[TMP46:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP29]]
 ; VEC4_INTERL2-NEXT:    [[TMP43:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP30]]
 ; VEC4_INTERL2-NEXT:    store float [[OFFSET_IDX]], ptr [[TMP32]], align 4
 ; VEC4_INTERL2-NEXT:    store float [[TMP10]], ptr [[TMP36]], align 4
@@ -2093,8 +2093,8 @@ define void @fp_iv_used_in_gep_fadd(float %init, ptr noalias nocapture %A, float
 ; VEC2_INTERL1_PRED_STORE-NEXT:    [[TMP8:%.*]] = fadd fast float [[OFFSET_IDX]], [[TMP12]]
 ; VEC2_INTERL1_PRED_STORE-NEXT:    [[TMP9:%.*]] = fptoui <2 x float> [[VEC_IND]] to <2 x i32>
 ; VEC2_INTERL1_PRED_STORE-NEXT:    [[TMP10:%.*]] = extractelement <2 x i32> [[TMP9]], i64 0
-; VEC2_INTERL1_PRED_STORE-NEXT:    [[TMP13:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP10]]
 ; VEC2_INTERL1_PRED_STORE-NEXT:    [[TMP11:%.*]] = extractelement <2 x i32> [[TMP9]], i64 1
+; VEC2_INTERL1_PRED_STORE-NEXT:    [[TMP13:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP10]]
 ; VEC2_INTERL1_PRED_STORE-NEXT:    [[TMP15:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP11]]
 ; VEC2_INTERL1_PRED_STORE-NEXT:    store float [[OFFSET_IDX]], ptr [[TMP13]], align 4
 ; VEC2_INTERL1_PRED_STORE-NEXT:    store float [[TMP8]], ptr [[TMP15]], align 4
@@ -2181,12 +2181,12 @@ define void @fp_iv_used_in_gep_fsub(float %init, ptr noalias nocapture %A, float
 ; VEC4_INTERL1-NEXT:    [[TMP20:%.*]] = fsub fast float [[OFFSET_IDX]], [[TMP18]]
 ; VEC4_INTERL1-NEXT:    [[TMP13:%.*]] = fptoui <4 x float> [[VEC_IND]] to <4 x i32>
 ; VEC4_INTERL1-NEXT:    [[TMP14:%.*]] = extractelement <4 x i32> [[TMP13]], i64 0
-; VEC4_INTERL1-NEXT:    [[TMP19:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP14]]
 ; VEC4_INTERL1-NEXT:    [[TMP15:%.*]] = extractelement <4 x i32> [[TMP13]], i64 1
-; VEC4_INTERL1-NEXT:    [[TMP23:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP15]]
 ; VEC4_INTERL1-NEXT:    [[TMP16:%.*]] = extractelement <4 x i32> [[TMP13]], i64 2
-; VEC4_INTERL1-NEXT:    [[TMP25:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP16]]
 ; VEC4_INTERL1-NEXT:    [[TMP17:%.*]] = extractelement <4 x i32> [[TMP13]], i64 3
+; VEC4_INTERL1-NEXT:    [[TMP19:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP14]]
+; VEC4_INTERL1-NEXT:    [[TMP23:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP15]]
+; VEC4_INTERL1-NEXT:    [[TMP25:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP16]]
 ; VEC4_INTERL1-NEXT:    [[TMP27:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP17]]
 ; VEC4_INTERL1-NEXT:    store float [[OFFSET_IDX]], ptr [[TMP19]], align 4
 ; VEC4_INTERL1-NEXT:    store float [[TMP10]], ptr [[TMP23]], align 4
@@ -2263,20 +2263,20 @@ define void @fp_iv_used_in_gep_fsub(float %init, ptr noalias nocapture %A, float
 ; VEC4_INTERL2-NEXT:    [[TMP20:%.*]] = fptoui <4 x float> [[VEC_IND]] to <4 x i32>
 ; VEC4_INTERL2-NEXT:    [[TMP25:%.*]] = fptoui <4 x float> [[STEP_ADD]] to <4 x i32>
 ; VEC4_INTERL2-NEXT:    [[TMP21:%.*]] = extractelement <4 x i32> [[TMP20]], i64 0
-; VEC4_INTERL2-NEXT:    [[TMP31:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP21]]
 ; VEC4_INTERL2-NEXT:    [[TMP22:%.*]] = extractelement <4 x i32> [[TMP20]], i64 1
-; VEC4_INTERL2-NEXT:    [[TMP35:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP22]]
 ; VEC4_INTERL2-NEXT:    [[TMP23:%.*]] = extractelement <4 x i32> [[TMP20]], i64 2
-; VEC4_INTERL2-NEXT:    [[TMP37:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP23]]
 ; VEC4_INTERL2-NEXT:    [[TMP24:%.*]] = extractelement <4 x i32> [[TMP20]], i64 3
+; VEC4_INTERL2-NEXT:    [[TMP31:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP21]]
+; VEC4_INTERL2-NEXT:    [[TMP35:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP22]]
+; VEC4_INTERL2-NEXT:    [[TMP37:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP23]]
 ; VEC4_INTERL2-NEXT:    [[TMP39:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP24]]
 ; VEC4_INTERL2-NEXT:    [[TMP26:%.*]] = extractelement <4 x i32> [[TMP25]], i64 0
-; VEC4_INTERL2-NEXT:    [[TMP41:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP26]]
 ; VEC4_INTERL2-NEXT:    [[TMP27:%.*]] = extractelement <4 x i32> [[TMP25]], i64 1
-; VEC4_INTERL2-NEXT:    [[TMP43:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP27]]
 ; VEC4_INTERL2-NEXT:    [[TMP28:%.*]] = extractelement <4 x i32> [[TMP25]], i64 2
-; VEC4_INTERL2-NEXT:    [[TMP40:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP28]]
 ; VEC4_INTERL2-NEXT:    [[TMP29:%.*]] = extractelement <4 x i32> [[TMP25]], i64 3
+; VEC4_INTERL2-NEXT:    [[TMP41:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP26]]
+; VEC4_INTERL2-NEXT:    [[TMP43:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP27]]
+; VEC4_INTERL2-NEXT:    [[TMP40:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP28]]
 ; VEC4_INTERL2-NEXT:    [[TMP45:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP29]]
 ; VEC4_INTERL2-NEXT:    store float [[OFFSET_IDX]], ptr [[TMP31]], align 4
 ; VEC4_INTERL2-NEXT:    store float [[TMP10]], ptr [[TMP35]], align 4
@@ -2397,8 +2397,8 @@ define void @fp_iv_used_in_gep_fsub(float %init, ptr noalias nocapture %A, float
 ; VEC2_INTERL1_PRED_STORE-NEXT:    [[TMP8:%.*]] = fsub fast float [[OFFSET_IDX]], [[TMP12]]
 ; VEC2_INTERL1_PRED_STORE-NEXT:    [[TMP9:%.*]] = fptoui <2 x float> [[VEC_IND]] to <2 x i32>
 ; VEC2_INTERL1_PRED_STORE-NEXT:    [[TMP10:%.*]] = extractelement <2 x i32> [[TMP9]], i64 0
-; VEC2_INTERL1_PRED_STORE-NEXT:    [[TMP13:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP10]]
 ; VEC2_INTERL1_PRED_STORE-NEXT:    [[TMP11:%.*]] = extractelement <2 x i32> [[TMP9]], i64 1
+; VEC2_INTERL1_PRED_STORE-NEXT:    [[TMP13:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP10]]
 ; VEC2_INTERL1_PRED_STORE-NEXT:    [[TMP15:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[TMP11]]
 ; VEC2_INTERL1_PRED_STORE-NEXT:    store float [[OFFSET_IDX]], ptr [[TMP13]], align 4
 ; VEC2_INTERL1_PRED_STORE-NEXT:    store float [[TMP8]], ptr [[TMP15]], align 4

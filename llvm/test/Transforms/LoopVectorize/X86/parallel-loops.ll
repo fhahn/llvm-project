@@ -93,12 +93,12 @@ define void @parallel_loop(ptr nocapture %a, ptr nocapture %b) {
 ; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP14]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP15]]
 ; CHECK-NEXT:    [[TMP20:%.*]] = extractelement <4 x i32> [[WIDE_LOAD]], i64 0
-; CHECK-NEXT:    store i32 [[TMP20]], ptr [[TMP16]], align 4, !llvm.access.group [[ACC_GRP1:![0-9]+]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = extractelement <4 x i32> [[WIDE_LOAD]], i64 1
-; CHECK-NEXT:    store i32 [[TMP21]], ptr [[TMP17]], align 4, !llvm.access.group [[ACC_GRP1]]
 ; CHECK-NEXT:    [[TMP22:%.*]] = extractelement <4 x i32> [[WIDE_LOAD]], i64 2
-; CHECK-NEXT:    store i32 [[TMP22]], ptr [[TMP18]], align 4, !llvm.access.group [[ACC_GRP1]]
 ; CHECK-NEXT:    [[TMP23:%.*]] = extractelement <4 x i32> [[WIDE_LOAD]], i64 3
+; CHECK-NEXT:    store i32 [[TMP20]], ptr [[TMP16]], align 4, !llvm.access.group [[ACC_GRP1:![0-9]+]]
+; CHECK-NEXT:    store i32 [[TMP21]], ptr [[TMP17]], align 4, !llvm.access.group [[ACC_GRP1]]
+; CHECK-NEXT:    store i32 [[TMP22]], ptr [[TMP18]], align 4, !llvm.access.group [[ACC_GRP1]]
 ; CHECK-NEXT:    store i32 [[TMP23]], ptr [[TMP19]], align 4, !llvm.access.group [[ACC_GRP1]]
 ; CHECK-NEXT:    [[TMP24:%.*]] = add i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP25:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[TMP24]]

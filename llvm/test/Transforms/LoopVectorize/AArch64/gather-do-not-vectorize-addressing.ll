@@ -167,8 +167,8 @@ define void @load_used_as_address_via_recurrence(ptr noalias %A, ptr noalias %sr
 ; CHECK-NEXT:    [[TMP5]] = load <2 x i64>, ptr [[TMP1]], align 8
 ; CHECK-NEXT:    [[TMP6:%.*]] = shufflevector <2 x i64> [[VECTOR_RECUR]], <2 x i64> [[TMP5]], <2 x i32> <i32 1, i32 2>
 ; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <2 x i64> [[TMP6]], i64 0
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP7]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <2 x i64> [[TMP6]], i64 1
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP7]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP9]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = load i64, ptr [[TMP8]], align 8
 ; CHECK-NEXT:    [[TMP12:%.*]] = load i64, ptr [[TMP10]], align 8
@@ -303,8 +303,8 @@ define void @load_used_as_address_via_ptr_recurrence(ptr noalias %A, ptr noalias
 ; CHECK-NEXT:    [[TMP9]] = insertelement <2 x ptr> [[TMP8]], ptr [[TMP7]], i64 1
 ; CHECK-NEXT:    [[TMP10:%.*]] = shufflevector <2 x ptr> [[VECTOR_RECUR]], <2 x ptr> [[TMP9]], <2 x i32> <i32 1, i32 2>
 ; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <2 x ptr> [[TMP10]], i64 0
-; CHECK-NEXT:    [[TMP12:%.*]] = load i64, ptr [[TMP11]], align 8
 ; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <2 x ptr> [[TMP10]], i64 1
+; CHECK-NEXT:    [[TMP12:%.*]] = load i64, ptr [[TMP11]], align 8
 ; CHECK-NEXT:    [[TMP14:%.*]] = load i64, ptr [[TMP13]], align 8
 ; CHECK-NEXT:    [[TMP15:%.*]] = insertelement <2 x i64> poison, i64 [[TMP12]], i64 0
 ; CHECK-NEXT:    [[TMP16:%.*]] = insertelement <2 x i64> [[TMP15]], i64 [[TMP14]], i64 1

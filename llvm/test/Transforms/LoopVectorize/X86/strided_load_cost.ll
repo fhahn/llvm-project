@@ -524,20 +524,20 @@ define void @test(ptr %A, ptr noalias %B) #0 {
 ; CHECK-NEXT:    [[TMP26:%.*]] = getelementptr inbounds [1024 x i8], ptr [[B]], i64 0, i64 [[TMP6]]
 ; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr inbounds [1024 x i8], ptr [[B]], i64 0, i64 [[TMP7]]
 ; CHECK-NEXT:    [[TMP28:%.*]] = extractelement <8 x i8> [[TMP19]], i64 0
-; CHECK-NEXT:    store i8 [[TMP28]], ptr [[TMP20]], align 1
 ; CHECK-NEXT:    [[TMP29:%.*]] = extractelement <8 x i8> [[TMP19]], i64 1
-; CHECK-NEXT:    store i8 [[TMP29]], ptr [[TMP21]], align 1
 ; CHECK-NEXT:    [[TMP30:%.*]] = extractelement <8 x i8> [[TMP19]], i64 2
-; CHECK-NEXT:    store i8 [[TMP30]], ptr [[TMP22]], align 1
 ; CHECK-NEXT:    [[TMP31:%.*]] = extractelement <8 x i8> [[TMP19]], i64 3
-; CHECK-NEXT:    store i8 [[TMP31]], ptr [[TMP23]], align 1
 ; CHECK-NEXT:    [[TMP32:%.*]] = extractelement <8 x i8> [[TMP19]], i64 4
-; CHECK-NEXT:    store i8 [[TMP32]], ptr [[TMP24]], align 1
 ; CHECK-NEXT:    [[TMP33:%.*]] = extractelement <8 x i8> [[TMP19]], i64 5
-; CHECK-NEXT:    store i8 [[TMP33]], ptr [[TMP25]], align 1
 ; CHECK-NEXT:    [[TMP34:%.*]] = extractelement <8 x i8> [[TMP19]], i64 6
-; CHECK-NEXT:    store i8 [[TMP34]], ptr [[TMP26]], align 1
 ; CHECK-NEXT:    [[TMP35:%.*]] = extractelement <8 x i8> [[TMP19]], i64 7
+; CHECK-NEXT:    store i8 [[TMP28]], ptr [[TMP20]], align 1
+; CHECK-NEXT:    store i8 [[TMP29]], ptr [[TMP21]], align 1
+; CHECK-NEXT:    store i8 [[TMP30]], ptr [[TMP22]], align 1
+; CHECK-NEXT:    store i8 [[TMP31]], ptr [[TMP23]], align 1
+; CHECK-NEXT:    store i8 [[TMP32]], ptr [[TMP24]], align 1
+; CHECK-NEXT:    store i8 [[TMP33]], ptr [[TMP25]], align 1
+; CHECK-NEXT:    store i8 [[TMP34]], ptr [[TMP26]], align 1
 ; CHECK-NEXT:    store i8 [[TMP35]], ptr [[TMP27]], align 1
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP36:%.*]] = icmp eq i64 [[INDEX_NEXT]], 512
@@ -626,68 +626,68 @@ define void @test(ptr %A, ptr noalias %B) #0 {
 ; MAX-BW-NEXT:    [[TMP82:%.*]] = getelementptr inbounds [1024 x i8], ptr [[B]], i64 0, i64 [[TMP30]]
 ; MAX-BW-NEXT:    [[TMP98:%.*]] = getelementptr inbounds [1024 x i8], ptr [[B]], i64 0, i64 [[TMP31]]
 ; MAX-BW-NEXT:    [[TMP52:%.*]] = extractelement <32 x i8> [[TMP34]], i64 0
-; MAX-BW-NEXT:    store i8 [[TMP52]], ptr [[TMP35]], align 1
 ; MAX-BW-NEXT:    [[TMP53:%.*]] = extractelement <32 x i8> [[TMP34]], i64 1
-; MAX-BW-NEXT:    store i8 [[TMP53]], ptr [[TMP36]], align 1
 ; MAX-BW-NEXT:    [[TMP54:%.*]] = extractelement <32 x i8> [[TMP34]], i64 2
-; MAX-BW-NEXT:    store i8 [[TMP54]], ptr [[TMP37]], align 1
 ; MAX-BW-NEXT:    [[TMP55:%.*]] = extractelement <32 x i8> [[TMP34]], i64 3
-; MAX-BW-NEXT:    store i8 [[TMP55]], ptr [[TMP38]], align 1
 ; MAX-BW-NEXT:    [[TMP56:%.*]] = extractelement <32 x i8> [[TMP34]], i64 4
-; MAX-BW-NEXT:    store i8 [[TMP56]], ptr [[TMP39]], align 1
 ; MAX-BW-NEXT:    [[TMP57:%.*]] = extractelement <32 x i8> [[TMP34]], i64 5
-; MAX-BW-NEXT:    store i8 [[TMP57]], ptr [[TMP40]], align 1
 ; MAX-BW-NEXT:    [[TMP58:%.*]] = extractelement <32 x i8> [[TMP34]], i64 6
-; MAX-BW-NEXT:    store i8 [[TMP58]], ptr [[TMP41]], align 1
 ; MAX-BW-NEXT:    [[TMP59:%.*]] = extractelement <32 x i8> [[TMP34]], i64 7
-; MAX-BW-NEXT:    store i8 [[TMP59]], ptr [[TMP42]], align 1
 ; MAX-BW-NEXT:    [[TMP60:%.*]] = extractelement <32 x i8> [[TMP34]], i64 8
-; MAX-BW-NEXT:    store i8 [[TMP60]], ptr [[TMP43]], align 1
 ; MAX-BW-NEXT:    [[TMP61:%.*]] = extractelement <32 x i8> [[TMP34]], i64 9
-; MAX-BW-NEXT:    store i8 [[TMP61]], ptr [[TMP44]], align 1
 ; MAX-BW-NEXT:    [[TMP62:%.*]] = extractelement <32 x i8> [[TMP34]], i64 10
-; MAX-BW-NEXT:    store i8 [[TMP62]], ptr [[TMP45]], align 1
 ; MAX-BW-NEXT:    [[TMP63:%.*]] = extractelement <32 x i8> [[TMP34]], i64 11
-; MAX-BW-NEXT:    store i8 [[TMP63]], ptr [[TMP46]], align 1
 ; MAX-BW-NEXT:    [[TMP64:%.*]] = extractelement <32 x i8> [[TMP34]], i64 12
-; MAX-BW-NEXT:    store i8 [[TMP64]], ptr [[TMP47]], align 1
 ; MAX-BW-NEXT:    [[TMP65:%.*]] = extractelement <32 x i8> [[TMP34]], i64 13
-; MAX-BW-NEXT:    store i8 [[TMP65]], ptr [[TMP48]], align 1
 ; MAX-BW-NEXT:    [[TMP66:%.*]] = extractelement <32 x i8> [[TMP34]], i64 14
-; MAX-BW-NEXT:    store i8 [[TMP66]], ptr [[TMP49]], align 1
 ; MAX-BW-NEXT:    [[TMP67:%.*]] = extractelement <32 x i8> [[TMP34]], i64 15
-; MAX-BW-NEXT:    store i8 [[TMP67]], ptr [[TMP50]], align 1
 ; MAX-BW-NEXT:    [[TMP99:%.*]] = extractelement <32 x i8> [[TMP34]], i64 16
-; MAX-BW-NEXT:    store i8 [[TMP99]], ptr [[TMP51]], align 1
 ; MAX-BW-NEXT:    [[TMP100:%.*]] = extractelement <32 x i8> [[TMP34]], i64 17
-; MAX-BW-NEXT:    store i8 [[TMP100]], ptr [[TMP69]], align 1
 ; MAX-BW-NEXT:    [[TMP101:%.*]] = extractelement <32 x i8> [[TMP34]], i64 18
-; MAX-BW-NEXT:    store i8 [[TMP101]], ptr [[TMP70]], align 1
 ; MAX-BW-NEXT:    [[TMP102:%.*]] = extractelement <32 x i8> [[TMP34]], i64 19
-; MAX-BW-NEXT:    store i8 [[TMP102]], ptr [[TMP71]], align 1
 ; MAX-BW-NEXT:    [[TMP103:%.*]] = extractelement <32 x i8> [[TMP34]], i64 20
-; MAX-BW-NEXT:    store i8 [[TMP103]], ptr [[TMP72]], align 1
 ; MAX-BW-NEXT:    [[TMP104:%.*]] = extractelement <32 x i8> [[TMP34]], i64 21
-; MAX-BW-NEXT:    store i8 [[TMP104]], ptr [[TMP73]], align 1
 ; MAX-BW-NEXT:    [[TMP105:%.*]] = extractelement <32 x i8> [[TMP34]], i64 22
-; MAX-BW-NEXT:    store i8 [[TMP105]], ptr [[TMP74]], align 1
 ; MAX-BW-NEXT:    [[TMP106:%.*]] = extractelement <32 x i8> [[TMP34]], i64 23
-; MAX-BW-NEXT:    store i8 [[TMP106]], ptr [[TMP75]], align 1
 ; MAX-BW-NEXT:    [[TMP107:%.*]] = extractelement <32 x i8> [[TMP34]], i64 24
-; MAX-BW-NEXT:    store i8 [[TMP107]], ptr [[TMP76]], align 1
 ; MAX-BW-NEXT:    [[TMP108:%.*]] = extractelement <32 x i8> [[TMP34]], i64 25
-; MAX-BW-NEXT:    store i8 [[TMP108]], ptr [[TMP77]], align 1
 ; MAX-BW-NEXT:    [[TMP109:%.*]] = extractelement <32 x i8> [[TMP34]], i64 26
-; MAX-BW-NEXT:    store i8 [[TMP109]], ptr [[TMP78]], align 1
 ; MAX-BW-NEXT:    [[TMP110:%.*]] = extractelement <32 x i8> [[TMP34]], i64 27
-; MAX-BW-NEXT:    store i8 [[TMP110]], ptr [[TMP79]], align 1
 ; MAX-BW-NEXT:    [[TMP111:%.*]] = extractelement <32 x i8> [[TMP34]], i64 28
-; MAX-BW-NEXT:    store i8 [[TMP111]], ptr [[TMP80]], align 1
 ; MAX-BW-NEXT:    [[TMP112:%.*]] = extractelement <32 x i8> [[TMP34]], i64 29
-; MAX-BW-NEXT:    store i8 [[TMP112]], ptr [[TMP81]], align 1
 ; MAX-BW-NEXT:    [[TMP113:%.*]] = extractelement <32 x i8> [[TMP34]], i64 30
-; MAX-BW-NEXT:    store i8 [[TMP113]], ptr [[TMP82]], align 1
 ; MAX-BW-NEXT:    [[TMP114:%.*]] = extractelement <32 x i8> [[TMP34]], i64 31
+; MAX-BW-NEXT:    store i8 [[TMP52]], ptr [[TMP35]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP53]], ptr [[TMP36]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP54]], ptr [[TMP37]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP55]], ptr [[TMP38]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP56]], ptr [[TMP39]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP57]], ptr [[TMP40]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP58]], ptr [[TMP41]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP59]], ptr [[TMP42]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP60]], ptr [[TMP43]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP61]], ptr [[TMP44]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP62]], ptr [[TMP45]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP63]], ptr [[TMP46]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP64]], ptr [[TMP47]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP65]], ptr [[TMP48]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP66]], ptr [[TMP49]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP67]], ptr [[TMP50]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP99]], ptr [[TMP51]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP100]], ptr [[TMP69]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP101]], ptr [[TMP70]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP102]], ptr [[TMP71]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP103]], ptr [[TMP72]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP104]], ptr [[TMP73]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP105]], ptr [[TMP74]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP106]], ptr [[TMP75]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP107]], ptr [[TMP76]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP108]], ptr [[TMP77]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP109]], ptr [[TMP78]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP110]], ptr [[TMP79]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP111]], ptr [[TMP80]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP112]], ptr [[TMP81]], align 1
+; MAX-BW-NEXT:    store i8 [[TMP113]], ptr [[TMP82]], align 1
 ; MAX-BW-NEXT:    store i8 [[TMP114]], ptr [[TMP98]], align 1
 ; MAX-BW-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 32
 ; MAX-BW-NEXT:    [[TMP68:%.*]] = icmp eq i64 [[INDEX_NEXT]], 512

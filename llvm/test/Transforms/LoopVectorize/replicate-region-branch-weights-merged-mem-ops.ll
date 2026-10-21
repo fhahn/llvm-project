@@ -170,12 +170,12 @@ define void @sink_stores_no_prof_on_merged_store(ptr %dst, ptr %src, ptr %cond, 
 ; CHECK-NEXT:    [[TMP26:%.*]] = add <4 x i32> [[TMP24]], splat (i32 10)
 ; CHECK-NEXT:    [[TMP27:%.*]] = select <4 x i1> [[TMP8]], <4 x i32> [[TMP25]], <4 x i32> [[TMP26]]
 ; CHECK-NEXT:    [[TMP28:%.*]] = extractelement <4 x i32> [[TMP27]], i64 0
-; CHECK-NEXT:    store i32 [[TMP28]], ptr [[TMP13]], align 4, !alias.scope [[META24:![0-9]+]], !noalias [[META26:![0-9]+]]
 ; CHECK-NEXT:    [[TMP29:%.*]] = extractelement <4 x i32> [[TMP27]], i64 1
-; CHECK-NEXT:    store i32 [[TMP29]], ptr [[TMP14]], align 4, !alias.scope [[META24]], !noalias [[META26]]
 ; CHECK-NEXT:    [[TMP30:%.*]] = extractelement <4 x i32> [[TMP27]], i64 2
-; CHECK-NEXT:    store i32 [[TMP30]], ptr [[TMP15]], align 4, !alias.scope [[META24]], !noalias [[META26]]
 ; CHECK-NEXT:    [[TMP31:%.*]] = extractelement <4 x i32> [[TMP27]], i64 3
+; CHECK-NEXT:    store i32 [[TMP28]], ptr [[TMP13]], align 4, !alias.scope [[META24:![0-9]+]], !noalias [[META26:![0-9]+]]
+; CHECK-NEXT:    store i32 [[TMP29]], ptr [[TMP14]], align 4, !alias.scope [[META24]], !noalias [[META26]]
+; CHECK-NEXT:    store i32 [[TMP30]], ptr [[TMP15]], align 4, !alias.scope [[META24]], !noalias [[META26]]
 ; CHECK-NEXT:    store i32 [[TMP31]], ptr [[TMP16]], align 4, !alias.scope [[META24]], !noalias [[META26]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP32:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]

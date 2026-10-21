@@ -49,12 +49,12 @@ define void @load_store_factor5_saxpy(ptr noalias %A, ptr noalias %B, float %alp
 ; CHECK-NEXT:    [[TMP31:%.*]] = insertelement <4 x float> [[TMP30]], float [[TMP27]], i64 3
 ; CHECK-NEXT:    [[TMP32:%.*]] = fadd fast <4 x float> [[TMP31]], [[TMP175]]
 ; CHECK-NEXT:    [[TMP33:%.*]] = extractelement <4 x float> [[TMP32]], i64 0
-; CHECK-NEXT:    store float [[TMP33]], ptr [[TMP16]], align 4
 ; CHECK-NEXT:    [[TMP34:%.*]] = extractelement <4 x float> [[TMP32]], i64 1
-; CHECK-NEXT:    store float [[TMP34]], ptr [[TMP8]], align 4
 ; CHECK-NEXT:    [[TMP35:%.*]] = extractelement <4 x float> [[TMP32]], i64 2
-; CHECK-NEXT:    store float [[TMP35]], ptr [[TMP9]], align 4
 ; CHECK-NEXT:    [[TMP36:%.*]] = extractelement <4 x float> [[TMP32]], i64 3
+; CHECK-NEXT:    store float [[TMP33]], ptr [[TMP16]], align 4
+; CHECK-NEXT:    store float [[TMP34]], ptr [[TMP8]], align 4
+; CHECK-NEXT:    store float [[TMP35]], ptr [[TMP9]], align 4
 ; CHECK-NEXT:    store float [[TMP36]], ptr [[TMP10]], align 4
 ; CHECK-NEXT:    [[TMP37:%.*]] = add nuw nsw i64 [[TMP6]], 1
 ; CHECK-NEXT:    [[TMP38:%.*]] = add nuw nsw i64 [[TMP4]], 1
@@ -87,12 +87,12 @@ define void @load_store_factor5_saxpy(ptr noalias %A, ptr noalias %B, float %alp
 ; CHECK-NEXT:    [[TMP65:%.*]] = insertelement <4 x float> [[TMP64]], float [[TMP61]], i64 3
 ; CHECK-NEXT:    [[TMP66:%.*]] = fadd fast <4 x float> [[TMP65]], [[TMP57]]
 ; CHECK-NEXT:    [[TMP67:%.*]] = extractelement <4 x float> [[TMP66]], i64 0
-; CHECK-NEXT:    store float [[TMP67]], ptr [[TMP41]], align 4
 ; CHECK-NEXT:    [[TMP68:%.*]] = extractelement <4 x float> [[TMP66]], i64 1
-; CHECK-NEXT:    store float [[TMP68]], ptr [[TMP42]], align 4
 ; CHECK-NEXT:    [[TMP69:%.*]] = extractelement <4 x float> [[TMP66]], i64 2
-; CHECK-NEXT:    store float [[TMP69]], ptr [[TMP43]], align 4
 ; CHECK-NEXT:    [[TMP70:%.*]] = extractelement <4 x float> [[TMP66]], i64 3
+; CHECK-NEXT:    store float [[TMP67]], ptr [[TMP41]], align 4
+; CHECK-NEXT:    store float [[TMP68]], ptr [[TMP42]], align 4
+; CHECK-NEXT:    store float [[TMP69]], ptr [[TMP43]], align 4
 ; CHECK-NEXT:    store float [[TMP70]], ptr [[TMP44]], align 4
 ; CHECK-NEXT:    [[TMP71:%.*]] = add nuw nsw i64 [[TMP6]], 2
 ; CHECK-NEXT:    [[TMP72:%.*]] = add nuw nsw i64 [[TMP4]], 2
@@ -125,12 +125,12 @@ define void @load_store_factor5_saxpy(ptr noalias %A, ptr noalias %B, float %alp
 ; CHECK-NEXT:    [[TMP99:%.*]] = insertelement <4 x float> [[TMP98]], float [[TMP95]], i64 3
 ; CHECK-NEXT:    [[TMP100:%.*]] = fadd fast <4 x float> [[TMP99]], [[TMP91]]
 ; CHECK-NEXT:    [[TMP101:%.*]] = extractelement <4 x float> [[TMP100]], i64 0
-; CHECK-NEXT:    store float [[TMP101]], ptr [[TMP75]], align 4
 ; CHECK-NEXT:    [[TMP102:%.*]] = extractelement <4 x float> [[TMP100]], i64 1
-; CHECK-NEXT:    store float [[TMP102]], ptr [[TMP76]], align 4
 ; CHECK-NEXT:    [[TMP103:%.*]] = extractelement <4 x float> [[TMP100]], i64 2
-; CHECK-NEXT:    store float [[TMP103]], ptr [[TMP77]], align 4
 ; CHECK-NEXT:    [[TMP104:%.*]] = extractelement <4 x float> [[TMP100]], i64 3
+; CHECK-NEXT:    store float [[TMP101]], ptr [[TMP75]], align 4
+; CHECK-NEXT:    store float [[TMP102]], ptr [[TMP76]], align 4
+; CHECK-NEXT:    store float [[TMP103]], ptr [[TMP77]], align 4
 ; CHECK-NEXT:    store float [[TMP104]], ptr [[TMP78]], align 4
 ; CHECK-NEXT:    [[TMP105:%.*]] = add nuw nsw i64 [[TMP6]], 3
 ; CHECK-NEXT:    [[TMP106:%.*]] = add nuw nsw i64 [[TMP4]], 3
@@ -163,12 +163,12 @@ define void @load_store_factor5_saxpy(ptr noalias %A, ptr noalias %B, float %alp
 ; CHECK-NEXT:    [[TMP133:%.*]] = insertelement <4 x float> [[TMP132]], float [[TMP129]], i64 3
 ; CHECK-NEXT:    [[TMP134:%.*]] = fadd fast <4 x float> [[TMP133]], [[TMP125]]
 ; CHECK-NEXT:    [[TMP135:%.*]] = extractelement <4 x float> [[TMP134]], i64 0
-; CHECK-NEXT:    store float [[TMP135]], ptr [[TMP109]], align 4
 ; CHECK-NEXT:    [[TMP136:%.*]] = extractelement <4 x float> [[TMP134]], i64 1
-; CHECK-NEXT:    store float [[TMP136]], ptr [[TMP110]], align 4
 ; CHECK-NEXT:    [[TMP137:%.*]] = extractelement <4 x float> [[TMP134]], i64 2
-; CHECK-NEXT:    store float [[TMP137]], ptr [[TMP111]], align 4
 ; CHECK-NEXT:    [[TMP138:%.*]] = extractelement <4 x float> [[TMP134]], i64 3
+; CHECK-NEXT:    store float [[TMP135]], ptr [[TMP109]], align 4
+; CHECK-NEXT:    store float [[TMP136]], ptr [[TMP110]], align 4
+; CHECK-NEXT:    store float [[TMP137]], ptr [[TMP111]], align 4
 ; CHECK-NEXT:    store float [[TMP138]], ptr [[TMP112]], align 4
 ; CHECK-NEXT:    [[TMP139:%.*]] = add nuw nsw i64 [[TMP6]], 4
 ; CHECK-NEXT:    [[TMP140:%.*]] = add nuw nsw i64 [[TMP4]], 4
@@ -201,12 +201,12 @@ define void @load_store_factor5_saxpy(ptr noalias %A, ptr noalias %B, float %alp
 ; CHECK-NEXT:    [[TMP167:%.*]] = insertelement <4 x float> [[TMP166]], float [[TMP163]], i64 3
 ; CHECK-NEXT:    [[TMP168:%.*]] = fadd fast <4 x float> [[TMP167]], [[TMP159]]
 ; CHECK-NEXT:    [[TMP169:%.*]] = extractelement <4 x float> [[TMP168]], i64 0
-; CHECK-NEXT:    store float [[TMP169]], ptr [[TMP143]], align 4
 ; CHECK-NEXT:    [[TMP170:%.*]] = extractelement <4 x float> [[TMP168]], i64 1
-; CHECK-NEXT:    store float [[TMP170]], ptr [[TMP144]], align 4
 ; CHECK-NEXT:    [[TMP171:%.*]] = extractelement <4 x float> [[TMP168]], i64 2
-; CHECK-NEXT:    store float [[TMP171]], ptr [[TMP145]], align 4
 ; CHECK-NEXT:    [[TMP172:%.*]] = extractelement <4 x float> [[TMP168]], i64 3
+; CHECK-NEXT:    store float [[TMP169]], ptr [[TMP143]], align 4
+; CHECK-NEXT:    store float [[TMP170]], ptr [[TMP144]], align 4
+; CHECK-NEXT:    store float [[TMP171]], ptr [[TMP145]], align 4
 ; CHECK-NEXT:    store float [[TMP172]], ptr [[TMP146]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP2]], 4
 ; CHECK-NEXT:    [[TMP23:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
@@ -304,12 +304,12 @@ define void @load_store_factor5_cast(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP22:%.*]] = insertelement <4 x i32> [[TMP21]], i32 [[TMP18]], i64 3
 ; CHECK-NEXT:    [[TMP23:%.*]] = sitofp <4 x i32> [[TMP22]] to <4 x float>
 ; CHECK-NEXT:    [[C_0:%.*]] = extractelement <4 x float> [[TMP23]], i64 0
-; CHECK-NEXT:    store float [[C_0]], ptr [[A_0]], align 4
 ; CHECK-NEXT:    [[TMP25:%.*]] = extractelement <4 x float> [[TMP23]], i64 1
-; CHECK-NEXT:    store float [[TMP25]], ptr [[TMP8]], align 4
 ; CHECK-NEXT:    [[TMP26:%.*]] = extractelement <4 x float> [[TMP23]], i64 2
-; CHECK-NEXT:    store float [[TMP26]], ptr [[TMP9]], align 4
 ; CHECK-NEXT:    [[TMP27:%.*]] = extractelement <4 x float> [[TMP23]], i64 3
+; CHECK-NEXT:    store float [[C_0]], ptr [[A_0]], align 4
+; CHECK-NEXT:    store float [[TMP25]], ptr [[TMP8]], align 4
+; CHECK-NEXT:    store float [[TMP26]], ptr [[TMP9]], align 4
 ; CHECK-NEXT:    store float [[TMP27]], ptr [[TMP10]], align 4
 ; CHECK-NEXT:    [[O_1:%.*]] = add nuw nsw i64 [[OFFSET]], 1
 ; CHECK-NEXT:    [[TMP29:%.*]] = add nuw nsw i64 [[TMP4]], 1
@@ -333,12 +333,12 @@ define void @load_store_factor5_cast(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP47:%.*]] = insertelement <4 x i32> [[TMP46]], i32 [[TMP43]], i64 3
 ; CHECK-NEXT:    [[TMP48:%.*]] = sitofp <4 x i32> [[TMP47]] to <4 x float>
 ; CHECK-NEXT:    [[C_1:%.*]] = extractelement <4 x float> [[TMP48]], i64 0
-; CHECK-NEXT:    store float [[C_1]], ptr [[A_1]], align 4
 ; CHECK-NEXT:    [[TMP50:%.*]] = extractelement <4 x float> [[TMP48]], i64 1
-; CHECK-NEXT:    store float [[TMP50]], ptr [[TMP33]], align 4
 ; CHECK-NEXT:    [[TMP51:%.*]] = extractelement <4 x float> [[TMP48]], i64 2
-; CHECK-NEXT:    store float [[TMP51]], ptr [[TMP34]], align 4
 ; CHECK-NEXT:    [[TMP52:%.*]] = extractelement <4 x float> [[TMP48]], i64 3
+; CHECK-NEXT:    store float [[C_1]], ptr [[A_1]], align 4
+; CHECK-NEXT:    store float [[TMP50]], ptr [[TMP33]], align 4
+; CHECK-NEXT:    store float [[TMP51]], ptr [[TMP34]], align 4
 ; CHECK-NEXT:    store float [[TMP52]], ptr [[TMP35]], align 4
 ; CHECK-NEXT:    [[O_2:%.*]] = add nuw nsw i64 [[OFFSET]], 2
 ; CHECK-NEXT:    [[TMP54:%.*]] = add nuw nsw i64 [[TMP4]], 2
@@ -362,12 +362,12 @@ define void @load_store_factor5_cast(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP72:%.*]] = insertelement <4 x i32> [[TMP71]], i32 [[TMP68]], i64 3
 ; CHECK-NEXT:    [[TMP73:%.*]] = sitofp <4 x i32> [[TMP72]] to <4 x float>
 ; CHECK-NEXT:    [[C_2:%.*]] = extractelement <4 x float> [[TMP73]], i64 0
-; CHECK-NEXT:    store float [[C_2]], ptr [[A_2]], align 4
 ; CHECK-NEXT:    [[TMP75:%.*]] = extractelement <4 x float> [[TMP73]], i64 1
-; CHECK-NEXT:    store float [[TMP75]], ptr [[TMP58]], align 4
 ; CHECK-NEXT:    [[TMP76:%.*]] = extractelement <4 x float> [[TMP73]], i64 2
-; CHECK-NEXT:    store float [[TMP76]], ptr [[TMP59]], align 4
 ; CHECK-NEXT:    [[TMP77:%.*]] = extractelement <4 x float> [[TMP73]], i64 3
+; CHECK-NEXT:    store float [[C_2]], ptr [[A_2]], align 4
+; CHECK-NEXT:    store float [[TMP75]], ptr [[TMP58]], align 4
+; CHECK-NEXT:    store float [[TMP76]], ptr [[TMP59]], align 4
 ; CHECK-NEXT:    store float [[TMP77]], ptr [[TMP60]], align 4
 ; CHECK-NEXT:    [[O_3:%.*]] = add nuw nsw i64 [[OFFSET]], 3
 ; CHECK-NEXT:    [[TMP79:%.*]] = add nuw nsw i64 [[TMP4]], 3
@@ -391,12 +391,12 @@ define void @load_store_factor5_cast(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP97:%.*]] = insertelement <4 x i32> [[TMP96]], i32 [[TMP93]], i64 3
 ; CHECK-NEXT:    [[TMP98:%.*]] = sitofp <4 x i32> [[TMP97]] to <4 x float>
 ; CHECK-NEXT:    [[C_3:%.*]] = extractelement <4 x float> [[TMP98]], i64 0
-; CHECK-NEXT:    store float [[C_3]], ptr [[A_3]], align 4
 ; CHECK-NEXT:    [[TMP100:%.*]] = extractelement <4 x float> [[TMP98]], i64 1
-; CHECK-NEXT:    store float [[TMP100]], ptr [[TMP83]], align 4
 ; CHECK-NEXT:    [[TMP101:%.*]] = extractelement <4 x float> [[TMP98]], i64 2
-; CHECK-NEXT:    store float [[TMP101]], ptr [[TMP84]], align 4
 ; CHECK-NEXT:    [[TMP102:%.*]] = extractelement <4 x float> [[TMP98]], i64 3
+; CHECK-NEXT:    store float [[C_3]], ptr [[A_3]], align 4
+; CHECK-NEXT:    store float [[TMP100]], ptr [[TMP83]], align 4
+; CHECK-NEXT:    store float [[TMP101]], ptr [[TMP84]], align 4
 ; CHECK-NEXT:    store float [[TMP102]], ptr [[TMP85]], align 4
 ; CHECK-NEXT:    [[O_4:%.*]] = add nuw nsw i64 [[OFFSET]], 4
 ; CHECK-NEXT:    [[TMP104:%.*]] = add nuw nsw i64 [[TMP4]], 4
@@ -420,12 +420,12 @@ define void @load_store_factor5_cast(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP122:%.*]] = insertelement <4 x i32> [[TMP121]], i32 [[TMP118]], i64 3
 ; CHECK-NEXT:    [[TMP123:%.*]] = sitofp <4 x i32> [[TMP122]] to <4 x float>
 ; CHECK-NEXT:    [[C_4:%.*]] = extractelement <4 x float> [[TMP123]], i64 0
-; CHECK-NEXT:    store float [[C_4]], ptr [[A_4]], align 4
 ; CHECK-NEXT:    [[TMP125:%.*]] = extractelement <4 x float> [[TMP123]], i64 1
-; CHECK-NEXT:    store float [[TMP125]], ptr [[TMP108]], align 4
 ; CHECK-NEXT:    [[TMP126:%.*]] = extractelement <4 x float> [[TMP123]], i64 2
-; CHECK-NEXT:    store float [[TMP126]], ptr [[TMP109]], align 4
 ; CHECK-NEXT:    [[TMP127:%.*]] = extractelement <4 x float> [[TMP123]], i64 3
+; CHECK-NEXT:    store float [[C_4]], ptr [[A_4]], align 4
+; CHECK-NEXT:    store float [[TMP125]], ptr [[TMP108]], align 4
+; CHECK-NEXT:    store float [[TMP126]], ptr [[TMP109]], align 4
 ; CHECK-NEXT:    store float [[TMP127]], ptr [[TMP110]], align 4
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw i64 [[IV]], 4
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 1000
@@ -527,12 +527,12 @@ define void @load_store_factor5_runtime_tc(ptr noalias %A, ptr noalias %B, float
 ; CHECK-NEXT:    [[TMP32:%.*]] = insertelement <4 x float> [[TMP31]], float [[TMP28]], i64 3
 ; CHECK-NEXT:    [[TMP33:%.*]] = fadd fast <4 x float> [[TMP32]], [[TMP24]]
 ; CHECK-NEXT:    [[TMP34:%.*]] = extractelement <4 x float> [[TMP33]], i64 0
-; CHECK-NEXT:    store float [[TMP34]], ptr [[TMP11]], align 4
 ; CHECK-NEXT:    [[TMP35:%.*]] = extractelement <4 x float> [[TMP33]], i64 1
-; CHECK-NEXT:    store float [[TMP35]], ptr [[TMP9]], align 4
 ; CHECK-NEXT:    [[TMP36:%.*]] = extractelement <4 x float> [[TMP33]], i64 2
-; CHECK-NEXT:    store float [[TMP36]], ptr [[TMP10]], align 4
 ; CHECK-NEXT:    [[TMP37:%.*]] = extractelement <4 x float> [[TMP33]], i64 3
+; CHECK-NEXT:    store float [[TMP34]], ptr [[TMP11]], align 4
+; CHECK-NEXT:    store float [[TMP35]], ptr [[TMP9]], align 4
+; CHECK-NEXT:    store float [[TMP36]], ptr [[TMP10]], align 4
 ; CHECK-NEXT:    store float [[TMP37]], ptr [[TMP12]], align 4
 ; CHECK-NEXT:    [[TMP38:%.*]] = add nuw nsw i64 [[TMP7]], 1
 ; CHECK-NEXT:    [[TMP39:%.*]] = add nuw nsw i64 [[TMP5]], 1
@@ -565,12 +565,12 @@ define void @load_store_factor5_runtime_tc(ptr noalias %A, ptr noalias %B, float
 ; CHECK-NEXT:    [[TMP66:%.*]] = insertelement <4 x float> [[TMP65]], float [[TMP62]], i64 3
 ; CHECK-NEXT:    [[TMP67:%.*]] = fadd fast <4 x float> [[TMP66]], [[TMP58]]
 ; CHECK-NEXT:    [[TMP68:%.*]] = extractelement <4 x float> [[TMP67]], i64 0
-; CHECK-NEXT:    store float [[TMP68]], ptr [[TMP42]], align 4
 ; CHECK-NEXT:    [[TMP69:%.*]] = extractelement <4 x float> [[TMP67]], i64 1
-; CHECK-NEXT:    store float [[TMP69]], ptr [[TMP43]], align 4
 ; CHECK-NEXT:    [[TMP70:%.*]] = extractelement <4 x float> [[TMP67]], i64 2
-; CHECK-NEXT:    store float [[TMP70]], ptr [[TMP44]], align 4
 ; CHECK-NEXT:    [[TMP71:%.*]] = extractelement <4 x float> [[TMP67]], i64 3
+; CHECK-NEXT:    store float [[TMP68]], ptr [[TMP42]], align 4
+; CHECK-NEXT:    store float [[TMP69]], ptr [[TMP43]], align 4
+; CHECK-NEXT:    store float [[TMP70]], ptr [[TMP44]], align 4
 ; CHECK-NEXT:    store float [[TMP71]], ptr [[TMP45]], align 4
 ; CHECK-NEXT:    [[TMP72:%.*]] = add nuw nsw i64 [[TMP7]], 2
 ; CHECK-NEXT:    [[TMP73:%.*]] = add nuw nsw i64 [[TMP5]], 2
@@ -603,12 +603,12 @@ define void @load_store_factor5_runtime_tc(ptr noalias %A, ptr noalias %B, float
 ; CHECK-NEXT:    [[TMP100:%.*]] = insertelement <4 x float> [[TMP99]], float [[TMP96]], i64 3
 ; CHECK-NEXT:    [[TMP101:%.*]] = fadd fast <4 x float> [[TMP100]], [[TMP92]]
 ; CHECK-NEXT:    [[TMP102:%.*]] = extractelement <4 x float> [[TMP101]], i64 0
-; CHECK-NEXT:    store float [[TMP102]], ptr [[TMP76]], align 4
 ; CHECK-NEXT:    [[TMP103:%.*]] = extractelement <4 x float> [[TMP101]], i64 1
-; CHECK-NEXT:    store float [[TMP103]], ptr [[TMP77]], align 4
 ; CHECK-NEXT:    [[TMP104:%.*]] = extractelement <4 x float> [[TMP101]], i64 2
-; CHECK-NEXT:    store float [[TMP104]], ptr [[TMP78]], align 4
 ; CHECK-NEXT:    [[TMP105:%.*]] = extractelement <4 x float> [[TMP101]], i64 3
+; CHECK-NEXT:    store float [[TMP102]], ptr [[TMP76]], align 4
+; CHECK-NEXT:    store float [[TMP103]], ptr [[TMP77]], align 4
+; CHECK-NEXT:    store float [[TMP104]], ptr [[TMP78]], align 4
 ; CHECK-NEXT:    store float [[TMP105]], ptr [[TMP79]], align 4
 ; CHECK-NEXT:    [[TMP106:%.*]] = add nuw nsw i64 [[TMP7]], 3
 ; CHECK-NEXT:    [[TMP107:%.*]] = add nuw nsw i64 [[TMP5]], 3
@@ -641,12 +641,12 @@ define void @load_store_factor5_runtime_tc(ptr noalias %A, ptr noalias %B, float
 ; CHECK-NEXT:    [[TMP134:%.*]] = insertelement <4 x float> [[TMP133]], float [[TMP130]], i64 3
 ; CHECK-NEXT:    [[TMP135:%.*]] = fadd fast <4 x float> [[TMP134]], [[TMP126]]
 ; CHECK-NEXT:    [[TMP136:%.*]] = extractelement <4 x float> [[TMP135]], i64 0
-; CHECK-NEXT:    store float [[TMP136]], ptr [[TMP110]], align 4
 ; CHECK-NEXT:    [[TMP137:%.*]] = extractelement <4 x float> [[TMP135]], i64 1
-; CHECK-NEXT:    store float [[TMP137]], ptr [[TMP111]], align 4
 ; CHECK-NEXT:    [[TMP138:%.*]] = extractelement <4 x float> [[TMP135]], i64 2
-; CHECK-NEXT:    store float [[TMP138]], ptr [[TMP112]], align 4
 ; CHECK-NEXT:    [[TMP139:%.*]] = extractelement <4 x float> [[TMP135]], i64 3
+; CHECK-NEXT:    store float [[TMP136]], ptr [[TMP110]], align 4
+; CHECK-NEXT:    store float [[TMP137]], ptr [[TMP111]], align 4
+; CHECK-NEXT:    store float [[TMP138]], ptr [[TMP112]], align 4
 ; CHECK-NEXT:    store float [[TMP139]], ptr [[TMP113]], align 4
 ; CHECK-NEXT:    [[TMP140:%.*]] = add nuw nsw i64 [[TMP7]], 4
 ; CHECK-NEXT:    [[TMP141:%.*]] = add nuw nsw i64 [[TMP5]], 4
@@ -679,12 +679,12 @@ define void @load_store_factor5_runtime_tc(ptr noalias %A, ptr noalias %B, float
 ; CHECK-NEXT:    [[TMP168:%.*]] = insertelement <4 x float> [[TMP167]], float [[TMP164]], i64 3
 ; CHECK-NEXT:    [[TMP169:%.*]] = fadd fast <4 x float> [[TMP168]], [[TMP160]]
 ; CHECK-NEXT:    [[TMP170:%.*]] = extractelement <4 x float> [[TMP169]], i64 0
-; CHECK-NEXT:    store float [[TMP170]], ptr [[TMP144]], align 4
 ; CHECK-NEXT:    [[TMP171:%.*]] = extractelement <4 x float> [[TMP169]], i64 1
-; CHECK-NEXT:    store float [[TMP171]], ptr [[TMP145]], align 4
 ; CHECK-NEXT:    [[TMP172:%.*]] = extractelement <4 x float> [[TMP169]], i64 2
-; CHECK-NEXT:    store float [[TMP172]], ptr [[TMP146]], align 4
 ; CHECK-NEXT:    [[TMP173:%.*]] = extractelement <4 x float> [[TMP169]], i64 3
+; CHECK-NEXT:    store float [[TMP170]], ptr [[TMP144]], align 4
+; CHECK-NEXT:    store float [[TMP171]], ptr [[TMP145]], align 4
+; CHECK-NEXT:    store float [[TMP172]], ptr [[TMP146]], align 4
 ; CHECK-NEXT:    store float [[TMP173]], ptr [[TMP147]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP3]], 4
 ; CHECK-NEXT:    [[TMP23:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
@@ -776,12 +776,12 @@ define void @store_factor5_from_load_factor4(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP6]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP7]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <4 x float> [[STRIDED_VEC]], i64 0
-; CHECK-NEXT:    store float [[TMP13]], ptr [[TMP3]], align 4
 ; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <4 x float> [[STRIDED_VEC]], i64 1
-; CHECK-NEXT:    store float [[TMP14]], ptr [[TMP10]], align 4
 ; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <4 x float> [[STRIDED_VEC]], i64 2
-; CHECK-NEXT:    store float [[TMP15]], ptr [[TMP11]], align 4
 ; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <4 x float> [[STRIDED_VEC]], i64 3
+; CHECK-NEXT:    store float [[TMP13]], ptr [[TMP3]], align 4
+; CHECK-NEXT:    store float [[TMP14]], ptr [[TMP10]], align 4
+; CHECK-NEXT:    store float [[TMP15]], ptr [[TMP11]], align 4
 ; CHECK-NEXT:    store float [[TMP16]], ptr [[TMP12]], align 4
 ; CHECK-NEXT:    [[TMP17:%.*]] = add nuw nsw i64 [[TMP1]], 1
 ; CHECK-NEXT:    [[TMP18:%.*]] = add nuw nsw i64 [[TMP5]], 1
@@ -792,12 +792,12 @@ define void @store_factor5_from_load_factor4(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP23:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP19]]
 ; CHECK-NEXT:    [[TMP24:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP20]]
 ; CHECK-NEXT:    [[TMP25:%.*]] = extractelement <4 x float> [[STRIDED_VEC1]], i64 0
-; CHECK-NEXT:    store float [[TMP25]], ptr [[TMP21]], align 4
 ; CHECK-NEXT:    [[TMP26:%.*]] = extractelement <4 x float> [[STRIDED_VEC1]], i64 1
-; CHECK-NEXT:    store float [[TMP26]], ptr [[TMP22]], align 4
 ; CHECK-NEXT:    [[TMP27:%.*]] = extractelement <4 x float> [[STRIDED_VEC1]], i64 2
-; CHECK-NEXT:    store float [[TMP27]], ptr [[TMP23]], align 4
 ; CHECK-NEXT:    [[TMP28:%.*]] = extractelement <4 x float> [[STRIDED_VEC1]], i64 3
+; CHECK-NEXT:    store float [[TMP25]], ptr [[TMP21]], align 4
+; CHECK-NEXT:    store float [[TMP26]], ptr [[TMP22]], align 4
+; CHECK-NEXT:    store float [[TMP27]], ptr [[TMP23]], align 4
 ; CHECK-NEXT:    store float [[TMP28]], ptr [[TMP24]], align 4
 ; CHECK-NEXT:    [[TMP29:%.*]] = add nuw nsw i64 [[TMP1]], 2
 ; CHECK-NEXT:    [[TMP30:%.*]] = add nuw nsw i64 [[TMP5]], 2
@@ -808,12 +808,12 @@ define void @store_factor5_from_load_factor4(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP35:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP31]]
 ; CHECK-NEXT:    [[TMP36:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP32]]
 ; CHECK-NEXT:    [[TMP37:%.*]] = extractelement <4 x float> [[STRIDED_VEC2]], i64 0
-; CHECK-NEXT:    store float [[TMP37]], ptr [[TMP33]], align 4
 ; CHECK-NEXT:    [[TMP38:%.*]] = extractelement <4 x float> [[STRIDED_VEC2]], i64 1
-; CHECK-NEXT:    store float [[TMP38]], ptr [[TMP34]], align 4
 ; CHECK-NEXT:    [[TMP39:%.*]] = extractelement <4 x float> [[STRIDED_VEC2]], i64 2
-; CHECK-NEXT:    store float [[TMP39]], ptr [[TMP35]], align 4
 ; CHECK-NEXT:    [[TMP40:%.*]] = extractelement <4 x float> [[STRIDED_VEC2]], i64 3
+; CHECK-NEXT:    store float [[TMP37]], ptr [[TMP33]], align 4
+; CHECK-NEXT:    store float [[TMP38]], ptr [[TMP34]], align 4
+; CHECK-NEXT:    store float [[TMP39]], ptr [[TMP35]], align 4
 ; CHECK-NEXT:    store float [[TMP40]], ptr [[TMP36]], align 4
 ; CHECK-NEXT:    [[TMP41:%.*]] = add nuw nsw i64 [[TMP1]], 3
 ; CHECK-NEXT:    [[TMP42:%.*]] = add nuw nsw i64 [[TMP5]], 3
@@ -824,12 +824,12 @@ define void @store_factor5_from_load_factor4(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP47:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP43]]
 ; CHECK-NEXT:    [[TMP48:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP44]]
 ; CHECK-NEXT:    [[TMP49:%.*]] = extractelement <4 x float> [[STRIDED_VEC3]], i64 0
-; CHECK-NEXT:    store float [[TMP49]], ptr [[TMP45]], align 4
 ; CHECK-NEXT:    [[TMP50:%.*]] = extractelement <4 x float> [[STRIDED_VEC3]], i64 1
-; CHECK-NEXT:    store float [[TMP50]], ptr [[TMP46]], align 4
 ; CHECK-NEXT:    [[TMP51:%.*]] = extractelement <4 x float> [[STRIDED_VEC3]], i64 2
-; CHECK-NEXT:    store float [[TMP51]], ptr [[TMP47]], align 4
 ; CHECK-NEXT:    [[TMP52:%.*]] = extractelement <4 x float> [[STRIDED_VEC3]], i64 3
+; CHECK-NEXT:    store float [[TMP49]], ptr [[TMP45]], align 4
+; CHECK-NEXT:    store float [[TMP50]], ptr [[TMP46]], align 4
+; CHECK-NEXT:    store float [[TMP51]], ptr [[TMP47]], align 4
 ; CHECK-NEXT:    store float [[TMP52]], ptr [[TMP48]], align 4
 ; CHECK-NEXT:    [[TMP53:%.*]] = add nuw nsw i64 [[TMP1]], 4
 ; CHECK-NEXT:    [[TMP54:%.*]] = add nuw nsw i64 [[TMP5]], 4
@@ -939,12 +939,12 @@ define void @load_store_factor5_saxpy_cast_chain(ptr noalias %A, ptr noalias %B,
 ; CHECK-NEXT:    [[TMP33:%.*]] = insertelement <4 x float> [[TMP32]], float [[TMP29]], i64 3
 ; CHECK-NEXT:    [[TMP34:%.*]] = fadd fast <4 x float> [[TMP33]], [[TMP25]]
 ; CHECK-NEXT:    [[TMP35:%.*]] = extractelement <4 x float> [[TMP34]], i64 0
-; CHECK-NEXT:    store float [[TMP35]], ptr [[TMP1]], align 4
 ; CHECK-NEXT:    [[TMP36:%.*]] = extractelement <4 x float> [[TMP34]], i64 1
-; CHECK-NEXT:    store float [[TMP36]], ptr [[TMP8]], align 4
 ; CHECK-NEXT:    [[TMP37:%.*]] = extractelement <4 x float> [[TMP34]], i64 2
-; CHECK-NEXT:    store float [[TMP37]], ptr [[TMP9]], align 4
 ; CHECK-NEXT:    [[TMP38:%.*]] = extractelement <4 x float> [[TMP34]], i64 3
+; CHECK-NEXT:    store float [[TMP35]], ptr [[TMP1]], align 4
+; CHECK-NEXT:    store float [[TMP36]], ptr [[TMP8]], align 4
+; CHECK-NEXT:    store float [[TMP37]], ptr [[TMP9]], align 4
 ; CHECK-NEXT:    store float [[TMP38]], ptr [[TMP10]], align 4
 ; CHECK-NEXT:    [[TMP39:%.*]] = add nuw nsw i64 [[TMP0]], 1
 ; CHECK-NEXT:    [[TMP40:%.*]] = add nuw nsw i64 [[TMP4]], 1
@@ -979,12 +979,12 @@ define void @load_store_factor5_saxpy_cast_chain(ptr noalias %A, ptr noalias %B,
 ; CHECK-NEXT:    [[TMP69:%.*]] = insertelement <4 x float> [[TMP68]], float [[TMP65]], i64 3
 ; CHECK-NEXT:    [[TMP70:%.*]] = fadd fast <4 x float> [[TMP69]], [[TMP61]]
 ; CHECK-NEXT:    [[TMP71:%.*]] = extractelement <4 x float> [[TMP70]], i64 0
-; CHECK-NEXT:    store float [[TMP71]], ptr [[TMP43]], align 4
 ; CHECK-NEXT:    [[TMP72:%.*]] = extractelement <4 x float> [[TMP70]], i64 1
-; CHECK-NEXT:    store float [[TMP72]], ptr [[TMP44]], align 4
 ; CHECK-NEXT:    [[TMP73:%.*]] = extractelement <4 x float> [[TMP70]], i64 2
-; CHECK-NEXT:    store float [[TMP73]], ptr [[TMP45]], align 4
 ; CHECK-NEXT:    [[TMP74:%.*]] = extractelement <4 x float> [[TMP70]], i64 3
+; CHECK-NEXT:    store float [[TMP71]], ptr [[TMP43]], align 4
+; CHECK-NEXT:    store float [[TMP72]], ptr [[TMP44]], align 4
+; CHECK-NEXT:    store float [[TMP73]], ptr [[TMP45]], align 4
 ; CHECK-NEXT:    store float [[TMP74]], ptr [[TMP46]], align 4
 ; CHECK-NEXT:    [[TMP75:%.*]] = add nuw nsw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[TMP76:%.*]] = add nuw nsw i64 [[TMP4]], 2
@@ -1019,12 +1019,12 @@ define void @load_store_factor5_saxpy_cast_chain(ptr noalias %A, ptr noalias %B,
 ; CHECK-NEXT:    [[TMP105:%.*]] = insertelement <4 x float> [[TMP104]], float [[TMP101]], i64 3
 ; CHECK-NEXT:    [[TMP106:%.*]] = fadd fast <4 x float> [[TMP105]], [[TMP97]]
 ; CHECK-NEXT:    [[TMP107:%.*]] = extractelement <4 x float> [[TMP106]], i64 0
-; CHECK-NEXT:    store float [[TMP107]], ptr [[TMP79]], align 4
 ; CHECK-NEXT:    [[TMP108:%.*]] = extractelement <4 x float> [[TMP106]], i64 1
-; CHECK-NEXT:    store float [[TMP108]], ptr [[TMP80]], align 4
 ; CHECK-NEXT:    [[TMP109:%.*]] = extractelement <4 x float> [[TMP106]], i64 2
-; CHECK-NEXT:    store float [[TMP109]], ptr [[TMP81]], align 4
 ; CHECK-NEXT:    [[TMP110:%.*]] = extractelement <4 x float> [[TMP106]], i64 3
+; CHECK-NEXT:    store float [[TMP107]], ptr [[TMP79]], align 4
+; CHECK-NEXT:    store float [[TMP108]], ptr [[TMP80]], align 4
+; CHECK-NEXT:    store float [[TMP109]], ptr [[TMP81]], align 4
 ; CHECK-NEXT:    store float [[TMP110]], ptr [[TMP82]], align 4
 ; CHECK-NEXT:    [[TMP111:%.*]] = add nuw nsw i64 [[TMP0]], 3
 ; CHECK-NEXT:    [[TMP112:%.*]] = add nuw nsw i64 [[TMP4]], 3
@@ -1059,12 +1059,12 @@ define void @load_store_factor5_saxpy_cast_chain(ptr noalias %A, ptr noalias %B,
 ; CHECK-NEXT:    [[TMP141:%.*]] = insertelement <4 x float> [[TMP140]], float [[TMP137]], i64 3
 ; CHECK-NEXT:    [[TMP142:%.*]] = fadd fast <4 x float> [[TMP141]], [[TMP133]]
 ; CHECK-NEXT:    [[TMP143:%.*]] = extractelement <4 x float> [[TMP142]], i64 0
-; CHECK-NEXT:    store float [[TMP143]], ptr [[TMP115]], align 4
 ; CHECK-NEXT:    [[TMP144:%.*]] = extractelement <4 x float> [[TMP142]], i64 1
-; CHECK-NEXT:    store float [[TMP144]], ptr [[TMP116]], align 4
 ; CHECK-NEXT:    [[TMP145:%.*]] = extractelement <4 x float> [[TMP142]], i64 2
-; CHECK-NEXT:    store float [[TMP145]], ptr [[TMP117]], align 4
 ; CHECK-NEXT:    [[TMP146:%.*]] = extractelement <4 x float> [[TMP142]], i64 3
+; CHECK-NEXT:    store float [[TMP143]], ptr [[TMP115]], align 4
+; CHECK-NEXT:    store float [[TMP144]], ptr [[TMP116]], align 4
+; CHECK-NEXT:    store float [[TMP145]], ptr [[TMP117]], align 4
 ; CHECK-NEXT:    store float [[TMP146]], ptr [[TMP118]], align 4
 ; CHECK-NEXT:    [[TMP147:%.*]] = add nuw nsw i64 [[TMP0]], 4
 ; CHECK-NEXT:    [[TMP148:%.*]] = add nuw nsw i64 [[TMP4]], 4
@@ -1099,12 +1099,12 @@ define void @load_store_factor5_saxpy_cast_chain(ptr noalias %A, ptr noalias %B,
 ; CHECK-NEXT:    [[TMP177:%.*]] = insertelement <4 x float> [[TMP176]], float [[TMP173]], i64 3
 ; CHECK-NEXT:    [[TMP178:%.*]] = fadd fast <4 x float> [[TMP177]], [[TMP169]]
 ; CHECK-NEXT:    [[TMP179:%.*]] = extractelement <4 x float> [[TMP178]], i64 0
-; CHECK-NEXT:    store float [[TMP179]], ptr [[TMP151]], align 4
 ; CHECK-NEXT:    [[TMP180:%.*]] = extractelement <4 x float> [[TMP178]], i64 1
-; CHECK-NEXT:    store float [[TMP180]], ptr [[TMP152]], align 4
 ; CHECK-NEXT:    [[TMP181:%.*]] = extractelement <4 x float> [[TMP178]], i64 2
-; CHECK-NEXT:    store float [[TMP181]], ptr [[TMP153]], align 4
 ; CHECK-NEXT:    [[TMP182:%.*]] = extractelement <4 x float> [[TMP178]], i64 3
+; CHECK-NEXT:    store float [[TMP179]], ptr [[TMP151]], align 4
+; CHECK-NEXT:    store float [[TMP180]], ptr [[TMP152]], align 4
+; CHECK-NEXT:    store float [[TMP181]], ptr [[TMP153]], align 4
 ; CHECK-NEXT:    store float [[TMP182]], ptr [[TMP154]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
@@ -1221,12 +1221,12 @@ define void @load_store_factor5_select(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP31:%.*]] = fcmp ogt <4 x float> [[TMP30]], [[TMP22]]
 ; CHECK-NEXT:    [[TMP32:%.*]] = select <4 x i1> [[TMP31]], <4 x float> [[TMP30]], <4 x float> [[TMP22]]
 ; CHECK-NEXT:    [[R_0:%.*]] = extractelement <4 x float> [[TMP32]], i64 0
-; CHECK-NEXT:    store float [[R_0]], ptr [[TMP10]], align 4
 ; CHECK-NEXT:    [[TMP34:%.*]] = extractelement <4 x float> [[TMP32]], i64 1
-; CHECK-NEXT:    store float [[TMP34]], ptr [[TMP8]], align 4
 ; CHECK-NEXT:    [[TMP35:%.*]] = extractelement <4 x float> [[TMP32]], i64 2
-; CHECK-NEXT:    store float [[TMP35]], ptr [[TMP9]], align 4
 ; CHECK-NEXT:    [[TMP36:%.*]] = extractelement <4 x float> [[TMP32]], i64 3
+; CHECK-NEXT:    store float [[R_0]], ptr [[TMP10]], align 4
+; CHECK-NEXT:    store float [[TMP34]], ptr [[TMP8]], align 4
+; CHECK-NEXT:    store float [[TMP35]], ptr [[TMP9]], align 4
 ; CHECK-NEXT:    store float [[TMP36]], ptr [[TMP37]], align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = add nuw nsw i64 [[TMP6]], 1
 ; CHECK-NEXT:    [[TMP38:%.*]] = add nuw nsw i64 [[TMP4]], 1
@@ -1259,12 +1259,12 @@ define void @load_store_factor5_select(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP65:%.*]] = fcmp ogt <4 x float> [[TMP64]], [[TMP56]]
 ; CHECK-NEXT:    [[TMP66:%.*]] = select <4 x i1> [[TMP65]], <4 x float> [[TMP64]], <4 x float> [[TMP56]]
 ; CHECK-NEXT:    [[R_1:%.*]] = extractelement <4 x float> [[TMP66]], i64 0
-; CHECK-NEXT:    store float [[R_1]], ptr [[A_1]], align 4
 ; CHECK-NEXT:    [[TMP68:%.*]] = extractelement <4 x float> [[TMP66]], i64 1
-; CHECK-NEXT:    store float [[TMP68]], ptr [[TMP42]], align 4
 ; CHECK-NEXT:    [[TMP69:%.*]] = extractelement <4 x float> [[TMP66]], i64 2
-; CHECK-NEXT:    store float [[TMP69]], ptr [[TMP43]], align 4
 ; CHECK-NEXT:    [[TMP70:%.*]] = extractelement <4 x float> [[TMP66]], i64 3
+; CHECK-NEXT:    store float [[R_1]], ptr [[A_1]], align 4
+; CHECK-NEXT:    store float [[TMP68]], ptr [[TMP42]], align 4
+; CHECK-NEXT:    store float [[TMP69]], ptr [[TMP43]], align 4
 ; CHECK-NEXT:    store float [[TMP70]], ptr [[TMP44]], align 4
 ; CHECK-NEXT:    [[TMP19:%.*]] = add nuw nsw i64 [[TMP6]], 2
 ; CHECK-NEXT:    [[TMP72:%.*]] = add nuw nsw i64 [[TMP4]], 2
@@ -1297,12 +1297,12 @@ define void @load_store_factor5_select(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP99:%.*]] = fcmp ogt <4 x float> [[TMP98]], [[TMP90]]
 ; CHECK-NEXT:    [[TMP100:%.*]] = select <4 x i1> [[TMP99]], <4 x float> [[TMP98]], <4 x float> [[TMP90]]
 ; CHECK-NEXT:    [[R_2:%.*]] = extractelement <4 x float> [[TMP100]], i64 0
-; CHECK-NEXT:    store float [[R_2]], ptr [[A_2]], align 4
 ; CHECK-NEXT:    [[TMP102:%.*]] = extractelement <4 x float> [[TMP100]], i64 1
-; CHECK-NEXT:    store float [[TMP102]], ptr [[TMP76]], align 4
 ; CHECK-NEXT:    [[TMP103:%.*]] = extractelement <4 x float> [[TMP100]], i64 2
-; CHECK-NEXT:    store float [[TMP103]], ptr [[TMP77]], align 4
 ; CHECK-NEXT:    [[TMP104:%.*]] = extractelement <4 x float> [[TMP100]], i64 3
+; CHECK-NEXT:    store float [[R_2]], ptr [[A_2]], align 4
+; CHECK-NEXT:    store float [[TMP102]], ptr [[TMP76]], align 4
+; CHECK-NEXT:    store float [[TMP103]], ptr [[TMP77]], align 4
 ; CHECK-NEXT:    store float [[TMP104]], ptr [[TMP78]], align 4
 ; CHECK-NEXT:    [[TMP23:%.*]] = add nuw nsw i64 [[TMP6]], 3
 ; CHECK-NEXT:    [[TMP106:%.*]] = add nuw nsw i64 [[TMP4]], 3
@@ -1335,12 +1335,12 @@ define void @load_store_factor5_select(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP133:%.*]] = fcmp ogt <4 x float> [[TMP132]], [[TMP124]]
 ; CHECK-NEXT:    [[TMP134:%.*]] = select <4 x i1> [[TMP133]], <4 x float> [[TMP132]], <4 x float> [[TMP124]]
 ; CHECK-NEXT:    [[R_3:%.*]] = extractelement <4 x float> [[TMP134]], i64 0
-; CHECK-NEXT:    store float [[R_3]], ptr [[A_3]], align 4
 ; CHECK-NEXT:    [[TMP136:%.*]] = extractelement <4 x float> [[TMP134]], i64 1
-; CHECK-NEXT:    store float [[TMP136]], ptr [[TMP110]], align 4
 ; CHECK-NEXT:    [[TMP137:%.*]] = extractelement <4 x float> [[TMP134]], i64 2
-; CHECK-NEXT:    store float [[TMP137]], ptr [[TMP111]], align 4
 ; CHECK-NEXT:    [[TMP138:%.*]] = extractelement <4 x float> [[TMP134]], i64 3
+; CHECK-NEXT:    store float [[R_3]], ptr [[A_3]], align 4
+; CHECK-NEXT:    store float [[TMP136]], ptr [[TMP110]], align 4
+; CHECK-NEXT:    store float [[TMP137]], ptr [[TMP111]], align 4
 ; CHECK-NEXT:    store float [[TMP138]], ptr [[TMP112]], align 4
 ; CHECK-NEXT:    [[O_4:%.*]] = add nuw nsw i64 [[TMP6]], 4
 ; CHECK-NEXT:    [[TMP140:%.*]] = add nuw nsw i64 [[TMP4]], 4
@@ -1373,12 +1373,12 @@ define void @load_store_factor5_select(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP167:%.*]] = fcmp ogt <4 x float> [[TMP166]], [[TMP158]]
 ; CHECK-NEXT:    [[TMP168:%.*]] = select <4 x i1> [[TMP167]], <4 x float> [[TMP166]], <4 x float> [[TMP158]]
 ; CHECK-NEXT:    [[R_4:%.*]] = extractelement <4 x float> [[TMP168]], i64 0
-; CHECK-NEXT:    store float [[R_4]], ptr [[A_4]], align 4
 ; CHECK-NEXT:    [[TMP170:%.*]] = extractelement <4 x float> [[TMP168]], i64 1
-; CHECK-NEXT:    store float [[TMP170]], ptr [[TMP144]], align 4
 ; CHECK-NEXT:    [[TMP171:%.*]] = extractelement <4 x float> [[TMP168]], i64 2
-; CHECK-NEXT:    store float [[TMP171]], ptr [[TMP145]], align 4
 ; CHECK-NEXT:    [[TMP172:%.*]] = extractelement <4 x float> [[TMP168]], i64 3
+; CHECK-NEXT:    store float [[R_4]], ptr [[A_4]], align 4
+; CHECK-NEXT:    store float [[TMP170]], ptr [[TMP144]], align 4
+; CHECK-NEXT:    store float [[TMP171]], ptr [[TMP145]], align 4
 ; CHECK-NEXT:    store float [[TMP172]], ptr [[TMP146]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP15]], 4
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
@@ -1487,12 +1487,12 @@ define void @load_store_factor5_distinct_invariants(ptr noalias %A, ptr noalias 
 ; CHECK-NEXT:    [[TMP22:%.*]] = insertelement <4 x float> [[TMP21]], float [[TMP18]], i64 3
 ; CHECK-NEXT:    [[TMP23:%.*]] = fmul fast <4 x float> [[TMP22]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    [[TMP130:%.*]] = extractelement <4 x float> [[TMP23]], i64 0
-; CHECK-NEXT:    store float [[TMP130]], ptr [[TMP19]], align 4
 ; CHECK-NEXT:    [[TMP25:%.*]] = extractelement <4 x float> [[TMP23]], i64 1
-; CHECK-NEXT:    store float [[TMP25]], ptr [[TMP12]], align 4
 ; CHECK-NEXT:    [[TMP26:%.*]] = extractelement <4 x float> [[TMP23]], i64 2
-; CHECK-NEXT:    store float [[TMP26]], ptr [[TMP13]], align 4
 ; CHECK-NEXT:    [[TMP27:%.*]] = extractelement <4 x float> [[TMP23]], i64 3
+; CHECK-NEXT:    store float [[TMP130]], ptr [[TMP19]], align 4
+; CHECK-NEXT:    store float [[TMP25]], ptr [[TMP12]], align 4
+; CHECK-NEXT:    store float [[TMP26]], ptr [[TMP13]], align 4
 ; CHECK-NEXT:    store float [[TMP27]], ptr [[TMP14]], align 4
 ; CHECK-NEXT:    [[TMP28:%.*]] = add nuw nsw i64 [[TMP11]], 1
 ; CHECK-NEXT:    [[TMP29:%.*]] = add nuw nsw i64 [[TMP4]], 1
@@ -1516,12 +1516,12 @@ define void @load_store_factor5_distinct_invariants(ptr noalias %A, ptr noalias 
 ; CHECK-NEXT:    [[TMP47:%.*]] = insertelement <4 x float> [[TMP46]], float [[TMP43]], i64 3
 ; CHECK-NEXT:    [[TMP48:%.*]] = fmul fast <4 x float> [[TMP47]], [[BROADCAST_SPLAT2]]
 ; CHECK-NEXT:    [[TMP49:%.*]] = extractelement <4 x float> [[TMP48]], i64 0
-; CHECK-NEXT:    store float [[TMP49]], ptr [[TMP36]], align 4
 ; CHECK-NEXT:    [[TMP50:%.*]] = extractelement <4 x float> [[TMP48]], i64 1
-; CHECK-NEXT:    store float [[TMP50]], ptr [[TMP37]], align 4
 ; CHECK-NEXT:    [[TMP51:%.*]] = extractelement <4 x float> [[TMP48]], i64 2
-; CHECK-NEXT:    store float [[TMP51]], ptr [[TMP38]], align 4
 ; CHECK-NEXT:    [[TMP52:%.*]] = extractelement <4 x float> [[TMP48]], i64 3
+; CHECK-NEXT:    store float [[TMP49]], ptr [[TMP36]], align 4
+; CHECK-NEXT:    store float [[TMP50]], ptr [[TMP37]], align 4
+; CHECK-NEXT:    store float [[TMP51]], ptr [[TMP38]], align 4
 ; CHECK-NEXT:    store float [[TMP52]], ptr [[TMP39]], align 4
 ; CHECK-NEXT:    [[TMP53:%.*]] = add nuw nsw i64 [[TMP11]], 2
 ; CHECK-NEXT:    [[TMP54:%.*]] = add nuw nsw i64 [[TMP4]], 2
@@ -1545,12 +1545,12 @@ define void @load_store_factor5_distinct_invariants(ptr noalias %A, ptr noalias 
 ; CHECK-NEXT:    [[TMP72:%.*]] = insertelement <4 x float> [[TMP71]], float [[TMP68]], i64 3
 ; CHECK-NEXT:    [[TMP73:%.*]] = fmul fast <4 x float> [[TMP72]], [[BROADCAST_SPLAT4]]
 ; CHECK-NEXT:    [[TMP74:%.*]] = extractelement <4 x float> [[TMP73]], i64 0
-; CHECK-NEXT:    store float [[TMP74]], ptr [[TMP61]], align 4
 ; CHECK-NEXT:    [[TMP75:%.*]] = extractelement <4 x float> [[TMP73]], i64 1
-; CHECK-NEXT:    store float [[TMP75]], ptr [[TMP62]], align 4
 ; CHECK-NEXT:    [[TMP76:%.*]] = extractelement <4 x float> [[TMP73]], i64 2
-; CHECK-NEXT:    store float [[TMP76]], ptr [[TMP63]], align 4
 ; CHECK-NEXT:    [[TMP77:%.*]] = extractelement <4 x float> [[TMP73]], i64 3
+; CHECK-NEXT:    store float [[TMP74]], ptr [[TMP61]], align 4
+; CHECK-NEXT:    store float [[TMP75]], ptr [[TMP62]], align 4
+; CHECK-NEXT:    store float [[TMP76]], ptr [[TMP63]], align 4
 ; CHECK-NEXT:    store float [[TMP77]], ptr [[TMP64]], align 4
 ; CHECK-NEXT:    [[TMP78:%.*]] = add nuw nsw i64 [[TMP11]], 3
 ; CHECK-NEXT:    [[TMP79:%.*]] = add nuw nsw i64 [[TMP4]], 3
@@ -1574,12 +1574,12 @@ define void @load_store_factor5_distinct_invariants(ptr noalias %A, ptr noalias 
 ; CHECK-NEXT:    [[TMP97:%.*]] = insertelement <4 x float> [[TMP96]], float [[TMP93]], i64 3
 ; CHECK-NEXT:    [[TMP98:%.*]] = fmul fast <4 x float> [[TMP97]], [[BROADCAST_SPLAT6]]
 ; CHECK-NEXT:    [[TMP99:%.*]] = extractelement <4 x float> [[TMP98]], i64 0
-; CHECK-NEXT:    store float [[TMP99]], ptr [[TMP86]], align 4
 ; CHECK-NEXT:    [[TMP100:%.*]] = extractelement <4 x float> [[TMP98]], i64 1
-; CHECK-NEXT:    store float [[TMP100]], ptr [[TMP87]], align 4
 ; CHECK-NEXT:    [[TMP101:%.*]] = extractelement <4 x float> [[TMP98]], i64 2
-; CHECK-NEXT:    store float [[TMP101]], ptr [[TMP88]], align 4
 ; CHECK-NEXT:    [[TMP102:%.*]] = extractelement <4 x float> [[TMP98]], i64 3
+; CHECK-NEXT:    store float [[TMP99]], ptr [[TMP86]], align 4
+; CHECK-NEXT:    store float [[TMP100]], ptr [[TMP87]], align 4
+; CHECK-NEXT:    store float [[TMP101]], ptr [[TMP88]], align 4
 ; CHECK-NEXT:    store float [[TMP102]], ptr [[TMP89]], align 4
 ; CHECK-NEXT:    [[TMP103:%.*]] = add nuw nsw i64 [[TMP11]], 4
 ; CHECK-NEXT:    [[TMP104:%.*]] = add nuw nsw i64 [[TMP4]], 4
@@ -1603,12 +1603,12 @@ define void @load_store_factor5_distinct_invariants(ptr noalias %A, ptr noalias 
 ; CHECK-NEXT:    [[TMP122:%.*]] = insertelement <4 x float> [[TMP121]], float [[TMP118]], i64 3
 ; CHECK-NEXT:    [[TMP123:%.*]] = fmul fast <4 x float> [[TMP122]], [[BROADCAST_SPLAT8]]
 ; CHECK-NEXT:    [[TMP124:%.*]] = extractelement <4 x float> [[TMP123]], i64 0
-; CHECK-NEXT:    store float [[TMP124]], ptr [[TMP111]], align 4
 ; CHECK-NEXT:    [[TMP125:%.*]] = extractelement <4 x float> [[TMP123]], i64 1
-; CHECK-NEXT:    store float [[TMP125]], ptr [[TMP112]], align 4
 ; CHECK-NEXT:    [[TMP126:%.*]] = extractelement <4 x float> [[TMP123]], i64 2
-; CHECK-NEXT:    store float [[TMP126]], ptr [[TMP113]], align 4
 ; CHECK-NEXT:    [[TMP127:%.*]] = extractelement <4 x float> [[TMP123]], i64 3
+; CHECK-NEXT:    store float [[TMP124]], ptr [[TMP111]], align 4
+; CHECK-NEXT:    store float [[TMP125]], ptr [[TMP112]], align 4
+; CHECK-NEXT:    store float [[TMP126]], ptr [[TMP113]], align 4
 ; CHECK-NEXT:    store float [[TMP127]], ptr [[TMP114]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP7]], 4
 ; CHECK-NEXT:    [[TMP24:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
@@ -1698,12 +1698,12 @@ define void @two_store_groups_shared_tree(ptr noalias %A, ptr noalias %B, ptr no
 ; CHECK-NEXT:    [[TMP22:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP24]]
 ; CHECK-NEXT:    [[TMP53:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP28]]
 ; CHECK-NEXT:    [[M_0:%.*]] = extractelement <4 x float> [[TMP40]], i64 0
-; CHECK-NEXT:    store float [[M_0]], ptr [[TMP18]], align 4
 ; CHECK-NEXT:    [[TMP25:%.*]] = extractelement <4 x float> [[TMP40]], i64 1
-; CHECK-NEXT:    store float [[TMP25]], ptr [[TMP49]], align 4
 ; CHECK-NEXT:    [[TMP26:%.*]] = extractelement <4 x float> [[TMP40]], i64 2
-; CHECK-NEXT:    store float [[TMP26]], ptr [[TMP22]], align 4
 ; CHECK-NEXT:    [[TMP27:%.*]] = extractelement <4 x float> [[TMP40]], i64 3
+; CHECK-NEXT:    store float [[M_0]], ptr [[TMP18]], align 4
+; CHECK-NEXT:    store float [[TMP25]], ptr [[TMP49]], align 4
+; CHECK-NEXT:    store float [[TMP26]], ptr [[TMP22]], align 4
 ; CHECK-NEXT:    store float [[TMP27]], ptr [[TMP53]], align 4
 ; CHECK-NEXT:    [[C_0:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP6]]
 ; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP11]]
@@ -1735,12 +1735,12 @@ define void @two_store_groups_shared_tree(ptr noalias %A, ptr noalias %B, ptr no
 ; CHECK-NEXT:    [[TMP51:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP34]]
 ; CHECK-NEXT:    [[TMP52:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP35]]
 ; CHECK-NEXT:    [[M_1:%.*]] = extractelement <4 x float> [[TMP48]], i64 0
-; CHECK-NEXT:    store float [[M_1]], ptr [[A_1]], align 4
 ; CHECK-NEXT:    [[TMP54:%.*]] = extractelement <4 x float> [[TMP48]], i64 1
-; CHECK-NEXT:    store float [[TMP54]], ptr [[TMP50]], align 4
 ; CHECK-NEXT:    [[TMP55:%.*]] = extractelement <4 x float> [[TMP48]], i64 2
-; CHECK-NEXT:    store float [[TMP55]], ptr [[TMP51]], align 4
 ; CHECK-NEXT:    [[TMP56:%.*]] = extractelement <4 x float> [[TMP48]], i64 3
+; CHECK-NEXT:    store float [[M_1]], ptr [[A_1]], align 4
+; CHECK-NEXT:    store float [[TMP54]], ptr [[TMP50]], align 4
+; CHECK-NEXT:    store float [[TMP55]], ptr [[TMP51]], align 4
 ; CHECK-NEXT:    store float [[TMP56]], ptr [[TMP52]], align 4
 ; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP3]]
 ; CHECK-NEXT:    [[TMP58:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP33]]
@@ -1772,12 +1772,12 @@ define void @two_store_groups_shared_tree(ptr noalias %A, ptr noalias %B, ptr no
 ; CHECK-NEXT:    [[TMP80:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP63]]
 ; CHECK-NEXT:    [[TMP81:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP64]]
 ; CHECK-NEXT:    [[M_2:%.*]] = extractelement <4 x float> [[TMP77]], i64 0
-; CHECK-NEXT:    store float [[M_2]], ptr [[A_2]], align 4
 ; CHECK-NEXT:    [[TMP83:%.*]] = extractelement <4 x float> [[TMP77]], i64 1
-; CHECK-NEXT:    store float [[TMP83]], ptr [[TMP79]], align 4
 ; CHECK-NEXT:    [[TMP84:%.*]] = extractelement <4 x float> [[TMP77]], i64 2
-; CHECK-NEXT:    store float [[TMP84]], ptr [[TMP80]], align 4
 ; CHECK-NEXT:    [[TMP85:%.*]] = extractelement <4 x float> [[TMP77]], i64 3
+; CHECK-NEXT:    store float [[M_2]], ptr [[A_2]], align 4
+; CHECK-NEXT:    store float [[TMP83]], ptr [[TMP79]], align 4
+; CHECK-NEXT:    store float [[TMP84]], ptr [[TMP80]], align 4
 ; CHECK-NEXT:    store float [[TMP85]], ptr [[TMP81]], align 4
 ; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP4]]
 ; CHECK-NEXT:    [[TMP87:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP62]]
@@ -1809,12 +1809,12 @@ define void @two_store_groups_shared_tree(ptr noalias %A, ptr noalias %B, ptr no
 ; CHECK-NEXT:    [[TMP109:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP92]]
 ; CHECK-NEXT:    [[TMP110:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP93]]
 ; CHECK-NEXT:    [[M_3:%.*]] = extractelement <4 x float> [[TMP106]], i64 0
-; CHECK-NEXT:    store float [[M_3]], ptr [[A_3]], align 4
 ; CHECK-NEXT:    [[TMP112:%.*]] = extractelement <4 x float> [[TMP106]], i64 1
-; CHECK-NEXT:    store float [[TMP112]], ptr [[TMP108]], align 4
 ; CHECK-NEXT:    [[TMP113:%.*]] = extractelement <4 x float> [[TMP106]], i64 2
-; CHECK-NEXT:    store float [[TMP113]], ptr [[TMP109]], align 4
 ; CHECK-NEXT:    [[TMP114:%.*]] = extractelement <4 x float> [[TMP106]], i64 3
+; CHECK-NEXT:    store float [[M_3]], ptr [[A_3]], align 4
+; CHECK-NEXT:    store float [[TMP112]], ptr [[TMP108]], align 4
+; CHECK-NEXT:    store float [[TMP113]], ptr [[TMP109]], align 4
 ; CHECK-NEXT:    store float [[TMP114]], ptr [[TMP110]], align 4
 ; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP5]]
 ; CHECK-NEXT:    [[TMP116:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP91]]
@@ -1846,12 +1846,12 @@ define void @two_store_groups_shared_tree(ptr noalias %A, ptr noalias %B, ptr no
 ; CHECK-NEXT:    [[TMP138:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP121]]
 ; CHECK-NEXT:    [[TMP139:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP122]]
 ; CHECK-NEXT:    [[M_4:%.*]] = extractelement <4 x float> [[TMP135]], i64 0
-; CHECK-NEXT:    store float [[M_4]], ptr [[A_4]], align 4
 ; CHECK-NEXT:    [[TMP141:%.*]] = extractelement <4 x float> [[TMP135]], i64 1
-; CHECK-NEXT:    store float [[TMP141]], ptr [[TMP137]], align 4
 ; CHECK-NEXT:    [[TMP142:%.*]] = extractelement <4 x float> [[TMP135]], i64 2
-; CHECK-NEXT:    store float [[TMP142]], ptr [[TMP138]], align 4
 ; CHECK-NEXT:    [[TMP143:%.*]] = extractelement <4 x float> [[TMP135]], i64 3
+; CHECK-NEXT:    store float [[M_4]], ptr [[A_4]], align 4
+; CHECK-NEXT:    store float [[TMP141]], ptr [[TMP137]], align 4
+; CHECK-NEXT:    store float [[TMP142]], ptr [[TMP138]], align 4
 ; CHECK-NEXT:    store float [[TMP143]], ptr [[TMP139]], align 4
 ; CHECK-NEXT:    [[C_4:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[O_4]]
 ; CHECK-NEXT:    [[TMP145:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP120]]
@@ -1963,12 +1963,12 @@ define void @store_groups_with_different_factors(ptr noalias %A, ptr noalias %B,
 ; CHECK-NEXT:    [[TMP26:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP9]]
 ; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP10]]
 ; CHECK-NEXT:    [[TMP28:%.*]] = extractelement <4 x float> [[TMP23]], i64 0
-; CHECK-NEXT:    store float [[TMP28]], ptr [[TMP4]], align 4
 ; CHECK-NEXT:    [[TMP29:%.*]] = extractelement <4 x float> [[TMP23]], i64 1
-; CHECK-NEXT:    store float [[TMP29]], ptr [[TMP25]], align 4
 ; CHECK-NEXT:    [[TMP30:%.*]] = extractelement <4 x float> [[TMP23]], i64 2
-; CHECK-NEXT:    store float [[TMP30]], ptr [[TMP26]], align 4
 ; CHECK-NEXT:    [[TMP31:%.*]] = extractelement <4 x float> [[TMP23]], i64 3
+; CHECK-NEXT:    store float [[TMP28]], ptr [[TMP4]], align 4
+; CHECK-NEXT:    store float [[TMP29]], ptr [[TMP25]], align 4
+; CHECK-NEXT:    store float [[TMP30]], ptr [[TMP26]], align 4
 ; CHECK-NEXT:    store float [[TMP31]], ptr [[TMP27]], align 4
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP0]]
 ; CHECK-NEXT:    [[TMP33:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP24]]
@@ -2004,12 +2004,12 @@ define void @store_groups_with_different_factors(ptr noalias %A, ptr noalias %B,
 ; CHECK-NEXT:    [[TMP59:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP42]]
 ; CHECK-NEXT:    [[TMP60:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP43]]
 ; CHECK-NEXT:    [[TMP61:%.*]] = extractelement <4 x float> [[TMP56]], i64 0
-; CHECK-NEXT:    store float [[TMP61]], ptr [[TMP57]], align 4
 ; CHECK-NEXT:    [[TMP62:%.*]] = extractelement <4 x float> [[TMP56]], i64 1
-; CHECK-NEXT:    store float [[TMP62]], ptr [[TMP58]], align 4
 ; CHECK-NEXT:    [[TMP63:%.*]] = extractelement <4 x float> [[TMP56]], i64 2
-; CHECK-NEXT:    store float [[TMP63]], ptr [[TMP59]], align 4
 ; CHECK-NEXT:    [[TMP64:%.*]] = extractelement <4 x float> [[TMP56]], i64 3
+; CHECK-NEXT:    store float [[TMP61]], ptr [[TMP57]], align 4
+; CHECK-NEXT:    store float [[TMP62]], ptr [[TMP58]], align 4
+; CHECK-NEXT:    store float [[TMP63]], ptr [[TMP59]], align 4
 ; CHECK-NEXT:    store float [[TMP64]], ptr [[TMP60]], align 4
 ; CHECK-NEXT:    [[TMP65:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP36]]
 ; CHECK-NEXT:    [[TMP66:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP37]]
@@ -2045,12 +2045,12 @@ define void @store_groups_with_different_factors(ptr noalias %A, ptr noalias %B,
 ; CHECK-NEXT:    [[TMP92:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP75]]
 ; CHECK-NEXT:    [[TMP93:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP76]]
 ; CHECK-NEXT:    [[TMP94:%.*]] = extractelement <4 x float> [[TMP89]], i64 0
-; CHECK-NEXT:    store float [[TMP94]], ptr [[TMP90]], align 4
 ; CHECK-NEXT:    [[TMP95:%.*]] = extractelement <4 x float> [[TMP89]], i64 1
-; CHECK-NEXT:    store float [[TMP95]], ptr [[TMP91]], align 4
 ; CHECK-NEXT:    [[TMP96:%.*]] = extractelement <4 x float> [[TMP89]], i64 2
-; CHECK-NEXT:    store float [[TMP96]], ptr [[TMP92]], align 4
 ; CHECK-NEXT:    [[TMP97:%.*]] = extractelement <4 x float> [[TMP89]], i64 3
+; CHECK-NEXT:    store float [[TMP94]], ptr [[TMP90]], align 4
+; CHECK-NEXT:    store float [[TMP95]], ptr [[TMP91]], align 4
+; CHECK-NEXT:    store float [[TMP96]], ptr [[TMP92]], align 4
 ; CHECK-NEXT:    store float [[TMP97]], ptr [[TMP93]], align 4
 ; CHECK-NEXT:    [[TMP98:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP69]]
 ; CHECK-NEXT:    [[TMP99:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP70]]
@@ -2086,12 +2086,12 @@ define void @store_groups_with_different_factors(ptr noalias %A, ptr noalias %B,
 ; CHECK-NEXT:    [[TMP125:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP108]]
 ; CHECK-NEXT:    [[TMP126:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP109]]
 ; CHECK-NEXT:    [[TMP127:%.*]] = extractelement <4 x float> [[TMP122]], i64 0
-; CHECK-NEXT:    store float [[TMP127]], ptr [[TMP123]], align 4
 ; CHECK-NEXT:    [[TMP128:%.*]] = extractelement <4 x float> [[TMP122]], i64 1
-; CHECK-NEXT:    store float [[TMP128]], ptr [[TMP124]], align 4
 ; CHECK-NEXT:    [[TMP129:%.*]] = extractelement <4 x float> [[TMP122]], i64 2
-; CHECK-NEXT:    store float [[TMP129]], ptr [[TMP125]], align 4
 ; CHECK-NEXT:    [[TMP130:%.*]] = extractelement <4 x float> [[TMP122]], i64 3
+; CHECK-NEXT:    store float [[TMP127]], ptr [[TMP123]], align 4
+; CHECK-NEXT:    store float [[TMP128]], ptr [[TMP124]], align 4
+; CHECK-NEXT:    store float [[TMP129]], ptr [[TMP125]], align 4
 ; CHECK-NEXT:    store float [[TMP130]], ptr [[TMP126]], align 4
 ; CHECK-NEXT:    [[TMP131:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP102]]
 ; CHECK-NEXT:    [[TMP132:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP103]]
@@ -2127,12 +2127,12 @@ define void @store_groups_with_different_factors(ptr noalias %A, ptr noalias %B,
 ; CHECK-NEXT:    [[TMP158:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP141]]
 ; CHECK-NEXT:    [[TMP159:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP142]]
 ; CHECK-NEXT:    [[TMP160:%.*]] = extractelement <4 x float> [[TMP155]], i64 0
-; CHECK-NEXT:    store float [[TMP160]], ptr [[TMP156]], align 4
 ; CHECK-NEXT:    [[TMP161:%.*]] = extractelement <4 x float> [[TMP155]], i64 1
-; CHECK-NEXT:    store float [[TMP161]], ptr [[TMP157]], align 4
 ; CHECK-NEXT:    [[TMP162:%.*]] = extractelement <4 x float> [[TMP155]], i64 2
-; CHECK-NEXT:    store float [[TMP162]], ptr [[TMP158]], align 4
 ; CHECK-NEXT:    [[TMP163:%.*]] = extractelement <4 x float> [[TMP155]], i64 3
+; CHECK-NEXT:    store float [[TMP160]], ptr [[TMP156]], align 4
+; CHECK-NEXT:    store float [[TMP161]], ptr [[TMP157]], align 4
+; CHECK-NEXT:    store float [[TMP162]], ptr [[TMP158]], align 4
 ; CHECK-NEXT:    store float [[TMP163]], ptr [[TMP159]], align 4
 ; CHECK-NEXT:    [[TMP164:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP135]]
 ; CHECK-NEXT:    [[TMP165:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP136]]
@@ -2164,12 +2164,12 @@ define void @store_groups_with_different_factors(ptr noalias %A, ptr noalias %B,
 ; CHECK-NEXT:    [[TMP187:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP170]]
 ; CHECK-NEXT:    [[TMP188:%.*]] = getelementptr inbounds float, ptr [[C]], i64 [[TMP171]]
 ; CHECK-NEXT:    [[TMP189:%.*]] = extractelement <4 x float> [[TMP184]], i64 0
-; CHECK-NEXT:    store float [[TMP189]], ptr [[TMP185]], align 4
 ; CHECK-NEXT:    [[TMP190:%.*]] = extractelement <4 x float> [[TMP184]], i64 1
-; CHECK-NEXT:    store float [[TMP190]], ptr [[TMP186]], align 4
 ; CHECK-NEXT:    [[TMP191:%.*]] = extractelement <4 x float> [[TMP184]], i64 2
-; CHECK-NEXT:    store float [[TMP191]], ptr [[TMP187]], align 4
 ; CHECK-NEXT:    [[TMP192:%.*]] = extractelement <4 x float> [[TMP184]], i64 3
+; CHECK-NEXT:    store float [[TMP189]], ptr [[TMP185]], align 4
+; CHECK-NEXT:    store float [[TMP190]], ptr [[TMP186]], align 4
+; CHECK-NEXT:    store float [[TMP191]], ptr [[TMP187]], align 4
 ; CHECK-NEXT:    store float [[TMP192]], ptr [[TMP188]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP19:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000

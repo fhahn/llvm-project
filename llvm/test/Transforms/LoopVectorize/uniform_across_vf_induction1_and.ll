@@ -100,8 +100,8 @@ define void @ld_and_neg3_step1_start0_ind1(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i64> [ <i64 0, i64 1>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = and <2 x i64> [[VEC_IND]], splat (i64 -3)
 ; CHECK-NEXT:    [[TMP1:%.*]] = extractelement <2 x i64> [[TMP0]], i64 0
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP1]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <2 x i64> [[TMP0]], i64 1
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP1]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP3]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = load i64, ptr [[TMP2]], align 8
 ; CHECK-NEXT:    [[TMP6:%.*]] = load i64, ptr [[TMP4]], align 8
@@ -158,8 +158,8 @@ define void @ld_and_neg1_step2_start0_ind1(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP0]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP1]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <2 x i64> [[TMP8]], i64 0
-; CHECK-NEXT:    store i64 [[TMP11]], ptr [[TMP9]], align 8
 ; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <2 x i64> [[TMP8]], i64 1
+; CHECK-NEXT:    store i64 [[TMP11]], ptr [[TMP9]], align 8
 ; CHECK-NEXT:    store i64 [[TMP12]], ptr [[TMP10]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], 500
@@ -253,8 +253,8 @@ define void @ld_and_neg1_step3_start0_ind1(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP0]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP1]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <2 x i64> [[TMP8]], i64 0
-; CHECK-NEXT:    store i64 [[TMP11]], ptr [[TMP9]], align 8
 ; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <2 x i64> [[TMP8]], i64 1
+; CHECK-NEXT:    store i64 [[TMP11]], ptr [[TMP9]], align 8
 ; CHECK-NEXT:    store i64 [[TMP12]], ptr [[TMP10]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], 332
@@ -295,8 +295,8 @@ define void @ld_and_neg2_step3_start0_ind1(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], 3
 ; CHECK-NEXT:    [[TMP2:%.*]] = and <2 x i64> [[VEC_IND]], splat (i64 -2)
 ; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <2 x i64> [[TMP2]], i64 0
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP3]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <2 x i64> [[TMP2]], i64 1
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP3]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP5]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = load i64, ptr [[TMP4]], align 8
 ; CHECK-NEXT:    [[TMP8:%.*]] = load i64, ptr [[TMP6]], align 8
@@ -306,8 +306,8 @@ define void @ld_and_neg2_step3_start0_ind1(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP0]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP1]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <2 x i64> [[TMP11]], i64 0
-; CHECK-NEXT:    store i64 [[TMP14]], ptr [[TMP12]], align 8
 ; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <2 x i64> [[TMP11]], i64 1
+; CHECK-NEXT:    store i64 [[TMP14]], ptr [[TMP12]], align 8
 ; CHECK-NEXT:    store i64 [[TMP15]], ptr [[TMP13]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nsw <2 x i64> [[VEC_IND]], splat (i64 6)
@@ -348,8 +348,8 @@ define void @ld_and_neg2_step1_start1_ind1(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i64 1, [[INDEX]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = and <2 x i64> [[VEC_IND]], splat (i64 -2)
 ; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <2 x i64> [[TMP1]], i64 0
-; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP2]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x i64> [[TMP1]], i64 1
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP2]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP4]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = load i64, ptr [[TMP3]], align 8
 ; CHECK-NEXT:    [[TMP7:%.*]] = load i64, ptr [[TMP5]], align 8
@@ -399,8 +399,8 @@ define void @ld_and_neg2_step2_start1_ind1(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP1]], 2
 ; CHECK-NEXT:    [[TMP3:%.*]] = and <2 x i64> [[VEC_IND]], splat (i64 -2)
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x i64> [[TMP3]], i64 0
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP4]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <2 x i64> [[TMP3]], i64 1
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP4]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP6]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = load i64, ptr [[TMP5]], align 8
 ; CHECK-NEXT:    [[TMP9:%.*]] = load i64, ptr [[TMP7]], align 8
@@ -410,8 +410,8 @@ define void @ld_and_neg2_step2_start1_ind1(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP1]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP2]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <2 x i64> [[TMP12]], i64 0
-; CHECK-NEXT:    store i64 [[TMP15]], ptr [[TMP13]], align 8
 ; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <2 x i64> [[TMP12]], i64 1
+; CHECK-NEXT:    store i64 [[TMP15]], ptr [[TMP13]], align 8
 ; CHECK-NEXT:    store i64 [[TMP16]], ptr [[TMP14]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nsw <2 x i64> [[VEC_IND]], splat (i64 4)
@@ -454,8 +454,8 @@ define void @ld_and_neg2_step3_start1_ind1(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP1]], 3
 ; CHECK-NEXT:    [[TMP3:%.*]] = and <2 x i64> [[VEC_IND]], splat (i64 -2)
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x i64> [[TMP3]], i64 0
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP4]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <2 x i64> [[TMP3]], i64 1
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP4]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP6]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = load i64, ptr [[TMP5]], align 8
 ; CHECK-NEXT:    [[TMP9:%.*]] = load i64, ptr [[TMP7]], align 8
@@ -465,8 +465,8 @@ define void @ld_and_neg2_step3_start1_ind1(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP1]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP2]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <2 x i64> [[TMP12]], i64 0
-; CHECK-NEXT:    store i64 [[TMP15]], ptr [[TMP13]], align 8
 ; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <2 x i64> [[TMP12]], i64 1
+; CHECK-NEXT:    store i64 [[TMP15]], ptr [[TMP13]], align 8
 ; CHECK-NEXT:    store i64 [[TMP16]], ptr [[TMP14]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nsw <2 x i64> [[VEC_IND]], splat (i64 6)
@@ -509,8 +509,8 @@ define void @ld_and_neg3_step3_start1_ind1(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP1]], 3
 ; CHECK-NEXT:    [[TMP3:%.*]] = and <2 x i64> [[VEC_IND]], splat (i64 -3)
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x i64> [[TMP3]], i64 0
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP4]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <2 x i64> [[TMP3]], i64 1
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP4]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP6]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = load i64, ptr [[TMP5]], align 8
 ; CHECK-NEXT:    [[TMP9:%.*]] = load i64, ptr [[TMP7]], align 8
@@ -520,8 +520,8 @@ define void @ld_and_neg3_step3_start1_ind1(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP1]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP2]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <2 x i64> [[TMP12]], i64 0
-; CHECK-NEXT:    store i64 [[TMP15]], ptr [[TMP13]], align 8
 ; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <2 x i64> [[TMP12]], i64 1
+; CHECK-NEXT:    store i64 [[TMP15]], ptr [[TMP13]], align 8
 ; CHECK-NEXT:    store i64 [[TMP16]], ptr [[TMP14]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nsw <2 x i64> [[VEC_IND]], splat (i64 6)

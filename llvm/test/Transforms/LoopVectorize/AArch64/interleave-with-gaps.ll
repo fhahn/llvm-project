@@ -238,12 +238,12 @@ define void @main_vector_loop_fixed_single_vector_iteration_with_runtime_checks(
 ; CHECK-NOTF-NEXT:    [[TMP12:%.*]] = getelementptr i16, ptr [[K]], i64 [[TMP2]]
 ; CHECK-NOTF-NEXT:    [[TMP13:%.*]] = getelementptr i16, ptr [[K]], i64 [[TMP3]]
 ; CHECK-NOTF-NEXT:    [[TMP6:%.*]] = extractelement <4 x i16> [[TMP5]], i64 0
-; CHECK-NOTF-NEXT:    store i16 [[TMP6]], ptr [[TMP10]], align 2
 ; CHECK-NOTF-NEXT:    [[TMP7:%.*]] = extractelement <4 x i16> [[TMP5]], i64 1
-; CHECK-NOTF-NEXT:    store i16 [[TMP7]], ptr [[TMP11]], align 2
 ; CHECK-NOTF-NEXT:    [[TMP8:%.*]] = extractelement <4 x i16> [[TMP5]], i64 2
-; CHECK-NOTF-NEXT:    store i16 [[TMP8]], ptr [[TMP12]], align 2
 ; CHECK-NOTF-NEXT:    [[TMP9:%.*]] = extractelement <4 x i16> [[TMP5]], i64 3
+; CHECK-NOTF-NEXT:    store i16 [[TMP6]], ptr [[TMP10]], align 2
+; CHECK-NOTF-NEXT:    store i16 [[TMP7]], ptr [[TMP11]], align 2
+; CHECK-NOTF-NEXT:    store i16 [[TMP8]], ptr [[TMP12]], align 2
 ; CHECK-NOTF-NEXT:    store i16 [[TMP9]], ptr [[TMP13]], align 2
 ; CHECK-NOTF-NEXT:    store i64 0, ptr [[A]], align 8
 ; CHECK-NOTF-NEXT:    store i64 0, ptr [[B]], align 8

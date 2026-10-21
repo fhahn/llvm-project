@@ -2240,12 +2240,12 @@ define i32 @reverse_gather(ptr %p) {
 ; AVX512-NEXT:    [[WIDE_LOAD17:%.*]] = load <4 x ptr>, ptr [[TMP22]], align 8
 ; AVX512-NEXT:    [[REVERSE18:%.*]] = shufflevector <4 x ptr> [[WIDE_LOAD17]], <4 x ptr> poison, <4 x i32> <i32 3, i32 2, i32 1, i32 0>
 ; AVX512-NEXT:    [[TMP23:%.*]] = extractelement <4 x ptr> [[REVERSE18]], i64 0
-; AVX512-NEXT:    [[TMP24:%.*]] = load i32, ptr [[TMP23]], align 8
 ; AVX512-NEXT:    [[TMP25:%.*]] = extractelement <4 x ptr> [[REVERSE18]], i64 1
-; AVX512-NEXT:    [[TMP26:%.*]] = load i32, ptr [[TMP25]], align 8
 ; AVX512-NEXT:    [[TMP27:%.*]] = extractelement <4 x ptr> [[REVERSE18]], i64 2
-; AVX512-NEXT:    [[TMP28:%.*]] = load i32, ptr [[TMP27]], align 8
 ; AVX512-NEXT:    [[TMP29:%.*]] = extractelement <4 x ptr> [[REVERSE18]], i64 3
+; AVX512-NEXT:    [[TMP24:%.*]] = load i32, ptr [[TMP23]], align 8
+; AVX512-NEXT:    [[TMP26:%.*]] = load i32, ptr [[TMP25]], align 8
+; AVX512-NEXT:    [[TMP28:%.*]] = load i32, ptr [[TMP27]], align 8
 ; AVX512-NEXT:    [[TMP30:%.*]] = load i32, ptr [[TMP29]], align 8
 ; AVX512-NEXT:    [[TMP31:%.*]] = insertelement <4 x i32> poison, i32 [[TMP24]], i64 0
 ; AVX512-NEXT:    [[TMP32:%.*]] = insertelement <4 x i32> [[TMP31]], i32 [[TMP26]], i64 1

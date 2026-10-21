@@ -849,19 +849,20 @@ void VPlanTransforms::materializeUnpacks(VPlan &Plan) {
   if (Plan.hasScalarVFOnly())
     return;
 
-  // Replace uses of values generated as vectors that only need their first
-  // lane, or any lane if all lanes are equal, by a single extract of the first
-  // lane, placed directly after the definition. Definitions are visited after
-  // their users, as whether a user only needs the first lane of an operand may
-  // depend on its own users, e.g. if it only generates the first lane when
-  // only that is used. Header phis are visited after the definitions of their
-  // backedge values, which is harmless as their uses of operands do not depend
-  // on their users.
+  // Add explicit extracts for recipes using scalars of values generated as
+  // vectors. Uses only needing the first lane, or any lane if all lanes are
+  // equal, use a single extract of the first lane placed directly after the
+  // definition, other uses an Unpack of all lanes placed before the user.
+  // Definitions are visited after their users, as whether a user uses scalars
+  // of an operand may depend on its own users, e.g. if it only generates the
+  // first lane when only that is used. Header phis are visited after the
+  // definitions of their backedge values, which is harmless as their uses of
+  // operands do not depend on their users.
   SmallVector<VPInstruction *> Extracts;
   PostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> POT(
       Plan.getEntry());
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(POT)) {
-    for (VPRecipeBase &R : reverse(*VPBB)) {
+    for (VPRecipeBase &R : make_early_inc_range(reverse(*VPBB))) {
       for (VPValue *Def : R.definedValues()) {
         if (!generatesVector(Def))
           continue;
@@ -887,6 +888,17 @@ void VPlanTransforms::materializeUnpacks(VPlan &Plan) {
             U->setOperand(Idx, Extract);
           }
         }
+      }
+
+      // Unpack all lanes of operands for the remaining uses of scalars, after
+      // the uses of R's own definitions have been updated above.
+      for (const auto &[Idx, Op] : enumerate(R.operands())) {
+        if (!generatesVector(Op) || !R.usesScalars(Op) ||
+            vputils::isSingleScalar(Op) || R.usesFirstLaneOnly(Op))
+          continue;
+        assert(!R.isPhi() && "phis only use scalars of the first lane");
+        R.setOperand(Idx,
+                     VPBuilder(&R).createNaryOp(VPInstruction::Unpack, {Op}));
       }
     }
   }

@@ -766,12 +766,12 @@ define void @for_and_ind_trunc_predicate_not_implied(ptr %dst, i64 %n) {
 ; CHECK-NEXT:    [[TMP6:%.*]] = shufflevector <4 x i64> [[VECTOR_RECUR]], <4 x i64> [[TMP5]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
 ; CHECK-NEXT:    [[TMP7:%.*]] = trunc <4 x i64> [[TMP6]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x i32> [[TMP7]], i64 0
-; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP8]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <4 x i32> [[TMP7]], i64 1
-; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP10]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <4 x i32> [[TMP7]], i64 2
-; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP12]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <4 x i32> [[TMP7]], i64 3
+; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP8]]
+; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP10]]
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP12]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP14]]
 ; CHECK-NEXT:    store i32 0, ptr [[TMP9]], align 4
 ; CHECK-NEXT:    store i32 0, ptr [[TMP11]], align 4
@@ -826,12 +826,12 @@ define void @for_and_ind_trunc_predicate_not_implied(ptr %dst, i64 %n) {
 ; THRESHOLD-NEXT:    [[TMP6:%.*]] = shufflevector <4 x i64> [[VECTOR_RECUR]], <4 x i64> [[TMP5]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
 ; THRESHOLD-NEXT:    [[TMP7:%.*]] = trunc <4 x i64> [[TMP6]] to <4 x i32>
 ; THRESHOLD-NEXT:    [[TMP8:%.*]] = extractelement <4 x i32> [[TMP7]], i64 0
-; THRESHOLD-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP8]]
 ; THRESHOLD-NEXT:    [[TMP10:%.*]] = extractelement <4 x i32> [[TMP7]], i64 1
-; THRESHOLD-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP10]]
 ; THRESHOLD-NEXT:    [[TMP12:%.*]] = extractelement <4 x i32> [[TMP7]], i64 2
-; THRESHOLD-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP12]]
 ; THRESHOLD-NEXT:    [[TMP14:%.*]] = extractelement <4 x i32> [[TMP7]], i64 3
+; THRESHOLD-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP8]]
+; THRESHOLD-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP10]]
+; THRESHOLD-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP12]]
 ; THRESHOLD-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP14]]
 ; THRESHOLD-NEXT:    store i32 0, ptr [[TMP9]], align 4
 ; THRESHOLD-NEXT:    store i32 0, ptr [[TMP11]], align 4
@@ -931,24 +931,24 @@ define void @for_and_ind_indupdate_feeds_gep_index(ptr %dst, ptr %dst2, i64 %n) 
 ; CHECK-NEXT:    [[TMP16]] = zext <4 x i16> [[TMP15]] to <4 x i64>
 ; CHECK-NEXT:    [[TMP17:%.*]] = shufflevector <4 x i64> [[VECTOR_RECUR]], <4 x i64> [[TMP16]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
 ; CHECK-NEXT:    [[TMP18:%.*]] = extractelement <4 x i64> [[TMP16]], i64 0
-; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i8, ptr [[DST]], i64 [[TMP18]]
 ; CHECK-NEXT:    [[TMP20:%.*]] = extractelement <4 x i64> [[TMP16]], i64 1
-; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr inbounds i8, ptr [[DST]], i64 [[TMP20]]
 ; CHECK-NEXT:    [[TMP22:%.*]] = extractelement <4 x i64> [[TMP16]], i64 2
-; CHECK-NEXT:    [[TMP23:%.*]] = getelementptr inbounds i8, ptr [[DST]], i64 [[TMP22]]
 ; CHECK-NEXT:    [[TMP24:%.*]] = extractelement <4 x i64> [[TMP16]], i64 3
+; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i8, ptr [[DST]], i64 [[TMP18]]
+; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr inbounds i8, ptr [[DST]], i64 [[TMP20]]
+; CHECK-NEXT:    [[TMP23:%.*]] = getelementptr inbounds i8, ptr [[DST]], i64 [[TMP22]]
 ; CHECK-NEXT:    [[TMP25:%.*]] = getelementptr inbounds i8, ptr [[DST]], i64 [[TMP24]]
 ; CHECK-NEXT:    store i8 0, ptr [[TMP19]], align 1, !alias.scope [[META15:![0-9]+]], !noalias [[META18:![0-9]+]]
 ; CHECK-NEXT:    store i8 0, ptr [[TMP21]], align 1, !alias.scope [[META15]], !noalias [[META18]]
 ; CHECK-NEXT:    store i8 0, ptr [[TMP23]], align 1, !alias.scope [[META15]], !noalias [[META18]]
 ; CHECK-NEXT:    store i8 0, ptr [[TMP25]], align 1, !alias.scope [[META15]], !noalias [[META18]]
 ; CHECK-NEXT:    [[TMP26:%.*]] = extractelement <4 x i64> [[TMP17]], i64 0
-; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr inbounds i64, ptr [[DST2]], i64 [[TMP26]]
 ; CHECK-NEXT:    [[TMP28:%.*]] = extractelement <4 x i64> [[TMP17]], i64 1
-; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr inbounds i64, ptr [[DST2]], i64 [[TMP28]]
 ; CHECK-NEXT:    [[TMP30:%.*]] = extractelement <4 x i64> [[TMP17]], i64 2
-; CHECK-NEXT:    [[TMP31:%.*]] = getelementptr inbounds i64, ptr [[DST2]], i64 [[TMP30]]
 ; CHECK-NEXT:    [[TMP32:%.*]] = extractelement <4 x i64> [[TMP17]], i64 3
+; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr inbounds i64, ptr [[DST2]], i64 [[TMP26]]
+; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr inbounds i64, ptr [[DST2]], i64 [[TMP28]]
+; CHECK-NEXT:    [[TMP31:%.*]] = getelementptr inbounds i64, ptr [[DST2]], i64 [[TMP30]]
 ; CHECK-NEXT:    [[TMP33:%.*]] = getelementptr inbounds i64, ptr [[DST2]], i64 [[TMP32]]
 ; CHECK-NEXT:    store i64 0, ptr [[TMP27]], align 8, !alias.scope [[META18]]
 ; CHECK-NEXT:    store i64 0, ptr [[TMP29]], align 8, !alias.scope [[META18]]

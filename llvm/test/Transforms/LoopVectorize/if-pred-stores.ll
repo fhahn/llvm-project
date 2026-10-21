@@ -946,8 +946,8 @@ define void @sinkable_predicated_store(ptr %A, ptr %B) {
 ; VEC-NEXT:    [[TMP4:%.*]] = icmp ne <2 x i32> [[WIDE_LOAD]], zeroinitializer
 ; VEC-NEXT:    [[TMP5:%.*]] = select <2 x i1> [[TMP4]], <2 x i32> splat (i32 1), <2 x i32> zeroinitializer
 ; VEC-NEXT:    [[TMP6:%.*]] = extractelement <2 x i32> [[TMP5]], i64 0
-; VEC-NEXT:    store i32 [[TMP6]], ptr [[TMP1]], align 4, !alias.scope [[META12:![0-9]+]], !noalias [[META9]]
 ; VEC-NEXT:    [[TMP7:%.*]] = extractelement <2 x i32> [[TMP5]], i64 1
+; VEC-NEXT:    store i32 [[TMP6]], ptr [[TMP1]], align 4, !alias.scope [[META12:![0-9]+]], !noalias [[META9]]
 ; VEC-NEXT:    store i32 [[TMP7]], ptr [[TMP2]], align 4, !alias.scope [[META12]], !noalias [[META9]]
 ; VEC-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; VEC-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
