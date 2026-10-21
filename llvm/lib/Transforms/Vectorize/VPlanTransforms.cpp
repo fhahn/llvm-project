@@ -5960,8 +5960,15 @@ static bool needsPredication(VPInstruction *VPI, PredicatedScalarEvolution &PSE,
     return false;
   if (VPI->getOpcode() == Instruction::Store)
     return true;
-  // TODO: Replace the legacy check below with VPlan-based reasoning.
-  if (isSafeToSpeculativelyExecute(VPI->getUnderlyingInstr()))
+  VPlan &Plan = *VPI->getParent()->getPlan();
+  const DataLayout &DL = Plan.getDataLayout();
+  Align LoadAlign = getLoadStoreAlignment(VPI->getUnderlyingInstr());
+  // A load from a dereferenceable and aligned live-in address can execute
+  // unconditionally.
+  VPValue *Addr = VPI->getOperand(0);
+  if (isa<VPIRValue>(Addr) &&
+      isDereferenceableAndAlignedPointer(Addr->getLiveInIRValue(),
+                                         VPI->getScalarType(), LoadAlign, DL))
     return false;
   // Loads under the uncountable-exit mask, which may have no active lane, keep
   // their mask.
@@ -5969,7 +5976,6 @@ static bool needsPredication(VPInstruction *VPI, PredicatedScalarEvolution &PSE,
     return true;
   // The header mask has its first lane active, so loads only masked by it don't
   // need predication if their address is loop-invariant.
-  VPValue *Addr = VPI->getOperand(0);
   if (match(Mask, m_HeaderMask())) {
     const SCEV *AddrSCEV = vputils::getSCEVExprForVPValue(Addr, PSE, L);
     if (!isa<SCEVCouldNotCompute>(AddrSCEV) &&
@@ -5979,10 +5985,7 @@ static bool needsPredication(VPInstruction *VPI, PredicatedScalarEvolution &PSE,
 
   // A load can execute unconditionally if an unmasked load or store of at
   // least its size and alignment accesses the same address.
-  VPlan &Plan = *VPI->getParent()->getPlan();
-  const DataLayout &DL = Plan.getDataLayout();
   TypeSize LoadSize = DL.getTypeStoreSize(VPI->getScalarType());
-  Align LoadAlign = getLoadStoreAlignment(VPI->getUnderlyingInstr());
   auto CoversLoad = [&](VPUser *U) {
     auto *Other = dyn_cast<VPInstruction>(U);
     if (!Other || Other->isMasked() || !Other->getUnderlyingValue())
