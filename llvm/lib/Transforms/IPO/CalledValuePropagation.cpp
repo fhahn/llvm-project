@@ -20,6 +20,7 @@
 #include "llvm/Analysis/SparsePropagation.h"
 #include "llvm/Analysis/ValueLatticeUtils.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/CommandLine.h"
@@ -373,6 +374,16 @@ template <> struct LatticeKeyInfo<CVPLatticeKey> {
 } // namespace llvm
 
 static bool runCVP(Module &M) {
+  // Only indirect calls get metadata. Without any, the solver's results are
+  // unused.
+  if (none_of(M, [](Function &F) {
+        return any_of(instructions(F), [](Instruction &I) {
+          auto *CB = dyn_cast<CallBase>(&I);
+          return CB && !CB->getCalledFunction();
+        });
+      }))
+    return false;
+
   // Our custom lattice function and generic sparse propagation solver.
   CVPLatticeFunc Lattice;
   SparseSolver<CVPLatticeKey, CVPLatticeVal> Solver(&Lattice);
