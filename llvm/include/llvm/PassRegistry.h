@@ -17,6 +17,7 @@
 #define LLVM_PASSREGISTRY_H
 
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
@@ -45,6 +46,9 @@ class PassRegistry {
   using StringMapType = StringMap<const PassInfo *>;
   StringMapType PassInfoStringMap;
 
+  /// The type identifiers of the registered CFG-only passes.
+  SmallVector<const void *> CFGOnlyPasses;
+
   std::vector<std::unique_ptr<const PassInfo>> ToFree;
   std::vector<PassRegistrationListener *> Listeners;
 
@@ -72,6 +76,9 @@ public:
   /// enumerateWith - Enumerate the registered passes, calling the provided
   /// PassRegistrationListener's passEnumerate() callback on each of them.
   LLVM_ABI void enumerateWith(PassRegistrationListener *L);
+
+  /// Append the type identifiers of all registered CFG-only passes to \p IDs.
+  LLVM_ABI void addCFGOnlyPasses(SmallVectorImpl<const void *> &IDs) const;
 
   /// addRegistrationListener - Register the given PassRegistrationListener
   /// to receive passRegistered() callbacks whenever a new pass is registered.
