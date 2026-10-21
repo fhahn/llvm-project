@@ -947,7 +947,12 @@ void PMDataManager::removeDeadPasses(Pass *P, StringRef Msg,
     return;
 
   TPM->collectLastUses(DeadPasses, P);
+  freeDeadPasses(P, DeadPasses, Msg, DBG_STR);
+}
 
+void PMDataManager::freeDeadPasses(Pass *P, ArrayRef<Pass *> DeadPasses,
+                                   StringRef Msg,
+                                   enum PassDebuggingString DBG_STR) {
   if (PassDebugging >= Details && !DeadPasses.empty()) {
     dbgs() << " -*- '" <<  P->getPassName();
     dbgs() << "' is the last user of following pass instances.";
@@ -1324,7 +1329,7 @@ void FPPassManager::cleanup() {
     assert(AR && "Analysis Resolver is not set");
     AR->clearAnalysisImpls();
  }
- NumAnalysisImplsInitialized = 0;
+ LastUses.clear();
 }
 
 
@@ -1379,9 +1384,9 @@ bool FPPassManager::runOnFunction(Function &F) {
     dumpPassInfo(FP, EXECUTION_MSG, ON_FUNCTION_MSG, Name);
     dumpRequiredSet(FP);
 
-    if (Index == NumAnalysisImplsInitialized) {
+    if (Index == LastUses.size()) {
       initializeAnalysisImpl(FP);
-      ++NumAnalysisImplsInitialized;
+      TPM->collectLastUses(LastUses.emplace_back(), FP);
     }
 
     // For --print-changed, capture the IR before the pass. Skip analyses (like
@@ -1459,7 +1464,7 @@ bool FPPassManager::runOnFunction(Function &F) {
     if (LocalChanged)
       removeNotPreservedAnalysis(FP);
     recordAvailableAnalysis(FP);
-    removeDeadPasses(FP, Name, ON_FUNCTION_MSG);
+    freeDeadPasses(FP, LastUses[Index], Name, ON_FUNCTION_MSG);
   }
 
   return Changed;
@@ -1476,7 +1481,7 @@ bool FPPassManager::runOnModule(Module &M) {
 
 bool FPPassManager::doInitialization(Module &M) {
   bool Changed = false;
-  NumAnalysisImplsInitialized = 0;
+  LastUses.clear();
 
   for (unsigned Index = 0; Index < getNumContainedPasses(); ++Index)
     Changed |= getContainedPass(Index)->doInitialization(M);

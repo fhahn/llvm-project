@@ -313,6 +313,10 @@ public:
   void removeDeadPasses(Pass *P, StringRef Msg,
                         enum PassDebuggingString);
 
+  /// Free DeadPasses, the passes whose last user is P.
+  void freeDeadPasses(Pass *P, ArrayRef<Pass *> DeadPasses, StringRef Msg,
+                      enum PassDebuggingString);
+
   /// Remove P.
   void freePass(Pass *P, StringRef Msg,
                 enum PassDebuggingString);
@@ -508,10 +512,11 @@ public:
   }
 
 private:
-  /// The number of contained passes whose required analyses have been added to
-  /// their resolvers. They stay there until cleanup(), so this is only done on
-  /// the first function after doInitialization() or cleanup().
-  unsigned NumAnalysisImplsInitialized = 0;
+  /// The passes whose last user is the contained pass at the same index, for
+  /// the contained passes set up so far. Last users only change while passes
+  /// are scheduled, so they are collected together with the required analyses
+  /// on the first function after doInitialization() or cleanup().
+  SmallVector<SmallVector<Pass *>> LastUses;
 };
 }
 
