@@ -1073,10 +1073,7 @@ define void @iv_increment_stored_to_invariant_address(ptr noalias %dst, ptr noal
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i32> [ <i32 0, i32 1, i32 2, i32 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[STEP_ADD:%.*]] = add nuw <4 x i32> [[VEC_IND]], splat (i32 4)
-; CHECK-NEXT:    [[STEP_ADD_2:%.*]] = add nuw <4 x i32> [[STEP_ADD]], splat (i32 4)
-; CHECK-NEXT:    [[STEP_ADD_3:%.*]] = add nuw <4 x i32> [[STEP_ADD_2]], splat (i32 4)
+; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[INDEX]], 15
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext nneg i32 [[INDEX]] to i64
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw i32, ptr [[DST]], i64 [[TMP1]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw i32, ptr [[TMP2]], i64 4
@@ -1086,11 +1083,9 @@ define void @iv_increment_stored_to_invariant_address(ptr noalias %dst, ptr noal
 ; CHECK-NEXT:    store <4 x i32> zeroinitializer, ptr [[TMP3]], align 4
 ; CHECK-NEXT:    store <4 x i32> zeroinitializer, ptr [[TMP4]], align 4
 ; CHECK-NEXT:    store <4 x i32> zeroinitializer, ptr [[TMP5]], align 4
-; CHECK-NEXT:    [[TMP6:%.*]] = add nuw nsw <4 x i32> [[STEP_ADD_3]], splat (i32 1)
-; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i32> [[TMP6]], i64 3
+; CHECK-NEXT:    [[TMP7:%.*]] = add nuw nsw i32 [[TMP6]], 1
 ; CHECK-NEXT:    store i32 [[TMP7]], ptr [[IV_PTR]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 16
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i32> [[STEP_ADD_3]], splat (i32 4)
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP32:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -1103,21 +1098,16 @@ define void @iv_increment_stored_to_invariant_address(ptr noalias %dst, ptr noal
 ; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i32 [ [[N_VEC]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    [[TMP9:%.*]] = and i32 [[SMAX]], 3
 ; CHECK-NEXT:    [[N_VEC2:%.*]] = sub i32 [[SMAX]], [[TMP9]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[VEC_EPILOG_RESUME_VAL]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[INDUCTION:%.*]] = add nuw nsw <4 x i32> [[BROADCAST_SPLAT]], <i32 0, i32 1, i32 2, i32 3>
 ; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX3:%.*]] = phi i32 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT5:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_IND4:%.*]] = phi <4 x i32> [ [[INDUCTION]], %[[VEC_EPILOG_PH]] ], [ [[VEC_IND_NEXT6:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP12:%.*]] = add i32 [[INDEX3]], 3
 ; CHECK-NEXT:    [[TMP10:%.*]] = zext nneg i32 [[INDEX3]] to i64
 ; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds nuw i32, ptr [[DST]], i64 [[TMP10]]
 ; CHECK-NEXT:    store <4 x i32> zeroinitializer, ptr [[TMP11]], align 4
-; CHECK-NEXT:    [[TMP12:%.*]] = add nuw nsw <4 x i32> [[VEC_IND4]], splat (i32 1)
-; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <4 x i32> [[TMP12]], i64 3
+; CHECK-NEXT:    [[TMP13:%.*]] = add nuw nsw i32 [[TMP12]], 1
 ; CHECK-NEXT:    store i32 [[TMP13]], ptr [[IV_PTR]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT5]] = add nuw i32 [[INDEX3]], 4
-; CHECK-NEXT:    [[VEC_IND_NEXT6]] = add nuw nsw <4 x i32> [[VEC_IND4]], splat (i32 4)
 ; CHECK-NEXT:    [[TMP14:%.*]] = icmp eq i32 [[INDEX_NEXT5]], [[N_VEC2]]
 ; CHECK-NEXT:    br i1 [[TMP14]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP34:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:

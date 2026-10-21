@@ -6097,6 +6097,16 @@ void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
     });
   };
 
+  // Returns true if \p VPI adds a wide induction and an invariant. Both are
+  // available as scalars, as scalar users of wide inductions get scalar steps.
+  // Other operands are visited after their users and may still be widened.
+  auto IsWideIVPlusInvariant = [](VPInstruction &VPI) {
+    VPValue *Offset;
+    return match(&VPI, m_c_Add(m_Isa<VPWidenIntOrFpInductionRecipe>(),
+                               m_VPValue(Offset))) &&
+           Offset->isDefinedOutsideLoopRegions();
+  };
+
   PostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> POT(
       Plan.getEntry());
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(POT)) {
@@ -6126,11 +6136,13 @@ void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
             VPI.getOpcode(), VPI.operandsWithoutMask(), /*Mask=*/nullptr, VPI,
             VPI, VPI.getDebugLoc(), VPI.getScalarType(), I);
       } else if (!Range.Start.isScalable() &&
-                 VPI.getOpcode() == Instruction::GetElementPtr &&
+                 (VPI.getOpcode() == Instruction::GetElementPtr ||
+                  IsWideIVPlusInvariant(VPI)) &&
                  OnlyScalarsUsed(VPI)) {
-        // Replicate GEPs only used as scalars, e.g. by replicated memory
-        // recipes, instead of widening them and extracting each lane. Scalable
-        // vectors cannot be replicated.
+        // Replicate GEPs and adds of wide inductions only used as scalars, e.g.
+        // by replicated memory recipes, instead of widening them and extracting
+        // each lane. Scalable vectors cannot be replicated.
+        // TODO: Also replicate other recipes only used as scalars.
         Recipe = new VPReplicateRecipe(I, VPI.operandsWithoutMask(),
                                        /*IsSingleScalar=*/false,
                                        /*Mask=*/nullptr, VPI, VPI,
