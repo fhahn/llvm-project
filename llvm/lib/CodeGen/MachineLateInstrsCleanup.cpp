@@ -222,6 +222,12 @@ bool MachineLateInstrsCleanup::processBlock(MachineBasicBlock *MBB) {
   const TargetRegisterInfo *TRI = MF->getSubtarget().getRegisterInfo();
   Register FrameReg = TRI->getFrameRegister(*MF);
   for (MachineInstr &MI : llvm::make_early_inc_range(*MBB)) {
+    Register DefedReg;
+    bool IsCandidate = isCandidate(&MI, DefedReg, FrameReg);
+    // Without tracked defs, only a candidate can change anything below.
+    if (!IsCandidate && MBBDefs.empty())
+      continue;
+
     // If FrameReg is modified, no previous load-address instructions (using
     // it) are valid.
     if (MI.modifiesRegister(FrameReg, TRI)) {
@@ -229,9 +235,6 @@ bool MachineLateInstrsCleanup::processBlock(MachineBasicBlock *MBB) {
       MBBKills.clear();
       continue;
     }
-
-    Register DefedReg;
-    bool IsCandidate = isCandidate(&MI, DefedReg, FrameReg);
 
     // Check for an earlier identical and reusable instruction.
     if (IsCandidate && MBBDefs.hasIdentical(DefedReg, &MI)) {
