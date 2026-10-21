@@ -252,23 +252,6 @@ PassNameParser::~PassNameParser() = default;
 //   AnalysisUsage Class Implementation
 //
 
-namespace {
-
-struct GetCFGOnlyPasses : public PassRegistrationListener {
-  using VectorType = AnalysisUsage::VectorType;
-
-  VectorType &CFGOnlyList;
-
-  GetCFGOnlyPasses(VectorType &L) : CFGOnlyList(L) {}
-
-  void passEnumerate(const PassInfo *P) override {
-    if (P->isCFGOnlyPass())
-      CFGOnlyList.push_back(P->getTypeInfo());
-  }
-};
-
-} // end anonymous namespace
-
 // setPreservesCFG - This function should be called to by the pass, iff they do
 // not:
 //
@@ -280,7 +263,7 @@ struct GetCFGOnlyPasses : public PassRegistrationListener {
 void AnalysisUsage::setPreservesCFG() {
   // Since this transformation doesn't modify the CFG, it preserves all analyses
   // that only depend on the CFG (like dominators, loop info, etc...)
-  GetCFGOnlyPasses(Preserved).enumeratePasses();
+  PassRegistry::getPassRegistry()->addCFGOnlyPasses(Preserved);
 }
 
 AnalysisUsage &AnalysisUsage::addPreserved(StringRef Arg) {
