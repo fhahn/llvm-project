@@ -196,14 +196,14 @@ static std::string getDescription(const Function &F) {
 
 bool FunctionPass::skipFunction(const Function &F) const {
   OptPassGate &Gate = F.getContext().getOptPassGate();
-
-  StringRef PassName = getPassArgument();
-  if (PassName.empty())
-    PassName = this->getPassName();
-
-  if (Gate.isEnabled() &&
-      !Gate.shouldRunPass(PassName, getDescription(F), F.getName()))
-    return true;
+  if (Gate.isEnabled()) {
+    // Only look up the pass name if needed, it queries the pass registry.
+    StringRef PassName = getPassArgument();
+    if (PassName.empty())
+      PassName = this->getPassName();
+    if (!Gate.shouldRunPass(PassName, getDescription(F), F.getName()))
+      return true;
+  }
 
   if (F.hasOptNone()) {
     LLVM_DEBUG(dbgs() << "Skipping pass '" << getPassName() << "' on function "
