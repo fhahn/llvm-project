@@ -948,9 +948,8 @@ public:
     unsigned NumBuckets = getNumBuckets();
     BucketT *B = getBuckets();
     bool Removed = false;
-    for (unsigned I = 0; I != NumBuckets; ++I) {
-      if (!llvm::densemap::detail::used(U, I))
-        continue;
+    // Visit the occupied buckets in index order, a used word at a time.
+    llvm::densemap::detail::forEachUsed(U, NumBuckets, [&](unsigned I) {
       if (Pred(B[I])) {
         B[I].getSecond().~ValueT();
         B[I].getFirst().~KeyT();
@@ -958,7 +957,7 @@ public:
         decrementNumEntries();
         Removed = true;
       }
-    }
+    });
     if (Removed) {
       incrementEpoch();
       grow(NumBuckets);
