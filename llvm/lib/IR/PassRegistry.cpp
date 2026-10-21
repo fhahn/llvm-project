@@ -50,7 +50,8 @@ void PassRegistry::registerPass(const PassInfo &PI, bool ShouldFree) {
   bool Inserted =
       PassInfoMap.insert(std::make_pair(PI.getTypeInfo(), &PI)).second;
   assert(Inserted && "Pass registered multiple times!");
-  (void)Inserted;
+  if (Inserted && PI.isCFGOnlyPass())
+    CFGOnlyPasses.push_back(PI.getTypeInfo());
   PassInfoStringMap[PI.getPassArgument()] = &PI;
 
   // Notify any listeners.
@@ -65,6 +66,11 @@ void PassRegistry::enumerateWith(PassRegistrationListener *L) {
   sys::SmartScopedReader<true> Guard(Lock);
   for (auto PassInfoPair : PassInfoMap)
     L->passEnumerate(PassInfoPair.second);
+}
+
+void PassRegistry::addCFGOnlyPasses(SmallVectorImpl<const void *> &IDs) const {
+  sys::SmartScopedReader<true> Guard(Lock);
+  llvm::append_range(IDs, CFGOnlyPasses);
 }
 
 void PassRegistry::addRegistrationListener(PassRegistrationListener *L) {
