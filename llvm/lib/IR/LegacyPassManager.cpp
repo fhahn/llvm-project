@@ -1324,6 +1324,7 @@ void FPPassManager::cleanup() {
     assert(AR && "Analysis Resolver is not set");
     AR->clearAnalysisImpls();
  }
+ NumAnalysisImplsInitialized = 0;
 }
 
 
@@ -1378,7 +1379,10 @@ bool FPPassManager::runOnFunction(Function &F) {
     dumpPassInfo(FP, EXECUTION_MSG, ON_FUNCTION_MSG, Name);
     dumpRequiredSet(FP);
 
-    initializeAnalysisImpl(FP);
+    if (Index == NumAnalysisImplsInitialized) {
+      initializeAnalysisImpl(FP);
+      ++NumAnalysisImplsInitialized;
+    }
 
     // For --print-changed, capture the IR before the pass. Skip analyses (like
     // the new pass manager) and passes with no registry info (pass managers and
@@ -1472,6 +1476,7 @@ bool FPPassManager::runOnModule(Module &M) {
 
 bool FPPassManager::doInitialization(Module &M) {
   bool Changed = false;
+  NumAnalysisImplsInitialized = 0;
 
   for (unsigned Index = 0; Index < getNumContainedPasses(); ++Index)
     Changed |= getContainedPass(Index)->doInitialization(M);
