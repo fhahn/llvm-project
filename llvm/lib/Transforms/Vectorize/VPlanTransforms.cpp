@@ -1387,6 +1387,13 @@ static VPValue *simplifyRecipe(VPlan &Plan, VPSingleDefRecipe *Def) {
   if (!Plan.isUnrolled())
     return nullptr;
 
+  // After unrolling, ExtractPenultimateElement extracts from a single part, so
+  // all lanes of a single-scalar operand are the same.
+  if (match(Def, m_ExtractPenultimateElement(m_VPValue(A))) &&
+      isa<VPIRValue, VPInstruction, VPReplicateRecipe>(A) &&
+      vputils::isSingleScalar(A))
+    return A;
+
   // Simplify extracts of the same single-scalar.
   if (match(Def, m_VPInstruction<VPInstruction::ExtractLane>()) &&
       all_equal(drop_begin(Def->operands())) &&
