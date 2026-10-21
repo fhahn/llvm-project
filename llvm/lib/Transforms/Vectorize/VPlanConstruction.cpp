@@ -1081,16 +1081,34 @@ getIntInductionDescriptor(VPPhi *PhiR, PredicatedScalarEvolution &PSE,
     auto [V, Negate] = Worklist.pop_back_val();
     const SCEV *S = vputils::getSCEVExprForVPValue(V, PSE, &L);
     VPValue *X, *Y;
-    if (!isa<SCEVCouldNotCompute>(S))
+    VPIRValue *Inv;
+    auto *Phi = dyn_cast<VPPhi>(V);
+    if (!isa<SCEVCouldNotCompute>(S)) {
+      S = SE.getTruncateOrNoop(S, Ty);
       Terms.push_back(Negate ? SE.getNegativeSCEV(S) : S);
-    else if (V == PhiR)
+    } else if (V == PhiR) {
       PhiRCoeff += Negate ? -1 : 1;
-    else if (match(V, m_Add(m_VPValue(X), m_VPValue(Y))))
+    } else if (match(V, m_Add(m_VPValue(X), m_VPValue(Y))) ||
+               (Ty->isIntegerTy(1) &&
+                match(V, m_Binary<Instruction::Xor>(m_VPValue(X),
+                                                    m_VPValue(Y)))) ||
+               match(V, m_Binary<Instruction::ExtractValue>(
+                            m_Intrinsic<Intrinsic::sadd_with_overflow>(
+                                m_VPValue(X), m_VPValue(Y)),
+                            m_ZeroInt()))) {
       Worklist.append({{X, Negate}, {Y, Negate}});
-    else if (match(V, m_Sub(m_VPValue(X), m_VPValue(Y))))
+    } else if (match(V, m_Sub(m_VPValue(X), m_VPValue(Y)))) {
       Worklist.append({{X, Negate}, {Y, !Negate}});
-    else
+    } else if (Phi && all_equal(Phi->operands())) {
+      Worklist.push_back({Phi->getOperand(0), Negate});
+    } else if (match(V, m_Trunc(m_c_Add(m_ZExtOrSExt(m_Specific(PhiR)),
+                                        m_VPIRValue(Inv)))) &&
+               !isa<SCEVAddExpr>(
+                   vputils::getSCEVExprForVPValue(Inv, PSE, &L))) {
+      Worklist.append({{PhiR, Negate}, {Inv, Negate}});
+    } else {
       return std::nullopt;
+    }
   }
   if (Terms.empty())
     return std::nullopt;
