@@ -106,10 +106,9 @@
 ; LAXX-NEXT:       Machine Block Frequency Analysis
 ; LAXX-NEXT:       Early Machine Loop Invariant Code Motion
 ; LAXX-NEXT:       MachineDominator Tree Construction
-; LAXX-NEXT:       Machine Cycle Info Analysis
-; LAXX-NEXT:       Machine Block Frequency Analysis
 ; LAXX-NEXT:       Machine Common Subexpression Elimination
 ; LAXX-NEXT:       MachinePostDominator Tree Construction
+; LAXX-NEXT:       Machine Cycle Info Analysis
 ; LAXX-NEXT:       Machine code sinking
 ; LAXX-NEXT:       Peephole Optimizations
 ; LAXX-NEXT:       Remove dead machine instructions
@@ -146,8 +145,6 @@
 ; LAXX-NEXT:       Remove Redundant DEBUG_VALUE analysis
 ; LAXX-NEXT:       Fixup Statepoint Caller Saved
 ; LAXX-NEXT:       PostRA Machine Sink
-; LAXX-NEXT:       Machine Cycle Info Analysis
-; LAXX-NEXT:       Machine Block Frequency Analysis
 ; LAXX-NEXT:       MachineDominator Tree Construction
 ; LAXX-NEXT:       MachinePostDominator Tree Construction
 ; LAXX-NEXT:       Lazy Machine Block Frequency Analysis

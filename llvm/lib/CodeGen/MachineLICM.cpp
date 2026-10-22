@@ -24,6 +24,7 @@
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineBlockFrequencyInfo.h"
+#include "llvm/CodeGen/MachineCycleAnalysis.h"
 #include "llvm/CodeGen/MachineDomTreeUpdater.h"
 #include "llvm/CodeGen/MachineDominators.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
@@ -140,6 +141,7 @@ namespace {
 
     // State that is updated as we process loops
     bool Changed = false;           // True if a loop is changed.
+    bool SplitEdge = false;         // True if a critical edge was split.
     bool FirstInLoop = false;       // True if it's the first LICM in the loop.
 
     // Holds information about whether it is allowed to move load instructions
@@ -308,6 +310,8 @@ namespace {
       AU.addRequired<MachineRegisterClassInfoWrapperPass>();
       AU.addRequired<AAResultsWrapperPass>();
       AU.addPreserved<MachineLoopInfoWrapperPass>();
+      if (DisableHoistingToHotterBlocks != UseBFI::None)
+        AU.addPreserved<MachineBlockFrequencyInfoWrapperPass>();
       AU.addPreserved<MachineRegisterClassInfoWrapperPass>();
       MachineFunctionPass::getAnalysisUsage(AU);
     }
@@ -387,7 +391,7 @@ bool MachineLICMImpl::run(MachineFunction &MF) {
              ? GET_RESULT(MachineBlockFrequency, getMBFI, Info)
              : nullptr;
 
-  Changed = FirstInLoop = false;
+  Changed = FirstInLoop = SplitEdge = false;
   const TargetSubtargetInfo &ST = MF.getSubtarget();
   TII = ST.getInstrInfo();
   TLI = ST.getTargetLowering();
@@ -431,6 +435,16 @@ bool MachineLICMImpl::run(MachineFunction &MF) {
       HoistOutOfLoop(N, CurLoop);
       CSEMap.clear();
     }
+  }
+
+  // MBFI is preserved. Recompute it if we split an edge or it was updated
+  // incrementally before, so later passes see the same frequencies as with a
+  // fresh computation. The new PM keeps all analyses if nothing changed.
+  if (MBFI && (SplitEdge || MBFI->hasIncrementalUpdates()) &&
+      (Changed || LegacyPass)) {
+    MachineCycleInfo CI;
+    CI.compute(MF);
+    MBFI->calculate(MF, *MBFI->getMBPI(), CI);
   }
   releaseMemory();
   return Changed;
@@ -1714,7 +1728,7 @@ MachineBasicBlock *MachineLICMImpl::getOrCreatePreheader(MachineLoop *CurLoop) {
     MachineBasicBlock *NewPreheader =
         Pred->SplitCriticalEdge(CurLoop->getHeader(), LegacyPass, MFAM, MDTU);
     if (NewPreheader)
-      Changed = true;
+      Changed = SplitEdge = true;
     return NewPreheader;
   }
 
@@ -1747,6 +1761,8 @@ PreservedAnalyses MachineLICMBasePass<DerivedT, PreRegAlloc>::run(
     return PreservedAnalyses::all();
   auto PA = getMachineFunctionPassPreservedAnalyses();
   PA.preserve<MachineLoopAnalysis>();
+  if (DisableHoistingToHotterBlocks != UseBFI::None)
+    PA.preserve<MachineBlockFrequencyAnalysis>();
   return PA;
 }
 
