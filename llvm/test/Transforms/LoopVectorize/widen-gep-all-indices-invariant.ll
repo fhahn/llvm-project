@@ -140,13 +140,13 @@ define void @pr173761(i8 %c, ptr %p, ptr noalias %q, ptr noalias %r) {
 ; CHECK-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <4 x ptr> [[BROADCAST_SPLATINSERT3]], <4 x ptr> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP0:%.*]] = trunc <4 x i8> [[BROADCAST_SPLAT]] to <4 x i1>
 ; CHECK-NEXT:    [[TMP1:%.*]] = select <4 x i1> [[TMP0]], <4 x ptr> [[BROADCAST_SPLAT4]], <4 x ptr> [[BROADCAST_SPLAT2]]
+; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <4 x ptr> [[TMP1]], i64 3
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP2:%.*]] = load i8, ptr [[P]], align 1
-; CHECK-NEXT:    store i8 [[TMP2]], ptr [[R]], align 1
-; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <4 x ptr> [[TMP1]], i64 3
-; CHECK-NEXT:    [[TMP4:%.*]] = load i8, ptr [[TMP3]], align 1
+; CHECK-NEXT:    [[TMP3:%.*]] = load i8, ptr [[P]], align 1
+; CHECK-NEXT:    store i8 [[TMP3]], ptr [[R]], align 1
+; CHECK-NEXT:    [[TMP4:%.*]] = load i8, ptr [[TMP2]], align 1
 ; CHECK-NEXT:    store i8 [[TMP4]], ptr [[Q]], align 1
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i32 [[INDEX_NEXT]], 1024

@@ -1911,6 +1911,46 @@ static void narrowToSingleScalarRecipes(VPlan &Plan) {
         continue;
       }
 
+      // Narrow replicate recipes of which only the last lane is used, e.g. by
+      // stores to uniform addresses narrowed above, to a single scalar of the
+      // last lanes of their operands. Skip scalable VFs, for which the last
+      // lanes of per-lane operands like scalar steps are not available, and
+      // struct operands, for which extracts are not supported.
+      if (RepR && !Plan.hasScalableVF() && !RepR->mayHaveSideEffects() &&
+          none_of(RepR->operands(),
+                  [](VPValue *Op) {
+                    return isa<StructType>(Op->getScalarType());
+                  }) &&
+          all_of(RepR->users(), [](VPUser *U) {
+            return match(U, m_ExtractLastPart(m_VPValue())) &&
+                   all_of(cast<VPInstruction>(U)->users(),
+                          match_fn(m_ExtractLastLane(m_VPValue())));
+          })) {
+        VPBuilder Builder(RepR);
+        SmallVector<VPValue *> Ops;
+        for (VPValue *Op : RepR->operands()) {
+          if (!vputils::isUniformAcrossVFsAndUFs(Op)) {
+            Op = Builder.createNaryOp(VPInstruction::ExtractLastPart, Op);
+            Op = Builder.createNaryOp(VPInstruction::ExtractLastLane, Op);
+          }
+          Ops.push_back(Op);
+        }
+        auto *Clone = VPBuilder::createSingleScalarOp(
+            RepR->getOpcode(), Ops, /*Mask=*/nullptr, *RepR /*Flags*/,
+            *RepR /*Metadata*/, RepR->getDebugLoc(), RepR->getScalarType(),
+            RepR->getUnderlyingInstr());
+        Clone->insertBefore(RepR);
+        // Erase RepR and its users right away, so replicates it uses can be
+        // narrowed as well. ExtractLastLane of Clone folds to Clone.
+        for (VPUser *U : to_vector(RepR->users())) {
+          auto *ExtractPart = cast<VPInstruction>(U);
+          ExtractPart->replaceAllUsesWith(Clone);
+          ExtractPart->eraseFromParent();
+        }
+        RepR->eraseFromParent();
+        continue;
+      }
+
       // Narrow llvm.masked.{u,s}{div,rem} intrinsics with a safe divisor.
       if (auto *IntrR = dyn_cast<VPWidenIntrinsicRecipe>(RepOrWidenR)) {
         if (!vputils::onlyFirstLaneUsed(IntrR))
