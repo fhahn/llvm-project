@@ -8132,6 +8132,11 @@ InstructionCost X86TTIImpl::getInterleavedMemoryOpCost(
       {6, MVT::v8i64, 30}, // interleave 6 x 8i64 into 48i64 (and store)
   };
 
+  static const CostTblEntry AVX1InterleavedStoreTbl[] = {
+      {4, MVT::v2i64, 4}, // interleave 4 x 2i64 into 8i64 (and store)
+      {4, MVT::v4i64, 8}, // interleave 4 x 4i64 into 16i64 (and store)
+  };
+
   static const CostTblEntry SSE2InterleavedStoreTbl[] = {
       {2, MVT::v2i8, 1},   // interleave 2 x 2i8 into 4i8 (and store)
       {2, MVT::v4i8, 1},   // interleave 2 x 4i8 into 8i8 (and store)
@@ -8172,6 +8177,11 @@ InstructionCost X86TTIImpl::getInterleavedMemoryOpCost(
            "Interleaved store only supports fully-interleaved groups.");
     if (ST->hasAVX2())
       if (const auto *Entry = CostTableLookup(AVX2InterleavedStoreTbl, Factor,
+                                              ETy.getSimpleVT()))
+        return MemOpCosts + Entry->Cost;
+
+    if (ST->hasAVX())
+      if (const auto *Entry = CostTableLookup(AVX1InterleavedStoreTbl, Factor,
                                               ETy.getSimpleVT()))
         return MemOpCosts + Entry->Cost;
 
