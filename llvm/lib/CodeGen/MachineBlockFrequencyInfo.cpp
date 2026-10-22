@@ -227,6 +227,7 @@ void MachineBlockFrequencyInfo::calculate(
   if (!MBFI)
     MBFI.reset(new ImplType);
   MBFI->calculate(F, MBPI, MCI);
+  HasIncrementalUpdates = false;
   if (ViewMachineBlockFreqPropagationDAG != GVDT_None &&
       (ViewBlockFreqFuncName.empty() || F.getName() == ViewBlockFreqFuncName)) {
     view("MachineBlockFrequencyDAGS." + F.getName());
@@ -290,6 +291,7 @@ void MachineBlockFrequencyInfo::onEdgeSplit(
                      MBPI.getEdgeProbability(&NewPredecessor, &NewSuccessor);
 
   MBFI->setBlockFreq(&NewSuccessor, NewSuccFreq);
+  HasIncrementalUpdates = true;
 }
 
 const MachineFunction *MachineBlockFrequencyInfo::getFunction() const {
