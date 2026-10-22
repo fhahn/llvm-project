@@ -1230,21 +1230,39 @@ exit:
 define void @uniform_store_addr_via_predicated_udiv(ptr %dst, i1 %c, i64 %d) {
 ; CHECK-LABEL: define void @uniform_store_addr_via_predicated_udiv(
 ; CHECK-SAME: ptr [[DST:%.*]], i1 [[C:%.*]], i64 [[D:%.*]]) #[[ATTR1]] {
-; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
-; CHECK:       [[LOOP_HEADER]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    br i1 [[C]], label %[[LOOP_LATCH]], label %[[ELSE:.*]]
-; CHECK:       [[ELSE]]:
-; CHECK-NEXT:    [[DIV:%.*]] = udiv i64 99, [[D]]
-; CHECK-NEXT:    br label %[[LOOP_LATCH]]
-; CHECK:       [[LOOP_LATCH]]:
-; CHECK-NEXT:    [[IDX:%.*]] = phi i64 [ [[DIV]], %[[ELSE]] ], [ 0, %[[LOOP_HEADER]] ]
-; CHECK-NEXT:    [[GEP:%.*]] = getelementptr i64, ptr [[DST]], i64 [[IDX]]
-; CHECK-NEXT:    store i64 0, ptr [[GEP]], align 8
-; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
-; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 100
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP_HEADER]]
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = xor i1 [[C]], true
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_UDIV_CONTINUE6:.*]] ]
+; CHECK-NEXT:    br i1 [[TMP0]], label %[[PRED_UDIV_IF:.*]], label %[[PRED_UDIV_CONTINUE:.*]]
+; CHECK:       [[PRED_UDIV_IF]]:
+; CHECK-NEXT:    [[TMP1:%.*]] = udiv i64 99, [[D]]
+; CHECK-NEXT:    br label %[[PRED_UDIV_CONTINUE]]
+; CHECK:       [[PRED_UDIV_CONTINUE]]:
+; CHECK-NEXT:    [[TMP2:%.*]] = phi i64 [ poison, %[[VECTOR_BODY]] ], [ [[TMP1]], %[[PRED_UDIV_IF]] ]
+; CHECK-NEXT:    br i1 [[TMP0]], label %[[PRED_UDIV_IF1:.*]], label %[[PRED_UDIV_CONTINUE2:.*]]
+; CHECK:       [[PRED_UDIV_IF1]]:
+; CHECK-NEXT:    br label %[[PRED_UDIV_CONTINUE2]]
+; CHECK:       [[PRED_UDIV_CONTINUE2]]:
+; CHECK-NEXT:    br i1 [[TMP0]], label %[[PRED_UDIV_IF3:.*]], label %[[PRED_UDIV_CONTINUE4:.*]]
+; CHECK:       [[PRED_UDIV_IF3]]:
+; CHECK-NEXT:    br label %[[PRED_UDIV_CONTINUE4]]
+; CHECK:       [[PRED_UDIV_CONTINUE4]]:
+; CHECK-NEXT:    br i1 [[TMP0]], label %[[PRED_UDIV_IF5:.*]], label %[[PRED_UDIV_CONTINUE6]]
+; CHECK:       [[PRED_UDIV_IF5]]:
+; CHECK-NEXT:    br label %[[PRED_UDIV_CONTINUE6]]
+; CHECK:       [[PRED_UDIV_CONTINUE6]]:
+; CHECK-NEXT:    [[PREDPHI:%.*]] = select i1 [[C]], i64 0, i64 [[TMP2]]
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i64, ptr [[DST]], i64 [[PREDPHI]]
+; CHECK-NEXT:    store i64 0, ptr [[TMP3]], align 8
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
+; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP28:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;

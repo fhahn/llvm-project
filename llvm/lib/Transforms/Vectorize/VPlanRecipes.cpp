@@ -4238,10 +4238,6 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
   case Instruction::Store: {
     bool IsLoad = UI->getOpcode() == Instruction::Load;
     const VPValue *PtrOp = getOperand(!IsLoad);
-    const SCEV *PtrSCEV = getAddressAccessSCEV(PtrOp, Ctx.PSE, Ctx.L);
-    if (isa_and_nonnull<SCEVCouldNotCompute>(PtrSCEV))
-      break;
-
     Type *ValTy = (IsLoad ? this : getOperand(0))->getScalarType();
     Type *ScalarPtrTy = PtrOp->getScalarType();
     const Align Alignment = getLoadStoreAlignment(UI);
@@ -4254,14 +4250,22 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
         UI->getOpcode(), ValTy, Alignment, AS, Ctx.CostKind, OpInfo,
         UsedByLoadStoreAddress ? UI : nullptr);
 
-    Type *PtrTy = isSingleScalar() ? ScalarPtrTy : toVectorTy(ScalarPtrTy, VF);
+    // The address SCEV is only used for the cost of vector addresses.
+    if (isSingleScalar())
+      return ScalarMemOpCost +
+             Ctx.TTI.getAddressComputationCost(ScalarPtrTy, nullptr, nullptr,
+                                               Ctx.CostKind);
+
+    const SCEV *PtrSCEV = getAddressAccessSCEV(PtrOp, Ctx.PSE, Ctx.L);
+    if (isa_and_nonnull<SCEVCouldNotCompute>(PtrSCEV))
+      break;
+
+    Type *PtrTy = toVectorTy(ScalarPtrTy, VF);
     InstructionCost ScalarCost =
         ScalarMemOpCost +
         Ctx.TTI.getAddressComputationCost(
             PtrTy, UsedByLoadStoreAddress ? nullptr : Ctx.PSE.getSE(), PtrSCEV,
             Ctx.CostKind);
-    if (isSingleScalar())
-      return ScalarCost;
 
     SmallVector<const VPValue *> OpsToScalarize;
     Type *ResultTy = Type::getVoidTy(PtrTy->getContext());
