@@ -16062,7 +16062,16 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   unsigned NumDomTreeSteps = 0;
   VisitedBlocks.insert(Block);
   std::pair<const BasicBlock *, const BasicBlock *> Pair(Pred, Block);
-  for (;; Pair = SE.getPredecessorWithUniqueSuccessorForBB(Pair.first)) {
+  // getPredecessorWithUniqueSuccessorForBB skips from a merge block inside a
+  // loop to the loop header. Continue at the merge block's immediate dominator
+  // instead, to also collect the conditions dominating the merge block.
+  auto GetNextPair = [&](const BasicBlock *BB) {
+    while (Depth == 0 && SE.LI.getLoopFor(BB) && !SE.LI.isLoopHeader(BB) &&
+           !BB->getSinglePredecessor())
+      BB = SE.DT.getNode(BB)->getIDom()->getBlock();
+    return SE.getPredecessorWithUniqueSuccessorForBB(BB);
+  };
+  for (;; Pair = GetNextPair(Pair.first)) {
     if (!Pair.first) {
       // At the first block without a unique predecessor, try to build
       // conditions for its phis by merging those of their incoming blocks.
