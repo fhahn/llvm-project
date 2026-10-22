@@ -398,8 +398,6 @@
 ; GCN-O1-NEXT:        Remove Redundant DEBUG_VALUE analysis
 ; GCN-O1-NEXT:        Fixup Statepoint Caller Saved
 ; GCN-O1-NEXT:        PostRA Machine Sink
-; GCN-O1-NEXT:        Machine Cycle Info Analysis
-; GCN-O1-NEXT:        Machine Block Frequency Analysis
 ; GCN-O1-NEXT:        MachineDominator Tree Construction
 ; GCN-O1-NEXT:        MachinePostDominator Tree Construction
 ; GCN-O1-NEXT:        Lazy Machine Block Frequency Analysis
@@ -655,8 +653,6 @@
 ; GCN-O1-OPTS-NEXT:        MachineDominator Tree Construction
 ; GCN-O1-OPTS-NEXT:        Early Machine Loop Invariant Code Motion
 ; GCN-O1-OPTS-NEXT:        MachineDominator Tree Construction
-; GCN-O1-OPTS-NEXT:        Machine Cycle Info Analysis
-; GCN-O1-OPTS-NEXT:        Machine Block Frequency Analysis
 ; GCN-O1-OPTS-NEXT:        Machine Common Subexpression Elimination
 ; GCN-O1-OPTS-NEXT:        SI Fold Operands
 ; GCN-O1-OPTS-NEXT:        Remove dead machine instructions
@@ -722,8 +718,6 @@
 ; GCN-O1-OPTS-NEXT:        Remove Redundant DEBUG_VALUE analysis
 ; GCN-O1-OPTS-NEXT:        Fixup Statepoint Caller Saved
 ; GCN-O1-OPTS-NEXT:        PostRA Machine Sink
-; GCN-O1-OPTS-NEXT:        Machine Cycle Info Analysis
-; GCN-O1-OPTS-NEXT:        Machine Block Frequency Analysis
 ; GCN-O1-OPTS-NEXT:        MachineDominator Tree Construction
 ; GCN-O1-OPTS-NEXT:        MachinePostDominator Tree Construction
 ; GCN-O1-OPTS-NEXT:        Lazy Machine Block Frequency Analysis
@@ -983,8 +977,6 @@
 ; GCN-O2-NEXT:        MachineDominator Tree Construction
 ; GCN-O2-NEXT:        Early Machine Loop Invariant Code Motion
 ; GCN-O2-NEXT:        MachineDominator Tree Construction
-; GCN-O2-NEXT:        Machine Cycle Info Analysis
-; GCN-O2-NEXT:        Machine Block Frequency Analysis
 ; GCN-O2-NEXT:        Machine Common Subexpression Elimination
 ; GCN-O2-NEXT:        SI Fold Operands
 ; GCN-O2-NEXT:        Remove dead machine instructions
@@ -1051,8 +1043,6 @@
 ; GCN-O2-NEXT:        Remove Redundant DEBUG_VALUE analysis
 ; GCN-O2-NEXT:        Fixup Statepoint Caller Saved
 ; GCN-O2-NEXT:        PostRA Machine Sink
-; GCN-O2-NEXT:        Machine Cycle Info Analysis
-; GCN-O2-NEXT:        Machine Block Frequency Analysis
 ; GCN-O2-NEXT:        MachineDominator Tree Construction
 ; GCN-O2-NEXT:        MachinePostDominator Tree Construction
 ; GCN-O2-NEXT:        Lazy Machine Block Frequency Analysis
@@ -1327,8 +1317,6 @@
 ; GCN-O3-NEXT:        MachineDominator Tree Construction
 ; GCN-O3-NEXT:        Early Machine Loop Invariant Code Motion
 ; GCN-O3-NEXT:        MachineDominator Tree Construction
-; GCN-O3-NEXT:        Machine Cycle Info Analysis
-; GCN-O3-NEXT:        Machine Block Frequency Analysis
 ; GCN-O3-NEXT:        Machine Common Subexpression Elimination
 ; GCN-O3-NEXT:        SI Fold Operands
 ; GCN-O3-NEXT:        Remove dead machine instructions
@@ -1395,8 +1383,6 @@
 ; GCN-O3-NEXT:        Remove Redundant DEBUG_VALUE analysis
 ; GCN-O3-NEXT:        Fixup Statepoint Caller Saved
 ; GCN-O3-NEXT:        PostRA Machine Sink
-; GCN-O3-NEXT:        Machine Cycle Info Analysis
-; GCN-O3-NEXT:        Machine Block Frequency Analysis
 ; GCN-O3-NEXT:        MachineDominator Tree Construction
 ; GCN-O3-NEXT:        MachinePostDominator Tree Construction
 ; GCN-O3-NEXT:        Lazy Machine Block Frequency Analysis

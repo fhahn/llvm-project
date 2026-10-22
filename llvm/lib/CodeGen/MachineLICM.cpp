@@ -25,6 +25,8 @@
 #include "llvm/CodeGen/LazyMachineBlockFrequencyInfo.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineBlockFrequencyInfo.h"
+#include "llvm/CodeGen/MachineBranchProbabilityInfo.h"
+#include "llvm/CodeGen/MachineCycleAnalysis.h"
 #include "llvm/CodeGen/MachineDomTreeUpdater.h"
 #include "llvm/CodeGen/MachineDominators.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
@@ -309,6 +311,7 @@ namespace {
       AU.addRequired<MachineRegisterClassInfoWrapperPass>();
       AU.addRequired<AAResultsWrapperPass>();
       AU.addPreserved<MachineLoopInfoWrapperPass>();
+      AU.addPreserved<MachineBlockFrequencyInfoWrapperPass>();
       AU.addPreserved<MachineRegisterClassInfoWrapperPass>();
       MachineFunctionPass::getAnalysisUsage(AU);
     }
@@ -354,12 +357,30 @@ INITIALIZE_PASS_DEPENDENCY(AAResultsWrapperPass)
 INITIALIZE_PASS_END(EarlyMachineLICM, "early-machinelicm",
                     "Early Machine Loop Invariant Code Motion", false, false)
 
-bool MachineLICMBase::runOnMachineFunction(MachineFunction &MF) {
-  if (skipFunction(MF.getFunction()))
-    return false;
+/// MBFI is preserved. Recompute it if MachineLICM added blocks (split edges)
+/// or it was updated incrementally before, to match a fresh computation.
+static void recomputeStaleMBFI(MachineFunction &MF,
+                               MachineBlockFrequencyInfo &MBFI,
+                               const MachineBranchProbabilityInfo &MBPI,
+                               unsigned NumBlocks) {
+  if (MF.getNumBlockIDs() == NumBlocks && !MBFI.hasIncrementalUpdates())
+    return;
+  MachineCycleInfo CI;
+  CI.compute(MF);
+  MBFI.calculate(MF, MBPI, CI);
+}
 
+bool MachineLICMBase::runOnMachineFunction(MachineFunction &MF) {
+  unsigned NumBlocks = MF.getNumBlockIDs();
   MachineLICMImpl Impl(PreRegAlloc, this, nullptr);
-  return Impl.run(MF);
+  bool Changed = !skipFunction(MF.getFunction()) && Impl.run(MF);
+  // MBFI is preserved even if we skipped or did not change MF.
+  if (auto *MBFIWrapper =
+          getAnalysisIfAvailable<MachineBlockFrequencyInfoWrapperPass>()) {
+    MachineBlockFrequencyInfo &MBFI = MBFIWrapper->getMBFI();
+    recomputeStaleMBFI(MF, MBFI, *MBFI.getMBPI(), NumBlocks);
+  }
+  return Changed;
 }
 
 #define GET_RESULT(RESULT, GETTER, INFIX)                                      \
@@ -1743,11 +1764,17 @@ bool MachineLICMImpl::isTgtHotterThanSrc(MachineBasicBlock *SrcBlock,
 template <typename DerivedT, bool PreRegAlloc>
 PreservedAnalyses MachineLICMBasePass<DerivedT, PreRegAlloc>::run(
     MachineFunction &MF, MachineFunctionAnalysisManager &MFAM) {
+  unsigned NumBlocks = MF.getNumBlockIDs();
   bool Changed = MachineLICMImpl(PreRegAlloc, nullptr, &MFAM).run(MF);
   if (!Changed)
     return PreservedAnalyses::all();
+  if (auto *MBFI = MFAM.getCachedResult<MachineBlockFrequencyAnalysis>(MF))
+    recomputeStaleMBFI(MF, *MBFI,
+                       MFAM.getResult<MachineBranchProbabilityAnalysis>(MF),
+                       NumBlocks);
   auto PA = getMachineFunctionPassPreservedAnalyses();
   PA.preserve<MachineLoopAnalysis>();
+  PA.preserve<MachineBlockFrequencyAnalysis>();
   return PA;
 }
 
