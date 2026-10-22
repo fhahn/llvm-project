@@ -220,6 +220,7 @@ void MachineBlockFrequencyInfo::calculate(
   if (!MBFI)
     MBFI.reset(new ImplType);
   MBFI->calculate(F, MBPI, MCI);
+  HasIncrementalUpdates = false;
   const LLVMContext &Ctx = F.getFunction().getContext();
   StringRef ViewFuncName = getViewBlockFreqFuncName(Ctx);
   if (ViewMachineBlockFreqPropagationDAG != GVDAGType::None &&
@@ -286,6 +287,7 @@ void MachineBlockFrequencyInfo::onEdgeSplit(
                      MBPI.getEdgeProbability(&NewPredecessor, &NewSuccessor);
 
   MBFI->setBlockFreq(&NewSuccessor, NewSuccFreq);
+  HasIncrementalUpdates = true;
 }
 
 const MachineFunction *MachineBlockFrequencyInfo::getFunction() const {

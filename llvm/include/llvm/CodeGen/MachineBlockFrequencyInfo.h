@@ -35,6 +35,8 @@ class raw_ostream;
 class MachineBlockFrequencyInfo {
   using ImplType = BlockFrequencyInfoImpl<MachineBasicBlock>;
   std::unique_ptr<ImplType> MBFI;
+  /// True if frequencies were updated incrementally since the last calculate.
+  bool HasIncrementalUpdates = false;
 
 public:
   LLVM_ABI MachineBlockFrequencyInfo(); // Legacy pass manager only.
@@ -85,6 +87,10 @@ public:
   LLVM_ABI void onEdgeSplit(const MachineBasicBlock &NewPredecessor,
                             const MachineBasicBlock &NewSuccessor,
                             const MachineBranchProbabilityInfo &MBPI);
+
+  /// Return true if the frequencies may differ from a fresh calculation
+  /// because they were updated incrementally, e.g. by onEdgeSplit.
+  bool hasIncrementalUpdates() const { return HasIncrementalUpdates; }
 
   LLVM_ABI const MachineFunction *getFunction() const;
   LLVM_ABI const MachineBranchProbabilityInfo *getMBPI() const;
