@@ -1227,6 +1227,50 @@ exit:
   ret void
 }
 
+define void @uniform_store_addr_via_predicated_udiv(ptr %dst, i1 %c, i64 %d) {
+; CHECK-LABEL: define void @uniform_store_addr_via_predicated_udiv(
+; CHECK-SAME: ptr [[DST:%.*]], i1 [[C:%.*]], i64 [[D:%.*]]) #[[ATTR1]] {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    br i1 [[C]], label %[[LOOP_LATCH]], label %[[ELSE:.*]]
+; CHECK:       [[ELSE]]:
+; CHECK-NEXT:    [[DIV:%.*]] = udiv i64 99, [[D]]
+; CHECK-NEXT:    br label %[[LOOP_LATCH]]
+; CHECK:       [[LOOP_LATCH]]:
+; CHECK-NEXT:    [[IDX:%.*]] = phi i64 [ [[DIV]], %[[ELSE]] ], [ 0, %[[LOOP_HEADER]] ]
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr i64, ptr [[DST]], i64 [[IDX]]
+; CHECK-NEXT:    store i64 0, ptr [[GEP]], align 8
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 100
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP_HEADER]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop.header
+
+loop.header:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  br i1 %c, label %loop.latch, label %else
+
+else:
+  %div = udiv i64 99, %d
+  br label %loop.latch
+
+loop.latch:
+  %idx = phi i64 [ %div, %else ], [ 0, %loop.header ]
+  %gep = getelementptr i64, ptr %dst, i64 %idx
+  store i64 0, ptr %gep, align 8
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 100
+  br i1 %ec, label %exit, label %loop.header
+
+exit:
+  ret void
+}
+
 
 attributes #0 = { "target-cpu"="penryn" }
 attributes #1 = { "target-features"="+avx512bw,+avx512cd,+avx512dq,+avx512f,+avx512vl" }
