@@ -150,8 +150,6 @@
 ; LAXX-NEXT:       Remove Redundant DEBUG_VALUE analysis
 ; LAXX-NEXT:       Fixup Statepoint Caller Saved
 ; LAXX-NEXT:       PostRA Machine Sink
-; LAXX-NEXT:       Machine Cycle Info Analysis
-; LAXX-NEXT:       Machine Block Frequency Analysis
 ; LAXX-NEXT:       MachinePostDominator Tree Construction
 ; LAXX-NEXT:       Lazy Machine Block Frequency Analysis
 ; LAXX-NEXT:       Machine Optimization Remark Emitter
