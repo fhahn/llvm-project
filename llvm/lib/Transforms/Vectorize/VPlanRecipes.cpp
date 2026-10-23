@@ -1784,6 +1784,8 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
 
 bool VPInstruction::usesFirstLaneOnly(const VPValue *Op) const {
   assert(is_contained(operands(), Op) && "Op must be an operand of the recipe");
+  if (doesGenerateSingleScalar())
+    return true;
   if (vputils::propagatesFirstLaneUse(this, Op))
     return vputils::onlyFirstLaneUsed(this);
 
@@ -1796,19 +1798,14 @@ bool VPInstruction::usesFirstLaneOnly(const VPValue *Op) const {
     return Op == getOperand(1) || Op == getOperand(2);
   case VPInstruction::ExtractLastActive:
     return Op == getOperand(0);
-  case Instruction::PHI:
-  case Instruction::Load:
   case VPInstruction::ActiveLaneMask:
   case VPInstruction::WideActiveLaneMask:
-  case VPInstruction::ExplicitVectorLength:
   case VPInstruction::CanonicalIVIncrementForPart:
   case VPInstruction::BranchOnCount:
   case VPInstruction::BranchOnCond:
   case VPInstruction::BranchOnTwoConds:
   case VPInstruction::Broadcast:
-  case VPInstruction::Intrinsic:
   case VPInstruction::ReductionStartVector:
-  case VPInstruction::ResumeForEpilogue:
   case VPInstruction::WideVectorLoad:
   case VPInstruction::BuildVector:
     return true;

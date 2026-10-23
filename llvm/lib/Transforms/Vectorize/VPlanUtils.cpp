@@ -36,7 +36,9 @@ bool vputils::propagatesFirstLaneUse(const VPUser *U, const VPValue *Op) {
   if (isa<VPBlendRecipe>(U))
     return true;
   auto *VPI = dyn_cast<VPInstruction>(U);
-  if (!VPI)
+  // Single-scalar VPInstructions only use the first lane of their operands,
+  // independent of their users.
+  if (!VPI || VPI->doesGenerateSingleScalar())
     return false;
   unsigned Opcode = VPI->getOpcode();
   switch (Opcode) {

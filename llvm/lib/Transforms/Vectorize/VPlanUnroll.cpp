@@ -1006,10 +1006,7 @@ void VPlanTransforms::replicateByVF(VPlan &Plan, ElementCount VF) {
       /// Users that only demand the first lane can use the definition for lane
       /// 0.
       DefR->replaceUsesWithIf(LaneDefs[0], [DefR](VPUser *U) {
-        if (U->usesFirstLaneOnly(DefR))
-          return true;
-        auto *VPI = dyn_cast<VPInstruction>(U);
-        return VPI && Instruction::isCast(VPI->getOpcode());
+        return U->usesFirstLaneOnly(DefR);
       });
       ToRemove.push_back(DefR);
     }
