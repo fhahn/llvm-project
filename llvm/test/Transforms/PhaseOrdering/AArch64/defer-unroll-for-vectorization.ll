@@ -157,7 +157,7 @@ define ptr @find_if_arr(i8 %c) {
 ; CHECK-NEXT:    [[SPEC_SELECT:%.*]] = select i1 [[IS_MATCH_1]], ptr getelementptr inbounds nuw (i8, ptr @arr, i64 25), ptr getelementptr inbounds nuw (i8, ptr @arr, i64 26)
 ; CHECK-NEXT:    br label [[EXIT]]
 ; CHECK:       exit:
-; CHECK-NEXT:    [[RES:%.*]] = phi ptr [ [[TMP31]], [[LOOP_LATCH_21]] ], [ [[SPEC_SELECT]], [[LOOP_LATCH]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 24), [[LOOP]] ]
+; CHECK-NEXT:    [[RES:%.*]] = phi ptr [ [[TMP31]], [[LOOP_LATCH_21]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 24), [[LOOP]] ], [ [[SPEC_SELECT]], [[LOOP_LATCH]] ]
 ; CHECK-NEXT:    ret ptr [[RES]]
 ;
 entry:
@@ -237,56 +237,6 @@ define void @rt_check_needed(ptr %dst, ptr %a) {
 ; CHECK-NEXT:    store <4 x i32> [[TMP20]], ptr [[TMP22]], align 4
 ; CHECK-NEXT:    br label [[EXIT:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[TMP23:%.*]] = add i64 [[A2]], 128
-; CHECK-NEXT:    [[TMP24:%.*]] = add i64 [[DST1]], 128
-; CHECK-NEXT:    [[RT_BOUND0:%.*]] = icmp ugt i64 [[TMP23]], [[DST1]]
-; CHECK-NEXT:    [[RT_BOUND1:%.*]] = icmp ugt i64 [[TMP24]], [[A2]]
-; CHECK-NEXT:    [[RT_CONFLICT:%.*]] = and i1 [[RT_BOUND0]], [[RT_BOUND1]]
-; CHECK-NEXT:    [[RT_GUARD:%.*]] = freeze i1 [[RT_CONFLICT]]
-; CHECK-NEXT:    br i1 [[RT_GUARD]], label [[LOOP_RTSCALAR:%.*]], label [[LOOP_RTVEC:%.*]], !prof [[PROF0:![0-9]+]]
-; CHECK:       exit:
-; CHECK-NEXT:    ret void
-; CHECK:       loop.rtvec:
-; CHECK-NEXT:    [[TMP25:%.*]] = load <4 x i32>, ptr [[A]], align 4
-; CHECK-NEXT:    [[TMP26:%.*]] = add nsw <4 x i32> [[TMP25]], splat (i32 1)
-; CHECK-NEXT:    store <4 x i32> [[TMP26]], ptr [[DST]], align 4
-; CHECK-NEXT:    [[GEP_A_32:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 16
-; CHECK-NEXT:    [[GEP_DST_32:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 16
-; CHECK-NEXT:    [[TMP27:%.*]] = load <4 x i32>, ptr [[GEP_A_32]], align 4
-; CHECK-NEXT:    [[TMP28:%.*]] = add nsw <4 x i32> [[TMP27]], splat (i32 1)
-; CHECK-NEXT:    store <4 x i32> [[TMP28]], ptr [[GEP_DST_32]], align 4
-; CHECK-NEXT:    [[GEP_A_33:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 32
-; CHECK-NEXT:    [[GEP_DST_33:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 32
-; CHECK-NEXT:    [[TMP29:%.*]] = load <4 x i32>, ptr [[GEP_A_33]], align 4
-; CHECK-NEXT:    [[TMP30:%.*]] = add nsw <4 x i32> [[TMP29]], splat (i32 1)
-; CHECK-NEXT:    store <4 x i32> [[TMP30]], ptr [[GEP_DST_33]], align 4
-; CHECK-NEXT:    [[GEP_A_34:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 48
-; CHECK-NEXT:    [[GEP_DST_34:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 48
-; CHECK-NEXT:    [[TMP31:%.*]] = load <4 x i32>, ptr [[GEP_A_34]], align 4
-; CHECK-NEXT:    [[TMP32:%.*]] = add nsw <4 x i32> [[TMP31]], splat (i32 1)
-; CHECK-NEXT:    store <4 x i32> [[TMP32]], ptr [[GEP_DST_34]], align 4
-; CHECK-NEXT:    [[GEP_A_35:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 64
-; CHECK-NEXT:    [[GEP_DST_35:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 64
-; CHECK-NEXT:    [[TMP33:%.*]] = load <4 x i32>, ptr [[GEP_A_35]], align 4
-; CHECK-NEXT:    [[TMP34:%.*]] = add nsw <4 x i32> [[TMP33]], splat (i32 1)
-; CHECK-NEXT:    store <4 x i32> [[TMP34]], ptr [[GEP_DST_35]], align 4
-; CHECK-NEXT:    [[GEP_A_36:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 80
-; CHECK-NEXT:    [[GEP_DST_36:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 80
-; CHECK-NEXT:    [[TMP35:%.*]] = load <4 x i32>, ptr [[GEP_A_36]], align 4
-; CHECK-NEXT:    [[TMP36:%.*]] = add nsw <4 x i32> [[TMP35]], splat (i32 1)
-; CHECK-NEXT:    store <4 x i32> [[TMP36]], ptr [[GEP_DST_36]], align 4
-; CHECK-NEXT:    [[GEP_A_37:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 96
-; CHECK-NEXT:    [[GEP_DST_37:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 96
-; CHECK-NEXT:    [[TMP37:%.*]] = load <4 x i32>, ptr [[GEP_A_37]], align 4
-; CHECK-NEXT:    [[TMP38:%.*]] = add nsw <4 x i32> [[TMP37]], splat (i32 1)
-; CHECK-NEXT:    store <4 x i32> [[TMP38]], ptr [[GEP_DST_37]], align 4
-; CHECK-NEXT:    [[GEP_A_38:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 112
-; CHECK-NEXT:    [[GEP_DST_38:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 112
-; CHECK-NEXT:    [[TMP39:%.*]] = load <4 x i32>, ptr [[GEP_A_38]], align 4
-; CHECK-NEXT:    [[TMP40:%.*]] = add nsw <4 x i32> [[TMP39]], splat (i32 1)
-; CHECK-NEXT:    store <4 x i32> [[TMP40]], ptr [[GEP_DST_38]], align 4
-; CHECK-NEXT:    br label [[EXIT]]
-; CHECK:       loop.rtscalar:
 ; CHECK-NEXT:    [[VA:%.*]] = load i32, ptr [[A]], align 4
 ; CHECK-NEXT:    [[ADD:%.*]] = add nsw i32 [[VA]], 1
 ; CHECK-NEXT:    store i32 [[ADD]], ptr [[DST]], align 4
@@ -446,6 +396,8 @@ define void @rt_check_needed(ptr %dst, ptr %a) {
 ; CHECK-NEXT:    [[GEP_DST_31:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 124
 ; CHECK-NEXT:    store i32 [[ADD_31]], ptr [[GEP_DST_31]], align 4
 ; CHECK-NEXT:    br label [[EXIT]]
+; CHECK:       exit:
+; CHECK-NEXT:    ret void
 ;
 entry:
   br label %loop
@@ -1282,7 +1234,7 @@ define void @inner_needs_runtime_alias_checks(ptr %dst, ptr %a) {
 ; CHECK-NEXT:    [[RT_BOUND1:%.*]] = icmp ugt i64 [[TMP1]], [[A13]]
 ; CHECK-NEXT:    [[RT_CONFLICT:%.*]] = and i1 [[RT_BOUND0]], [[RT_BOUND1]]
 ; CHECK-NEXT:    [[RT_GUARD:%.*]] = freeze i1 [[RT_CONFLICT]]
-; CHECK-NEXT:    br i1 [[RT_GUARD]], label [[ENTRY_RTSCALAR:%.*]], label [[ENTRY_RTVEC:%.*]], !prof [[PROF0]]
+; CHECK-NEXT:    br i1 [[RT_GUARD]], label [[ENTRY_RTSCALAR:%.*]], label [[ENTRY_RTVEC:%.*]], !prof [[PROF0:![0-9]+]]
 ; CHECK:       entry.rtvec:
 ; CHECK-NEXT:    [[TMP2:%.*]] = load <4 x i32>, ptr [[A]], align 4
 ; CHECK-NEXT:    [[TMP3:%.*]] = add nsw <4 x i32> [[TMP2]], splat (i32 1)

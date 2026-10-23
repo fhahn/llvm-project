@@ -1696,11 +1696,8 @@ PreservedAnalyses LoopFullUnrollPass::run(Loop &L, LoopAnalysisManager &AM,
     if (!findOptionMDForLoop(&L, LLVMLoopUnrollDeferredForVectorization))
       return PreservedAnalyses::all();
     // A deferred loop handled by LoopVectorize (the vector loop and its scalar
-    // remainder both inherit the marker) must not be fully unrolled, but may
-    // still leave patterns for the post-unroll cleanup chain (e.g. an
-    // LV-generated memset shadowed by a subsequent full-width store).
+    // remainder both inherit the marker) must not be fully unrolled.
     if (getBooleanLoopAttribute(&L, "llvm.loop.isvectorized")) {
-      L.getHeader()->getParent()->addFnAttr("late-unroll-performed");
       clearDeferredMarker(L);
       return PreservedAnalyses::all();
     }

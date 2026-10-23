@@ -1406,24 +1406,17 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
     // loop (or the unroll cost model rejected them), the attribute is not
     // set and the cleanup chain below is skipped.
     FPM.addPass(MarkLateUnrollCleanupPass());
-    // Recover code quality on the deferred loops after vectorization + late
-    // full unroll. The late transformations (either LoopVectorize turning
-    // the loop into a vector body, or LoopFullUnroll turning it into
-    // straight-line code) can leave behind redundant memsets/stores,
-    // chains of identical-condition branches, and duplicated conditional
-    // stores. A small cleanup sequence recovers that: InstCombine restores
-    // the if/else structure, JumpThreading collapses the repeated
-    // equal-condition branches, DSE drops the now-redundant stores
-    // (including LV-generated memsets shadowed by a subsequent full-width
-    // store), and SimplifyCFG with hoist/sink moves common straight-line
-    // code to the merge point. A standard LoopUnrollPass follows to fully
-    // unroll any leftover LV-produced vector.body loops inside an outer
-    // loop that we kept (because its inner was deferred), turning them
-    // into straight-line stores; LoopIdiomRecognize then re-runs on the
-    // outer loop to fold the resulting nested init pattern into a memset
-    // (e.g. the doubly-nested screen-init idiom). Without these two steps
-    // those nested init patterns bottom out as a wide chain of scalar
-    // stores.
+    // Recover code quality after the late full unroll. The straight-line code
+    // it produces can leave behind redundant stores, chains of
+    // identical-condition branches, and duplicated conditional stores, which
+    // the early pipeline would have cleaned up after the early full unroll.
+    // InstCombine restores the if/else structure, JumpThreading collapses the
+    // repeated equal-condition branches, DSE drops the now-redundant stores,
+    // and SimplifyCFG with hoist/sink moves common straight-line code to the
+    // merge point. A standard LoopUnrollPass fully unrolls leftover vector
+    // loops inside outer loops kept because an inner loop was deferred, and
+    // LoopIdiomRecognize folds the resulting nested init patterns into
+    // memsets.
     {
       ExtraFunctionPassManager<ShouldRunLateUnrollCleanup> ExtraPasses;
       ExtraPasses.addPass(InstCombinePass());

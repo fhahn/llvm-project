@@ -10,6 +10,10 @@
 ; nested pattern into a memset, leaving ~840 explicit stores in the
 ; final IR.
 ;
+; Currently missed: LV vectorizes the deferred inner loop and the late full
+; unroll does not unroll anything, so the post-unroll cleanup chain, whose
+; LoopUnrollPass + LoopIdiomRecognize would form the memset, does not run.
+;
 ; Source equivalent (MultiSource/Benchmarks/Prolangs-C++/shapes/bjarne.cpp):
 ;   char screen[40][24];
 ;   void init() {
@@ -27,8 +31,20 @@ target triple = "arm64-apple-macosx14"
 define void @init() local_unnamed_addr {
 ; CHECK-LABEL: define void @init(
 ; CHECK-SAME: ) local_unnamed_addr #[[ATTR0:[0-9]+]] {
-; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    tail call void @llvm.memset.p0.i64(ptr noundef nonnull align 16 dereferenceable(960) @screen, i8 32, i64 960, i1 false)
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[X_BODY:.*]]
+; CHECK:       [[X_BODY]]:
+; CHECK-NEXT:    [[X:%.*]] = phi i64 [ [[TMP3:%.*]], %[[X_BODY]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [24 x i8], ptr @screen, i64 [[X]]
+; CHECK-NEXT:    store <8 x i8> splat (i8 32), ptr [[TMP0]], align 8
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw [24 x i8], ptr getelementptr inbounds nuw (i8, ptr @screen, i64 8), i64 [[X]]
+; CHECK-NEXT:    store <8 x i8> splat (i8 32), ptr [[TMP1]], align 8
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw [24 x i8], ptr getelementptr inbounds nuw (i8, ptr @screen, i64 16), i64 [[X]]
+; CHECK-NEXT:    store <8 x i8> splat (i8 32), ptr [[TMP2]], align 8
+; CHECK-NEXT:    [[TMP3]] = add nuw nsw i64 [[X]], 1
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[TMP3]], 40
+; CHECK-NEXT:    br i1 [[TMP4]], label %[[EXIT:.*]], label %[[X_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;
 entry:

@@ -4,8 +4,8 @@
 ; In only-deferred mode, LoopFullUnrollPass only processes loops whose full
 ; unrolling was deferred earlier, i.e. loops marked with
 ; llvm.loop.unroll.deferred_for_vectorization. If it fully unrolls such a loop,
-; or finds that LoopVectorize vectorized it, it adds the late-unroll-performed
-; function attribute, which gates the post-unroll cleanup pipeline.
+; it adds the late-unroll-performed function attribute, which gates the
+; post-unroll cleanup pipeline.
 
 ; An unmarked loop is left untouched, even though it could be fully unrolled.
 define void @unmarked(ptr %dst) {
@@ -125,11 +125,11 @@ exit:
   ret void
 }
 
-; A marked loop already vectorized by LoopVectorize is not unrolled, but loses
-; the marker, and the attribute is added.
+; A marked loop already vectorized by LoopVectorize is not unrolled and loses
+; the marker. The attribute is not added.
 define void @marked_vectorized(ptr %dst) {
 ; CHECK-LABEL: define void @marked_vectorized(
-; CHECK-SAME: ptr [[DST:%.*]]) #[[ATTR0]] {
+; CHECK-SAME: ptr [[DST:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:

@@ -5,25 +5,59 @@
 target datalayout = "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-apple-macosx"
 
-; @has_deferred_loop has an innermost loop without vectorize-disable metadata,
-; so the early LoopFullUnrollPass defers it and MarkLoopsDeferredForVectorizationPass
-; sets the marker. The late LoopFullUnrollPass + SROAPass + InstCombinePass run
-; for this function, then the marker is invalidated.
+; @deferred_loop_unrolled has an innermost loop without vectorize-disable
+; metadata, so the early LoopFullUnrollPass defers it and
+; MarkLoopsDeferredForVectorizationPass sets the marker. LoopVectorize cannot
+; vectorize it (loop-carried dependence through memory), so the late
+; LoopFullUnrollPass fully unrolls it and the cleanup chain runs.
 ;
-; CHECK:      Running pass: MarkLoopsDeferredForVectorizationPass on has_deferred_loop
-; CHECK-NEXT: Running analysis: ShouldRunExtraUnrollAfterVectorize on has_deferred_loop
-; CHECK:      Running pass: LoopVectorizePass on has_deferred_loop
+; CHECK:      Running pass: MarkLoopsDeferredForVectorizationPass on deferred_loop_unrolled
+; CHECK-NEXT: Running analysis: ShouldRunExtraUnrollAfterVectorize on deferred_loop_unrolled
+; CHECK:      Running pass: LoopVectorizePass on deferred_loop_unrolled
 ;
 ; The late unroll cleanup runs:
-; CHECK:      Running pass: LoopFullUnrollPass on loop {{.*}} in function has_deferred_loop
-; CHECK:      Running pass: SROAPass on has_deferred_loop
-; CHECK:      Invalidating analysis: ShouldRunExtraUnrollAfterVectorize on has_deferred_loop
-; CHECK:      Running pass: MarkLateUnrollCleanupPass on has_deferred_loop
-; CHECK-NEXT: Running analysis: ShouldRunLateUnrollCleanup on has_deferred_loop
-; CHECK:      Running pass: InstCombinePass on has_deferred_loop
-; CHECK:      Invalidating analysis: ShouldRunLateUnrollCleanup on has_deferred_loop
+; CHECK:      Running pass: LoopFullUnrollPass on loop {{.*}} in function deferred_loop_unrolled
+; CHECK:      Running pass: SROAPass on deferred_loop_unrolled
+; CHECK:      Invalidating analysis: ShouldRunExtraUnrollAfterVectorize on deferred_loop_unrolled
+; CHECK:      Running pass: MarkLateUnrollCleanupPass on deferred_loop_unrolled
+; CHECK-NEXT: Running analysis: ShouldRunLateUnrollCleanup on deferred_loop_unrolled
+; CHECK:      Running pass: InstCombinePass on deferred_loop_unrolled
+; CHECK:      Invalidating analysis: ShouldRunLateUnrollCleanup on deferred_loop_unrolled
 
-define void @has_deferred_loop(ptr noalias %dst, ptr noalias %a, ptr noalias %b) {
+define void @deferred_loop_unrolled(ptr noalias %a, ptr noalias %b) {
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
+  %iv.next = add nuw nsw i64 %iv, 1
+  %gep.a.next = getelementptr inbounds i32, ptr %a, i64 %iv.next
+  %va = load i32, ptr %gep.a, align 4
+  %vb = load i32, ptr %gep.b, align 4
+  %add = add nsw i32 %va, %vb
+  store i32 %add, ptr %gep.a.next, align 4
+  %cmp = icmp ult i64 %iv.next, 16
+  br i1 %cmp, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; @deferred_loop_vectorized has a deferred loop that LoopVectorize vectorizes.
+; The late LoopFullUnrollPass runs, but does not unroll anything, so the
+; cleanup chain does not run.
+;
+; CHECK:      Running pass: MarkLoopsDeferredForVectorizationPass on deferred_loop_vectorized
+; CHECK-NEXT: Running analysis: ShouldRunExtraUnrollAfterVectorize on deferred_loop_vectorized
+; CHECK:      Running pass: LoopVectorizePass on deferred_loop_vectorized
+; CHECK:      Running pass: LoopFullUnrollPass on loop {{.*}} in function deferred_loop_vectorized
+; CHECK:      Running pass: MarkLateUnrollCleanupPass on deferred_loop_vectorized
+; CHECK-NOT:  Running analysis: ShouldRunLateUnrollCleanup on deferred_loop_vectorized
+; CHECK:      Running pass: SLPVectorizerPass on deferred_loop_vectorized
+
+define void @deferred_loop_vectorized(ptr noalias %dst, ptr noalias %a, ptr noalias %b) {
 entry:
   br label %loop
 
