@@ -294,6 +294,7 @@ while.end:
   ret void
 }
 
+; %p2 is accessed in reverse, so range checks are used.
 define void @too_many_runtime_checks(ptr nocapture noundef %p, ptr nocapture noundef %p1, ptr nocapture noundef readonly %p2, ptr nocapture noundef readonly %p3, i32 noundef %tc, i16 noundef %val) {
 ; CHECK-LABEL: define void @too_many_runtime_checks(
 ; CHECK-SAME: ptr noundef captures(none) [[P:%.*]], ptr noundef captures(none) [[P1:%.*]], ptr noundef readonly captures(none) [[P2:%.*]], ptr noundef readonly captures(none) [[P3:%.*]], i32 noundef [[TC:%.*]], i16 noundef [[VAL:%.*]]) #[[ATTR0]] {
@@ -307,7 +308,8 @@ define void @too_many_runtime_checks(ptr nocapture noundef %p, ptr nocapture nou
 ; CHECK-NEXT:    br label %[[WHILE_BODY:.*]]
 ; CHECK:       [[WHILE_BODY]]:
 ; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[TMP1]], %[[WHILE_PREHEADER]] ], [ [[INDVARS_IV_NEXT:%.*]], %[[WHILE_BODY]] ]
-; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds nuw i8, ptr [[P2]], i64 [[INDVARS_IV]]
+; CHECK-NEXT:    [[REV:%.*]] = sub nuw nsw i64 16, [[INDVARS_IV]]
+; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds nuw i8, ptr [[P2]], i64 [[REV]]
 ; CHECK-NEXT:    [[TMP60:%.*]] = load i8, ptr [[ARRAYIDX]], align 1
 ; CHECK-NEXT:    [[ARRAYIDX2:%.*]] = getelementptr inbounds nuw i8, ptr [[P3]], i64 [[INDVARS_IV]]
 ; CHECK-NEXT:    [[TMP61:%.*]] = load i8, ptr [[ARRAYIDX2]], align 1
@@ -341,7 +343,8 @@ while.preheader:
 
 while.body:
   %iv = phi i64 [ %1, %while.preheader ], [ %iv.next, %while.body ]
-  %arrayidx = getelementptr inbounds nuw i8, ptr %p2, i64 %iv
+  %rev = sub nuw nsw i64 16, %iv
+  %arrayidx = getelementptr inbounds nuw i8, ptr %p2, i64 %rev
   %2 = load i8, ptr %arrayidx, align 1
   %arrayidx2 = getelementptr inbounds nuw i8, ptr %p3, i64 %iv
   %3 = load i8, ptr %arrayidx2, align 1

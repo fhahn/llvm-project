@@ -304,6 +304,8 @@ exit:
   ret void
 }
 
+; %a and %b are accessed with different steps, so range checks are used, which
+; add the scoped noalias metadata.
 define void @test_noalias_metadata(ptr %a, ptr %b, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'test_noalias_metadata'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
@@ -327,9 +329,10 @@ define void @test_noalias_metadata(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep.a>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%l> = load vp<[[VP5]]> (!alias.scope !28, !noalias !27)
 ; CHECK-NEXT:      CLONE ir<%gep.b> = getelementptr inbounds ir<%b>, vp<[[VP4]]>
-; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep.b>, ir<1>
+; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds i64, ir<%gep.b>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%l2> = load vp<[[VP6]]> (!alias.scope !27)
-; CHECK-NEXT:      WIDEN ir<%add> = add ir<%l>, ir<%l2>
+; CHECK-NEXT:      WIDEN-CAST ir<%l2.trunc> = trunc ir<%l2> to i32
+; CHECK-NEXT:      WIDEN ir<%add> = add ir<%l>, ir<%l2.trunc>
 ; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<%add> (!alias.scope !28, !noalias !27)
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
@@ -353,9 +356,10 @@ define void @test_noalias_metadata(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    IR   %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ] (extra operand: vp<%bc.resume.val> from scalar.ph)
 ; CHECK-NEXT:    IR   %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
 ; CHECK-NEXT:    IR   %l = load i32, ptr %gep.a, align 4
-; CHECK-NEXT:    IR   %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
-; CHECK-NEXT:    IR   %l2 = load i32, ptr %gep.b, align 4
-; CHECK-NEXT:    IR   %add = add i32 %l, %l2
+; CHECK-NEXT:    IR   %gep.b = getelementptr inbounds i64, ptr %b, i64 %iv
+; CHECK-NEXT:    IR   %l2 = load i64, ptr %gep.b, align 8
+; CHECK-NEXT:    IR   %l2.trunc = trunc i64 %l2 to i32
+; CHECK-NEXT:    IR   %add = add i32 %l, %l2.trunc
 ; CHECK-NEXT:    IR   store i32 %add, ptr %gep.a, align 4
 ; CHECK-NEXT:    IR   %iv.next = add nuw nsw i64 %iv, 1
 ; CHECK-NEXT:    IR   %ec = icmp eq i64 %iv.next, %n
@@ -369,9 +373,10 @@ loop:
   %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
   %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
   %l = load i32, ptr %gep.a, align 4
-  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
-  %l2 = load i32, ptr %gep.b, align 4
-  %add = add i32 %l, %l2
+  %gep.b = getelementptr inbounds i64, ptr %b, i64 %iv
+  %l2 = load i64, ptr %gep.b, align 8
+  %l2.trunc = trunc i64 %l2 to i32
+  %add = add i32 %l, %l2.trunc
   store i32 %add, ptr %gep.a, align 4
   %iv.next = add nuw nsw i64 %iv, 1
   %ec = icmp eq i64 %iv.next, %n
