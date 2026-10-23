@@ -18,7 +18,7 @@ define void @threshold_does_not_fit_index_type(ptr %a, ptr %b, i16 %n) {
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP3:%.*]] = sub i16 [[B3]], [[A4]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = sub i16 [[TMP3]], 1
-; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i16 [[TMP4]], 32767
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i16 [[TMP4]], -1
 ; CHECK-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
 ;
 entry:
@@ -59,7 +59,7 @@ define void @nested_loop_threshold_does_not_fit_index_type(ptr %a, ptr %b, i16 %
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP4:%.*]] = sub i16 [[TMP0]], 1
-; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i16 [[TMP4]], 32767
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i16 [[TMP4]], -1
 ; CHECK-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
 ;
 entry:

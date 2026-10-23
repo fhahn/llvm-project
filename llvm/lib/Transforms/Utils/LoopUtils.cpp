@@ -2269,6 +2269,25 @@ Value *llvm::addRuntimeChecks(
   return MemoryRuntimeCheck;
 }
 
+const SCEV *llvm::getDiffCheckThreshold(ScalarEvolution &SE, Type *Ty,
+                                        ElementCount VF, unsigned IC,
+                                        unsigned AccessSize) {
+  unsigned BW = Ty->getScalarSizeInBits();
+  // The product of three 32-bit values fits 96 bits.
+  APInt MinThreshold = APInt(96, VF.getKnownMinValue()) * IC * AccessSize;
+  if (!MinThreshold.isIntN(BW))
+    return SE.getZero(Ty);
+  MinThreshold = MinThreshold.zextOrTrunc(BW);
+  // vscale is a power of 2, so a power-of-2 threshold fits or wraps to 0.
+  const SCEV *VScale = VF.isScalable() ? SE.getVScale(Ty) : SE.getOne(Ty);
+  bool Overflow = false;
+  if (!MinThreshold.isPowerOf2())
+    (void)MinThreshold.umul_ov(SE.getUnsignedRangeMax(VScale), Overflow);
+  if (Overflow)
+    return SE.getZero(Ty);
+  return SE.getMulExpr(SE.getConstant(MinThreshold), VScale);
+}
+
 Value *llvm::addDiffRuntimeChecks(Instruction *Loc,
                                   ArrayRef<PointerDiffInfo> Checks,
                                   SCEVExpander &Expander, ElementCount VF,
@@ -2287,7 +2306,8 @@ Value *llvm::addDiffRuntimeChecks(Instruction *Loc,
     assert(IC * AccessSize > 0 &&
            "Threshold must be non-zero to use diff-check");
     Type *Ty = SinkStart->getType();
-    const SCEV *TotalAccessSize = SE.getElementCount(Ty, VF * IC * AccessSize);
+    const SCEV *TotalAccessSize =
+        getDiffCheckThreshold(SE, Ty, VF, IC, AccessSize);
     Value *ThresholdMinusOne = Expander.expandCodeFor(
         SE.getMinusSCEV(TotalAccessSize, SE.getConstant(Ty, 1)), Ty, Loc);
     Value *Diff =

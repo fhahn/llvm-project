@@ -1620,7 +1620,8 @@ static VPValue *createDiffRuntimeChecks(VPlan &Plan, VPBuilder &Builder,
     assert(UF * AccessSize > 0 &&
            "Threshold must be non-zero to use diff-check");
     Type *Ty = SinkStart->getType();
-    const SCEV *TotalAccessSize = SE.getElementCount(Ty, VF * UF * AccessSize);
+    const SCEV *TotalAccessSize =
+        getDiffCheckThreshold(SE, Ty, VF, UF, AccessSize);
     const SCEV *ThresholdMinusOneSCEV =
         SE.getMinusSCEV(TotalAccessSize, SE.getOne(Ty));
     const SCEV *DiffSCEV = SE.getMinusSCEV(SinkStart, SrcStart);

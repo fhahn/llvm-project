@@ -20,12 +20,9 @@ define void @threshold_does_not_fit_index_type(ptr %a, ptr %b, i16 %n) #0 {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP2]], [[TMP4]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP5:%.*]] = call i16 @llvm.vscale.i16()
-; CHECK-NEXT:    [[TMP6:%.*]] = mul i16 [[TMP5]], 12288
-; CHECK-NEXT:    [[TMP7:%.*]] = add i16 [[TMP6]], -1
 ; CHECK-NEXT:    [[TMP8:%.*]] = sub i16 [[B3]], [[A4]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = sub i16 [[TMP8]], 1
-; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i16 [[TMP9]], [[TMP7]]
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i16 [[TMP9]], -1
 ; CHECK-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
 ;
 entry:

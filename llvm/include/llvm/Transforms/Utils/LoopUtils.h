@@ -667,6 +667,12 @@ addRuntimeChecks(Instruction *Loc, Loop *TheLoop,
                  const SmallVectorImpl<RuntimePointerCheck> &PointerChecks,
                  SCEVExpander &Expander, bool HoistRuntimeChecks = false);
 
+/// Returns the threshold VF * IC * AccessSize of a diff check of type \p Ty, or
+/// 0, i.e. 2^BW, if it may not fit \p Ty, so any non-zero difference conflicts.
+LLVM_ABI const SCEV *getDiffCheckThreshold(ScalarEvolution &SE, Type *Ty,
+                                           ElementCount VF, unsigned IC,
+                                           unsigned AccessSize);
+
 LLVM_ABI Value *addDiffRuntimeChecks(Instruction *Loc,
                                      ArrayRef<PointerDiffInfo> Checks,
                                      SCEVExpander &Expander, ElementCount VF,
