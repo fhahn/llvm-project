@@ -883,7 +883,10 @@ public:
       return;
 
     auto DiffChecks = Checks->getDiffChecks();
-    if (!DiffChecks || DiffChecks->empty())
+    // Alias masks only rule out conflicts in lane order.
+    if (!DiffChecks || DiffChecks->empty() ||
+        any_of(*DiffChecks,
+               [](const PointerDiffInfo &C) { return C.MayReorderLanes; }))
       return;
 
     [[maybe_unused]] auto HasPointerArgs = [](CallBase *CB) {

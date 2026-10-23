@@ -2283,7 +2283,8 @@ Value *llvm::addDiffRuntimeChecks(Instruction *Loc,
   // Map to keep track of created compares, The key is the pair of operands for
   // the compare, to allow detecting and re-using redundant compares.
   DenseMap<std::pair<Value *, Value *>, Value *> SeenCompares;
-  for (const auto &[SrcStart, SinkStart, AccessSize, NeedsFreeze] : Checks) {
+  for (const auto &[SrcStart, SinkStart, AccessSize, NeedsFreeze,
+                    MayReorderLanes] : Checks) {
     assert(IC * AccessSize > 0 &&
            "Threshold must be non-zero to use diff-check");
     Type *Ty = SinkStart->getType();

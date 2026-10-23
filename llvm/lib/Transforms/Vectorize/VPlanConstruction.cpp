@@ -1616,7 +1616,8 @@ static VPValue *createDiffRuntimeChecks(VPlan &Plan, VPBuilder &Builder,
   // re-using redundant compares.
   SmallDenseSet<std::pair<const SCEV *, const SCEV *>, 8> SeenCompares;
   VPValue *Cond = Plan.getFalse();
-  for (const auto &[SrcStart, SinkStart, AccessSize, NeedsFreeze] : Checks) {
+  for (const auto &[SrcStart, SinkStart, AccessSize, NeedsFreeze,
+                    MayReorderLanes] : Checks) {
     assert(UF * AccessSize > 0 &&
            "Threshold must be non-zero to use diff-check");
     Type *Ty = SinkStart->getType();

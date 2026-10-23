@@ -540,11 +540,15 @@ struct PointerDiffInfo {
   const SCEV *SinkStart;
   unsigned AccessSize;
   bool NeedsFreeze;
+  /// Whether the accesses may be reordered across lanes. The check is then one
+  /// of a pair ruling out conflicts in both directions.
+  bool MayReorderLanes;
 
   PointerDiffInfo(const SCEV *SrcStart, const SCEV *SinkStart,
-                  unsigned AccessSize, bool NeedsFreeze)
+                  unsigned AccessSize, bool NeedsFreeze,
+                  bool MayReorderLanes = false)
       : SrcStart(SrcStart), SinkStart(SinkStart), AccessSize(AccessSize),
-        NeedsFreeze(NeedsFreeze) {}
+        NeedsFreeze(NeedsFreeze), MayReorderLanes(MayReorderLanes) {}
 };
 
 /// Holds information about the memory runtime legality checks to verify
