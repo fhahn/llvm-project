@@ -156,6 +156,9 @@ struct LLVM_ABI CaptureAnalysis {
   /// are also considered.
   ///
   /// If I is nullptr, then captures at any point will be considered.
+  ///
+  /// Returns CaptureComponents::Provenance if \p Object is not
+  /// isIdentifiedFunctionLocal(); callers may skip the query for such objects.
   virtual CaptureComponents getCapturesBefore(const Value *Object,
                                               const Instruction *I, bool OrAt,
                                               bool ReturnCaptures) = 0;
