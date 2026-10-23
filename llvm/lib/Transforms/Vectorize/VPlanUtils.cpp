@@ -19,6 +19,7 @@
 #include "llvm/Analysis/BlockFrequencyInfoImpl.h"
 #include "llvm/Analysis/BranchProbabilityInfo.h"
 #include "llvm/Analysis/InstSimplifyFolder.h"
+#include "llvm/Analysis/Loads.h"
 #include "llvm/Analysis/LoopAccessAnalysis.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/MemoryLocation.h"
@@ -409,6 +410,24 @@ vputils::getConstantStride(VPValue *Addr, Type *AccessTy,
     return {};
 
   return getStrideFromAddRec(AddRec, L, AccessTy, /*Ptr=*/nullptr, PSE);
+}
+
+bool vputils::isLoadDereferenceableAndAlignedInLoop(
+    const VPInstruction &LoadVPI, Loop *L, PredicatedScalarEvolution &PSE,
+    DominatorTree &DT, AssumptionCache *AC) {
+  const SCEV *PtrSCEV = getSCEVExprForVPValue(LoadVPI.getOperand(0), PSE, L);
+  if (isa<SCEVCouldNotCompute>(PtrSCEV))
+    return false;
+  ScalarEvolution &SE = *PSE.getSE();
+  const DataLayout &DL = L->getHeader()->getDataLayout();
+  const SCEV *SizeSCEV = SE.getStoreSizeOfExpr(
+      DL.getIndexType(PtrSCEV->getType()), LoadVPI.getScalarType());
+  // The predicates for the backedge-taken counts were already added to PSE
+  // when computing the trip count.
+  SmallVector<const SCEVPredicate *> Preds;
+  return isDereferenceableAndAlignedInLoop(
+      PtrSCEV, getLoadStoreAlignment(LoadVPI.getUnderlyingInstr()), SizeSCEV, L,
+      SE, DT, AC, &Preds);
 }
 
 bool vputils::isAddressSCEVForCost(const SCEV *Addr, ScalarEvolution &SE,

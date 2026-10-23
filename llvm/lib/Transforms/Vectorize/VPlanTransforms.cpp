@@ -5928,30 +5928,90 @@ void VPlanTransforms::createPartialReductions(VPlan &Plan,
   }
 }
 
+/// Returns true if \p Addr is only computed by speculatable recipes and phis
+/// from live-ins that are not poison.
+static bool canSpeculateAddress(VPValue *Addr, Loop *L, DominatorTree &DT,
+                                AssumptionCache *AC) {
+  Instruction *CtxI = L->getLoopPreheader()->getTerminator();
+  SetVector<VPValue *> Worklist;
+  Worklist.insert(Addr);
+  for (unsigned I = 0; I != Worklist.size(); ++I) {
+    VPValue *V = Worklist[I];
+    if (auto *IRV = dyn_cast<VPIRValue>(V)) {
+      if (!isGuaranteedNotToBePoison(IRV->getValue(), AC, CtxI, &DT))
+        return false;
+      continue;
+    }
+    VPRecipeBase *R = V->getDefiningRecipe();
+    if (!R)
+      continue;
+    if (!R->isPhi() && !R->isSafeToSpeculativelyExecute())
+      return false;
+    Worklist.insert_range(R->operands());
+  }
+  return true;
+}
+
 /// Returns true if the load or store \p VPI needs to be predicated.
-static bool needsPredication(VPInstruction *VPI, VPCostContext &CostCtx) {
+static bool needsPredication(VPInstruction *VPI, PredicatedScalarEvolution &PSE,
+                             Loop *L, DominatorTree &DT, AssumptionCache *AC) {
   VPValue *Mask = VPI->getMask();
   if (!Mask)
     return false;
   if (VPI->getOpcode() == Instruction::Store)
     return true;
-  // TODO: Replace the legacy checks below with VPlan-based reasoning.
-  auto *LI = cast<LoadInst>(VPI->getUnderlyingInstr());
-  if (isSafeToSpeculativelyExecute(LI) || !CostCtx.isMaskRequired(LI))
+  // TODO: Replace the legacy check below with VPlan-based reasoning.
+  if (isSafeToSpeculativelyExecute(VPI->getUnderlyingInstr()))
     return false;
+  // Loads under the uncountable-exit mask, which may have no active lane, keep
+  // their mask.
+  if (match(Mask, m_VPInstruction<VPInstruction::ActiveLaneMask>()))
+    return true;
   // The header mask has its first lane active, so loads only masked by it don't
   // need predication if their address is loop-invariant.
-  if (!match(Mask, m_HeaderMask()))
-    return true;
-  const SCEV *AddrSCEV = vputils::getSCEVExprForVPValue(VPI->getOperand(0),
-                                                        CostCtx.PSE, CostCtx.L);
-  return isa<SCEVCouldNotCompute>(AddrSCEV) ||
-         !CostCtx.PSE.getSE()->isLoopInvariant(AddrSCEV, CostCtx.L);
+  VPValue *Addr = VPI->getOperand(0);
+  if (match(Mask, m_HeaderMask())) {
+    const SCEV *AddrSCEV = vputils::getSCEVExprForVPValue(Addr, PSE, L);
+    if (!isa<SCEVCouldNotCompute>(AddrSCEV) &&
+        PSE.getSE()->isLoopInvariant(AddrSCEV, L))
+      return false;
+  }
+
+  // A load can execute unconditionally if an unmasked load or store of at
+  // least its size and alignment accesses the same address.
+  VPlan &Plan = *VPI->getParent()->getPlan();
+  const DataLayout &DL = Plan.getDataLayout();
+  TypeSize LoadSize = DL.getTypeStoreSize(VPI->getScalarType());
+  Align LoadAlign = getLoadStoreAlignment(VPI->getUnderlyingInstr());
+  auto CoversLoad = [&](VPUser *U) {
+    auto *Other = dyn_cast<VPInstruction>(U);
+    if (!Other || Other->isMasked() || !Other->getUnderlyingValue())
+      return false;
+    bool IsLoad = Other->getOpcode() == Instruction::Load;
+    if ((!IsLoad && Other->getOpcode() != Instruction::Store) ||
+        Other->getOperand(!IsLoad) != Addr)
+      return false;
+    return getLoadStoreAlignment(Other->getUnderlyingInstr()) >= LoadAlign &&
+           TypeSize::isKnownGE(
+               DL.getTypeStoreSize(getLoadStoreValueType(Other)), LoadSize);
+  };
+  if (any_of(Addr->users(), CoversLoad))
+    return false;
+
+  // Without a folded tail, a load can execute unconditionally if its address
+  // is speculatable, dereferenceable and aligned in all iterations of the
+  // loop. The address SCEV may rely on PSE's predicates, which hold in the
+  // vector loop.
+  return Plan.hasTailFolded() || !canSpeculateAddress(Addr, L, DT, AC) ||
+         !vputils::isLoadDereferenceableAndAlignedInLoop(*VPI, L, PSE, DT, AC);
 }
 
 void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
                                                  VPRecipeBuilder &RecipeBuilder,
-                                                 VPCostContext &CostCtx) {
+                                                 VPCostContext &CostCtx,
+                                                 Loop *TheLoop,
+                                                 DominatorTree &DT,
+                                                 AssumptionCache *AC) {
   // Collect all loads/stores first. We will start with ones having simpler
   // decisions followed by more complex ones that are potentially
   // guided/dependent on the simpler ones.
@@ -5970,7 +6030,7 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
   // Decide predication before the sub-passes below modify the plan.
   SmallPtrSet<VPInstruction *, 8> PredicatedMemOps;
   for (VPInstruction *VPI : MemOps)
-    if (needsPredication(VPI, CostCtx))
+    if (needsPredication(VPI, CostCtx.PSE, TheLoop, DT, AC))
       PredicatedMemOps.insert(VPI);
 
   // Few helpers to process different kinds of memory operations.

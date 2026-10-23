@@ -15,6 +15,7 @@
 #include "llvm/Support/Compiler.h"
 
 namespace llvm {
+class AssumptionCache;
 class DominatorTree;
 class MemoryLocation;
 class ScalarEvolution;
@@ -51,6 +52,15 @@ VPValue *getOrCreateVPValueForSCEVExpr(VPlan &Plan, const SCEV *Expr);
 LLVM_ABI_FOR_TEST const SCEV *
 getSCEVExprForVPValue(const VPValue *V, PredicatedScalarEvolution &PSE,
                       const Loop *L = nullptr);
+
+/// Returns true if the address of the load \p LoadVPI is dereferenceable and
+/// aligned in all iterations of \p L, using the SCEV of the address under the
+/// predicates of \p PSE.
+bool isLoadDereferenceableAndAlignedInLoop(const VPInstruction &LoadVPI,
+                                           Loop *L,
+                                           PredicatedScalarEvolution &PSE,
+                                           DominatorTree &DT,
+                                           AssumptionCache *AC);
 
 /// If the pointer operand \p Addr of a memory access is an affine AddRec
 /// w.r.t. \p L with a constant stride, return the stride in units of
