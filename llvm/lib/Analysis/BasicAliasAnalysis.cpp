@@ -140,18 +140,16 @@ static TypeSize getMinimalExtentFrom(const Value &V,
   return TypeSize::getFixed(DerefBytes);
 }
 
-/// Returns true if we can prove that the object specified by V is smaller than
-/// the minimal extent accessed from OtherV with size OtherSize. Bails out early
-/// unless the root object is passed as the first parameter.
-static bool isObjectSmallerThan(const Value *V, const Value &OtherV,
-                                LocationSize OtherSize, const DataLayout &DL,
-                                const TargetLibraryInfo &TLI,
-                                bool NullIsValidLoc) {
+/// Returns the aligned size of the object specified by V, or std::nullopt if
+/// it is unknown or V is not an identified object.
+static std::optional<TypeSize>
+getIdentifiedObjectSize(const Value *V, const DataLayout &DL,
+                        const TargetLibraryInfo &TLI, bool NullIsValidLoc) {
   // Note that the meanings of the "object" are slightly different in the
   // following contexts:
   //    c1: llvm::getObjectSize()
   //    c2: llvm.objectsize() intrinsic
-  //    c3: isObjectSmallerThan()
+  //    c3: getIdentifiedObjectSize()
   // c1 and c2 share the same meaning; however, the meaning of "object" in c3
   // refers to the "entire object".
   //
@@ -165,15 +163,21 @@ static bool isObjectSmallerThan(const Value *V, const Value &OtherV,
   // In the context of c3, the "object" refers to the chunk of memory being
   // allocated. So, the "object" has 100 bytes, and q points to the middle the
   // "object". However, unless p, the root object, is passed as the first
-  // parameter, the call to isIdentifiedObject() makes isObjectSmallerThan()
+  // parameter, the isIdentifiedObject() check makes getIdentifiedObjectSize()
   // bail out early.
   if (!isIdentifiedObject(V))
-    return false;
+    return std::nullopt;
 
   // This function needs to use the aligned object size because we allow
   // reads a bit past the end given sufficient alignment.
-  std::optional<TypeSize> ObjectSize = getObjectSize(V, DL, TLI, NullIsValidLoc,
-                                                     /*RoundToAlign*/ true);
+  return getObjectSize(V, DL, TLI, NullIsValidLoc, /*RoundToAlign*/ true);
+}
+
+/// Returns true if we can prove that an object of size ObjectSize is smaller
+/// than the minimal extent accessed from OtherV with size OtherSize.
+static bool isObjectSmallerThan(std::optional<TypeSize> ObjectSize,
+                                const Value &OtherV, LocationSize OtherSize,
+                                const DataLayout &DL, bool NullIsValidLoc) {
   if (!ObjectSize)
     return false;
 
@@ -1621,8 +1625,15 @@ AliasResult BasicAAResult::aliasCheck(const Value *V1, LocationSize V1Size,
   // If the size of one access is larger than the entire object on the other
   // side, then we know such behavior is undefined and can assume no alias.
   bool NullIsValidLocation = NullPointerIsDefined(&F);
-  if (isObjectSmallerThan(O2, *V1, V1Size, DL, TLI, NullIsValidLocation) ||
-      isObjectSmallerThan(O1, *V2, V2Size, DL, TLI, NullIsValidLocation))
+  std::optional<TypeSize> O2Size =
+      getIdentifiedObjectSize(O2, DL, TLI, NullIsValidLocation);
+  if (isObjectSmallerThan(O2Size, *V1, V1Size, DL, NullIsValidLocation))
+    return AliasResult::NoAlias;
+  // Both pointers often share an underlying object; reuse its size then.
+  std::optional<TypeSize> O1Size =
+      O1 == O2 ? O2Size
+               : getIdentifiedObjectSize(O1, DL, TLI, NullIsValidLocation);
+  if (isObjectSmallerThan(O1Size, *V2, V2Size, DL, NullIsValidLocation))
     return AliasResult::NoAlias;
 
   if (EnableSeparateStorageAnalysis) {
