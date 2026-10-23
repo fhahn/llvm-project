@@ -12,7 +12,7 @@ target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128"
 ;
 ;   for (i = 0; i < n; i++) {
 ;     C[i] = A[i] + 1;
-;     C[i] += B[i];
+;     C[i] += B[2 * i];
 ;   }
 ;
 ; Check that the corresponding noalias metadata is added to the vector loop
@@ -44,7 +44,7 @@ for.body:
 ; DSE-NOT: store
   store i32 %add, ptr %arrayidxC, align 4
 
-  %arrayidxB = getelementptr inbounds i32, ptr %b, i64 %ind
+  %arrayidxB = getelementptr inbounds i64, ptr %b, i64 %ind
 ; Scope 6
 ; LV: = load {{.*}} !alias.scope !7
   %loadB = load i32, ptr %arrayidxB, align 4
