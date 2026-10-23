@@ -623,13 +623,12 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
     return false;
 
   // All accesses through Src must precede the accesses through Sink they may
-  // conflict with. Bail out if there are conflicting accesses in both orders.
+  // conflict with. If there are conflicting accesses in both orders, also
+  // check with Src and Sink swapped.
   bool SrcFirst =
       hasConflictingAccessBefore(DC, Src->PointerValue, Sink->PointerValue);
   bool SinkFirst =
       hasConflictingAccessBefore(DC, Sink->PointerValue, Src->PointerValue);
-  if (SrcFirst && SinkFirst)
-    return false;
   // Swap if Sink is accessed first, and again when counting down, which swaps
   // the dependence distance.
   if (SinkFirst != Step->getAPInt().isNegative())
@@ -668,6 +667,9 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
                     << "SinkStartInt: " << *SinkStartInt << '\n');
   DiffChecks.emplace_back(SrcStartInt, SinkStartInt, AllocSize,
                           Src->NeedsFreeze || Sink->NeedsFreeze);
+  if (SrcFirst && SinkFirst)
+    DiffChecks.emplace_back(SinkStartInt, SrcStartInt, AllocSize,
+                            Src->NeedsFreeze || Sink->NeedsFreeze);
   return true;
 }
 

@@ -11,36 +11,60 @@ define void @test(ptr nocapture %asd, ptr nocapture %aud,
 ; CHECK-LABEL: define void @test(
 ; CHECK-SAME: ptr captures(none) [[ASD:%.*]], ptr captures(none) [[AUD:%.*]], ptr captures(none) [[ASR:%.*]], ptr captures(none) [[AUR:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[AUR29:%.*]] = ptrtoaddr ptr [[AUR]] to i64
+; CHECK-NEXT:    [[ASR28:%.*]] = ptrtoaddr ptr [[ASR]] to i64
+; CHECK-NEXT:    [[AUD27:%.*]] = ptrtoaddr ptr [[AUD]] to i64
+; CHECK-NEXT:    [[ASD26:%.*]] = ptrtoaddr ptr [[ASD]] to i64
 ; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[ASD]], i64 512
-; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[AUD]], i64 512
-; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[ASR]], i64 512
-; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[AUR]], i64 512
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[ASD]], [[SCEVGEP1]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[AUD]], [[SCEVGEP]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    [[BOUND04:%.*]] = icmp ult ptr [[ASD]], [[SCEVGEP2]]
-; CHECK-NEXT:    [[BOUND15:%.*]] = icmp ult ptr [[ASR]], [[SCEVGEP]]
-; CHECK-NEXT:    [[FOUND_CONFLICT6:%.*]] = and i1 [[BOUND04]], [[BOUND15]]
+; CHECK-NEXT:    [[TMP52:%.*]] = sub i64 [[ASD26]], [[AUD27]]
+; CHECK-NEXT:    [[TMP53:%.*]] = sub i64 [[TMP52]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP53]], 7
+; CHECK-NEXT:    [[TMP54:%.*]] = sub i64 [[AUD27]], [[ASD26]]
+; CHECK-NEXT:    [[TMP55:%.*]] = sub i64 [[TMP54]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT6:%.*]] = icmp ult i64 [[TMP55]], 7
 ; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT6]]
-; CHECK-NEXT:    [[BOUND07:%.*]] = icmp ult ptr [[ASD]], [[SCEVGEP3]]
-; CHECK-NEXT:    [[BOUND18:%.*]] = icmp ult ptr [[AUR]], [[SCEVGEP]]
-; CHECK-NEXT:    [[FOUND_CONFLICT9:%.*]] = and i1 [[BOUND07]], [[BOUND18]]
+; CHECK-NEXT:    [[TMP56:%.*]] = sub i64 [[ASD26]], [[ASR28]]
+; CHECK-NEXT:    [[TMP57:%.*]] = sub i64 [[TMP56]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT9:%.*]] = icmp ult i64 [[TMP57]], 7
 ; CHECK-NEXT:    [[CONFLICT_RDX10:%.*]] = or i1 [[CONFLICT_RDX]], [[FOUND_CONFLICT9]]
-; CHECK-NEXT:    [[BOUND011:%.*]] = icmp ult ptr [[AUD]], [[SCEVGEP2]]
-; CHECK-NEXT:    [[BOUND112:%.*]] = icmp ult ptr [[ASR]], [[SCEVGEP1]]
-; CHECK-NEXT:    [[FOUND_CONFLICT13:%.*]] = and i1 [[BOUND011]], [[BOUND112]]
+; CHECK-NEXT:    [[TMP58:%.*]] = sub i64 [[ASR28]], [[ASD26]]
+; CHECK-NEXT:    [[TMP59:%.*]] = sub i64 [[TMP58]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT13:%.*]] = icmp ult i64 [[TMP59]], 7
 ; CHECK-NEXT:    [[CONFLICT_RDX14:%.*]] = or i1 [[CONFLICT_RDX10]], [[FOUND_CONFLICT13]]
-; CHECK-NEXT:    [[BOUND015:%.*]] = icmp ult ptr [[AUD]], [[SCEVGEP3]]
-; CHECK-NEXT:    [[BOUND116:%.*]] = icmp ult ptr [[AUR]], [[SCEVGEP1]]
-; CHECK-NEXT:    [[FOUND_CONFLICT17:%.*]] = and i1 [[BOUND015]], [[BOUND116]]
+; CHECK-NEXT:    [[TMP60:%.*]] = sub i64 [[ASD26]], [[AUR29]]
+; CHECK-NEXT:    [[TMP61:%.*]] = sub i64 [[TMP60]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT17:%.*]] = icmp ult i64 [[TMP61]], 7
 ; CHECK-NEXT:    [[CONFLICT_RDX18:%.*]] = or i1 [[CONFLICT_RDX14]], [[FOUND_CONFLICT17]]
-; CHECK-NEXT:    [[BOUND019:%.*]] = icmp ult ptr [[ASR]], [[SCEVGEP3]]
-; CHECK-NEXT:    [[BOUND120:%.*]] = icmp ult ptr [[AUR]], [[SCEVGEP2]]
-; CHECK-NEXT:    [[FOUND_CONFLICT21:%.*]] = and i1 [[BOUND019]], [[BOUND120]]
+; CHECK-NEXT:    [[TMP62:%.*]] = sub i64 [[AUR29]], [[ASD26]]
+; CHECK-NEXT:    [[TMP63:%.*]] = sub i64 [[TMP62]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT21:%.*]] = icmp ult i64 [[TMP63]], 7
 ; CHECK-NEXT:    [[CONFLICT_RDX22:%.*]] = or i1 [[CONFLICT_RDX18]], [[FOUND_CONFLICT21]]
-; CHECK-NEXT:    br i1 [[CONFLICT_RDX22]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP64:%.*]] = sub i64 [[AUD27]], [[ASR28]]
+; CHECK-NEXT:    [[TMP65:%.*]] = sub i64 [[TMP64]], 1
+; CHECK-NEXT:    [[DIFF_CHECK39:%.*]] = icmp ult i64 [[TMP65]], 7
+; CHECK-NEXT:    [[CONFLICT_RDX40:%.*]] = or i1 [[CONFLICT_RDX22]], [[DIFF_CHECK39]]
+; CHECK-NEXT:    [[TMP66:%.*]] = sub i64 [[ASR28]], [[AUD27]]
+; CHECK-NEXT:    [[TMP67:%.*]] = sub i64 [[TMP66]], 1
+; CHECK-NEXT:    [[DIFF_CHECK41:%.*]] = icmp ult i64 [[TMP67]], 7
+; CHECK-NEXT:    [[CONFLICT_RDX42:%.*]] = or i1 [[CONFLICT_RDX40]], [[DIFF_CHECK41]]
+; CHECK-NEXT:    [[TMP68:%.*]] = sub i64 [[AUD27]], [[AUR29]]
+; CHECK-NEXT:    [[TMP69:%.*]] = sub i64 [[TMP68]], 1
+; CHECK-NEXT:    [[DIFF_CHECK43:%.*]] = icmp ult i64 [[TMP69]], 7
+; CHECK-NEXT:    [[CONFLICT_RDX44:%.*]] = or i1 [[CONFLICT_RDX42]], [[DIFF_CHECK43]]
+; CHECK-NEXT:    [[TMP70:%.*]] = sub i64 [[AUR29]], [[AUD27]]
+; CHECK-NEXT:    [[TMP71:%.*]] = sub i64 [[TMP70]], 1
+; CHECK-NEXT:    [[DIFF_CHECK45:%.*]] = icmp ult i64 [[TMP71]], 7
+; CHECK-NEXT:    [[CONFLICT_RDX46:%.*]] = or i1 [[CONFLICT_RDX44]], [[DIFF_CHECK45]]
+; CHECK-NEXT:    [[TMP72:%.*]] = sub i64 [[ASR28]], [[AUR29]]
+; CHECK-NEXT:    [[TMP73:%.*]] = sub i64 [[TMP72]], 1
+; CHECK-NEXT:    [[DIFF_CHECK47:%.*]] = icmp ult i64 [[TMP73]], 7
+; CHECK-NEXT:    [[CONFLICT_RDX48:%.*]] = or i1 [[CONFLICT_RDX46]], [[DIFF_CHECK47]]
+; CHECK-NEXT:    [[TMP74:%.*]] = sub i64 [[AUR29]], [[ASR28]]
+; CHECK-NEXT:    [[TMP75:%.*]] = sub i64 [[TMP74]], 1
+; CHECK-NEXT:    [[DIFF_CHECK49:%.*]] = icmp ult i64 [[TMP75]], 7
+; CHECK-NEXT:    [[CONFLICT_RDX50:%.*]] = or i1 [[CONFLICT_RDX48]], [[DIFF_CHECK49]]
+; CHECK-NEXT:    br i1 [[CONFLICT_RDX50]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
@@ -49,10 +73,10 @@ define void @test(ptr nocapture %asd, ptr nocapture %aud,
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i32, ptr [[AUD]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i32, ptr [[ASR]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i32, ptr [[AUR]], i64 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP0]], align 4, !alias.scope [[META5:![0-9]+]], !noalias [[META8:![0-9]+]]
-; CHECK-NEXT:    [[WIDE_LOAD23:%.*]] = load <2 x i32>, ptr [[TMP1]], align 4, !alias.scope [[META12:![0-9]+]], !noalias [[META13:![0-9]+]]
-; CHECK-NEXT:    [[WIDE_LOAD24:%.*]] = load <2 x i32>, ptr [[TMP2]], align 4, !alias.scope [[META14:![0-9]+]], !noalias [[META15:![0-9]+]]
-; CHECK-NEXT:    [[WIDE_LOAD25:%.*]] = load <2 x i32>, ptr [[TMP3]], align 4, !alias.scope [[META15]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP0]], align 4
+; CHECK-NEXT:    [[WIDE_LOAD23:%.*]] = load <2 x i32>, ptr [[TMP1]], align 4
+; CHECK-NEXT:    [[WIDE_LOAD24:%.*]] = load <2 x i32>, ptr [[TMP2]], align 4
+; CHECK-NEXT:    [[WIDE_LOAD25:%.*]] = load <2 x i32>, ptr [[TMP3]], align 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = add nsw <2 x i32> [[WIDE_LOAD]], splat (i32 23)
 ; CHECK-NEXT:    [[TMP5:%.*]] = add nsw <2 x i32> [[WIDE_LOAD23]], splat (i32 24)
 ; CHECK-NEXT:    [[TMP6:%.*]] = add nsw <2 x i32> [[WIDE_LOAD24]], splat (i32 25)
@@ -112,10 +136,10 @@ define void @test(ptr nocapture %asd, ptr nocapture %aud,
 ; CHECK-NEXT:    [[PREDPHI28:%.*]] = select <2 x i1> [[TMP8]], <2 x i32> [[TMP48]], <2 x i32> [[TMP5]]
 ; CHECK-NEXT:    [[PREDPHI29:%.*]] = select <2 x i1> [[TMP8]], <2 x i32> [[TMP49]], <2 x i32> [[TMP6]]
 ; CHECK-NEXT:    [[PREDPHI30:%.*]] = select <2 x i1> [[TMP8]], <2 x i32> [[TMP50]], <2 x i32> [[TMP7]]
-; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP0]], align 4, !alias.scope [[META5]], !noalias [[META8]]
-; CHECK-NEXT:    store <2 x i32> [[PREDPHI28]], ptr [[TMP1]], align 4, !alias.scope [[META12]], !noalias [[META13]]
-; CHECK-NEXT:    store <2 x i32> [[PREDPHI29]], ptr [[TMP2]], align 4, !alias.scope [[META14]], !noalias [[META15]]
-; CHECK-NEXT:    store <2 x i32> [[PREDPHI30]], ptr [[TMP3]], align 4, !alias.scope [[META15]]
+; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP0]], align 4
+; CHECK-NEXT:    store <2 x i32> [[PREDPHI28]], ptr [[TMP1]], align 4
+; CHECK-NEXT:    store <2 x i32> [[PREDPHI29]], ptr [[TMP2]], align 4
+; CHECK-NEXT:    store <2 x i32> [[PREDPHI30]], ptr [[TMP3]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP51:%.*]] = icmp eq i64 [[INDEX_NEXT]], 128
 ; CHECK-NEXT:    br i1 [[TMP51]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
@@ -163,36 +187,60 @@ define void @test(ptr nocapture %asd, ptr nocapture %aud,
 ; UNROLL-NO-VF-LABEL: define void @test(
 ; UNROLL-NO-VF-SAME: ptr captures(none) [[ASD:%.*]], ptr captures(none) [[AUD:%.*]], ptr captures(none) [[ASR:%.*]], ptr captures(none) [[AUR:%.*]]) {
 ; UNROLL-NO-VF-NEXT:  [[ENTRY:.*:]]
+; UNROLL-NO-VF-NEXT:    [[AUR29:%.*]] = ptrtoaddr ptr [[AUR]] to i64
+; UNROLL-NO-VF-NEXT:    [[ASR28:%.*]] = ptrtoaddr ptr [[ASR]] to i64
+; UNROLL-NO-VF-NEXT:    [[AUD27:%.*]] = ptrtoaddr ptr [[AUD]] to i64
+; UNROLL-NO-VF-NEXT:    [[ASD26:%.*]] = ptrtoaddr ptr [[ASD]] to i64
 ; UNROLL-NO-VF-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; UNROLL-NO-VF:       [[VECTOR_MEMCHECK]]:
-; UNROLL-NO-VF-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[ASD]], i64 512
-; UNROLL-NO-VF-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[AUD]], i64 512
-; UNROLL-NO-VF-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[ASR]], i64 512
-; UNROLL-NO-VF-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[AUR]], i64 512
-; UNROLL-NO-VF-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[ASD]], [[SCEVGEP1]]
-; UNROLL-NO-VF-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[AUD]], [[SCEVGEP]]
-; UNROLL-NO-VF-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; UNROLL-NO-VF-NEXT:    [[BOUND04:%.*]] = icmp ult ptr [[ASD]], [[SCEVGEP2]]
-; UNROLL-NO-VF-NEXT:    [[BOUND15:%.*]] = icmp ult ptr [[ASR]], [[SCEVGEP]]
-; UNROLL-NO-VF-NEXT:    [[FOUND_CONFLICT6:%.*]] = and i1 [[BOUND04]], [[BOUND15]]
+; UNROLL-NO-VF-NEXT:    [[TMP44:%.*]] = sub i64 [[ASD26]], [[AUD27]]
+; UNROLL-NO-VF-NEXT:    [[TMP45:%.*]] = sub i64 [[TMP44]], 1
+; UNROLL-NO-VF-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP45]], 7
+; UNROLL-NO-VF-NEXT:    [[TMP46:%.*]] = sub i64 [[AUD27]], [[ASD26]]
+; UNROLL-NO-VF-NEXT:    [[TMP47:%.*]] = sub i64 [[TMP46]], 1
+; UNROLL-NO-VF-NEXT:    [[FOUND_CONFLICT6:%.*]] = icmp ult i64 [[TMP47]], 7
 ; UNROLL-NO-VF-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT6]]
-; UNROLL-NO-VF-NEXT:    [[BOUND07:%.*]] = icmp ult ptr [[ASD]], [[SCEVGEP3]]
-; UNROLL-NO-VF-NEXT:    [[BOUND18:%.*]] = icmp ult ptr [[AUR]], [[SCEVGEP]]
-; UNROLL-NO-VF-NEXT:    [[FOUND_CONFLICT9:%.*]] = and i1 [[BOUND07]], [[BOUND18]]
+; UNROLL-NO-VF-NEXT:    [[TMP48:%.*]] = sub i64 [[ASD26]], [[ASR28]]
+; UNROLL-NO-VF-NEXT:    [[TMP49:%.*]] = sub i64 [[TMP48]], 1
+; UNROLL-NO-VF-NEXT:    [[FOUND_CONFLICT9:%.*]] = icmp ult i64 [[TMP49]], 7
 ; UNROLL-NO-VF-NEXT:    [[CONFLICT_RDX10:%.*]] = or i1 [[CONFLICT_RDX]], [[FOUND_CONFLICT9]]
-; UNROLL-NO-VF-NEXT:    [[BOUND011:%.*]] = icmp ult ptr [[AUD]], [[SCEVGEP2]]
-; UNROLL-NO-VF-NEXT:    [[BOUND112:%.*]] = icmp ult ptr [[ASR]], [[SCEVGEP1]]
-; UNROLL-NO-VF-NEXT:    [[FOUND_CONFLICT13:%.*]] = and i1 [[BOUND011]], [[BOUND112]]
+; UNROLL-NO-VF-NEXT:    [[TMP50:%.*]] = sub i64 [[ASR28]], [[ASD26]]
+; UNROLL-NO-VF-NEXT:    [[TMP51:%.*]] = sub i64 [[TMP50]], 1
+; UNROLL-NO-VF-NEXT:    [[FOUND_CONFLICT13:%.*]] = icmp ult i64 [[TMP51]], 7
 ; UNROLL-NO-VF-NEXT:    [[CONFLICT_RDX14:%.*]] = or i1 [[CONFLICT_RDX10]], [[FOUND_CONFLICT13]]
-; UNROLL-NO-VF-NEXT:    [[BOUND015:%.*]] = icmp ult ptr [[AUD]], [[SCEVGEP3]]
-; UNROLL-NO-VF-NEXT:    [[BOUND116:%.*]] = icmp ult ptr [[AUR]], [[SCEVGEP1]]
-; UNROLL-NO-VF-NEXT:    [[FOUND_CONFLICT17:%.*]] = and i1 [[BOUND015]], [[BOUND116]]
+; UNROLL-NO-VF-NEXT:    [[TMP52:%.*]] = sub i64 [[ASD26]], [[AUR29]]
+; UNROLL-NO-VF-NEXT:    [[TMP53:%.*]] = sub i64 [[TMP52]], 1
+; UNROLL-NO-VF-NEXT:    [[FOUND_CONFLICT17:%.*]] = icmp ult i64 [[TMP53]], 7
 ; UNROLL-NO-VF-NEXT:    [[CONFLICT_RDX18:%.*]] = or i1 [[CONFLICT_RDX14]], [[FOUND_CONFLICT17]]
-; UNROLL-NO-VF-NEXT:    [[BOUND019:%.*]] = icmp ult ptr [[ASR]], [[SCEVGEP3]]
-; UNROLL-NO-VF-NEXT:    [[BOUND120:%.*]] = icmp ult ptr [[AUR]], [[SCEVGEP2]]
-; UNROLL-NO-VF-NEXT:    [[FOUND_CONFLICT21:%.*]] = and i1 [[BOUND019]], [[BOUND120]]
+; UNROLL-NO-VF-NEXT:    [[TMP54:%.*]] = sub i64 [[AUR29]], [[ASD26]]
+; UNROLL-NO-VF-NEXT:    [[TMP55:%.*]] = sub i64 [[TMP54]], 1
+; UNROLL-NO-VF-NEXT:    [[FOUND_CONFLICT21:%.*]] = icmp ult i64 [[TMP55]], 7
 ; UNROLL-NO-VF-NEXT:    [[CONFLICT_RDX22:%.*]] = or i1 [[CONFLICT_RDX18]], [[FOUND_CONFLICT21]]
-; UNROLL-NO-VF-NEXT:    br i1 [[CONFLICT_RDX22]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; UNROLL-NO-VF-NEXT:    [[TMP56:%.*]] = sub i64 [[AUD27]], [[ASR28]]
+; UNROLL-NO-VF-NEXT:    [[TMP57:%.*]] = sub i64 [[TMP56]], 1
+; UNROLL-NO-VF-NEXT:    [[DIFF_CHECK39:%.*]] = icmp ult i64 [[TMP57]], 7
+; UNROLL-NO-VF-NEXT:    [[CONFLICT_RDX40:%.*]] = or i1 [[CONFLICT_RDX22]], [[DIFF_CHECK39]]
+; UNROLL-NO-VF-NEXT:    [[TMP58:%.*]] = sub i64 [[ASR28]], [[AUD27]]
+; UNROLL-NO-VF-NEXT:    [[TMP59:%.*]] = sub i64 [[TMP58]], 1
+; UNROLL-NO-VF-NEXT:    [[DIFF_CHECK41:%.*]] = icmp ult i64 [[TMP59]], 7
+; UNROLL-NO-VF-NEXT:    [[CONFLICT_RDX42:%.*]] = or i1 [[CONFLICT_RDX40]], [[DIFF_CHECK41]]
+; UNROLL-NO-VF-NEXT:    [[TMP60:%.*]] = sub i64 [[AUD27]], [[AUR29]]
+; UNROLL-NO-VF-NEXT:    [[TMP61:%.*]] = sub i64 [[TMP60]], 1
+; UNROLL-NO-VF-NEXT:    [[DIFF_CHECK43:%.*]] = icmp ult i64 [[TMP61]], 7
+; UNROLL-NO-VF-NEXT:    [[CONFLICT_RDX44:%.*]] = or i1 [[CONFLICT_RDX42]], [[DIFF_CHECK43]]
+; UNROLL-NO-VF-NEXT:    [[TMP62:%.*]] = sub i64 [[AUR29]], [[AUD27]]
+; UNROLL-NO-VF-NEXT:    [[TMP63:%.*]] = sub i64 [[TMP62]], 1
+; UNROLL-NO-VF-NEXT:    [[DIFF_CHECK45:%.*]] = icmp ult i64 [[TMP63]], 7
+; UNROLL-NO-VF-NEXT:    [[CONFLICT_RDX46:%.*]] = or i1 [[CONFLICT_RDX44]], [[DIFF_CHECK45]]
+; UNROLL-NO-VF-NEXT:    [[TMP64:%.*]] = sub i64 [[ASR28]], [[AUR29]]
+; UNROLL-NO-VF-NEXT:    [[TMP65:%.*]] = sub i64 [[TMP64]], 1
+; UNROLL-NO-VF-NEXT:    [[DIFF_CHECK47:%.*]] = icmp ult i64 [[TMP65]], 7
+; UNROLL-NO-VF-NEXT:    [[CONFLICT_RDX48:%.*]] = or i1 [[CONFLICT_RDX46]], [[DIFF_CHECK47]]
+; UNROLL-NO-VF-NEXT:    [[TMP66:%.*]] = sub i64 [[AUR29]], [[ASR28]]
+; UNROLL-NO-VF-NEXT:    [[TMP67:%.*]] = sub i64 [[TMP66]], 1
+; UNROLL-NO-VF-NEXT:    [[DIFF_CHECK49:%.*]] = icmp ult i64 [[TMP67]], 7
+; UNROLL-NO-VF-NEXT:    [[CONFLICT_RDX50:%.*]] = or i1 [[CONFLICT_RDX48]], [[DIFF_CHECK49]]
+; UNROLL-NO-VF-NEXT:    br i1 [[CONFLICT_RDX50]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; UNROLL-NO-VF:       [[VECTOR_PH]]:
 ; UNROLL-NO-VF-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; UNROLL-NO-VF:       [[VECTOR_BODY]]:
@@ -206,14 +254,14 @@ define void @test(ptr nocapture %asd, ptr nocapture %aud,
 ; UNROLL-NO-VF-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[ASR]], i64 [[TMP0]]
 ; UNROLL-NO-VF-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i32, ptr [[AUR]], i64 [[INDEX]]
 ; UNROLL-NO-VF-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i32, ptr [[AUR]], i64 [[TMP0]]
-; UNROLL-NO-VF-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP1]], align 4, !alias.scope [[META5:![0-9]+]], !noalias [[META8:![0-9]+]]
-; UNROLL-NO-VF-NEXT:    [[TMP10:%.*]] = load i32, ptr [[TMP2]], align 4, !alias.scope [[META5]], !noalias [[META8]]
-; UNROLL-NO-VF-NEXT:    [[TMP11:%.*]] = load i32, ptr [[TMP3]], align 4, !alias.scope [[META12:![0-9]+]], !noalias [[META13:![0-9]+]]
-; UNROLL-NO-VF-NEXT:    [[TMP12:%.*]] = load i32, ptr [[TMP4]], align 4, !alias.scope [[META12]], !noalias [[META13]]
-; UNROLL-NO-VF-NEXT:    [[TMP13:%.*]] = load i32, ptr [[TMP5]], align 4, !alias.scope [[META14:![0-9]+]], !noalias [[META15:![0-9]+]]
-; UNROLL-NO-VF-NEXT:    [[TMP14:%.*]] = load i32, ptr [[TMP6]], align 4, !alias.scope [[META14]], !noalias [[META15]]
-; UNROLL-NO-VF-NEXT:    [[TMP15:%.*]] = load i32, ptr [[TMP7]], align 4, !alias.scope [[META15]]
-; UNROLL-NO-VF-NEXT:    [[TMP16:%.*]] = load i32, ptr [[TMP8]], align 4, !alias.scope [[META15]]
+; UNROLL-NO-VF-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP1]], align 4
+; UNROLL-NO-VF-NEXT:    [[TMP10:%.*]] = load i32, ptr [[TMP2]], align 4
+; UNROLL-NO-VF-NEXT:    [[TMP11:%.*]] = load i32, ptr [[TMP3]], align 4
+; UNROLL-NO-VF-NEXT:    [[TMP12:%.*]] = load i32, ptr [[TMP4]], align 4
+; UNROLL-NO-VF-NEXT:    [[TMP13:%.*]] = load i32, ptr [[TMP5]], align 4
+; UNROLL-NO-VF-NEXT:    [[TMP14:%.*]] = load i32, ptr [[TMP6]], align 4
+; UNROLL-NO-VF-NEXT:    [[TMP15:%.*]] = load i32, ptr [[TMP7]], align 4
+; UNROLL-NO-VF-NEXT:    [[TMP16:%.*]] = load i32, ptr [[TMP8]], align 4
 ; UNROLL-NO-VF-NEXT:    [[TMP17:%.*]] = add nsw i32 [[TMP9]], 23
 ; UNROLL-NO-VF-NEXT:    [[TMP18:%.*]] = add nsw i32 [[TMP10]], 23
 ; UNROLL-NO-VF-NEXT:    [[TMP19:%.*]] = add nsw i32 [[TMP11]], 24
@@ -256,14 +304,14 @@ define void @test(ptr nocapture %asd, ptr nocapture %aud,
 ; UNROLL-NO-VF-NEXT:    [[PREDPHI29:%.*]] = select i1 [[TMP26]], i32 [[TMP41]], i32 [[TMP22]]
 ; UNROLL-NO-VF-NEXT:    [[PREDPHI30:%.*]] = select i1 [[TMP25]], i32 [[TMP34]], i32 [[TMP23]]
 ; UNROLL-NO-VF-NEXT:    [[PREDPHI31:%.*]] = select i1 [[TMP26]], i32 [[TMP42]], i32 [[TMP24]]
-; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI]], ptr [[TMP1]], align 4, !alias.scope [[META5]], !noalias [[META8]]
-; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI25]], ptr [[TMP2]], align 4, !alias.scope [[META5]], !noalias [[META8]]
-; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI26]], ptr [[TMP3]], align 4, !alias.scope [[META12]], !noalias [[META13]]
-; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI27]], ptr [[TMP4]], align 4, !alias.scope [[META12]], !noalias [[META13]]
-; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI28]], ptr [[TMP5]], align 4, !alias.scope [[META14]], !noalias [[META15]]
-; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI29]], ptr [[TMP6]], align 4, !alias.scope [[META14]], !noalias [[META15]]
-; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI30]], ptr [[TMP7]], align 4, !alias.scope [[META15]]
-; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI31]], ptr [[TMP8]], align 4, !alias.scope [[META15]]
+; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI]], ptr [[TMP1]], align 4
+; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI25]], ptr [[TMP2]], align 4
+; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI26]], ptr [[TMP3]], align 4
+; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI27]], ptr [[TMP4]], align 4
+; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI28]], ptr [[TMP5]], align 4
+; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI29]], ptr [[TMP6]], align 4
+; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI30]], ptr [[TMP7]], align 4
+; UNROLL-NO-VF-NEXT:    store i32 [[PREDPHI31]], ptr [[TMP8]], align 4
 ; UNROLL-NO-VF-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; UNROLL-NO-VF-NEXT:    [[TMP43:%.*]] = icmp eq i64 [[INDEX_NEXT]], 128
 ; UNROLL-NO-VF-NEXT:    br i1 [[TMP43]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
