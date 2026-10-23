@@ -827,37 +827,62 @@ static void legalizeAndOptimizeInductions(VPlan &Plan) {
     WideIVs.push_back(&PhiR);
 
   // Try to narrow wide and replicating recipes to uniform recipes, based on
-  // VPlan analysis.
+  // VPlan analysis. Unlike makeScalarizationDecisions, this runs after
+  // interleave groups have been formed, so it also narrows users of inductions
+  // only feeding addresses of interleave groups.
   // TODO: Apply to all recipes in the future, to replace legacy uniformity
   // analysis.
+  auto IsExtractValue = [](VPUser *U) {
+    auto *R = dyn_cast<VPRecipeWithIRFlags>(U);
+    return R && R->getUnderlyingValue() &&
+           vputils::getOpcode(R) == Instruction::ExtractValue;
+  };
+  auto NarrowToSingleScalar = [&Plan](VPRecipeWithIRFlags *R) {
+    SmallVector<VPValue *> Ops(R->operands());
+    // Single-scalar calls take the called function as last operand.
+    if (isa<VPWidenIntrinsicRecipe>(R))
+      Ops.push_back(Plan.getOrAddLiveIn(
+          cast<CallInst>(R->getUnderlyingValue())->getCalledFunction()));
+    auto *Clone = VPBuilder::createSingleScalarOp(
+        R->getUnderlyingInstr()->getOpcode(), Ops, /*Mask=*/nullptr, *R,
+        getMetadataOf(R), DebugLoc::getUnknown(), R->getScalarType(),
+        R->getUnderlyingInstr());
+    Clone->insertAfter(R);
+    R->replaceAllUsesWith(Clone);
+    R->eraseFromParent();
+  };
   for (VPWidenInductionRecipe *PhiR : WideIVs) {
     auto Users = vputils::collectUsersRecursively(PhiR);
     for (VPUser *U : reverse(Users)) {
       auto *Def = dyn_cast<VPRecipeWithIRFlags>(U);
       auto *RepR = dyn_cast<VPReplicateRecipe>(U);
       // Skip recipes that shouldn't be narrowed.
+      // TODO: Support scalarizing ExtractValue on its own.
       if (!Def ||
-          !isa<VPReplicateRecipe, VPWidenRecipe, VPWidenGEPRecipe>(Def) ||
+          !isa<VPReplicateRecipe, VPWidenRecipe, VPWidenCastRecipe,
+               VPWidenGEPRecipe, VPWidenIntrinsicRecipe>(Def) ||
           Def->user_empty() || !Def->getUnderlyingValue() ||
+          IsExtractValue(Def) ||
           (RepR && (RepR->isSingleScalar() || RepR->isPredicated())))
         continue;
 
+      // ExtractValues take the shape of their aggregate, so calls returning
+      // structs are narrowed together with their extractvalue users.
+      SmallVector<VPUser *> Extracts;
+      if (all_of(Def->users(), [&](VPUser *U) {
+            return IsExtractValue(U) &&
+                   vputils::onlyFirstLaneUsed(cast<VPSingleDefRecipe>(U));
+          }))
+        Extracts = to_vector(Def->users());
+
       // Skip recipes that may have other lanes than their first used.
-      if (!vputils::isSingleScalar(Def) && !vputils::onlyFirstLaneUsed(Def))
+      if (Extracts.empty() && !vputils::isSingleScalar(Def) &&
+          !vputils::onlyFirstLaneUsed(Def))
         continue;
 
-      // TODO: Support scalarizing ExtractValue.
-      if (match(Def,
-                m_Binary<Instruction::ExtractValue>(m_VPValue(), m_VPValue())))
-        continue;
-
-      auto *Clone = VPBuilder::createSingleScalarOp(
-          Def->getUnderlyingInstr()->getOpcode(), Def->operands(),
-          /*Mask=*/nullptr, *Def, getMetadataOf(Def), DebugLoc::getUnknown(),
-          Def->getScalarType(), Def->getUnderlyingInstr());
-      Clone->insertAfter(Def);
-      Def->replaceAllUsesWith(Clone);
-      Def->eraseFromParent();
+      NarrowToSingleScalar(Def);
+      for (VPUser *U : Extracts)
+        NarrowToSingleScalar(cast<VPRecipeWithIRFlags>(U));
     }
   }
 
