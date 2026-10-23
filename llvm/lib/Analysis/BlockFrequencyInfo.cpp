@@ -231,20 +231,20 @@ void BlockFrequencyInfo::setBlockFreqAndScale(
     const BasicBlock *ReferenceBB, BlockFrequency Freq,
     SmallPtrSetImpl<BasicBlock *> &BlocksToScale) {
   assert(BFI && "Expected analysis to be available");
-  // Use 128 bits APInt to avoid overflow.
-  APInt NewFreq(128, Freq.getFrequency());
-  APInt OldFreq(128, BFI->getBlockFreq(ReferenceBB).getFrequency());
-  APInt BBFreq(128, 0);
+  uint64_t NewFreq = Freq.getFrequency();
+  uint64_t OldFreq = BFI->getBlockFreq(ReferenceBB).getFrequency();
   for (auto *BB : BlocksToScale) {
-    BBFreq = BFI->getBlockFreq(BB).getFrequency();
+    uint64_t BBFreq = BFI->getBlockFreq(BB).getFrequency();
     // Multiply first by NewFreq and then divide by OldFreq
     // to minimize loss of precision.
-    BBFreq *= NewFreq;
-    // udiv is an expensive operation in the general case. If this ends up being
-    // a hot spot, one of the options proposed in
-    // https://reviews.llvm.org/D28535#650071 could be used to avoid this.
-    BBFreq = BBFreq.udiv(OldFreq);
-    BFI->setBlockFreq(BB, BlockFrequency(BBFreq.getLimitedValue()));
+    // MSVC's runtime lacks the 128-bit division helper, even with clang-cl.
+#if defined(__SIZEOF_INT128__) && !defined(_MSC_VER)
+    __uint128_t Scaled = __uint128_t(BBFreq) * NewFreq / OldFreq;
+    BBFreq = std::min<__uint128_t>(Scaled, UINT64_MAX);
+#else
+    BBFreq = (APInt(128, BBFreq) * NewFreq).udiv(OldFreq).getLimitedValue();
+#endif
+    BFI->setBlockFreq(BB, BlockFrequency(BBFreq));
   }
   BFI->setBlockFreq(ReferenceBB, Freq);
 }
