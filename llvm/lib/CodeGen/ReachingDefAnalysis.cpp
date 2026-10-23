@@ -112,27 +112,20 @@ static bool isFIDef(const MachineInstr &MI, int FrameIndex,
 }
 
 void ReachingDefInfo::enterBasicBlock(MachineBasicBlock *MBB) {
-  unsigned MBBNumber = MBB->getNumber();
-  assert(MBBNumber < MBBReachingDefs.numBlockIDs() &&
+  assert(unsigned(MBB->getNumber()) < BlockDefRanges.size() &&
          "Unexpected basic block number.");
   assert(LiveRegs.empty() && "LiveRegs should be empty on BB entry");
-  MBBReachingDefs.startBasicBlock(MBBNumber, NumRegUnits);
-
-  // Reset instruction counter in each basic block.
-  CurInstr = 0;
 
   // This is the entry block.
   if (MBB == &MBB->getParent()->front()) {
-    LiveRegs.assign(NumRegUnits, ReachingDefDefaultVal);
+    LiveRegs.assign(NumDenseUnits, ReachingDefDefaultVal);
     for (const auto &LI : MBB->liveins()) {
       for (MCRegUnit Unit : TRI->regunits(LI.PhysReg)) {
         // Treat function live-ins as if they were defined just before the first
         // instruction.  Usually, function arguments are set up immediately
         // before the call.
-        if (LiveRegs[static_cast<unsigned>(Unit)] != FunctionLiveInMarker) {
-          LiveRegs[static_cast<unsigned>(Unit)] = FunctionLiveInMarker;
-          MBBReachingDefs.append(MBBNumber, Unit, FunctionLiveInMarker);
-        }
+        LiveRegs[UnitToDenseIdx[static_cast<unsigned>(Unit)]] =
+            FunctionLiveInMarker;
       }
     }
     LLVM_DEBUG(dbgs() << printMBBReference(*MBB) << ": entry\n");
@@ -144,7 +137,7 @@ void ReachingDefInfo::enterBasicBlock(MachineBasicBlock *MBB) {
   for (MachineBasicBlock *pred : MBB->predecessors()) {
     assert(unsigned(pred->getNumber()) < MBBOutRegsInfos.size() &&
            "Should have pre-allocated MBBInfos for all MBBs");
-    const LiveRegsDefInfo &Incoming = MBBOutRegsInfos[pred->getNumber()];
+    ArrayRef<int> Incoming = MBBOutRegsInfos[pred->getNumber()];
     // Incoming is null if this is a backedge from a BB
     // we haven't processed yet
     if (Incoming.empty())
@@ -152,41 +145,38 @@ void ReachingDefInfo::enterBasicBlock(MachineBasicBlock *MBB) {
 
     // Directly copy over the reg infos for the first predecessor.
     if (!Initialized) {
-      LiveRegs = Incoming;
+      LiveRegs.assign(Incoming.begin(), Incoming.end());
       Initialized = true;
       continue;
     }
 
     // Find the most recent reaching definition from a predecessor.
-    for (unsigned Unit = 0; Unit != NumRegUnits; ++Unit)
+    for (unsigned Unit = 0; Unit != NumDenseUnits; ++Unit)
       LiveRegs[Unit] = std::max(LiveRegs[Unit], Incoming[Unit]);
   }
 
   if (!Initialized)
-    LiveRegs.assign(NumRegUnits, ReachingDefDefaultVal);
-
-  // Insert the most recent reaching definition we found.
-  for (unsigned Unit = 0; Unit != NumRegUnits; ++Unit)
-    if (LiveRegs[Unit] != ReachingDefDefaultVal)
-      MBBReachingDefs.append(MBBNumber, static_cast<MCRegUnit>(Unit),
-                             LiveRegs[Unit]);
+    LiveRegs.assign(NumDenseUnits, ReachingDefDefaultVal);
 }
 
 void ReachingDefInfo::leaveBasicBlock(MachineBasicBlock *MBB) {
-  assert(!LiveRegs.empty() && "Must enter basic block first.");
+  assert(LiveRegs.size() == NumDenseUnits && "Must enter basic block first.");
   unsigned MBBNumber = MBB->getNumber();
   assert(MBBNumber < MBBOutRegsInfos.size() &&
          "Unexpected basic block number.");
   // Save register clearances at end of MBB - used by enterBasicBlock().
-  MBBOutRegsInfos[MBBNumber] = LiveRegs;
+  MBBOutRegsInfos[MBBNumber] = MutableArrayRef<int>(
+      OutRegsStorage.data() + MBBNumber * NumDenseUnits, NumDenseUnits);
+  llvm::copy(LiveRegs, MBBOutRegsInfos[MBBNumber].begin());
 
   // While processing the basic block, we kept `Def` relative to the start
   // of the basic block for convenience. However, future use of this information
   // only cares about the clearance from the end of the block, so adjust
   // everything to be relative to the end of the basic block.
+  int NumInsts = BlockNumInsts[MBBNumber];
   for (int &OutLiveReg : MBBOutRegsInfos[MBBNumber])
     if (OutLiveReg != ReachingDefDefaultVal)
-      OutLiveReg -= CurInstr;
+      OutLiveReg -= NumInsts;
   LiveRegs.clear();
 }
 
@@ -194,8 +184,7 @@ void ReachingDefInfo::processDefs(MachineInstr *MI) {
   assert(!MI->isDebugInstr() && "Won't process debug instructions");
 
   unsigned MBBNumber = MI->getParent()->getNumber();
-  assert(MBBNumber < MBBReachingDefs.numBlockIDs() &&
-         "Unexpected basic block number.");
+  assert(MBBNumber < BlockDefRanges.size() && "Unexpected basic block number.");
 
   for (auto &MO : MI->operands()) {
     if (MO.isFI()) {
@@ -211,11 +200,7 @@ void ReachingDefInfo::processDefs(MachineInstr *MI) {
       LLVM_DEBUG(dbgs() << printRegUnit(Unit, TRI) << ":\t" << CurInstr << '\t'
                         << *MI);
 
-      // How many instructions since this reg unit was last written?
-      if (LiveRegs[static_cast<unsigned>(Unit)] != CurInstr) {
-        LiveRegs[static_cast<unsigned>(Unit)] = CurInstr;
-        MBBReachingDefs.append(MBBNumber, Unit, CurInstr);
-      }
+      LocalDefs.push_back({static_cast<unsigned>(Unit), CurInstr});
     }
   }
   InstIds[MI] = CurInstr;
@@ -224,41 +209,31 @@ void ReachingDefInfo::processDefs(MachineInstr *MI) {
 
 void ReachingDefInfo::reprocessBasicBlock(MachineBasicBlock *MBB) {
   unsigned MBBNumber = MBB->getNumber();
-  assert(MBBNumber < MBBReachingDefs.numBlockIDs() &&
-         "Unexpected basic block number.");
+  assert(MBBNumber < BlockDefRanges.size() && "Unexpected basic block number.");
 
-  // Count number of non-debug instructions for end of block adjustment.
-  auto NonDbgInsts =
-    instructionsWithoutDebug(MBB->instr_begin(), MBB->instr_end());
-  int NumInsts = std::distance(NonDbgInsts.begin(), NonDbgInsts.end());
+  int NumInsts = BlockNumInsts[MBBNumber];
+  int *LiveIns = BlockLiveIns.data() + MBBNumber * NumDenseUnits;
 
   // When reprocessing a block, the only thing we need to do is check whether
   // there is now a more recent incoming reaching definition from a predecessor.
   for (MachineBasicBlock *pred : MBB->predecessors()) {
     assert(unsigned(pred->getNumber()) < MBBOutRegsInfos.size() &&
            "Should have pre-allocated MBBInfos for all MBBs");
-    const LiveRegsDefInfo &Incoming = MBBOutRegsInfos[pred->getNumber()];
+    ArrayRef<int> Incoming = MBBOutRegsInfos[pred->getNumber()];
     // Incoming may be empty for dead predecessors.
     if (Incoming.empty())
       continue;
 
-    for (unsigned Unit = 0; Unit != NumRegUnits; ++Unit) {
+    for (unsigned Unit = 0; Unit != NumDenseUnits; ++Unit) {
       int Def = Incoming[Unit];
       if (Def == ReachingDefDefaultVal)
         continue;
 
-      auto Defs = MBBReachingDefs.defs(MBBNumber, static_cast<MCRegUnit>(Unit));
-      if (!Defs.empty() && Defs.front() < 0) {
-        if (Defs.front() >= Def)
-          continue;
-
-        // Update existing reaching def from predecessor to a more recent one.
-        MBBReachingDefs.replaceFront(MBBNumber, static_cast<MCRegUnit>(Unit),
-                                     Def);
-      } else {
-        // Insert new reaching def from predecessor.
-        MBBReachingDefs.prepend(MBBNumber, static_cast<MCRegUnit>(Unit), Def);
-      }
+      // Update the reaching def from predecessor to a more recent one.
+      int &LiveIn = LiveIns[Unit];
+      if (LiveIn != ReachingDefDefaultVal && LiveIn >= Def)
+        continue;
+      LiveIn = Def;
 
       // Update reaching def at end of BB. Keep in mind that these are
       // adjusted relative to the end of the basic block.
@@ -282,10 +257,28 @@ void ReachingDefInfo::processBasicBlock(
   }
 
   enterBasicBlock(MBB);
+  unsigned MBBNumber = MBB->getNumber();
+  llvm::copy(LiveRegs, BlockLiveIns.begin() + MBBNumber * NumDenseUnits);
+  auto [Begin, End] = BlockDefRanges[MBBNumber];
+  for (const UnitDef &Def : ArrayRef(LocalDefs).slice(Begin, End - Begin))
+    LiveRegs[Def.Unit] = Def.InstId;
+  leaveBasicBlock(MBB);
+}
+
+void ReachingDefInfo::scanBasicBlock(MachineBasicBlock *MBB) {
+  unsigned Begin = LocalDefs.size();
+  CurInstr = 0;
   for (MachineInstr &MI :
        instructionsWithoutDebug(MBB->instr_begin(), MBB->instr_end()))
     processDefs(&MI);
-  leaveBasicBlock(MBB);
+  // Sort the block's defs by unit and drop the copies of units defined by
+  // several operands. The explicit comparator selects std::sort instead of the
+  // slower array_pod_sort.
+  MutableArrayRef<UnitDef> Defs = MutableArrayRef(LocalDefs).drop_front(Begin);
+  llvm::sort(Defs, std::less<UnitDef>());
+  LocalDefs.erase(llvm::unique(Defs), LocalDefs.end());
+  BlockDefRanges[MBB->getNumber()] = {Begin, LocalDefs.size()};
+  BlockNumInsts[MBB->getNumber()] = CurInstr;
 }
 
 void ReachingDefInfo::run(MachineFunction &mf) {
@@ -353,7 +346,12 @@ bool ReachingDefInfoWrapperPass::runOnMachineFunction(MachineFunction &mf) {
 void ReachingDefInfo::releaseMemory() {
   // Clear the internal vectors.
   MBBOutRegsInfos.clear();
-  MBBReachingDefs.clear();
+  OutRegsStorage.clear();
+  LocalDefs.clear();
+  BlockDefRanges.clear();
+  BlockNumInsts.clear();
+  UnitToDenseIdx.clear();
+  BlockLiveIns.clear();
   MBBFrameObjsReachingDefs.clear();
   InstIds.clear();
   LiveRegs.clear();
@@ -369,7 +367,8 @@ void ReachingDefInfo::init() {
   NumRegUnits = TRI->getNumRegUnits();
   NumStackObjects = MF->getFrameInfo().getNumObjects();
   ObjectIndexBegin = MF->getFrameInfo().getObjectIndexBegin();
-  MBBReachingDefs.init(MF->getNumBlockIDs());
+  BlockDefRanges.assign(MF->getNumBlockIDs(), {0, 0});
+  BlockNumInsts.assign(MF->getNumBlockIDs(), 0);
   // Initialize the MBBOutRegsInfos
   MBBOutRegsInfos.resize(MF->getNumBlockIDs());
   LoopTraversal Traversal;
@@ -377,23 +376,32 @@ void ReachingDefInfo::init() {
 }
 
 void ReachingDefInfo::traverse() {
+  // Record the defs of each reachable block first. Only units defined in a
+  // reachable block or live into the function can have a reaching def; number
+  // them densely.
+  for (LoopTraversal::TraversedMBBInfo TraversedMBB : TraversedMBBOrder)
+    if (TraversedMBB.PrimaryPass)
+      scanBasicBlock(TraversedMBB.MBB);
+  UnitToDenseIdx.assign(NumRegUnits, NoDenseUnit);
+  for (const UnitDef &Def : LocalDefs)
+    UnitToDenseIdx[Def.Unit] = 0;
+  for (const auto &LI : MF->front().liveins())
+    for (MCRegUnit Unit : TRI->regunits(LI.PhysReg))
+      UnitToDenseIdx[static_cast<unsigned>(Unit)] = 0;
+  NumDenseUnits = 0;
+  for (unsigned &Idx : UnitToDenseIdx)
+    if (Idx != NoDenseUnit)
+      Idx = NumDenseUnits++;
+  // The numbering preserves the order of units, so the defs stay sorted.
+  for (UnitDef &Def : LocalDefs)
+    Def.Unit = UnitToDenseIdx[Def.Unit];
+  BlockLiveIns.assign(MF->getNumBlockIDs() * NumDenseUnits,
+                      ReachingDefDefaultVal);
+  OutRegsStorage.resize(MF->getNumBlockIDs() * NumDenseUnits);
+
   // Traverse the basic blocks.
   for (LoopTraversal::TraversedMBBInfo TraversedMBB : TraversedMBBOrder)
     processBasicBlock(TraversedMBB);
-#ifndef NDEBUG
-  // Make sure reaching defs are sorted and unique.
-  for (unsigned MBBNumber = 0, NumBlockIDs = MF->getNumBlockIDs();
-       MBBNumber != NumBlockIDs; ++MBBNumber) {
-    for (unsigned Unit = 0; Unit != NumRegUnits; ++Unit) {
-      int LastDef = ReachingDefDefaultVal;
-      for (int Def :
-           MBBReachingDefs.defs(MBBNumber, static_cast<MCRegUnit>(Unit))) {
-        assert(Def > LastDef && "Defs must be sorted and unique");
-        LastDef = Def;
-      }
-    }
-  }
-#endif
 }
 
 int ReachingDefInfo::getReachingDef(MachineInstr *MI, Register Reg) const {
@@ -401,8 +409,7 @@ int ReachingDefInfo::getReachingDef(MachineInstr *MI, Register Reg) const {
   int InstId = InstIds.lookup(MI);
   int DefRes = ReachingDefDefaultVal;
   unsigned MBBNumber = MI->getParent()->getNumber();
-  assert(MBBNumber < MBBReachingDefs.numBlockIDs() &&
-         "Unexpected basic block number.");
+  assert(MBBNumber < BlockDefRanges.size() && "Unexpected basic block number.");
   int LatestDef = ReachingDefDefaultVal;
 
   if (Reg.isStack()) {
@@ -421,12 +428,19 @@ int ReachingDefInfo::getReachingDef(MachineInstr *MI, Register Reg) const {
     return LatestDef;
   }
 
+  auto [Begin, End] = BlockDefRanges[MBBNumber];
+  ArrayRef<UnitDef> Defs = ArrayRef(LocalDefs).slice(Begin, End - Begin);
   for (MCRegUnit Unit : TRI->regunits(Reg)) {
-    for (int Def : MBBReachingDefs.defs(MBBNumber, Unit)) {
-      if (Def >= InstId)
-        break;
-      DefRes = Def;
-    }
+    // Take the last def of the unit before MI in the block, or else the
+    // reaching def on entry to the block.
+    UnitDef Key = {UnitToDenseIdx[static_cast<unsigned>(Unit)], InstId};
+    if (Key.Unit == NoDenseUnit)
+      continue;
+    auto I = llvm::lower_bound(Defs, Key);
+    if (I != Defs.begin() && std::prev(I)->Unit == Key.Unit)
+      DefRes = std::prev(I)->InstId;
+    else
+      DefRes = BlockLiveIns[MBBNumber * NumDenseUnits + Key.Unit];
     LatestDef = std::max(LatestDef, DefRes);
   }
   return LatestDef;
@@ -451,8 +465,7 @@ bool ReachingDefInfo::hasSameReachingDef(MachineInstr *A, MachineInstr *B,
 
 MachineInstr *ReachingDefInfo::getInstFromId(MachineBasicBlock *MBB,
                                              int InstId) const {
-  assert(static_cast<size_t>(MBB->getNumber()) <
-             MBBReachingDefs.numBlockIDs() &&
+  assert(static_cast<size_t>(MBB->getNumber()) < BlockDefRanges.size() &&
          "Unexpected basic block number.");
   assert(InstId < static_cast<int>(MBB->size()) &&
          "Unexpected instruction id.");

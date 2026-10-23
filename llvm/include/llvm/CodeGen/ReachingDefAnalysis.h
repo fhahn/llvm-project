@@ -23,92 +23,16 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/CodeGen/LoopTraversal.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachinePassManager.h"
 #include "llvm/InitializePasses.h"
+#include <tuple>
 
 namespace llvm {
 
 class MachineBasicBlock;
 class MachineInstr;
-
-/// Thin wrapper around "int" used to store reaching definitions,
-/// using an encoding that makes it compatible with TinyPtrVector.
-/// The 0th LSB is forced zero (and will be used for pointer union tagging),
-/// The 1st LSB is forced one (to make sure the value is non-zero).
-class ReachingDef {
-  uintptr_t Encoded;
-  friend struct PointerLikeTypeTraits<ReachingDef>;
-  explicit ReachingDef(uintptr_t Encoded) : Encoded(Encoded) {}
-
-public:
-  ReachingDef(std::nullptr_t) : Encoded(0) {}
-  ReachingDef(int Instr) : Encoded(((uintptr_t) Instr << 2) | 2) {}
-  operator int() const { return ((int) Encoded) >> 2; }
-};
-
-template<>
-struct PointerLikeTypeTraits<ReachingDef> {
-  static constexpr int NumLowBitsAvailable = 1;
-
-  static inline void *getAsVoidPointer(const ReachingDef &RD) {
-    return reinterpret_cast<void *>(RD.Encoded);
-  }
-
-  static inline ReachingDef getFromVoidPointer(void *P) {
-    return ReachingDef(reinterpret_cast<uintptr_t>(P));
-  }
-
-  static inline ReachingDef getFromVoidPointer(const void *P) {
-    return ReachingDef(reinterpret_cast<uintptr_t>(P));
-  }
-};
-
-// The storage for all reaching definitions.
-class MBBReachingDefsInfo {
-public:
-  void init(unsigned NumBlockIDs) { AllReachingDefs.resize(NumBlockIDs); }
-
-  unsigned numBlockIDs() const { return AllReachingDefs.size(); }
-
-  void startBasicBlock(unsigned MBBNumber, unsigned NumRegUnits) {
-    AllReachingDefs[MBBNumber].resize(NumRegUnits);
-  }
-
-  void append(unsigned MBBNumber, MCRegUnit Unit, int Def) {
-    AllReachingDefs[MBBNumber][static_cast<unsigned>(Unit)].push_back(Def);
-  }
-
-  void prepend(unsigned MBBNumber, MCRegUnit Unit, int Def) {
-    auto &Defs = AllReachingDefs[MBBNumber][static_cast<unsigned>(Unit)];
-    Defs.insert(Defs.begin(), Def);
-  }
-
-  void replaceFront(unsigned MBBNumber, MCRegUnit Unit, int Def) {
-    assert(!AllReachingDefs[MBBNumber][static_cast<unsigned>(Unit)].empty());
-    *AllReachingDefs[MBBNumber][static_cast<unsigned>(Unit)].begin() = Def;
-  }
-
-  void clear() { AllReachingDefs.clear(); }
-
-  ArrayRef<ReachingDef> defs(unsigned MBBNumber, MCRegUnit Unit) const {
-    if (AllReachingDefs[MBBNumber].empty())
-      // Block IDs are not necessarily dense.
-      return ArrayRef<ReachingDef>();
-    return AllReachingDefs[MBBNumber][static_cast<unsigned>(Unit)];
-  }
-
-private:
-  /// All reaching defs of a given RegUnit for a given MBB.
-  using MBBRegUnitDefs = TinyPtrVector<ReachingDef>;
-  /// All reaching defs of all reg units for a given MBB
-  using MBBDefsInfo = std::vector<MBBRegUnitDefs>;
-
-  /// All reaching defs of all reg units for all MBBs
-  SmallVector<MBBDefsInfo, 4> AllReachingDefs;
-};
 
 /// This class provides the reaching def analysis.
 class ReachingDefInfo {
@@ -130,8 +54,11 @@ private:
   /// Keeps clearance information for all registers. Note that this
   /// is different from the usual definition notion of liveness. The CPU
   /// doesn't care whether or not we consider a register killed.
-  using OutRegsInfoMap = SmallVector<LiveRegsDefInfo, 4>;
+  /// The entry of a block is its slice of OutRegsStorage, or empty if the
+  /// block has not been processed yet.
+  using OutRegsInfoMap = SmallVector<MutableArrayRef<int>, 4>;
   OutRegsInfoMap MBBOutRegsInfos;
+  LiveRegsDefInfo OutRegsStorage;
 
   /// Current instruction number.
   /// The first instruction in each basic block is 0.
@@ -141,7 +68,38 @@ private:
   /// their basic blocks.
   DenseMap<MachineInstr *, int> InstIds;
 
-  MBBReachingDefsInfo MBBReachingDefs;
+  /// A def of a register unit by the instruction with id InstId.
+  struct UnitDef {
+    unsigned Unit;
+    int InstId;
+
+    bool operator<(const UnitDef &RHS) const {
+      return std::tie(Unit, InstId) < std::tie(RHS.Unit, RHS.InstId);
+    }
+    bool operator==(const UnitDef &RHS) const {
+      return Unit == RHS.Unit && InstId == RHS.InstId;
+    }
+  };
+
+  /// Defs in all blocks. Each block owns the index range BlockDefRanges[N] of
+  /// LocalDefs, sorted by unit and then by instruction id.
+  SmallVector<UnitDef> LocalDefs;
+  SmallVector<std::pair<unsigned, unsigned>> BlockDefRanges;
+
+  /// Number of non-debug instructions in each block.
+  SmallVector<int> BlockNumInsts;
+
+  /// Dense index of each register unit that is defined in a reachable block or
+  /// live into the function, or NoDenseUnit. No other unit can have a reaching
+  /// def, so the dataflow only tracks these, and LocalDefs, LiveRegs,
+  /// MBBOutRegsInfos and BlockLiveIns are indexed by the dense index.
+  static constexpr unsigned NoDenseUnit = ~0u;
+  SmallVector<unsigned> UnitToDenseIdx;
+  unsigned NumDenseUnits = 0;
+
+  /// Reaching def of each unit on entry to each block (indexed by block
+  /// number * NumDenseUnits + unit), or ReachingDefDefaultVal if none.
+  SmallVector<int> BlockLiveIns;
 
   /// MBBFrameObjsReachingDefs[{i, j}] is a list of instruction indices
   /// (relative to begining of MBB i) that define frame index j in MBB i. This
@@ -298,6 +256,9 @@ private:
 
   /// Process block that is part of a loop again.
   void reprocessBasicBlock(MachineBasicBlock *MBB);
+
+  /// Record the defs of all instructions in MBB.
+  void scanBasicBlock(MachineBasicBlock *MBB);
 
   /// Update def-ages for registers defined by MI.
   /// Also break dependencies on partial defs and undef uses.
