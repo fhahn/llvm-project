@@ -274,9 +274,10 @@ bool LiveRangeCalc::findReachingDefs(LiveRange &LR, MachineBasicBlock &UseMBB,
     UniqueVNI = false;
 
   // Both updateSSA() and LiveRangeUpdater benefit from ordered blocks, but
-  // neither require it. Skip the sorting overhead for small updates.
+  // neither require it. Skip the sorting overhead for small updates. This is
+  // hot: a comparator makes llvm::sort use std::sort rather than qsort.
   if (WorkList.size() > 4)
-    array_pod_sort(WorkList.begin(), WorkList.end());
+    llvm::sort(WorkList, std::less<>());
 
   // If a unique reaching def was found, blit in the live ranges immediately.
   if (UniqueVNI) {
