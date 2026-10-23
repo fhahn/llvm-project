@@ -3851,6 +3851,12 @@ static std::optional<bool> foldCondBranchOnValueKnownInPredecessorImpl(
 }
 
 bool SimplifyCFGOpt::foldCondBranchOnValueKnownInPredecessor(CondBrInst *BI) {
+  // getKnownValueOnEdge knows nothing about a non-PHI condition defined in
+  // this block, so there is nothing to thread.
+  auto *Cond = dyn_cast<Instruction>(BI->getCondition());
+  if (Cond && !isa<PHINode>(Cond) && Cond->getParent() == BI->getParent())
+    return false;
+
   // Note: If BB is a loop header then there is a risk that threading introduces
   // a non-canonical loop by moving a back edge. So we avoid this optimization
   // for loop headers if NeedCanonicalLoop is set.
