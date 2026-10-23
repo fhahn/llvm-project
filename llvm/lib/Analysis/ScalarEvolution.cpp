@@ -12017,40 +12017,13 @@ bool ScalarEvolution::isBasicBlockEntryGuardedByCond(const BasicBlock *BB,
   CmpPredicate NonStrictPredicate = ICmpInst::getNonStrictCmpPredicate(Pred);
   const bool ProvingStrictComparison =
       Pred != NonStrictPredicate.dropSameSign();
-  bool ProvedNonStrictComparison = false;
-  bool ProvedNonEquality = false;
-
-  auto SplitAndProve = [&](std::function<bool(CmpPredicate)> Fn) -> bool {
-    if (!ProvedNonStrictComparison)
-      ProvedNonStrictComparison = Fn(NonStrictPredicate);
-    if (!ProvedNonEquality)
-      ProvedNonEquality = Fn(ICmpInst::ICMP_NE);
-    if (ProvedNonStrictComparison && ProvedNonEquality)
-      return true;
-    return false;
-  };
-
-  if (ProvingStrictComparison) {
-    auto ProofFn = [&](CmpPredicate P) {
-      return isKnownViaNonRecursiveReasoning(P, LHS, RHS);
-    };
-    if (SplitAndProve(ProofFn))
-      return true;
-  }
+  const Instruction *CtxI = &BB->front();
+  SmallVector<std::pair<const Value *, bool>> Conds;
 
   // Try to prove (Pred, LHS, RHS) using isImpliedCond.
   auto ProveViaCond = [&](const Value *Condition, bool Inverse) {
-    const Instruction *CtxI = &BB->front();
-    if (isImpliedCond(Pred, LHS, RHS, Condition, Inverse, CtxI))
-      return true;
-    if (ProvingStrictComparison) {
-      auto ProofFn = [&](CmpPredicate P) {
-        return isImpliedCond(P, LHS, RHS, Condition, Inverse, CtxI);
-      };
-      if (SplitAndProve(ProofFn))
-        return true;
-    }
-    return false;
+    Conds.emplace_back(Condition, Inverse);
+    return isImpliedCond(Pred, LHS, RHS, Condition, Inverse, CtxI);
   };
 
   // Starting at the block's predecessor, climb up the predecessor chain, as long
@@ -12095,7 +12068,18 @@ bool ScalarEvolution::isBasicBlockEntryGuardedByCond(const BasicBlock *BB,
         if (Guard->getFunction() == BB->getParent() && DT.dominates(Guard, BB))
           if (ProveViaCond(Guard->getArgOperand(0), false))
             return true;
-  return false;
+
+  // Prove the halves over all conditions only after the direct proofs failed,
+  // and only try the more expensive non-equality if the non-strict half holds.
+  if (!ProvingStrictComparison)
+    return false;
+  auto ProveViaAll = [&](CmpPredicate P) {
+    return isKnownViaNonRecursiveReasoning(P, LHS, RHS) ||
+           any_of(Conds, [&](const auto &C) {
+             return isImpliedCond(P, LHS, RHS, C.first, C.second, CtxI);
+           });
+  };
+  return ProveViaAll(NonStrictPredicate) && ProveViaAll(ICmpInst::ICMP_NE);
 }
 
 bool ScalarEvolution::isLoopEntryGuardedByCond(const Loop *L, CmpPredicate Pred,
