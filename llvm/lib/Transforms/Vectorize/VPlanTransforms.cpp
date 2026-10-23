@@ -1587,19 +1587,6 @@ static VPSingleDefRecipe *combineRecipe(VPlan &Plan, VPSingleDefRecipe *Def,
     return Builder.createAnd(X, Plan.getConstantInt(*APC - 1),
                              Def->getDebugLoc());
 
-  if (CanCreateNewRecipe && match(Def, m_c_Mul(m_VPValue(X), m_APInt(APC))) &&
-      APC->isPowerOf2()) {
-    auto *MulR = cast<VPRecipeWithIRFlags>(Def);
-    unsigned ShiftAmt = APC->exactLogBase2();
-    VPIRFlags::WrapFlagsTy NW(MulR->hasNoUnsignedWrap(),
-                              MulR->hasNoSignedWrap() &&
-                                  ShiftAmt != APC->getBitWidth() - 1);
-    return Builder.createNaryOp(
-        Instruction::Shl,
-        {X, Plan.getConstantInt(APC->getBitWidth(), ShiftAmt)}, NW,
-        Def->getDebugLoc());
-  }
-
   if (CanCreateNewRecipe && match(Def, m_UDiv(m_VPValue(X), m_APInt(APC))) &&
       APC->isPowerOf2())
     return Builder.createNaryOp(
@@ -1737,6 +1724,21 @@ static VPSingleDefRecipe *combineRecipe(VPlan &Plan, VPSingleDefRecipe *Def,
   // below.
   if (!Plan.isUnrolled())
     return nullptr;
+
+  // Strength-reduce mul by a power of 2 only after choosing the VF, as the new
+  // shl is not costed and hides the mul from transforms on widen and replicate
+  // recipes.
+  if (match(Def, m_c_Mul(m_VPValue(X), m_APInt(APC))) && APC->isPowerOf2()) {
+    auto *MulR = cast<VPRecipeWithIRFlags>(Def);
+    unsigned ShiftAmt = APC->exactLogBase2();
+    VPIRFlags::WrapFlagsTy NW(MulR->hasNoUnsignedWrap(),
+                              MulR->hasNoSignedWrap() &&
+                                  ShiftAmt != APC->getBitWidth() - 1);
+    return Builder.createNaryOp(
+        Instruction::Shl,
+        {X, Plan.getConstantInt(APC->getBitWidth(), ShiftAmt)}, NW,
+        Def->getDebugLoc());
+  }
 
   // Simplify extract-lane with single source to extract-element.
   VPValue *LaneToExtract;

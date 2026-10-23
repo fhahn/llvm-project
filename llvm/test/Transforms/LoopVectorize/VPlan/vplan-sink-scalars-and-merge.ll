@@ -30,40 +30,23 @@ define void @sink1(i32 %k, i32 %x) {
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT vp<[[VP7:%[0-9]+]]> = WIDEN-CANONICAL-INDUCTION nuw vp<[[VP5]]>
 ; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = icmp ule vp<[[VP7]]>, vp<[[VP3]]>
-; CHECK-NEXT:      vp<[[VP9:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5]]>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      WIDEN ir<%cond> = icmp eq ir<%iv>, ir<%x>
-; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = logical-and vp<[[VP8]]>, ir<%cond>
-; CHECK-NEXT:    Successor(s): pred.load
-; CHECK-EMPTY:
-; CHECK-NEXT:    <xVFxUF> pred.load: {
-; CHECK-NEXT:      pred.load.entry:
-; CHECK-NEXT:        BRANCH-ON-MASK vp<[[VP10]]>
-; CHECK-NEXT:      Successor(s): pred.load.if, pred.load.continue
-; CHECK-EMPTY:
-; CHECK-NEXT:      pred.load.if:
-; CHECK-NEXT:        REPLICATE ir<%gep.b> = getelementptr inbounds ir<@b>, ir<0>, vp<[[VP9]]>
-; CHECK-NEXT:        REPLICATE ir<%lv.b> = load ir<%gep.b>
-; CHECK-NEXT:      Successor(s): pred.load.continue
-; CHECK-EMPTY:
-; CHECK-NEXT:      pred.load.continue:
-; CHECK-NEXT:        PHI-PREDICATED-INSTRUCTION vp<[[VP11:%[0-9]+]]> = ir<%lv.b>
-; CHECK-NEXT:      No successors
-; CHECK-NEXT:    }
-; CHECK-NEXT:    Successor(s): if.0
-; CHECK-EMPTY:
-; CHECK-NEXT:    if.0:
-; CHECK-NEXT:      REPLICATE ir<%add> = add vp<[[VP11]]>, ir<10>
-; CHECK-NEXT:      EMIT vp<[[VP12:%[0-9]+]]> = shl ir<%add>, ir<1>
+; CHECK-NEXT:      EMIT vp<[[VP9:%[0-9]+]]> = logical-and vp<[[VP8]]>, ir<%cond>
 ; CHECK-NEXT:    Successor(s): pred.store
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    <xVFxUF> pred.store: {
 ; CHECK-NEXT:      pred.store.entry:
-; CHECK-NEXT:        BRANCH-ON-MASK vp<[[VP10]]>
+; CHECK-NEXT:        BRANCH-ON-MASK vp<[[VP9]]>
 ; CHECK-NEXT:      Successor(s): pred.store.if, pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.if:
-; CHECK-NEXT:        REPLICATE ir<%gep.a> = getelementptr inbounds ir<@a>, ir<0>, vp<[[VP9]]>
-; CHECK-NEXT:        REPLICATE store vp<[[VP12]]>, ir<%gep.a>
+; CHECK-NEXT:        vp<[[VP10:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5]]>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:        REPLICATE ir<%gep.b> = getelementptr inbounds ir<@b>, ir<0>, vp<[[VP10]]>
+; CHECK-NEXT:        REPLICATE ir<%lv.b> = load ir<%gep.b>
+; CHECK-NEXT:        REPLICATE ir<%add> = add ir<%lv.b>, ir<10>
+; CHECK-NEXT:        REPLICATE ir<%gep.a> = getelementptr inbounds ir<@a>, ir<0>, vp<[[VP10]]>
+; CHECK-NEXT:        REPLICATE ir<%mul> = mul ir<2>, ir<%add>
+; CHECK-NEXT:        REPLICATE store ir<%mul>, ir<%gep.a>
 ; CHECK-NEXT:      Successor(s): pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.continue:
@@ -163,7 +146,7 @@ define void @sink2(i32 %k) {
 ; CHECK-NEXT:    Successor(s): loop.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.0:
-; CHECK-NEXT:      EMIT vp<[[VP11:%[0-9]+]]> = shl ir<%iv>, ir<1>
+; CHECK-NEXT:      WIDEN ir<%mul> = mul ir<%iv>, ir<2>
 ; CHECK-NEXT:    Successor(s): pred.store
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    <xVFxUF> pred.store: {
@@ -172,7 +155,7 @@ define void @sink2(i32 %k) {
 ; CHECK-NEXT:      Successor(s): pred.store.if, pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.if:
-; CHECK-NEXT:        REPLICATE ir<%gep.a> = getelementptr inbounds ir<@a>, ir<0>, vp<[[VP11]]>
+; CHECK-NEXT:        REPLICATE ir<%gep.a> = getelementptr inbounds ir<@a>, ir<0>, ir<%mul>
 ; CHECK-NEXT:        REPLICATE ir<%add> = add vp<[[VP10]]>, ir<10>
 ; CHECK-NEXT:        REPLICATE store ir<%add>, ir<%gep.a>
 ; CHECK-NEXT:      Successor(s): pred.store.continue

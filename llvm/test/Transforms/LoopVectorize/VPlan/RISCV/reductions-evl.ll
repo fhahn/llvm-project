@@ -663,11 +663,11 @@ define i32 @print_mulacc_not_extended_const(ptr %start, ptr %end) vscale_range(2
 ; CHECK-NEXT:      vp<[[VP9:%[0-9]+]]> = vector-pointer i8, vp<%next.gep>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%l> = vp.load vp<[[VP9]]>, vp<%evl>
 ; CHECK-NEXT:      WIDEN-CAST ir<%l.ext> = sext ir<%l> to i32
-; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = shl ir<%l.ext>, ir<7>
-; CHECK-NEXT:      REDUCE ir<%red.next> = ir<%red> +  vp.reduce.add (vp<[[VP10]]>, vp<%evl>)
-; CHECK-NEXT:      EMIT-SCALAR vp<[[VP11:%[0-9]+]]> = zext vp<%evl> to i64
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP11]]>, vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP11]]>
+; CHECK-NEXT:      WIDEN ir<%mul> = mul ir<%l.ext>, ir<128>
+; CHECK-NEXT:      REDUCE ir<%red.next> = ir<%red> +  vp.reduce.add (ir<%mul>, vp<%evl>)
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP10:%[0-9]+]]> = zext vp<%evl> to i64
+; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP10]]>, vp<[[VP6]]>
+; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP10]]>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP4]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
@@ -675,7 +675,7 @@ define i32 @print_mulacc_not_extended_const(ptr %start, ptr %end) vscale_range(2
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = compute-reduction-result (add, in-loop) ir<%red.next>
+; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = compute-reduction-result (add, in-loop) ir<%red.next>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>
 ;
 entry:
@@ -781,7 +781,7 @@ define i64 @print_ext_mulacc_not_extended_const(ptr %start, ptr %end) vscale_ran
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      CURRENT-ITERATION-PHI vp<[[VP6:%[0-9]+]]> = phi ir<0>, vp<%current.iteration.next>
-; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%red> = phi (add) vp<[[VP3]]>, vp<[[VP11:%[0-9]+]]>
+; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%red> = phi (add) vp<[[VP3]]>, vp<[[VP10:%[0-9]+]]>
 ; CHECK-NEXT:      EMIT-SCALAR vp<%avl> = phi [ vp<[[VP2]]>, vector.ph ], [ vp<%avl.next>, vector.body ]
 ; CHECK-NEXT:      EMIT-SCALAR vp<%evl> = EXPLICIT-VECTOR-LENGTH vp<%avl>
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP7:%[0-9]+]]> = zext vp<%evl> to i64
@@ -790,11 +790,11 @@ define i64 @print_ext_mulacc_not_extended_const(ptr %start, ptr %end) vscale_ran
 ; CHECK-NEXT:      vp<[[VP9:%[0-9]+]]> = vector-pointer i8, vp<%next.gep>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%l> = vp.load vp<[[VP9]]>, vp<%evl>
 ; CHECK-NEXT:      WIDEN-CAST ir<%l.ext> = sext ir<%l> to i32
-; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = shl ir<%l.ext>, ir<7>
-; CHECK-NEXT:      EXPRESSION vp<[[VP11]]> = vp<%evl> + reduce.add (vp<[[VP10]]> sext to i64, vp<%evl>)
-; CHECK-NEXT:      EMIT-SCALAR vp<[[VP12:%[0-9]+]]> = zext vp<%evl> to i64
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP12]]>, vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP12]]>
+; CHECK-NEXT:      WIDEN ir<%mul> = mul ir<%l.ext>, ir<128>
+; CHECK-NEXT:      EXPRESSION vp<[[VP10]]> = vp<%evl> + reduce.add (ir<%mul> sext to i64, vp<%evl>)
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP11:%[0-9]+]]> = zext vp<%evl> to i64
+; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP11]]>, vp<[[VP6]]>
+; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP11]]>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP4]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
@@ -802,7 +802,7 @@ define i64 @print_ext_mulacc_not_extended_const(ptr %start, ptr %end) vscale_ran
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<[[VP14:%[0-9]+]]> = compute-reduction-result (add, in-loop) vp<[[VP11]]>
+; CHECK-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = compute-reduction-result (add, in-loop) vp<[[VP10]]>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>
 ;
 entry:

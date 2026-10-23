@@ -17,11 +17,10 @@ define void @test_scalar_iv_steps_used_by_replicate_and_first_lane_only_vpinst(p
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i8, ptr [[SRC_1]], i64 0
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i8, ptr [[SRC_1]], i64 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i8, ptr [[SRC_1]], i64 8
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i8, ptr [[SRC_1]], i64 12
-; CHECK-NEXT:    [[TMP12:%.*]] = load i8, ptr [[TMP8]], align 1
+; CHECK-NEXT:    [[TMP12:%.*]] = load i8, ptr [[SRC_1]], align 1
 ; CHECK-NEXT:    [[TMP9:%.*]] = load i8, ptr [[TMP5]], align 1
 ; CHECK-NEXT:    [[TMP10:%.*]] = load i8, ptr [[TMP6]], align 1
 ; CHECK-NEXT:    [[TMP11:%.*]] = load i8, ptr [[TMP7]], align 1
