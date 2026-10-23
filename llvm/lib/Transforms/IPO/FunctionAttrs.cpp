@@ -221,6 +221,11 @@ checkFunctionMemoryAccess(Function &F, bool ThisBody, AAResults &AAR,
         continue;
       }
 
+      // Once ME covers OrigME, the returned effects are final; only calls
+      // within the SCC can still add to RecursiveArgME.
+      if ((ME & OrigME) == OrigME)
+        continue;
+
       MemoryEffects CallME = AAR.getMemoryEffects(Call);
 
       // If the call doesn't access memory, we're done.
@@ -243,6 +248,9 @@ checkFunctionMemoryAccess(Function &F, bool ThisBody, AAResults &AAR,
         addArgLocs(ME, Call, ArgMR, AAR);
       continue;
     }
+
+    if ((ME & OrigME) == OrigME)
+      continue;
 
     MemoryEffects InstME = I.getMemoryEffects();
     if (InstME.doesNotAccessMemory())
