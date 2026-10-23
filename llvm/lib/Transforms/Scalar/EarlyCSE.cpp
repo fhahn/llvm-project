@@ -372,6 +372,10 @@ static bool isEqualImpl(SimpleValue LHS, SimpleValue RHS) {
 }
 
 bool DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS, SimpleValue RHS) {
+  // ScopedHashTable compares each entry with its own key when popping a scope,
+  // so check for identical instructions first.
+  if (LHS.Inst == RHS.Inst)
+    return true;
   // These comparisons are nontrivial, so assert that equality implies
   // hash equality (DenseMap demands this as an invariant).
   bool Result = isEqualImpl(LHS, RHS);
