@@ -291,7 +291,7 @@ private:
 
   // Map the block to reversed postorder traversal number. It is used to
   // find back edge easily.
-  DenseMap<AssertingVH<BasicBlock>, uint32_t> BlockRPONumber;
+  SmallVector<uint32_t, 0> BlockRPONumber;
 
   // This is set 'true' initially and also when new blocks have been added to
   // the function being analyzed. This boolean is used to control the updating
@@ -3419,11 +3419,11 @@ static bool isOnlyReachableViaThisEdge(const BasicBlockEdge &E,
 }
 
 void GVNPassImpl::assignBlockRPONumber(Function &F) {
-  BlockRPONumber.clear();
+  BlockRPONumber.assign(F.getMaxBlockNumber(), 0);
   uint32_t NextBlockNumber = 1;
   ReversePostOrderTraversal<Function *> RPOT(&F);
   for (BasicBlock *BB : RPOT)
-    BlockRPONumber[BB] = NextBlockNumber++;
+    BlockRPONumber[BB->getNumber()] = NextBlockNumber++;
   InvalidBlockRPONumbers = false;
 }
 
@@ -3984,12 +3984,6 @@ bool GVNPassImpl::performScalarPREInsertion(Instruction *Instr,
 }
 
 bool GVNPassImpl::performScalarPRE(Instruction *CurInst) {
-  if (isa<AllocaInst>(CurInst) || CurInst->isTerminator() ||
-      isa<PHINode>(CurInst) || CurInst->getType()->isVoidTy() ||
-      CurInst->mayReadFromMemory() || CurInst->mayHaveSideEffects() ||
-      CurInst->getType()->isTokenLikeTy())
-    return false;
-
   // Don't do PRE on compares. The PHI would prevent CodeGenPrepare from
   // sinking the compare again, and it would force the code generator to
   // move the i1 from processor flags or predicate registers into a general
@@ -4005,6 +3999,12 @@ bool GVNPassImpl::performScalarPRE(Instruction *CurInst) {
   // This doesn't prevent Load PRE. PHI translation will make the GEP available
   // to the load by moving it to the predecessor block if necessary.
   if (isa<GetElementPtrInst>(CurInst))
+    return false;
+
+  if (isa<AllocaInst>(CurInst) || CurInst->isTerminator() ||
+      isa<PHINode>(CurInst) || CurInst->getType()->isVoidTy() ||
+      CurInst->mayReadFromMemory() || CurInst->mayHaveSideEffects() ||
+      CurInst->getType()->isTokenLikeTy())
     return false;
 
   if (auto *CallB = dyn_cast<CallBase>(CurInst)) {
@@ -4039,9 +4039,11 @@ bool GVNPassImpl::performScalarPRE(Instruction *CurInst) {
       break;
     }
     // It is not safe to do PRE when P->CurrentBlock is a loop backedge.
-    assert(BlockRPONumber.count(P) && BlockRPONumber.count(CurrentBlock) &&
+    assert(BlockRPONumber[P->getNumber()] &&
+           BlockRPONumber[CurrentBlock->getNumber()] &&
            "Invalid BlockRPONumber map.");
-    if (BlockRPONumber[P] >= BlockRPONumber[CurrentBlock]) {
+    if (BlockRPONumber[P->getNumber()] >=
+        BlockRPONumber[CurrentBlock->getNumber()]) {
       NumWithout = 2;
       break;
     }
