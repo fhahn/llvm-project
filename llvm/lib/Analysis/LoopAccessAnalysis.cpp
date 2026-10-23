@@ -584,12 +584,6 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
   const PointerInfo *Src = &Pointers[CGI.Members[0]];
   const PointerInfo *Sink = &Pointers[CGJ.Members[0]];
 
-  // If either pointer is read and written, multiple checks may be needed. Bail
-  // out.
-  if (!DC.getOrderForAccess(Src->PointerValue, !Src->IsWritePtr).empty() ||
-      !DC.getOrderForAccess(Sink->PointerValue, !Sink->IsWritePtr).empty())
-    return false;
-
   const SCEVConstant *Step;
   const SCEV *SrcStart;
   const SCEV *SinkStart;

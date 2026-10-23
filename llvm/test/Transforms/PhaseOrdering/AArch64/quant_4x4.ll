@@ -10,33 +10,31 @@ define i32 @quant_4x4(ptr noundef %dct, ptr noundef %mf, ptr noundef %bias) {
 ; CHECK-LABEL: define range(i32 0, 2) i32 @quant_4x4
 ; CHECK-SAME: (ptr nofree noundef captures(none) [[DCT:%.*]], ptr nofree noundef readonly captures(none) [[MF:%.*]], ptr nofree noundef readonly captures(none) [[BIAS:%.*]]) local_unnamed_addr #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DCT]], i64 32
-; CHECK-NEXT:    [[SCEVGEP23:%.*]] = getelementptr i8, ptr [[BIAS]], i64 32
-; CHECK-NEXT:    [[SCEVGEP24:%.*]] = getelementptr i8, ptr [[MF]], i64 32
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DCT]], [[SCEVGEP23]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[BIAS]], [[SCEVGEP]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    [[BOUND025:%.*]] = icmp ult ptr [[DCT]], [[SCEVGEP24]]
-; CHECK-NEXT:    [[BOUND126:%.*]] = icmp ult ptr [[MF]], [[SCEVGEP]]
-; CHECK-NEXT:    [[FOUND_CONFLICT27:%.*]] = and i1 [[BOUND025]], [[BOUND126]]
-; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT27]]
+; CHECK-NEXT:    [[DCT27:%.*]] = ptrtoaddr ptr [[DCT]] to i64
+; CHECK-NEXT:    [[BIAS28:%.*]] = ptrtoaddr ptr [[BIAS]] to i64
+; CHECK-NEXT:    [[MF29:%.*]] = ptrtoaddr ptr [[MF]] to i64
+; CHECK-NEXT:    [[TMP96:%.*]] = sub i64 [[BIAS28]], [[DCT27]]
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ugt i64 [[TMP96]], -32
+; CHECK-NEXT:    [[TMP97:%.*]] = sub i64 [[MF29]], [[DCT27]]
+; CHECK-NEXT:    [[DIFF_CHECK30:%.*]] = icmp ugt i64 [[TMP97]], -32
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[DIFF_CHECK]], [[DIFF_CHECK30]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label [[FOR_BODY:%.*]], label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i8, ptr [[DCT]], i64 16
-; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <8 x i16>, ptr [[DCT]], align 2, !alias.scope [[META0:![0-9]+]], !noalias [[META3:![0-9]+]]
-; CHECK-NEXT:    [[WIDE_LOAD28:%.*]] = load <8 x i16>, ptr [[TMP0]], align 2, !alias.scope [[META0]], !noalias [[META3]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <8 x i16>, ptr [[DCT]], align 2
+; CHECK-NEXT:    [[WIDE_LOAD28:%.*]] = load <8 x i16>, ptr [[TMP0]], align 2
 ; CHECK-NEXT:    [[TMP1:%.*]] = sext <8 x i16> [[WIDE_LOAD]] to <8 x i32>
 ; CHECK-NEXT:    [[TMP2:%.*]] = sext <8 x i16> [[WIDE_LOAD28]] to <8 x i32>
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp sgt <8 x i16> [[WIDE_LOAD]], zeroinitializer
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp sgt <8 x i16> [[WIDE_LOAD28]], zeroinitializer
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw i8, ptr [[BIAS]], i64 16
-; CHECK-NEXT:    [[WIDE_LOAD29:%.*]] = load <8 x i16>, ptr [[BIAS]], align 2, !alias.scope [[META6:![0-9]+]]
-; CHECK-NEXT:    [[WIDE_LOAD30:%.*]] = load <8 x i16>, ptr [[TMP5]], align 2, !alias.scope [[META6]]
+; CHECK-NEXT:    [[WIDE_LOAD29:%.*]] = load <8 x i16>, ptr [[BIAS]], align 2
+; CHECK-NEXT:    [[WIDE_LOAD30:%.*]] = load <8 x i16>, ptr [[TMP5]], align 2
 ; CHECK-NEXT:    [[TMP6:%.*]] = zext <8 x i16> [[WIDE_LOAD29]] to <8 x i32>
 ; CHECK-NEXT:    [[TMP7:%.*]] = zext <8 x i16> [[WIDE_LOAD30]] to <8 x i32>
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds nuw i8, ptr [[MF]], i64 16
-; CHECK-NEXT:    [[WIDE_LOAD31:%.*]] = load <8 x i16>, ptr [[MF]], align 2, !alias.scope [[META7:![0-9]+]]
-; CHECK-NEXT:    [[WIDE_LOAD32:%.*]] = load <8 x i16>, ptr [[TMP8]], align 2, !alias.scope [[META7]]
+; CHECK-NEXT:    [[WIDE_LOAD31:%.*]] = load <8 x i16>, ptr [[MF]], align 2
+; CHECK-NEXT:    [[WIDE_LOAD32:%.*]] = load <8 x i16>, ptr [[TMP8]], align 2
 ; CHECK-NEXT:    [[TMP9:%.*]] = zext <8 x i16> [[WIDE_LOAD31]] to <8 x i32>
 ; CHECK-NEXT:    [[TMP10:%.*]] = zext <8 x i16> [[WIDE_LOAD32]] to <8 x i32>
 ; CHECK-NEXT:    [[TMP11:%.*]] = sub nsw <8 x i32> [[TMP6]], [[TMP1]]
@@ -59,8 +57,8 @@ define i32 @quant_4x4(ptr noundef %dct, ptr noundef %mf, ptr noundef %bias) {
 ; CHECK-NEXT:    [[TMP28:%.*]] = trunc nuw <8 x i32> [[TMP26]] to <8 x i16>
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <8 x i1> [[TMP3]], <8 x i16> [[TMP27]], <8 x i16> [[TMP19]]
 ; CHECK-NEXT:    [[PREDPHI33:%.*]] = select <8 x i1> [[TMP4]], <8 x i16> [[TMP28]], <8 x i16> [[TMP20]]
-; CHECK-NEXT:    store <8 x i16> [[PREDPHI]], ptr [[DCT]], align 2, !alias.scope [[META0]], !noalias [[META3]]
-; CHECK-NEXT:    store <8 x i16> [[PREDPHI33]], ptr [[TMP0]], align 2, !alias.scope [[META0]], !noalias [[META3]]
+; CHECK-NEXT:    store <8 x i16> [[PREDPHI]], ptr [[DCT]], align 2
+; CHECK-NEXT:    store <8 x i16> [[PREDPHI33]], ptr [[TMP0]], align 2
 ; CHECK-NEXT:    [[BIN_RDX34:%.*]] = or <8 x i16> [[PREDPHI33]], [[PREDPHI]]
 ; CHECK-NEXT:    [[TMP29:%.*]] = tail call i16 @llvm.vector.reduce.or.v8i16(<8 x i16> [[BIN_RDX34]])
 ; CHECK-NEXT:    br label [[FOR_COND_CLEANUP:%.*]]

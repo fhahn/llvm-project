@@ -908,21 +908,21 @@ exit:
   ret void
 }
 
-; The first pointer is read and written, while the second is read-only. The
-; baseline uses a full-range check; a difference check can cover the
-; write/read dependence because the extra read/read pair does not conflict.
+; The first pointer is read and written, while the second is read-only. A
+; difference check covers the write/read dependence, as the extra read/read
+; pair does not conflict.
 define void @read_modify_write_and_read_only(ptr %dst, ptr %src) {
 ; CHECK-LABEL: define void @read_modify_write_and_read_only(
 ; CHECK-SAME: ptr [[DST:%.*]], ptr [[SRC:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[SRC4:%.*]] = ptrtoaddr ptr [[SRC]] to i64
+; CHECK-NEXT:    [[DST3:%.*]] = ptrtoaddr ptr [[DST]] to i64
 ; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr nuw i8, ptr [[DST]], i64 512
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[DST]], i64 1536
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[SRC]], i64 1024
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP0]], [[TMP2]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC]], [[TMP1]]
-; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[DST3]], 512
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[SRC4]]
+; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP2]], 15
 ; CHECK-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH:label %.*]], [[VECTOR_PH:label %.*]]
 ;
 entry:
@@ -945,21 +945,21 @@ exit:
   ret void
 }
 
-; A read-modify-write pointer against a write pointer may need multiple checks.
-; Keep the full-range overlap check in this case.
+; A read-modify-write pointer against a write pointer. All accesses through %dst
+; precede the store to %other, so one diff check suffices.
 define void @read_modify_write_and_write_only(ptr %dst, ptr %other) {
 ; CHECK-LABEL: define void @read_modify_write_and_write_only(
 ; CHECK-SAME: ptr [[DST:%.*]], ptr [[OTHER:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[DST4:%.*]] = ptrtoaddr ptr [[DST]] to i64
+; CHECK-NEXT:    [[OTHER3:%.*]] = ptrtoaddr ptr [[OTHER]] to i64
 ; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr nuw i8, ptr [[DST]], i64 512
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[DST]], i64 1536
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[OTHER]], i64 1024
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP0]], [[TMP2]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[OTHER]], [[TMP1]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH:label %.*]], [[VECTOR_PH:label %.*]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[OTHER3]], -512
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[DST4]]
+; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP2]], 15
+; CHECK-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH:label %.*]], [[VECTOR_PH:label %.*]]
 ;
 entry:
   br label %loop.header
@@ -1018,16 +1018,15 @@ define void @read_and_written_pointer_reverse(ptr %a, ptr %b, i64 %n) {
 ; CHECK-LABEL: define void @read_and_written_pointer_reverse(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[A4:%.*]] = ptrtoaddr ptr [[A]] to i64
+; CHECK-NEXT:    [[B3:%.*]] = ptrtoaddr ptr [[B]] to i64
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP0]]
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP0]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[TMP2]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[TMP1]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
+; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[B3]], [[A4]]
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP1]], 15
+; CHECK-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
 ;
 entry:
   br label %loop
@@ -1053,16 +1052,15 @@ define void @read_and_written_pointers_same_direction(ptr %a, ptr %b, i64 %n) {
 ; CHECK-LABEL: define void @read_and_written_pointers_same_direction(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[B4:%.*]] = ptrtoaddr ptr [[B]] to i64
+; CHECK-NEXT:    [[A3:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP0]]
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP0]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[TMP2]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[TMP1]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
+; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[A3]], [[B4]]
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP1]], 15
+; CHECK-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
 ;
 entry:
   br label %loop

@@ -43,27 +43,28 @@ define void @many_deps(ptr noalias %buckets, ptr %array, ptr %indices, ptr %othe
 ; NORMAL_DEP_LIMIT-LABEL: define void @many_deps(
 ; NORMAL_DEP_LIMIT-SAME: ptr noalias [[BUCKETS:%.*]], ptr [[ARRAY:%.*]], ptr [[INDICES:%.*]], ptr [[OTHER:%.*]], i64 [[N:%.*]]) #[[ATTR0:[0-9]+]] {
 ; NORMAL_DEP_LIMIT-NEXT:  entry:
+; NORMAL_DEP_LIMIT-NEXT:    [[INDICES9:%.*]] = ptrtoaddr ptr [[INDICES]] to i64
+; NORMAL_DEP_LIMIT-NEXT:    [[ARRAY8:%.*]] = ptrtoaddr ptr [[ARRAY]] to i64
+; NORMAL_DEP_LIMIT-NEXT:    [[OTHER7:%.*]] = ptrtoaddr ptr [[OTHER]] to i64
 ; NORMAL_DEP_LIMIT-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
 ; NORMAL_DEP_LIMIT-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 2
-; NORMAL_DEP_LIMIT-NEXT:    [[TMP2:%.*]] = call i64 @llvm.umax.i64(i64 [[TMP1]], i64 8)
+; NORMAL_DEP_LIMIT-NEXT:    [[TMP2:%.*]] = call i64 @llvm.umax.i64(i64 [[TMP1]], i64 12)
 ; NORMAL_DEP_LIMIT-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], [[TMP2]]
 ; NORMAL_DEP_LIMIT-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_MEMCHECK:%.*]]
 ; NORMAL_DEP_LIMIT:       vector.memcheck:
-; NORMAL_DEP_LIMIT-NEXT:    [[TMP3:%.*]] = shl i64 [[N]], 2
-; NORMAL_DEP_LIMIT-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[ARRAY]], i64 [[TMP3]]
-; NORMAL_DEP_LIMIT-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[OTHER]], i64 [[TMP3]]
-; NORMAL_DEP_LIMIT-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[INDICES]], i64 [[TMP3]]
-; NORMAL_DEP_LIMIT-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[ARRAY]], [[SCEVGEP1]]
-; NORMAL_DEP_LIMIT-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[OTHER]], [[SCEVGEP]]
-; NORMAL_DEP_LIMIT-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; NORMAL_DEP_LIMIT-NEXT:    [[BOUND03:%.*]] = icmp ult ptr [[ARRAY]], [[SCEVGEP2]]
-; NORMAL_DEP_LIMIT-NEXT:    [[BOUND14:%.*]] = icmp ult ptr [[INDICES]], [[SCEVGEP]]
-; NORMAL_DEP_LIMIT-NEXT:    [[FOUND_CONFLICT5:%.*]] = and i1 [[BOUND03]], [[BOUND14]]
-; NORMAL_DEP_LIMIT-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT5]]
-; NORMAL_DEP_LIMIT-NEXT:    [[BOUND06:%.*]] = icmp ult ptr [[OTHER]], [[SCEVGEP2]]
-; NORMAL_DEP_LIMIT-NEXT:    [[BOUND17:%.*]] = icmp ult ptr [[INDICES]], [[SCEVGEP1]]
-; NORMAL_DEP_LIMIT-NEXT:    [[FOUND_CONFLICT8:%.*]] = and i1 [[BOUND06]], [[BOUND17]]
-; NORMAL_DEP_LIMIT-NEXT:    [[CONFLICT_RDX9:%.*]] = or i1 [[CONFLICT_RDX]], [[FOUND_CONFLICT8]]
+; NORMAL_DEP_LIMIT-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP0]], 4
+; NORMAL_DEP_LIMIT-NEXT:    [[TMP4:%.*]] = add i64 [[TMP3]], -1
+; NORMAL_DEP_LIMIT-NEXT:    [[TMP5:%.*]] = sub i64 [[OTHER7]], [[ARRAY8]]
+; NORMAL_DEP_LIMIT-NEXT:    [[TMP6:%.*]] = sub i64 [[TMP5]], 1
+; NORMAL_DEP_LIMIT-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP6]], [[TMP4]]
+; NORMAL_DEP_LIMIT-NEXT:    [[TMP17:%.*]] = sub i64 [[ARRAY8]], [[INDICES9]]
+; NORMAL_DEP_LIMIT-NEXT:    [[TMP8:%.*]] = sub i64 [[TMP17]], 1
+; NORMAL_DEP_LIMIT-NEXT:    [[DIFF_CHECK10:%.*]] = icmp ult i64 [[TMP8]], [[TMP4]]
+; NORMAL_DEP_LIMIT-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[DIFF_CHECK]], [[DIFF_CHECK10]]
+; NORMAL_DEP_LIMIT-NEXT:    [[TMP18:%.*]] = sub i64 [[OTHER7]], [[INDICES9]]
+; NORMAL_DEP_LIMIT-NEXT:    [[TMP19:%.*]] = sub i64 [[TMP18]], 1
+; NORMAL_DEP_LIMIT-NEXT:    [[DIFF_CHECK11:%.*]] = icmp ult i64 [[TMP19]], [[TMP4]]
+; NORMAL_DEP_LIMIT-NEXT:    [[CONFLICT_RDX9:%.*]] = or i1 [[CONFLICT_RDX]], [[DIFF_CHECK11]]
 ; NORMAL_DEP_LIMIT-NEXT:    br i1 [[CONFLICT_RDX9]], label [[SCALAR_PH]], label [[ENTRY:%.*]]
 ; NORMAL_DEP_LIMIT:       vector.ph:
 ; NORMAL_DEP_LIMIT-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N]], [[TMP1]]
@@ -77,16 +78,16 @@ define void @many_deps(ptr noalias %buckets, ptr %array, ptr %indices, ptr %othe
 ; NORMAL_DEP_LIMIT-NEXT:    [[IV:%.*]] = phi i64 [ 0, [[ENTRY]] ], [ [[IV_NEXT:%.*]], [[FOR_BODY]] ]
 ; NORMAL_DEP_LIMIT-NEXT:    [[VEC_IND:%.*]] = phi <vscale x 4 x i32> [ [[TMP7]], [[ENTRY]] ], [ [[VEC_IND_NEXT:%.*]], [[FOR_BODY]] ]
 ; NORMAL_DEP_LIMIT-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i32, ptr [[INDICES]], i64 [[IV]]
-; NORMAL_DEP_LIMIT-NEXT:    [[WIDE_LOAD:%.*]] = load <vscale x 4 x i32>, ptr [[TMP13]], align 4, !alias.scope [[META0:![0-9]+]]
+; NORMAL_DEP_LIMIT-NEXT:    [[WIDE_LOAD:%.*]] = load <vscale x 4 x i32>, ptr [[TMP13]], align 4
 ; NORMAL_DEP_LIMIT-NEXT:    [[TMP11:%.*]] = zext <vscale x 4 x i32> [[WIDE_LOAD]] to <vscale x 4 x i64>
 ; NORMAL_DEP_LIMIT-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i32, ptr [[BUCKETS]], <vscale x 4 x i64> [[TMP11]]
 ; NORMAL_DEP_LIMIT-NEXT:    call void @llvm.experimental.vector.histogram.add.nxv4p0.i32(<vscale x 4 x ptr> [[TMP12]], i32 1, <vscale x 4 x i1> splat (i1 true))
 ; NORMAL_DEP_LIMIT-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i32, ptr [[ARRAY]], i64 [[IV]]
-; NORMAL_DEP_LIMIT-NEXT:    store <vscale x 4 x i32> [[VEC_IND]], ptr [[TMP10]], align 4, !alias.scope [[META3:![0-9]+]], !noalias [[META5:![0-9]+]]
+; NORMAL_DEP_LIMIT-NEXT:    store <vscale x 4 x i32> [[VEC_IND]], ptr [[TMP10]], align 4
 ; NORMAL_DEP_LIMIT-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i32, ptr [[OTHER]], i64 [[IV]]
-; NORMAL_DEP_LIMIT-NEXT:    [[WIDE_LOAD10:%.*]] = load <vscale x 4 x i32>, ptr [[TMP14]], align 4, !alias.scope [[META7:![0-9]+]], !noalias [[META0]]
+; NORMAL_DEP_LIMIT-NEXT:    [[WIDE_LOAD10:%.*]] = load <vscale x 4 x i32>, ptr [[TMP14]], align 4
 ; NORMAL_DEP_LIMIT-NEXT:    [[TMP15:%.*]] = add <vscale x 4 x i32> [[WIDE_LOAD10]], [[VEC_IND]]
-; NORMAL_DEP_LIMIT-NEXT:    store <vscale x 4 x i32> [[TMP15]], ptr [[TMP14]], align 4, !alias.scope [[META7]], !noalias [[META0]]
+; NORMAL_DEP_LIMIT-NEXT:    store <vscale x 4 x i32> [[TMP15]], ptr [[TMP14]], align 4
 ; NORMAL_DEP_LIMIT-NEXT:    [[IV_NEXT]] = add nuw i64 [[IV]], [[TMP1]]
 ; NORMAL_DEP_LIMIT-NEXT:    [[VEC_IND_NEXT]] = add <vscale x 4 x i32> [[VEC_IND]], [[DOTSPLAT]]
 ; NORMAL_DEP_LIMIT-NEXT:    [[TMP16:%.*]] = icmp eq i64 [[IV_NEXT]], [[N_VEC]]
