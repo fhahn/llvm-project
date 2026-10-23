@@ -4297,10 +4297,8 @@ bool llvm::foldBranchToCommonDest(CondBrInst *BI, DomTreeUpdater *DTU,
   for (BasicBlock *PredBlock : predecessors(BB)) {
     CondBrInst *PBI = dyn_cast<CondBrInst>(PredBlock->getTerminator());
 
-    // Check that we have two conditional branches.  If there is a PHI node in
-    // the common successor, verify that the same value flows in from both
-    // blocks.
-    if (!PBI || !safeToMergeTerminators(BI, PBI))
+    // Check that we have two conditional branches.
+    if (!PBI)
       continue;
 
     // Determine if the two branches share a common destination.
@@ -4310,6 +4308,11 @@ bool llvm::foldBranchToCommonDest(CondBrInst *BI, DomTreeUpdater *DTU,
     if (auto Recipe = shouldFoldCondBranchesToCommonDestination(BI, PBI, TTI))
       std::tie(CommonSucc, Opc, InvertPredCond) = *Recipe;
     else
+      continue;
+
+    // If there is a PHI node in the common successor, verify that the same
+    // value flows in from both blocks.
+    if (!safeToMergeTerminators(BI, PBI))
       continue;
 
     // Check the cost of inserting the necessary logic before performing the
