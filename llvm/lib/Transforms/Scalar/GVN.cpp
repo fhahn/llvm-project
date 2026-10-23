@@ -137,8 +137,13 @@ struct llvm::GVNValueTable::Expression {
   }
 
   friend hash_code hash_value(const Expression &Value) {
-    return hash_combine(Value.Opcode, Value.Ty,
-                        hash_combine_range(Value.VarArgs));
+    // ExpressionNumbering is only probed, never iterated, so a cheap inline
+    // hash is enough; hash_combine would hash the operands twice via xxh3.
+    uint64_t H = (uint64_t(Value.Opcode) << 32) ^
+                 reinterpret_cast<uintptr_t>(Value.Ty);
+    for (uint32_t Arg : Value.VarArgs)
+      H = (H ^ Arg) * 0x9e3779b97f4a7c15ULL;
+    return hash_value(H);
   }
 };
 
@@ -927,7 +932,11 @@ uint32_t GVNValueTable::lookupOrAdd(Value *V) {
     return NextValueNumber++;
   }
 
-  Expression Exp;
+  auto AssignExp = [&](Expression Exp) {
+    uint32_t E = assignExpNewValueNum(Exp).first;
+    ValueNumbering[V] = E;
+    return E;
+  };
   switch (I->getOpcode()) {
     case Instruction::Call:
       return lookupOrAddCall(cast<CallInst>(I));
@@ -970,19 +979,16 @@ uint32_t GVNValueTable::lookupOrAdd(Value *V) {
     case Instruction::InsertElement:
     case Instruction::ShuffleVector:
     case Instruction::InsertValue:
-      Exp = createExpr(I);
-      break;
+      return AssignExp(createExpr(I));
     case Instruction::ICmp:
     case Instruction::FCmp:
-      Exp = createCmpExpr(I->getOpcode(), cast<CmpInst>(I)->getPredicate(),
-                          I->getOperand(0), I->getOperand(1));
-      break;
+      return AssignExp(createCmpExpr(I->getOpcode(),
+                                     cast<CmpInst>(I)->getPredicate(),
+                                     I->getOperand(0), I->getOperand(1)));
     case Instruction::GetElementPtr:
-      Exp = createGEPExpr(cast<GetElementPtrInst>(I));
-      break;
+      return AssignExp(createGEPExpr(cast<GetElementPtrInst>(I)));
     case Instruction::ExtractValue:
-      Exp = createExtractValueExpr(cast<ExtractValueInst>(I));
-      break;
+      return AssignExp(createExtractValueExpr(cast<ExtractValueInst>(I)));
     case Instruction::PHI:
       ValueNumbering[V] = NextValueNumber;
       NumberingPhi[NextValueNumber] = cast<PHINode>(V);
@@ -994,10 +1000,6 @@ uint32_t GVNValueTable::lookupOrAdd(Value *V) {
       ValueNumbering[V] = NextValueNumber;
       return NextValueNumber++;
   }
-
-  uint32_t E = assignExpNewValueNum(Exp).first;
-  ValueNumbering[V] = E;
-  return E;
 }
 
 /// Returns the value number of the specified value. Fails if
@@ -3294,7 +3296,7 @@ uint32_t GVNValueTable::phiTranslateImpl(const BasicBlock *Pred,
                                          GVNLeaderMap &LeaderTable) {
   // See if we can refine the value number by looking at the PN incoming value
   // for the given predecessor.
-  if (PHINode *PN = NumberingPhi[Num]) {
+  if (PHINode *PN = NumberingPhi.lookup(Num)) {
     if (PN->getParent() != PhiBlock)
       return Num;
     for (unsigned I = 0; I != PN->getNumIncomingValues(); ++I) {
@@ -3306,7 +3308,7 @@ uint32_t GVNValueTable::phiTranslateImpl(const BasicBlock *Pred,
     return Num;
   }
 
-  if (BasicBlock *BB = NumberingBB[Num]) {
+  if (BasicBlock *BB = NumberingBB.lookup(Num)) {
     assert(MSSA && "NumberingBB is non-empty only when using MemorySSA");
     // Value numbers of basic blocks are used to represent memory state in
     // load/store instructions and read-only function calls when said state is
@@ -3361,7 +3363,7 @@ uint32_t GVNValueTable::phiTranslateImpl(const BasicBlock *Pred,
     }
   }
 
-  if (uint32_t NewNum = ExpressionNumbering[Exp]) {
+  if (uint32_t NewNum = ExpressionNumbering.lookup(Exp)) {
     if (Exp.Opcode == Instruction::Call && NewNum != Num)
       return areCallValsEqual(Num, NewNum, Pred, PhiBlock, LeaderTable) ? NewNum
                                                                         : Num;
