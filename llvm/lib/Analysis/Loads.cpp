@@ -810,7 +810,7 @@ Value *llvm::FindAvailableLoadedValue(LoadInst *Load, BatchAAResults &AA,
   // Try to find an available value first, and delay expensive alias analysis
   // queries until later.
   Value *Available = nullptr;
-  SmallVector<Instruction *> MustNotAliasInsts;
+  Instruction *AvailableInst = nullptr;
   for (Instruction &Inst : make_range(++Load->getReverseIterator(),
                                       ScanBB->rend())) {
     if (isa<PseudoProbeInst>(Inst))
@@ -821,19 +821,20 @@ Value *llvm::FindAvailableLoadedValue(LoadInst *Load, BatchAAResults &AA,
 
     Available = getAvailableLoadStore(&Inst, StrippedPtr, AccessTy, AccessProps,
                                       DL, IsLoadCSE);
-    if (Available)
+    if (Available) {
+      AvailableInst = &Inst;
       break;
-
-    if (Inst.mayWriteToMemory())
-      MustNotAliasInsts.push_back(&Inst);
+    }
   }
 
   // If we found an available value, ensure that the instructions in between
   // did not modify the memory location.
   if (Available) {
     MemoryLocation Loc = MemoryLocation::get(Load);
-    for (Instruction *Inst : MustNotAliasInsts)
-      if (isModSet(AA.getModRefInfo(Inst, Loc)))
+    for (Instruction &Inst : make_range(++Load->getReverseIterator(),
+                                        AvailableInst->getReverseIterator()))
+      if (!isa<PseudoProbeInst>(Inst) && Inst.mayWriteToMemory() &&
+          isModSet(AA.getModRefInfo(&Inst, Loc)))
         return nullptr;
   }
 
