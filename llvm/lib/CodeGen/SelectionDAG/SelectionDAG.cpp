@@ -4208,6 +4208,11 @@ KnownBits SelectionDAG::computeKnownBits(SDValue Op, const APInt &DemandedElts,
   case ISD::ADD: {
     SDNodeFlags Flags = Op.getNode()->getFlags();
     Known = computeKnownBits(Op.getOperand(0), DemandedElts, Depth + 1);
+    // If one operand is unknown and we have no nowrap information, the result
+    // will be unknown independently of the second operand, unless it is X + X.
+    if (Known.isUnknown() && !Flags.hasNoSignedWrap() &&
+        !Flags.hasNoUnsignedWrap() && Op.getOperand(0) != Op.getOperand(1))
+      break;
     Known2 = computeKnownBits(Op.getOperand(1), DemandedElts, Depth + 1);
     bool SelfAdd = Op.getOperand(0) == Op.getOperand(1) &&
                    isGuaranteedNotToBeUndefOrPoison(
