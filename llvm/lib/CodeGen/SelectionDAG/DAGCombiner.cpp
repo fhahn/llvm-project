@@ -325,7 +325,11 @@ static const MDNode *getCommonMemCacheHint(const RangeT &Nodes) {
     }
 
     void deleteAndRecombine(SDNode *N);
-    bool recursivelyDeleteUnusedNodes(SDNode *N);
+    bool deleteUnusedNodes(SDNode *N);
+    /// Most nodes still have uses, so check that inline.
+    bool recursivelyDeleteUnusedNodes(SDNode *N) {
+      return N->use_empty() && deleteUnusedNodes(N);
+    }
 
     /// Replaces all uses of the results of one DAG node with new values.
     SDValue CombineTo(SDNode *N, const SDValue *To, unsigned NumTo,
@@ -1832,10 +1836,7 @@ bool DAGCombiner::PromoteLoad(SDValue Op) {
 /// Note that this both deletes the nodes and removes them from the worklist.
 /// It also adds any nodes who have had a user deleted to the worklist as they
 /// may now have only one use and subject to other combines.
-bool DAGCombiner::recursivelyDeleteUnusedNodes(SDNode *N) {
-  if (!N->use_empty())
-    return false;
-
+bool DAGCombiner::deleteUnusedNodes(SDNode *N) {
   SmallSetVector<SDNode *, 16> Nodes;
   Nodes.insert(N);
   do {
