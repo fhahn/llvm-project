@@ -2628,6 +2628,16 @@ SDValue DAGCombiner::foldBinOpIntoSelect(SDNode *BO) {
   assert(TLI.isBinOp(BO->getOpcode()) && BO->getNumValues() == 1 &&
          "Unexpected binary operator");
 
+  // All folds below need a select operand, which for shifts may be behind a
+  // truncate (or i1 setcc) of the shift amount.
+  auto IsSelect = [](SDValue V) {
+    return V.getOpcode() == ISD::SELECT || V.getOpcode() == ISD::VSELECT;
+  };
+  SDValue N1 = BO->getOperand(1);
+  if (!IsSelect(BO->getOperand(0)) && !IsSelect(N1) &&
+      N1.getOpcode() != ISD::TRUNCATE && N1.getOpcode() != ISD::SETCC)
+    return SDValue();
+
   if (SDValue Sel = foldSelectWithIdentityConstant(BO, DAG, false))
     return Sel;
 
