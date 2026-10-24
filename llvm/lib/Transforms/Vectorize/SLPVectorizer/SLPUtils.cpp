@@ -481,11 +481,12 @@ bool areAllOperandsNonInsts(Value *V) {
   auto *I = dyn_cast<Instruction>(V);
   if (!I)
     return true;
-  return !mayHaveNonDefUseDependency(*I) &&
-         all_of(make_isa_range<Instruction>(I->operands()),
+  // Check the operands first, they are cheap and usually fail.
+  return all_of(make_isa_range<Instruction>(I->operands()),
                 [I](Instruction *IO) {
                   return isa<PHINode>(IO) || IO->getParent() != I->getParent();
-                });
+                }) &&
+         !mayHaveNonDefUseDependency(*I);
 }
 
 bool isUsedOutsideBlock(Value *V) {
