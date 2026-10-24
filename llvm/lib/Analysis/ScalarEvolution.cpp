@@ -13836,6 +13836,13 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
             isKnownPredicate(CondGE, GuardedRHS, GuardedStart))
           return true;
 
+        // Guards can rewrite RHS to a min/max with a bound that is unrelated to
+        // Start (e.g. n -> smin(n, m) for a guard n <= m), hiding facts about
+        // the original RHS, like n >= Start via induction. Try without guards.
+        if ((GuardedRHS != GELHS || GuardedStart != GERHS) &&
+            isKnownPredicate(CondGE, GELHS, GERHS))
+          return true;
+
         // (RHS > Start - 1) implies RHS >= Start.
         // * "RHS >= Start" is trivially equivalent to "RHS > Start - 1" if
         //   "Start - 1" doesn't overflow.
