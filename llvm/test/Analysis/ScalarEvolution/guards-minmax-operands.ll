@@ -12,7 +12,7 @@ define void @smin_sgt_0_then_sge_4(ptr %p, i32 %a, i32 %b) {
 ; CHECK-LABEL: 'smin_sgt_0_then_sge_4'
 ; CHECK-NEXT:  Determining loop execution counts for: @smin_sgt_0_then_sge_4
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-4 + (4 * (zext i5 (trunc i32 ((64 smin %b) /u 4) to i5) to i32))<nuw><nsw>)<nsw> /u 4)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 1073741823
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 15
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-4 + (4 * (zext i5 (trunc i32 ((64 smin %b) /u 4) to i5) to i32))<nuw><nsw>)<nsw> /u 4)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -119,7 +119,7 @@ define void @umin_ugt_0_then_uge_4(ptr %p, i32 %a, i32 %b) {
 ; CHECK-LABEL: 'umin_ugt_0_then_uge_4'
 ; CHECK-NEXT:  Determining loop execution counts for: @umin_ugt_0_then_uge_4
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-4 + (4 * ((64 umin %b) /u 4))<nuw><nsw>)<nsw> /u 4)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 1073741823
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 15
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-4 + (4 * ((64 umin %b) /u 4))<nuw><nsw>)<nsw> /u 4)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -156,7 +156,7 @@ define void @umax_ult_1000_then_ule_64(ptr %p, i32 %a, i32 %b) {
 ; CHECK-LABEL: 'umax_ult_1000_then_ule_64'
 ; CHECK-NEXT:  Determining loop execution counts for: @umax_ult_1000_then_ule_64
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is %b
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 999
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 64
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is %b
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;

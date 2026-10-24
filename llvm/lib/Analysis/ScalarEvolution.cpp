@@ -16044,10 +16044,6 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
     SmallVector<SCEVUse, 16> Worklist(1, LHS);
     SmallPtrSet<const SCEV *, 16> Visited;
 
-    auto EnqueueOperands = [&Worklist](const SCEVNAryExpr *S) {
-      append_range(Worklist, S->operands());
-    };
-
     while (!Worklist.empty()) {
       const SCEV *From = Worklist.pop_back_val();
       if (isa<SCEVConstant>(From))
@@ -16057,30 +16053,35 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       const SCEV *FromRewritten = GetMaybeRewritten(From);
       const SCEV *To = nullptr;
 
+      // The condition also holds for the operands of a min/max of kind Kind.
+      // Check both From and FromRewritten: an earlier condition may have
+      // wrapped From in a different kind of min/max, or added operands to it.
+      auto EnqueueOperands = [&](SCEVTypes Kind) {
+        for (const SCEV *S : {From, FromRewritten})
+          if (S->getSCEVType() == Kind)
+            append_range(Worklist, cast<SCEVMinMaxExpr>(S)->operands());
+      };
+
       switch (Predicate) {
       case CmpInst::ICMP_ULT:
       case CmpInst::ICMP_ULE:
         To = SE.getUMinExpr(FromRewritten, RHS);
-        if (auto *UMax = dyn_cast<SCEVUMaxExpr>(FromRewritten))
-          EnqueueOperands(UMax);
+        EnqueueOperands(scUMaxExpr);
         break;
       case CmpInst::ICMP_SLT:
       case CmpInst::ICMP_SLE:
         To = SE.getSMinExpr(FromRewritten, RHS);
-        if (auto *SMax = dyn_cast<SCEVSMaxExpr>(FromRewritten))
-          EnqueueOperands(SMax);
+        EnqueueOperands(scSMaxExpr);
         break;
       case CmpInst::ICMP_UGT:
       case CmpInst::ICMP_UGE:
         To = SE.getUMaxExpr(FromRewritten, RHS);
-        if (auto *UMin = dyn_cast<SCEVUMinExpr>(FromRewritten))
-          EnqueueOperands(UMin);
+        EnqueueOperands(scUMinExpr);
         break;
       case CmpInst::ICMP_SGT:
       case CmpInst::ICMP_SGE:
         To = SE.getSMaxExpr(FromRewritten, RHS);
-        if (auto *SMin = dyn_cast<SCEVSMinExpr>(FromRewritten))
-          EnqueueOperands(SMin);
+        EnqueueOperands(scSMinExpr);
         break;
       case CmpInst::ICMP_EQ:
         if (isa<SCEVConstant>(RHS))
