@@ -564,6 +564,18 @@ static bool canVectorizeOperandBundles(Instruction &I,
   return false;
 }
 
+/// Atomic and volatile instructions cannot be widened.
+static bool canVectorizeAtomicOrVolatile(Instruction &I,
+                                         OptimizationRemarkEmitter *ORE,
+                                         Loop *TheLoop) {
+  if (!I.isAtomic() && !I.isVolatile())
+    return true;
+  reportVectorizationFailure("Unsupported volatile or atomic memory operation",
+                             "instruction cannot be vectorized",
+                             "CantVectorizeInstruction", ORE, TheLoop, &I);
+  return false;
+}
+
 bool LoopVectorizationLegality::canVectorizeOuterLoop() {
   assert(!TheLoop->isInnermost() && "We are not vectorizing an outer loop.");
   // Store the result and return it at the end instead of exiting early, in case
@@ -575,29 +587,16 @@ bool LoopVectorizationLegality::canVectorizeOuterLoop() {
     // Instructions in the loop nest are widened, so the types they produce and
     // store must be widenable. Struct-returning calls are not supported yet.
     // Uses of swifterror values must remain scalar. Calls with operand bundles
-    // cannot be widened.
+    // and atomic or volatile instructions cannot be widened.
     for (Instruction &I : *BB) {
       if (canWidenTypes(I, /*AllowStructCalls=*/false, ORE, TheLoop) &&
           canVectorizeSwiftErrorUses(I, ORE, TheLoop) &&
-          canVectorizeOperandBundles(I, ORE, TheLoop))
+          canVectorizeOperandBundles(I, ORE, TheLoop) &&
+          canVectorizeAtomicOrVolatile(I, ORE, TheLoop))
         continue;
       if (!DoExtraAnalysis)
         return false;
       Result = false;
-    }
-
-    // Don't try to vectorize outer loops with atomic or volatile accesses.
-    for (Instruction &I : *BB) {
-      if (!I.isAtomic() && !I.isVolatile())
-        continue;
-      reportVectorizationFailure(
-          "Unsupported volatile or atomic memory operation",
-          "instruction cannot be vectorized", "CantVectorizeInstruction", ORE,
-          TheLoop, &I);
-      if (DoExtraAnalysis)
-        Result = false;
-      else
-        return false;
     }
 
     // Check whether the BB terminator is a branch. Any other terminator is
@@ -1292,6 +1291,12 @@ bool LoopVectorizationLegality::canVectorizeMemory() {
 
     return canVectorizeIndirectUnsafeDependences();
   }
+
+  // LAA allows atomic and volatile accesses in annotated parallel loops, but
+  // they cannot be widened.
+  for (Instruction *I : LAI->getDepChecker().getMemoryInstructions())
+    if (!canVectorizeAtomicOrVolatile(*I, ORE, TheLoop))
+      return false;
 
   if (LAI->hasLoadStoreDependenceInvolvingLoopInvariantAddress()) {
     reportVectorizationFailure("We don't allow storing to uniform addresses",
