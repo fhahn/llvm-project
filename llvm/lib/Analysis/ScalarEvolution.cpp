@@ -16238,8 +16238,25 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
                                    Multiples, SE);
   }
 
-  for (const auto &[Predicate, LHS, RHS] : GuardsToProcess)
+  for (const auto &[Predicate, LHS, RHS] : GuardsToProcess) {
+    // LHS pred RHS also bounds RHS by the range of LHS implied by the
+    // conditions processed so far, e.g. LHS >=s 4 and LHS <=s RHS imply
+    // RHS >=s 4.
+    const SCEV *RewrittenLHS = Guards.RewriteMap.lookup_or(LHS, LHS);
     CollectCondition(Predicate, LHS, RHS, Guards.RewriteMap, DivGuards);
+    if (!ICmpInst::isRelational(Predicate) || isa<SCEVConstant>(RHS) ||
+        RHS->getType()->isPointerTy())
+      continue;
+    ConstantRange RHSRange = ConstantRange::makeAllowedICmpRegion(
+        ICmpInst::getSwappedPredicate(Predicate),
+        ICmpInst::isSigned(Predicate) ? SE.getSignedRange(RewrittenLHS)
+                                      : SE.getUnsignedRange(RewrittenLHS));
+    CmpInst::Predicate BoundPred;
+    APInt Bound;
+    if (!RHSRange.isFullSet() && RHSRange.getEquivalentICmp(BoundPred, Bound))
+      CollectCondition(BoundPred, RHS, SE.getConstant(Bound), Guards.RewriteMap,
+                       DivGuards);
+  }
 
   // Apply divisibility information last. This ensures it is applied to the
   // outermost expression after other rewrites for the given value.

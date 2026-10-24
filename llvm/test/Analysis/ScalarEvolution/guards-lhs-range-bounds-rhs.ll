@@ -9,7 +9,7 @@ define void @a_sge_4_then_a_sle_x(ptr %p, i32 %a, i32 %y) {
 ; CHECK-LABEL: 'a_sge_4_then_a_sle_x'
 ; CHECK-NEXT:  Determining loop execution counts for: @a_sge_4_then_a_sle_x
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-4 + (4 * (zext i5 (trunc i32 ((64 smin (1 + %y)) /u 4) to i5) to i32))<nuw><nsw>)<nsw> /u 4)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 1073741823
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 15
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-4 + (4 * (zext i5 (trunc i32 ((64 smin (1 + %y)) /u 4) to i5) to i32))<nuw><nsw>)<nsw> /u 4)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -79,7 +79,7 @@ define void @a_sge_4_then_a_sle_x_arg(ptr %p, i32 %a, i32 %x) {
 ; CHECK-LABEL: 'a_sge_4_then_a_sle_x_arg'
 ; CHECK-NEXT:  Determining loop execution counts for: @a_sge_4_then_a_sle_x_arg
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-4 + (4 * (zext i5 (trunc i32 ((64 smin %x) /u 4) to i5) to i32))<nuw><nsw>)<nsw> /u 4)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 1073741823
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 15
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-4 + (4 * (zext i5 (trunc i32 ((64 smin %x) /u 4) to i5) to i32))<nuw><nsw>)<nsw> /u 4)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -113,7 +113,7 @@ define void @a_sge_3_then_a_slt_x(ptr %p, i32 %a, i32 %y) {
 ; CHECK-LABEL: 'a_sge_3_then_a_slt_x'
 ; CHECK-NEXT:  Determining loop execution counts for: @a_sge_3_then_a_slt_x
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-4 + (4 * (zext i5 (trunc i32 ((64 smin (1 + %y)) /u 4) to i5) to i32))<nuw><nsw>)<nsw> /u 4)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 1073741823
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 15
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-4 + (4 * (zext i5 (trunc i32 ((64 smin (1 + %y)) /u 4) to i5) to i32))<nuw><nsw>)<nsw> /u 4)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -148,7 +148,7 @@ define void @a_uge_4_then_a_ule_x(ptr %p, i32 %a, i32 %y) {
 ; CHECK-LABEL: 'a_uge_4_then_a_ule_x'
 ; CHECK-NEXT:  Determining loop execution counts for: @a_uge_4_then_a_ule_x
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-4 + (4 * ((64 umin (1 + %y)) /u 4))<nuw><nsw>)<nsw> /u 4)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 1073741823
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 15
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-4 + (4 * ((64 umin (1 + %y)) /u 4))<nuw><nsw>)<nsw> /u 4)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -184,7 +184,7 @@ define void @a_sle_64_then_a_sge_x(ptr %p, i32 %a, i32 %y) {
 ; CHECK-LABEL: 'a_sle_64_then_a_sge_x'
 ; CHECK-NEXT:  Determining loop execution counts for: @a_sle_64_then_a_sge_x
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-4 + (4 * (zext i5 (trunc i32 ((4 smax (1 + %y)) /u 4) to i5) to i32))<nuw><nsw>)<nsw> /u 4)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 1073741823
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 15
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-4 + (4 * (zext i5 (trunc i32 ((4 smax (1 + %y)) /u 4) to i5) to i32))<nuw><nsw>)<nsw> /u 4)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -219,7 +219,7 @@ define void @smin_sge_4_then_smin_sle_x(ptr %p, i32 %a, i32 %c, i32 %y) {
 ; CHECK-LABEL: 'smin_sge_4_then_smin_sle_x'
 ; CHECK-NEXT:  Determining loop execution counts for: @smin_sge_4_then_smin_sle_x
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-4 + (4 * (zext i5 (trunc i32 ((64 smin (1 + %y)) /u 4) to i5) to i32))<nuw><nsw>)<nsw> /u 4)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 1073741823
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 15
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-4 + (4 * (zext i5 (trunc i32 ((64 smin (1 + %y)) /u 4) to i5) to i32))<nuw><nsw>)<nsw> /u 4)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
