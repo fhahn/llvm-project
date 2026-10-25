@@ -287,7 +287,13 @@ define void @alias_mask_truncated_wide_induction(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; CHECK-NEXT:    br label %[[VECTOR_CLAMPED_VF_CHECK:.*]]
 ; CHECK:       [[VECTOR_CLAMPED_VF_CHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[A2]], i64 [[B1]], i64 2)
+; CHECK-NEXT:    [[TMP15:%.*]] = sub i64 [[B1]], [[A2]]
+; CHECK-NEXT:    [[TMP16:%.*]] = and i64 [[TMP15]], -2
+; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP15]], 1
+; CHECK-NEXT:    [[TMP17:%.*]] = icmp ult i64 [[TMP2]], 1
+; CHECK-NEXT:    [[TMP18:%.*]] = select i1 [[TMP17]], i64 2, i64 [[TMP16]]
+; CHECK-NEXT:    [[TMP19:%.*]] = add i64 [[A2]], [[TMP18]]
+; CHECK-NEXT:    [[TMP0:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[A2]], i64 [[TMP19]], i64 2)
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext <4 x i1> [[TMP0]] to <4 x i64>
 ; CHECK-NEXT:    [[NUM_ACTIVE_LANES:%.*]] = call i64 @llvm.vector.reduce.add.v4i64(<4 x i64> [[TMP1]])
 ; CHECK-NEXT:    [[VF_IS_SCALAR:%.*]] = icmp ule i64 [[NUM_ACTIVE_LANES]], 1
@@ -427,7 +433,13 @@ define i32 @find_last_reduction(ptr %a, ptr noalias %b, ptr %c, i64 %n) {
 ; CHECK-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; CHECK-NEXT:    br label %[[VECTOR_CLAMPED_VF_CHECK:.*]]
 ; CHECK:       [[VECTOR_CLAMPED_VF_CHECK]]:
-; CHECK-NEXT:    [[ALIAS_MASK:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[A2]], i64 [[C1]], i64 4)
+; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[C1]], [[A2]]
+; CHECK-NEXT:    [[TMP7:%.*]] = and i64 [[TMP0]], -4
+; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP0]], 1
+; CHECK-NEXT:    [[TMP8:%.*]] = icmp ult i64 [[TMP2]], 3
+; CHECK-NEXT:    [[TMP21:%.*]] = select i1 [[TMP8]], i64 4, i64 [[TMP7]]
+; CHECK-NEXT:    [[TMP22:%.*]] = add i64 [[A2]], [[TMP21]]
+; CHECK-NEXT:    [[ALIAS_MASK:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[A2]], i64 [[TMP22]], i64 4)
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext <4 x i1> [[ALIAS_MASK]] to <4 x i64>
 ; CHECK-NEXT:    [[NUM_ACTIVE_LANES:%.*]] = call i64 @llvm.vector.reduce.add.v4i64(<4 x i64> [[TMP1]])
 ; CHECK-NEXT:    [[VF_IS_SCALAR:%.*]] = icmp ule i64 [[NUM_ACTIVE_LANES]], 1
@@ -506,7 +518,13 @@ define i64 @find_iv_reduction(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; CHECK-NEXT:    br label %[[VECTOR_CLAMPED_VF_CHECK:.*]]
 ; CHECK:       [[VECTOR_CLAMPED_VF_CHECK]]:
-; CHECK-NEXT:    [[ALIAS_MASK:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[A2]], i64 [[B1]], i64 8)
+; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[B1]], [[A2]]
+; CHECK-NEXT:    [[TMP6:%.*]] = and i64 [[TMP0]], -8
+; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP0]], 1
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp ult i64 [[TMP2]], 7
+; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP7]], i64 8, i64 [[TMP6]]
+; CHECK-NEXT:    [[TMP18:%.*]] = add i64 [[A2]], [[TMP10]]
+; CHECK-NEXT:    [[ALIAS_MASK:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[A2]], i64 [[TMP18]], i64 8)
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext <4 x i1> [[ALIAS_MASK]] to <4 x i64>
 ; CHECK-NEXT:    [[NUM_ACTIVE_LANES:%.*]] = call i64 @llvm.vector.reduce.add.v4i64(<4 x i64> [[TMP1]])
 ; CHECK-NEXT:    [[VF_IS_SCALAR:%.*]] = icmp ule i64 [[NUM_ACTIVE_LANES]], 1
@@ -582,7 +600,13 @@ define i64 @any_of_reduction(i64 %a, ptr %src, ptr %dst, i32 %n) {
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp slt i32 [[N]], 1
 ; CHECK-NEXT:    br i1 [[TMP2]], label %[[SCALAR_PH:.*]], label %[[VECTOR_CLAMPED_VF_CHECK:.*]]
 ; CHECK:       [[VECTOR_CLAMPED_VF_CHECK]]:
-; CHECK-NEXT:    [[ALIAS_MASK:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[TMP1]], i64 [[TMP0]], i64 4)
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP0]], [[TMP1]]
+; CHECK-NEXT:    [[TMP11:%.*]] = and i64 [[TMP3]], -4
+; CHECK-NEXT:    [[TMP5:%.*]] = sub i64 [[TMP3]], 1
+; CHECK-NEXT:    [[TMP12:%.*]] = icmp ult i64 [[TMP5]], 3
+; CHECK-NEXT:    [[TMP21:%.*]] = select i1 [[TMP12]], i64 4, i64 [[TMP11]]
+; CHECK-NEXT:    [[TMP22:%.*]] = add i64 [[TMP1]], [[TMP21]]
+; CHECK-NEXT:    [[ALIAS_MASK:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[TMP1]], i64 [[TMP22]], i64 4)
 ; CHECK-NEXT:    [[TMP4:%.*]] = zext <4 x i1> [[ALIAS_MASK]] to <4 x i64>
 ; CHECK-NEXT:    [[NUM_ACTIVE_LANES:%.*]] = call i64 @llvm.vector.reduce.add.v4i64(<4 x i64> [[TMP4]])
 ; CHECK-NEXT:    [[TMP6:%.*]] = trunc i64 [[NUM_ACTIVE_LANES]] to i32

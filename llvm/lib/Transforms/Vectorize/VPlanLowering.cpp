@@ -982,6 +982,25 @@ VPlanTransforms::materializeAliasMask(VPlan &Plan, VPBasicBlock *AliasCheckVPBB,
       Sink = Builder.createFreeze(Sink);
     }
 
+    // The mask is poison unless Sink - Src is a multiple of AccessSize. Round
+    // the distance down to a multiple, except for 0 < distance < AccessSize,
+    // which would round to 0 (all lanes active); use AccessSize (one lane).
+    if (Check.AccessSize != 1) {
+      assert(isPowerOf2_32(Check.AccessSize) && "Expected power-of-2 size");
+      VPValue *Size = Plan.getConstantInt(AddrType, Check.AccessSize);
+      VPValue *Dist = Builder.createSub(Sink, Src);
+      VPValue *Rounded = Builder.createAnd(
+          Dist, Plan.getConstantInt(AddrType, -(int64_t)Check.AccessSize,
+                                    /*IsSigned=*/true));
+      VPValue *DistMinusOne =
+          Builder.createSub(Dist, Plan.getConstantInt(AddrType, 1));
+      VPValue *IsSmall = Builder.createICmp(
+          CmpInst::ICMP_ULT, DistMinusOne,
+          Plan.getConstantInt(AddrType, Check.AccessSize - 1));
+      VPValue *RoundedDist = Builder.createSelect(IsSmall, Size, Rounded);
+      Sink = Builder.createAdd(Src, RoundedDist);
+    }
+
     // TODO: Generate loop_dependence_raw_mask when there's a read-after-write
     // dependency between the source and the sink. This is not necessary for
     // correctness of the mask, but using the "raw" variant prevents loads

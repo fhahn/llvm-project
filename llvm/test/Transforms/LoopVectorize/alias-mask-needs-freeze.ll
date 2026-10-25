@@ -12,13 +12,31 @@ define void @alias_mask_forked_pointer_needs_freeze(ptr %base1, ptr %base2,
 ; CHECK-NEXT:    [[PREDICATES4:%.*]] = ptrtoaddr ptr [[PREDICATES]] to i64
 ; CHECK-NEXT:    br label %[[VECTOR_CLAMPED_VF_CHECK:.*]]
 ; CHECK:       [[VECTOR_CLAMPED_VF_CHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[PREDICATES4]], i64 [[DEST1]], i64 4)
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 [[DEST1]], [[PREDICATES4]]
+; CHECK-NEXT:    [[TMP15:%.*]] = and i64 [[TMP6]], -4
+; CHECK-NEXT:    [[TMP16:%.*]] = sub i64 [[TMP6]], 1
+; CHECK-NEXT:    [[TMP17:%.*]] = icmp ult i64 [[TMP16]], 3
+; CHECK-NEXT:    [[TMP24:%.*]] = select i1 [[TMP17]], i64 4, i64 [[TMP15]]
+; CHECK-NEXT:    [[TMP25:%.*]] = add i64 [[PREDICATES4]], [[TMP24]]
+; CHECK-NEXT:    [[TMP0:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[PREDICATES4]], i64 [[TMP25]], i64 4)
 ; CHECK-NEXT:    [[TMP1:%.*]] = freeze i64 [[BASE23]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = freeze i64 [[DEST1]]
-; CHECK-NEXT:    [[TMP3:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[TMP1]], i64 [[TMP2]], i64 4)
+; CHECK-NEXT:    [[TMP26:%.*]] = sub i64 [[TMP2]], [[TMP1]]
+; CHECK-NEXT:    [[TMP10:%.*]] = and i64 [[TMP26]], -4
+; CHECK-NEXT:    [[TMP27:%.*]] = sub i64 [[TMP26]], 1
+; CHECK-NEXT:    [[TMP28:%.*]] = icmp ult i64 [[TMP27]], 3
+; CHECK-NEXT:    [[TMP13:%.*]] = select i1 [[TMP28]], i64 4, i64 [[TMP10]]
+; CHECK-NEXT:    [[TMP14:%.*]] = add i64 [[TMP1]], [[TMP13]]
+; CHECK-NEXT:    [[TMP3:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[TMP1]], i64 [[TMP14]], i64 4)
 ; CHECK-NEXT:    [[TMP4:%.*]] = and <4 x i1> [[TMP0]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = freeze i64 [[BASE12]]
-; CHECK-NEXT:    [[TMP7:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[TMP5]], i64 [[TMP2]], i64 4)
+; CHECK-NEXT:    [[TMP18:%.*]] = sub i64 [[TMP2]], [[TMP5]]
+; CHECK-NEXT:    [[TMP19:%.*]] = and i64 [[TMP18]], -4
+; CHECK-NEXT:    [[TMP20:%.*]] = sub i64 [[TMP18]], 1
+; CHECK-NEXT:    [[TMP21:%.*]] = icmp ult i64 [[TMP20]], 3
+; CHECK-NEXT:    [[TMP22:%.*]] = select i1 [[TMP21]], i64 4, i64 [[TMP19]]
+; CHECK-NEXT:    [[TMP23:%.*]] = add i64 [[TMP5]], [[TMP22]]
+; CHECK-NEXT:    [[TMP7:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[TMP5]], i64 [[TMP23]], i64 4)
 ; CHECK-NEXT:    [[TMP8:%.*]] = and <4 x i1> [[TMP4]], [[TMP7]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = zext <4 x i1> [[TMP8]] to <4 x i64>
 ; CHECK-NEXT:    [[NUM_ACTIVE_LANES:%.*]] = call i64 @llvm.vector.reduce.add.v4i64(<4 x i64> [[TMP9]])

@@ -14,7 +14,13 @@ define void @test(ptr %src, ptr %dst, i32 %n) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp slt i32 [[TMP0]], 0
 ; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH:.*]], label %[[VECTOR_CLAMPED_VF_CHECK:.*]]
 ; CHECK:       [[VECTOR_CLAMPED_VF_CHECK]]:
-; CHECK-NEXT:    [[ALIAS_MASK:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[SRC2]], i64 [[DST1]], i64 4)
+; CHECK-NEXT:    [[TMP11:%.*]] = sub i64 [[DST1]], [[SRC2]]
+; CHECK-NEXT:    [[TMP4:%.*]] = and i64 [[TMP11]], -4
+; CHECK-NEXT:    [[TMP5:%.*]] = sub i64 [[TMP11]], 1
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp ult i64 [[TMP5]], 3
+; CHECK-NEXT:    [[TMP14:%.*]] = select i1 [[TMP6]], i64 4, i64 [[TMP4]]
+; CHECK-NEXT:    [[TMP16:%.*]] = add i64 [[SRC2]], [[TMP14]]
+; CHECK-NEXT:    [[ALIAS_MASK:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[SRC2]], i64 [[TMP16]], i64 4)
 ; CHECK-NEXT:    [[TMP3:%.*]] = zext <4 x i1> [[ALIAS_MASK]] to <4 x i64>
 ; CHECK-NEXT:    [[NUM_ACTIVE_LANES:%.*]] = call i64 @llvm.vector.reduce.add.v4i64(<4 x i64> [[TMP3]])
 ; CHECK-NEXT:    [[TMP7:%.*]] = trunc i64 [[NUM_ACTIVE_LANES]] to i32

@@ -882,8 +882,12 @@ public:
     if (!Checks)
       return;
 
+    // The alias mask rounds distances to a multiple of a power-of-2 size.
     auto DiffChecks = Checks->getDiffChecks();
-    if (!DiffChecks || DiffChecks->empty())
+    if (!DiffChecks || DiffChecks->empty() ||
+        !all_of(*DiffChecks, [](const PointerDiffInfo &C) {
+          return isPowerOf2_32(C.AccessSize);
+        }))
       return;
 
     [[maybe_unused]] auto HasPointerArgs = [](CallBase *CB) {

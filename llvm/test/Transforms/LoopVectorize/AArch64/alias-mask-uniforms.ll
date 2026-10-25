@@ -12,7 +12,13 @@ define void @vf_dependent_uniform(ptr noalias %p, ptr %p.out, ptr %p.in, i64 %n)
 ; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
 ; CHECK-NEXT:    br label %[[VECTOR_CLAMPED_VF_CHECK:.*]]
 ; CHECK:       [[VECTOR_CLAMPED_VF_CHECK]]:
-; CHECK-NEXT:    [[ALIAS_MASK:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[P_IN2]], i64 [[P_OUT1]], i64 8)
+; CHECK-NEXT:    [[TMP9:%.*]] = sub i64 [[P_OUT1]], [[P_IN2]]
+; CHECK-NEXT:    [[TMP2:%.*]] = and i64 [[TMP9]], -8
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP9]], 1
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp ult i64 [[TMP3]], 7
+; CHECK-NEXT:    [[TMP39:%.*]] = select i1 [[TMP4]], i64 8, i64 [[TMP2]]
+; CHECK-NEXT:    [[TMP40:%.*]] = add i64 [[P_IN2]], [[TMP39]]
+; CHECK-NEXT:    [[ALIAS_MASK:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[P_IN2]], i64 [[TMP40]], i64 8)
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext <4 x i1> [[ALIAS_MASK]] to <4 x i64>
 ; CHECK-NEXT:    [[NUM_ACTIVE_LANES:%.*]] = call i64 @llvm.vector.reduce.add.v4i64(<4 x i64> [[TMP1]])
 ; CHECK-NEXT:    [[VF_IS_SCALAR:%.*]] = icmp ule i64 [[NUM_ACTIVE_LANES]], 1
@@ -119,7 +125,13 @@ define void @uniform_load(ptr noalias %p, ptr %p.out, ptr %p.in, i64 %n) {
 ; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
 ; CHECK-NEXT:    br label %[[VECTOR_CLAMPED_VF_CHECK:.*]]
 ; CHECK:       [[VECTOR_CLAMPED_VF_CHECK]]:
-; CHECK-NEXT:    [[ALIAS_MASK:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[P_IN2]], i64 [[P_OUT1]], i64 8)
+; CHECK-NEXT:    [[TMP9:%.*]] = sub i64 [[P_OUT1]], [[P_IN2]]
+; CHECK-NEXT:    [[TMP2:%.*]] = and i64 [[TMP9]], -8
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP9]], 1
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp ult i64 [[TMP3]], 7
+; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP4]], i64 8, i64 [[TMP2]]
+; CHECK-NEXT:    [[TMP11:%.*]] = add i64 [[P_IN2]], [[TMP10]]
+; CHECK-NEXT:    [[ALIAS_MASK:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[P_IN2]], i64 [[TMP11]], i64 8)
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext <4 x i1> [[ALIAS_MASK]] to <4 x i64>
 ; CHECK-NEXT:    [[NUM_ACTIVE_LANES:%.*]] = call i64 @llvm.vector.reduce.add.v4i64(<4 x i64> [[TMP1]])
 ; CHECK-NEXT:    [[VF_IS_SCALAR:%.*]] = icmp ule i64 [[NUM_ACTIVE_LANES]], 1
@@ -186,7 +198,13 @@ define void @uniform_store(ptr noalias %p, ptr %p.out, ptr %p.in, i64 %n) {
 ; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
 ; CHECK-NEXT:    br label %[[VECTOR_CLAMPED_VF_CHECK:.*]]
 ; CHECK:       [[VECTOR_CLAMPED_VF_CHECK]]:
-; CHECK-NEXT:    [[ALIAS_MASK:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[P_IN2]], i64 [[P_OUT1]], i64 8)
+; CHECK-NEXT:    [[TMP9:%.*]] = sub i64 [[P_OUT1]], [[P_IN2]]
+; CHECK-NEXT:    [[TMP2:%.*]] = and i64 [[TMP9]], -8
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP9]], 1
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp ult i64 [[TMP3]], 7
+; CHECK-NEXT:    [[TMP22:%.*]] = select i1 [[TMP4]], i64 8, i64 [[TMP2]]
+; CHECK-NEXT:    [[TMP23:%.*]] = add i64 [[P_IN2]], [[TMP22]]
+; CHECK-NEXT:    [[ALIAS_MASK:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[P_IN2]], i64 [[TMP23]], i64 8)
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext <4 x i1> [[ALIAS_MASK]] to <4 x i64>
 ; CHECK-NEXT:    [[NUM_ACTIVE_LANES:%.*]] = call i64 @llvm.vector.reduce.add.v4i64(<4 x i64> [[TMP1]])
 ; CHECK-NEXT:    [[VF_IS_SCALAR:%.*]] = icmp ule i64 [[NUM_ACTIVE_LANES]], 1
