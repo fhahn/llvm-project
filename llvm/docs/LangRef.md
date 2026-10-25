@@ -21386,19 +21386,20 @@ The result is a vector with the i1 element type.
 
 ##### Semantics:
 
-`%elementSize` is the size of the accessed elements in bytes. The intrinsic
-returns `poison` if the distance between `%addrA` and `%addrB` is not a multiple
-of `%elementsize`.
+`%elementSize` is the size of the accessed elements in bytes.
 
 Each lane of the mask `%m[i]` is defined as the `or` of:
 
 * `icmp uge %addrA, %addrB`
   * (guarantees that all lanes are loaded before any stores)
-* `icmp ult (%elementSize * i), (%addrB - %addrA)`
+* `icmp ult i, udiv(%addrB - %addrA, %elementSize)`
   * (guarantees that this lane is loaded before the store to the same address)
 
 where `%m` is the vector mask of active/inactive lanes with its elements
 indexed by `i`.
+
+That is, a distance that is not a multiple of `%elementSize` is rounded down
+to a multiple of `%elementSize`.
 
 ##### Examples:
 
@@ -21475,20 +21476,21 @@ The result is a vector with the i1 element type.
 
 ##### Semantics:
 
-`%elementSize` is the size of the accessed elements in bytes. The intrinsic
-returns `poison` if the distance between `%addrA` and `%addrB` is not a multiple
-of `%elementsize`.
+`%elementSize` is the size of the accessed elements in bytes.
 
 Each lane of the mask `%m[i]` is defined as the `or` of:
 
 * `icmp eq %addrA, %addrB`
   * (doesn't introduce any new hazards that weren't in the scalar code)
-* `icmp ult (%elementSize * i), uabs(%addrA,  %addrB)`
+* `icmp ult i, udiv(uabs(%addrA, %addrB), %elementSize)`
   * (guarantees that this lane is loaded before the store to the same address)
 
 where `%m` is the vector mask of active/inactive lanes with its elements indexed
 by `i` and `uabs` is the unsigned absolute difference between `%addrA` and
 `%addrB`.
+
+That is, a distance that is not a multiple of `%elementSize` is rounded down
+to a multiple of `%elementSize`.
 
 ##### Examples:
 
