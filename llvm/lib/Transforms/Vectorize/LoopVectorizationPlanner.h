@@ -8,7 +8,6 @@
 ///
 /// \file
 /// This file provides a LoopVectorizationPlanner class.
-/// InnerLoopVectorizer vectorizes loops which contain only one basic
 /// LoopVectorizationPlanner - drives the vectorization process after having
 /// passed Legality checks.
 /// The planner builds and optimizes the Vectorization Plans which record the
@@ -37,6 +36,7 @@ class GeneratedRTChecks;
 
 namespace llvm {
 
+class AssumptionCache;
 class BranchProbabilityInfo;
 class LoopInfo;
 class DominatorTree;
@@ -1004,7 +1004,7 @@ public:
   };
   DenseMap<const SCEV *, Value *>
   executePlan(ElementCount VF, unsigned UF, VPlan &BestPlan,
-              InnerLoopVectorizer &LB, DominatorTree *DT,
+              GeneratedRTChecks &RTChecks, AssumptionCache *AC,
               EpilogueVectorizationKind EpilogueVecKind =
                   EpilogueVectorizationKind::None,
               MutableArrayRef<VPBasicBlock *> TrackedBlocks = {});
