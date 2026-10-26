@@ -33,7 +33,7 @@ define i32 @cse_reduction_start_vector_multiple_users(ptr %a, i64 %n) {
 ; CHECK-NEXT:    WIDEN ir<%ld.a> = load ir<%gep.a.iv>
 ; CHECK-NEXT:    WIDEN ir<%rdx1.next> = add ir<%rdx1>, ir<%ld.a>
 ; CHECK-NEXT:    WIDEN ir<%rdx2.next> = xor ir<%rdx2>, ir<%ld.a>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP6:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP6]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
@@ -42,7 +42,7 @@ define i32 @cse_reduction_start_vector_multiple_users(ptr %a, i64 %n) {
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = resume-for-epilogue vp<%n.vec>, ir<0>
 ; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = compute-reduction-result (add) ir<%rdx1.next>
 ; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = compute-reduction-result (xor) ir<%rdx2.next>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<%n.vec>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP11:%[0-9]+]]> = resume-for-epilogue vp<%n.vec>, ir<0>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP12:%[0-9]+]]> = resume-for-epilogue vp<[[VP9]]>, ir<0>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP13:%[0-9]+]]> = resume-for-epilogue vp<[[VP10]]>, ir<0>

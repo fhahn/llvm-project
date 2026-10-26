@@ -41,7 +41,7 @@ define void @first_order_recurrence(ptr noalias %A, ptr noalias %B, i64 %TC) {
 ; IF-EVL-NEXT:     EMIT-SCALAR vp<[[CAST2:%[0-9]+]]> = zext vp<[[EVL]]> to i64
 ; IF-EVL-NEXT:     EMIT-SCALAR vp<[[IV_NEXT]]> = add vp<[[CAST2]]>, vp<[[EVL_PHI]]>
 ; IF-EVL-NEXT:     EMIT-SCALAR vp<[[AVL_NEXT]]> = sub nuw vp<[[AVL]]>, vp<[[CAST2]]>
-; IF-EVL-NEXT:     EMIT vp<[[IV_NEXT_EXIT:%.+]]> = add vp<[[IV]]>, vp<[[VFUF]]>
+; IF-EVL-NEXT:     EMIT-SCALAR vp<[[IV_NEXT_EXIT:%.+]]> = add vp<[[IV]]>, vp<[[VFUF]]>
 ; IF-EVL-NEXT:     EMIT branch-on-count  vp<[[IV_NEXT_EXIT]]>, vp<[[VTC]]>
 ; IF-EVL-NEXT:   No successors
 ; IF-EVL-NEXT: }

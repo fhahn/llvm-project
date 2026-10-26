@@ -17,11 +17,11 @@ define float @fmaxnum_reduction_f32(float %base, i32 %n) {
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%v> = fadd ir<%base>, ir<%iv.f>
 ; CHECK:  Cost of 0 for VF 2: EMIT vp<[[VP4:%[0-9]+]]> = freeze ir<%v>
 ; CHECK:  Cost of 1 for VF 2: WIDEN-INTRINSIC ir<%max.next> = call llvm.maxnum(ir<%max>, vp<[[VP4]]>)
-; CHECK:  Cost of 0 for VF 2: EMIT vp<%index.next> = add nuw vp<[[VP3:%[0-9]+]]>, vp<[[VP1:%[0-9]+]]>
+; CHECK:  Cost of 0 for VF 2: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3:%[0-9]+]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK:  Cost of 3 for VF 2: EMIT vp<[[VP5:%[0-9]+]]> = fcmp uno vp<[[VP4]]>, vp<[[VP4]]>
 ; CHECK:  Cost of 2 for VF 2: EMIT vp<[[VP6:%[0-9]+]]> = any-of vp<[[VP5]]>
-; CHECK:  Cost of 1 for VF 2: EMIT vp<[[VP7:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2:%[0-9]+]]>
-; CHECK:  Cost of 0 for VF 2: EMIT vp<[[VP8:%[0-9]+]]> = or vp<[[VP6]]>, vp<[[VP7]]>
+; CHECK:  Cost of 1 for VF 2: EMIT-SCALAR vp<[[VP7:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2:%[0-9]+]]>
+; CHECK:  Cost of 0 for VF 2: EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = or vp<[[VP6]]>, vp<[[VP7]]>
 ; CHECK:  Cost of 0 for VF 2: EMIT branch-on-cond vp<[[VP8]]>
 ; CHECK:  Cost of 0 for VF 2: vector loop backedge
 ; CHECK:  Cost of 1 for VF 2: canonical IV increment
@@ -35,11 +35,11 @@ define float @fmaxnum_reduction_f32(float %base, i32 %n) {
 ; CHECK:  Cost of 0 for VF 2: IR %iv.next = add nuw nsw i32 %iv, 1
 ; CHECK:  Cost of 0 for VF 2: IR %ec = icmp eq i32 %iv.next, %n
 ; CHECK:  Cost of 2 for VF 2: EMIT vp<[[VP10:%[0-9]+]]> = select vp<[[VP6]]>, ir<%max>, ir<%max.next>
-; CHECK:  Cost of 1 for VF 2: EMIT vp<[[VP11]]> = select vp<[[VP6]]>, vp<[[VP3]]>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 2: EMIT-SCALAR vp<[[VP11]]> = select vp<[[VP6]]>, vp<[[VP3]]>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 2: EMIT vp<[[VP12]]> = compute-reduction-result (fmaxnum) vp<[[VP10]]>
-; CHECK:  Cost of 1 for VF 2: EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
-; CHECK:  Cost of 1 for VF 2: EMIT vp<[[VP13:%[0-9]+]]> = not vp<[[VP6]]>
-; CHECK:  Cost of 0 for VF 2: EMIT vp<[[VP14:%[0-9]+]]> = and vp<%cmp.n>, vp<[[VP13]]>
+; CHECK:  Cost of 1 for VF 2: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 2: EMIT-SCALAR vp<[[VP13:%[0-9]+]]> = not vp<[[VP6]]>
+; CHECK:  Cost of 0 for VF 2: EMIT-SCALAR vp<[[VP14:%[0-9]+]]> = and vp<%cmp.n>, vp<[[VP13]]>
 ; CHECK:  Cost of 0 for VF 2: EMIT branch-on-cond vp<[[VP14]]>
 ; CHECK:  Cost of 0 for VF 2: IR %max.next.lcssa = phi float [ %max.next, %loop ] (extra operand: vp<[[VP12]]> from middle.block)
 ; CHECK:  Cost of 1 for VF 4: ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<[[VP0]]>
@@ -48,11 +48,11 @@ define float @fmaxnum_reduction_f32(float %base, i32 %n) {
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%v> = fadd ir<%base>, ir<%iv.f>
 ; CHECK:  Cost of 0 for VF 4: EMIT vp<[[VP4]]> = freeze ir<%v>
 ; CHECK:  Cost of 1 for VF 4: WIDEN-INTRINSIC ir<%max.next> = call llvm.maxnum(ir<%max>, vp<[[VP4]]>)
-; CHECK:  Cost of 0 for VF 4: EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK:  Cost of 0 for VF 4: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK:  Cost of 3 for VF 4: EMIT vp<[[VP5]]> = fcmp uno vp<[[VP4]]>, vp<[[VP4]]>
 ; CHECK:  Cost of 2 for VF 4: EMIT vp<[[VP6]]> = any-of vp<[[VP5]]>
-; CHECK:  Cost of 1 for VF 4: EMIT vp<[[VP7]]> = icmp eq vp<%index.next>, vp<[[VP2]]>
-; CHECK:  Cost of 0 for VF 4: EMIT vp<[[VP8]]> = or vp<[[VP6]]>, vp<[[VP7]]>
+; CHECK:  Cost of 1 for VF 4: EMIT-SCALAR vp<[[VP7]]> = icmp eq vp<%index.next>, vp<[[VP2]]>
+; CHECK:  Cost of 0 for VF 4: EMIT-SCALAR vp<[[VP8]]> = or vp<[[VP6]]>, vp<[[VP7]]>
 ; CHECK:  Cost of 0 for VF 4: EMIT branch-on-cond vp<[[VP8]]>
 ; CHECK:  Cost of 0 for VF 4: vector loop backedge
 ; CHECK:  Cost of 1 for VF 4: canonical IV increment
@@ -66,11 +66,11 @@ define float @fmaxnum_reduction_f32(float %base, i32 %n) {
 ; CHECK:  Cost of 0 for VF 4: IR %iv.next = add nuw nsw i32 %iv, 1
 ; CHECK:  Cost of 0 for VF 4: IR %ec = icmp eq i32 %iv.next, %n
 ; CHECK:  Cost of 2 for VF 4: EMIT vp<[[VP10]]> = select vp<[[VP6]]>, ir<%max>, ir<%max.next>
-; CHECK:  Cost of 1 for VF 4: EMIT vp<[[VP11]]> = select vp<[[VP6]]>, vp<[[VP3]]>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 4: EMIT-SCALAR vp<[[VP11]]> = select vp<[[VP6]]>, vp<[[VP3]]>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 4: EMIT vp<[[VP12]]> = compute-reduction-result (fmaxnum) vp<[[VP10]]>
-; CHECK:  Cost of 1 for VF 4: EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
-; CHECK:  Cost of 1 for VF 4: EMIT vp<[[VP13]]> = not vp<[[VP6]]>
-; CHECK:  Cost of 0 for VF 4: EMIT vp<[[VP14]]> = and vp<%cmp.n>, vp<[[VP13]]>
+; CHECK:  Cost of 1 for VF 4: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 4: EMIT-SCALAR vp<[[VP13]]> = not vp<[[VP6]]>
+; CHECK:  Cost of 0 for VF 4: EMIT-SCALAR vp<[[VP14]]> = and vp<%cmp.n>, vp<[[VP13]]>
 ; CHECK:  Cost of 0 for VF 4: EMIT branch-on-cond vp<[[VP14]]>
 ; CHECK:  Cost of 0 for VF 4: IR %max.next.lcssa = phi float [ %max.next, %loop ] (extra operand: vp<[[VP12]]> from middle.block)
 ; CHECK:  LV: Selecting VF: 4.
@@ -100,11 +100,11 @@ define double @fmaxnum_reduction_f64(double %base, i64 %n) {
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%v> = fadd ir<%base>, ir<%iv.f>
 ; CHECK:  Cost of 0 for VF 2: EMIT vp<[[VP4:%[0-9]+]]> = freeze ir<%v>
 ; CHECK:  Cost of 1 for VF 2: WIDEN-INTRINSIC ir<%max.next> = call llvm.maxnum(ir<%max>, vp<[[VP4]]>)
-; CHECK:  Cost of 0 for VF 2: EMIT vp<%index.next> = add nuw vp<[[VP3:%[0-9]+]]>, vp<[[VP1:%[0-9]+]]>
+; CHECK:  Cost of 0 for VF 2: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3:%[0-9]+]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK:  Cost of 3 for VF 2: EMIT vp<[[VP5:%[0-9]+]]> = fcmp uno vp<[[VP4]]>, vp<[[VP4]]>
 ; CHECK:  Cost of 2 for VF 2: EMIT vp<[[VP6:%[0-9]+]]> = any-of vp<[[VP5]]>
-; CHECK:  Cost of 1 for VF 2: EMIT vp<[[VP7:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2:%[0-9]+]]>
-; CHECK:  Cost of 0 for VF 2: EMIT vp<[[VP8:%[0-9]+]]> = or vp<[[VP6]]>, vp<[[VP7]]>
+; CHECK:  Cost of 1 for VF 2: EMIT-SCALAR vp<[[VP7:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2:%[0-9]+]]>
+; CHECK:  Cost of 0 for VF 2: EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = or vp<[[VP6]]>, vp<[[VP7]]>
 ; CHECK:  Cost of 0 for VF 2: EMIT branch-on-cond vp<[[VP8]]>
 ; CHECK:  Cost of 0 for VF 2: vector loop backedge
 ; CHECK:  Cost of 1 for VF 2: canonical IV increment
@@ -118,11 +118,11 @@ define double @fmaxnum_reduction_f64(double %base, i64 %n) {
 ; CHECK:  Cost of 0 for VF 2: IR %iv.next = add nuw nsw i64 %iv, 1
 ; CHECK:  Cost of 0 for VF 2: IR %ec = icmp eq i64 %iv.next, %n
 ; CHECK:  Cost of 2 for VF 2: EMIT vp<[[VP10:%[0-9]+]]> = select vp<[[VP6]]>, ir<%max>, ir<%max.next>
-; CHECK:  Cost of 1 for VF 2: EMIT vp<[[VP11]]> = select vp<[[VP6]]>, vp<[[VP3]]>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 2: EMIT-SCALAR vp<[[VP11]]> = select vp<[[VP6]]>, vp<[[VP3]]>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 2: EMIT vp<[[VP12]]> = compute-reduction-result (fmaxnum) vp<[[VP10]]>
-; CHECK:  Cost of 1 for VF 2: EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
-; CHECK:  Cost of 1 for VF 2: EMIT vp<[[VP13:%[0-9]+]]> = not vp<[[VP6]]>
-; CHECK:  Cost of 0 for VF 2: EMIT vp<[[VP14:%[0-9]+]]> = and vp<%cmp.n>, vp<[[VP13]]>
+; CHECK:  Cost of 1 for VF 2: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 2: EMIT-SCALAR vp<[[VP13:%[0-9]+]]> = not vp<[[VP6]]>
+; CHECK:  Cost of 0 for VF 2: EMIT-SCALAR vp<[[VP14:%[0-9]+]]> = and vp<%cmp.n>, vp<[[VP13]]>
 ; CHECK:  Cost of 0 for VF 2: EMIT branch-on-cond vp<[[VP14]]>
 ; CHECK:  Cost of 0 for VF 2: IR %max.next.lcssa = phi double [ %max.next, %loop ] (extra operand: vp<[[VP12]]> from middle.block)
 ; CHECK:  LV: Selecting VF: 1.
@@ -191,7 +191,7 @@ define i32 @switch_to_cmp(ptr %s, ptr %dst, i64 %n) {
 ; CHECK:  Cost of 0 for VF 2: CLONE ir<%dst.gep> = getelementptr ir<%dst>, vp<[[VP5]]>
 ; CHECK:  Cost of 0 for VF 2: vp<[[VP37:%[0-9]+]]> = vector-pointer i8, ir<%dst.gep>, ir<1>
 ; CHECK:  Cost of 4 for VF 2: WIDEN store vp<[[VP37]]>, ir<%l>
-; CHECK:  Cost of 0 for VF 2: EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1:%[0-9]+]]>
+; CHECK:  Cost of 0 for VF 2: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK:  Cost of 1 for VF 2: EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ; CHECK:  Cost of 0 for VF 2: vector loop backedge
 ; CHECK:  Cost of 1 for VF 2: canonical IV increment
@@ -203,7 +203,7 @@ define i32 @switch_to_cmp(ptr %s, ptr %dst, i64 %n) {
 ; CHECK:  Cost of 0 for VF 2: IR %l = load i8, ptr %gep, align 1
 ; CHECK:  Cost of 0 for VF 2: EMIT vp<[[VP3]]> = reduction-start-vector ir<0>, ir<0>, ir<1>
 ; CHECK:  Cost of 0 for VF 2: EMIT vp<[[VP39]]> = compute-reduction-result (add) ir<%c.next>
-; CHECK:  Cost of 1 for VF 2: EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 2: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 2: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  Cost of 0 for VF 2: IR %c.next.lcssa = phi i32 [ %c.next, %loop.latch ] (extra operand: vp<[[VP39]]> from middle.block)
 ; CHECK:  Cost of 0 for VF 4: forced scalar %gep = getelementptr i8, ptr %s, i64 %iv
@@ -249,7 +249,7 @@ define i32 @switch_to_cmp(ptr %s, ptr %dst, i64 %n) {
 ; CHECK:  Cost of 0 for VF 4: CLONE ir<%dst.gep> = getelementptr ir<%dst>, vp<[[VP5]]>
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP37]]> = vector-pointer i8, ir<%dst.gep>, ir<1>
 ; CHECK:  Cost of 2 for VF 4: WIDEN store vp<[[VP37]]>, ir<%l>
-; CHECK:  Cost of 0 for VF 4: EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
+; CHECK:  Cost of 0 for VF 4: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
 ; CHECK:  Cost of 1 for VF 4: EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 4: vector loop backedge
 ; CHECK:  Cost of 1 for VF 4: canonical IV increment
@@ -261,7 +261,7 @@ define i32 @switch_to_cmp(ptr %s, ptr %dst, i64 %n) {
 ; CHECK:  Cost of 0 for VF 4: IR %l = load i8, ptr %gep, align 1
 ; CHECK:  Cost of 0 for VF 4: EMIT vp<[[VP3]]> = reduction-start-vector ir<0>, ir<0>, ir<1>
 ; CHECK:  Cost of 0 for VF 4: EMIT vp<[[VP39]]> = compute-reduction-result (add) ir<%c.next>
-; CHECK:  Cost of 1 for VF 4: EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 4: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 4: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  Cost of 0 for VF 4: IR %c.next.lcssa = phi i32 [ %c.next, %loop.latch ] (extra operand: vp<[[VP39]]> from middle.block)
 ; CHECK:  Cost of 0 for VF 8: forced scalar %gep = getelementptr i8, ptr %s, i64 %iv
@@ -307,7 +307,7 @@ define i32 @switch_to_cmp(ptr %s, ptr %dst, i64 %n) {
 ; CHECK:  Cost of 0 for VF 8: CLONE ir<%dst.gep> = getelementptr ir<%dst>, vp<[[VP5]]>
 ; CHECK:  Cost of 0 for VF 8: vp<[[VP37]]> = vector-pointer i8, ir<%dst.gep>, ir<1>
 ; CHECK:  Cost of 1 for VF 8: WIDEN store vp<[[VP37]]>, ir<%l>
-; CHECK:  Cost of 0 for VF 8: EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
+; CHECK:  Cost of 0 for VF 8: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
 ; CHECK:  Cost of 1 for VF 8: EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 8: vector loop backedge
 ; CHECK:  Cost of 1 for VF 8: canonical IV increment
@@ -319,7 +319,7 @@ define i32 @switch_to_cmp(ptr %s, ptr %dst, i64 %n) {
 ; CHECK:  Cost of 0 for VF 8: IR %l = load i8, ptr %gep, align 1
 ; CHECK:  Cost of 0 for VF 8: EMIT vp<[[VP3]]> = reduction-start-vector ir<0>, ir<0>, ir<1>
 ; CHECK:  Cost of 0 for VF 8: EMIT vp<[[VP39]]> = compute-reduction-result (add) ir<%c.next>
-; CHECK:  Cost of 1 for VF 8: EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 8: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 8: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  Cost of 0 for VF 8: IR %c.next.lcssa = phi i32 [ %c.next, %loop.latch ] (extra operand: vp<[[VP39]]> from middle.block)
 ; CHECK:  Cost of 0 for VF 16: forced scalar %gep = getelementptr i8, ptr %s, i64 %iv
@@ -365,7 +365,7 @@ define i32 @switch_to_cmp(ptr %s, ptr %dst, i64 %n) {
 ; CHECK:  Cost of 0 for VF 16: CLONE ir<%dst.gep> = getelementptr ir<%dst>, vp<[[VP5]]>
 ; CHECK:  Cost of 0 for VF 16: vp<[[VP37]]> = vector-pointer i8, ir<%dst.gep>, ir<1>
 ; CHECK:  Cost of 1 for VF 16: WIDEN store vp<[[VP37]]>, ir<%l>
-; CHECK:  Cost of 0 for VF 16: EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
+; CHECK:  Cost of 0 for VF 16: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
 ; CHECK:  Cost of 1 for VF 16: EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 16: vector loop backedge
 ; CHECK:  Cost of 1 for VF 16: canonical IV increment
@@ -377,7 +377,7 @@ define i32 @switch_to_cmp(ptr %s, ptr %dst, i64 %n) {
 ; CHECK:  Cost of 0 for VF 16: IR %l = load i8, ptr %gep, align 1
 ; CHECK:  Cost of 0 for VF 16: EMIT vp<[[VP3]]> = reduction-start-vector ir<0>, ir<0>, ir<1>
 ; CHECK:  Cost of 0 for VF 16: EMIT vp<[[VP39]]> = compute-reduction-result (add) ir<%c.next>
-; CHECK:  Cost of 1 for VF 16: EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 16: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 16: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  Cost of 0 for VF 16: IR %c.next.lcssa = phi i32 [ %c.next, %loop.latch ] (extra operand: vp<[[VP39]]> from middle.block)
 ; CHECK:  LV: Selecting VF: 16.
@@ -447,7 +447,7 @@ define void @blend_fcmp_olt_f32(ptr noalias %dst, ptr noalias %src, i64 %n) {
 ; CHECK:  Cost of 0 for VF 2: CLONE ir<%dst.gep> = getelementptr inbounds ir<%dst>, vp<[[VP4]]>
 ; CHECK:  Cost of 0 for VF 2: vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds float, ir<%dst.gep>, ir<1>
 ; CHECK:  Cost of 1 for VF 2: WIDEN store vp<[[VP6]]>, ir<%p>
-; CHECK:  Cost of 0 for VF 2: EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
+; CHECK:  Cost of 0 for VF 2: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK:  Cost of 1 for VF 2: EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ; CHECK:  Cost of 0 for VF 2: vector loop backedge
 ; CHECK:  Cost of 1 for VF 2: canonical IV increment
@@ -456,7 +456,7 @@ define void @blend_fcmp_olt_f32(ptr noalias %dst, ptr noalias %src, i64 %n) {
 ; CHECK:  Cost of 0 for VF 2: IR %src.gep = getelementptr inbounds float, ptr %src, i64 %iv
 ; CHECK:  Cost of 0 for VF 2: IR %l = load float, ptr %src.gep, align 4
 ; CHECK:  Cost of 0 for VF 2: IR %c = fcmp olt float %l, 0.000000e+00
-; CHECK:  Cost of 1 for VF 2: EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 2: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 2: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  Cost of 0 for VF 4: forced scalar %src.gep = getelementptr inbounds float, ptr %src, i64 %iv
 ; CHECK:  Cost of 0 for VF 4: forced scalar %dst.gep = getelementptr inbounds float, ptr %dst, i64 %iv
@@ -470,7 +470,7 @@ define void @blend_fcmp_olt_f32(ptr noalias %dst, ptr noalias %src, i64 %n) {
 ; CHECK:  Cost of 0 for VF 4: CLONE ir<%dst.gep> = getelementptr inbounds ir<%dst>, vp<[[VP4]]>
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP6]]> = vector-pointer inbounds float, ir<%dst.gep>, ir<1>
 ; CHECK:  Cost of 1 for VF 4: WIDEN store vp<[[VP6]]>, ir<%p>
-; CHECK:  Cost of 0 for VF 4: EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK:  Cost of 0 for VF 4: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK:  Cost of 1 for VF 4: EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 4: vector loop backedge
 ; CHECK:  Cost of 1 for VF 4: canonical IV increment
@@ -479,7 +479,7 @@ define void @blend_fcmp_olt_f32(ptr noalias %dst, ptr noalias %src, i64 %n) {
 ; CHECK:  Cost of 0 for VF 4: IR %src.gep = getelementptr inbounds float, ptr %src, i64 %iv
 ; CHECK:  Cost of 0 for VF 4: IR %l = load float, ptr %src.gep, align 4
 ; CHECK:  Cost of 0 for VF 4: IR %c = fcmp olt float %l, 0.000000e+00
-; CHECK:  Cost of 1 for VF 4: EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 4: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 4: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  LV: Selecting VF: 4.
 ;
@@ -523,7 +523,7 @@ define void @blend_fcmp_uno_f32(ptr noalias %dst, ptr noalias %src, i64 %n) {
 ; CHECK:  Cost of 0 for VF 2: CLONE ir<%dst.gep> = getelementptr inbounds ir<%dst>, vp<[[VP4]]>
 ; CHECK:  Cost of 0 for VF 2: vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds float, ir<%dst.gep>, ir<1>
 ; CHECK:  Cost of 1 for VF 2: WIDEN store vp<[[VP6]]>, ir<%p>
-; CHECK:  Cost of 0 for VF 2: EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
+; CHECK:  Cost of 0 for VF 2: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK:  Cost of 1 for VF 2: EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ; CHECK:  Cost of 0 for VF 2: vector loop backedge
 ; CHECK:  Cost of 1 for VF 2: canonical IV increment
@@ -532,7 +532,7 @@ define void @blend_fcmp_uno_f32(ptr noalias %dst, ptr noalias %src, i64 %n) {
 ; CHECK:  Cost of 0 for VF 2: IR %src.gep = getelementptr inbounds float, ptr %src, i64 %iv
 ; CHECK:  Cost of 0 for VF 2: IR %l = load float, ptr %src.gep, align 4
 ; CHECK:  Cost of 0 for VF 2: IR %c = fcmp uno float %l, 0.000000e+00
-; CHECK:  Cost of 1 for VF 2: EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 2: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 2: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  Cost of 0 for VF 4: forced scalar %src.gep = getelementptr inbounds float, ptr %src, i64 %iv
 ; CHECK:  Cost of 0 for VF 4: forced scalar %dst.gep = getelementptr inbounds float, ptr %dst, i64 %iv
@@ -546,7 +546,7 @@ define void @blend_fcmp_uno_f32(ptr noalias %dst, ptr noalias %src, i64 %n) {
 ; CHECK:  Cost of 0 for VF 4: CLONE ir<%dst.gep> = getelementptr inbounds ir<%dst>, vp<[[VP4]]>
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP6]]> = vector-pointer inbounds float, ir<%dst.gep>, ir<1>
 ; CHECK:  Cost of 1 for VF 4: WIDEN store vp<[[VP6]]>, ir<%p>
-; CHECK:  Cost of 0 for VF 4: EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK:  Cost of 0 for VF 4: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK:  Cost of 1 for VF 4: EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 4: vector loop backedge
 ; CHECK:  Cost of 1 for VF 4: canonical IV increment
@@ -555,7 +555,7 @@ define void @blend_fcmp_uno_f32(ptr noalias %dst, ptr noalias %src, i64 %n) {
 ; CHECK:  Cost of 0 for VF 4: IR %src.gep = getelementptr inbounds float, ptr %src, i64 %iv
 ; CHECK:  Cost of 0 for VF 4: IR %l = load float, ptr %src.gep, align 4
 ; CHECK:  Cost of 0 for VF 4: IR %c = fcmp uno float %l, 0.000000e+00
-; CHECK:  Cost of 1 for VF 4: EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 4: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 4: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  LV: Selecting VF: 4.
 ;

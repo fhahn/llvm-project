@@ -19,8 +19,8 @@ define void @scev_ptradd_strided(ptr noalias %a, ptr noalias %dst, i64 %n) {
 ; CHECK-NEXT:    EMIT-SCALAR vp<%index> = phi [ ir<0>, vector.ph ], [ vp<%current.iteration.next>, vector.body ]
 ; CHECK-NEXT:    EMIT-SCALAR vp<%avl> = phi [ ir<%n>, vector.ph ], [ vp<%avl.next>, vector.body ]
 ; CHECK-NEXT:    EMIT-SCALAR vp<%evl> = EXPLICIT-VECTOR-LENGTH vp<%avl>
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = shl nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = ptradd nuw vp<[[VP2]]>, vp<[[VP3]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = shl nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = ptradd nuw vp<[[VP2]]>, vp<[[VP3]]>
 ; CHECK-NEXT:    WIDEN-INTRINSIC vp<[[VP5:%[0-9]+]]> = call llvm.experimental.vp.strided.load(vp<[[VP4]]>, ir<16>, ir<true>, vp<%evl>)
 ; CHECK-NEXT:    CLONE ir<%gd> = getelementptr inbounds ir<%dst>, vp<%index>
 ; CHECK-NEXT:    WIDEN vp.store ir<%gd>, vp<[[VP5]]>, vp<%evl>
@@ -73,8 +73,8 @@ define void @scev_ptradd_strided_var_offset(ptr noalias %a, ptr noalias %dst, i6
 ; CHECK-NEXT:    EMIT-SCALAR vp<%index> = phi [ ir<0>, vector.ph ], [ vp<%current.iteration.next>, vector.body ]
 ; CHECK-NEXT:    EMIT-SCALAR vp<%avl> = phi [ ir<%n>, vector.ph ], [ vp<%avl.next>, vector.body ]
 ; CHECK-NEXT:    EMIT-SCALAR vp<%evl> = EXPLICIT-VECTOR-LENGTH vp<%avl>
-; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = shl vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = ptradd vp<[[VP4]]>, vp<[[VP5]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP5:%[0-9]+]]> = shl vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP6:%[0-9]+]]> = ptradd vp<[[VP4]]>, vp<[[VP5]]>
 ; CHECK-NEXT:    WIDEN-INTRINSIC vp<[[VP7:%[0-9]+]]> = call llvm.experimental.vp.strided.load(vp<[[VP6]]>, ir<16>, ir<true>, vp<%evl>)
 ; CHECK-NEXT:    CLONE ir<%gd> = getelementptr inbounds ir<%dst>, vp<%index>
 ; CHECK-NEXT:    WIDEN vp.store ir<%gd>, vp<[[VP7]]>, vp<%evl>

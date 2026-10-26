@@ -44,7 +44,7 @@ define void @foo(ptr noalias %a, ptr noalias %b, ptr noalias %c, i64 %N) {
 ; IF-EVL-NEXT:      EMIT-SCALAR vp<[[VP10:%[0-9]+]]> = zext vp<%evl> to i64
 ; IF-EVL-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add vp<[[VP10]]>, vp<[[VP4]]>
 ; IF-EVL-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP10]]>
-; IF-EVL-NEXT:      EMIT vp<%index.next> = add vp<[[VP2]]>, vp<[[VP0]]>
+; IF-EVL-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP2]]>, vp<[[VP0]]>
 ; IF-EVL-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; IF-EVL-NEXT:    No successors
 ; IF-EVL-NEXT:  }
@@ -78,7 +78,7 @@ define void @foo(ptr noalias %a, ptr noalias %b, ptr noalias %c, i64 %N) {
 ; NO-VP-NEXT:      CLONE ir<%arrayidx4> = getelementptr inbounds ir<%a>, vp<[[VP4]]>
 ; NO-VP-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer inbounds i32, ir<%arrayidx4>, ir<1>
 ; NO-VP-NEXT:      WIDEN store vp<[[VP7]]>, ir<%add>
-; NO-VP-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; NO-VP-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; NO-VP-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; NO-VP-NEXT:    No successors
 ; NO-VP-NEXT:  }
@@ -132,7 +132,7 @@ define void @safe_dep(ptr %p) {
 ; IF-EVL-NEXT:      CLONE ir<%a2> = getelementptr ir<%p>, ir<%offset>
 ; IF-EVL-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer i64, ir<%a2>, ir<1>
 ; IF-EVL-NEXT:      WIDEN store vp<[[VP6]]>, ir<%v>
-; IF-EVL-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; IF-EVL-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; IF-EVL-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; IF-EVL-NEXT:    No successors
 ; IF-EVL-NEXT:  }
@@ -163,7 +163,7 @@ define void @safe_dep(ptr %p) {
 ; NO-VP-NEXT:      CLONE ir<%a2> = getelementptr ir<%p>, ir<%offset>
 ; NO-VP-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer i64, ir<%a2>, ir<1>
 ; NO-VP-NEXT:      WIDEN store vp<[[VP6]]>, ir<%v>
-; NO-VP-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; NO-VP-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; NO-VP-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; NO-VP-NEXT:    No successors
 ; NO-VP-NEXT:  }

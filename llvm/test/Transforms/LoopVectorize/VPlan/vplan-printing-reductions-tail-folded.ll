@@ -30,7 +30,7 @@ define float @print_reduction(i64 %n, ptr noalias %y) {
 ; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = vector-pointer inbounds float, ir<%arrayidx>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%lv> = load vp<[[VP10]]>, vp<[[VP8]]>
 ; CHECK-NEXT:      REDUCE ir<%red.next> = ir<%red> + fast  reduce.fadd (ir<%lv>, vp<[[VP8]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -90,7 +90,7 @@ define void @print_reduction_with_invariant_store(i64 %n, ptr noalias %y, ptr no
 ; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = vector-pointer inbounds float, ir<%arrayidx>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%lv> = load vp<[[VP10]]>, vp<[[VP8]]>
 ; CHECK-NEXT:      REDUCE ir<%red.next> = ir<%red> + fast  reduce.fadd (ir<%lv>, vp<[[VP8]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -155,7 +155,7 @@ define float @print_fmuladd_strict(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:      WIDEN ir<%l.b> = load vp<[[VP11]]>, vp<[[VP8]]>
 ; CHECK-NEXT:      EMIT vp<[[VP12:%[0-9]+]]> = fmul nnan ninf nsz ir<%l.a>, ir<%l.b>
 ; CHECK-NEXT:      REDUCE ir<%muladd> = ir<%sum.07> + nnan ninf nsz  reduce.fmuladd (vp<[[VP12]]>, vp<[[VP8]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -220,7 +220,7 @@ define i64 @find_last_iv(ptr %a, i64 %n, i64 %start) {
 ; CHECK-NEXT:      WIDEN ir<%cmp2> = icmp eq ir<%l.a>, ir<%start>
 ; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = logical-and vp<[[VP7]]>, ir<%cmp2>
 ; CHECK-NEXT:      EMIT vp<[[VP11]]> = select vp<[[VP10]]>, ir<%iv>, ir<%rdx>
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP4]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP4]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -228,8 +228,8 @@ define i64 @find_last_iv(ptr %a, i64 %n, i64 %start) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = compute-reduction-result (smax) vp<[[VP11]]>
-; CHECK-NEXT:    EMIT vp<[[VP14:%[0-9]+]]> = icmp ne vp<[[VP13]]>, ir<-9223372036854775808>
-; CHECK-NEXT:    EMIT vp<[[VP15:%[0-9]+]]> = select vp<[[VP14]]>, vp<[[VP13]]>, ir<%start>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP14:%[0-9]+]]> = icmp ne vp<[[VP13]]>, ir<-9223372036854775808>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP15:%[0-9]+]]> = select vp<[[VP14]]>, vp<[[VP13]]>, ir<%start>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<exit>:
@@ -283,7 +283,7 @@ define i64 @print_extended_reduction(ptr nocapture readonly %x, ptr nocapture re
 ; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = vector-pointer inbounds i32, ir<%arrayidx>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%load0> = load vp<[[VP10]]>, vp<[[VP8]]>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP11]]> = vp<[[VP8]]> + reduce.add (ir<%load0> zext to i64, vp<[[VP8]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -348,7 +348,7 @@ define i64 @print_mulacc(ptr nocapture readonly %x, ptr nocapture readonly %y, i
 ; CHECK-NEXT:      vp<[[VP11:%[0-9]+]]> = vector-pointer inbounds i64, ir<%arrayidx1>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%load1> = load vp<[[VP11]]>, vp<[[VP8]]>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP12]]> = ir<%rdx> + reduce.add (mul nsw ir<%load0>, ir<%load1>, vp<[[VP8]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -415,7 +415,7 @@ define i64 @print_mulacc_extended(ptr nocapture readonly %x, ptr nocapture reado
 ; CHECK-NEXT:      vp<[[VP11:%[0-9]+]]> = vector-pointer inbounds i16, ir<%arrayidx1>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%load1> = load vp<[[VP11]]>, vp<[[VP8]]>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP12]]> = ir<%rdx> + reduce.add (mul nsw (ir<%load0> sext to i64), (ir<%load1> sext to i64), vp<[[VP8]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -482,7 +482,7 @@ define i64 @print_extended_sub_reduction(ptr nocapture readonly %x, ptr nocaptur
 ; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = vector-pointer inbounds i32, ir<%arrayidx>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%load0> = load vp<[[VP10]]>, vp<[[VP8]]>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP11]]> = vp<[[VP8]]> + reduce.sub (ir<%load0> zext to i64, vp<[[VP8]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -545,7 +545,7 @@ define i32 @print_mulacc_sub(ptr %a, ptr %b) {
 ; CHECK-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer i8, ir<%gep.b>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%load.b> = load vp<[[VP7]]>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP8]]> = ir<%accum> + reduce.sub (mul (ir<%load.b> zext to i32), (ir<%load.a> zext to i32))
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -553,7 +553,7 @@ define i32 @print_mulacc_sub(ptr %a, ptr %b) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = compute-reduction-result (sub, in-loop) vp<[[VP8]]>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1024>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<1024>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -613,7 +613,7 @@ define i32 @print_mulacc_negated(ptr %a, ptr %b) {
 ; CHECK-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer i8, ir<%gep.b>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%load.b> = load vp<[[VP7]]>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP8]]> = ir<%accum> + reduce.add (sub (0, mul (ir<%load.b> zext to i32), (ir<%load.a> zext to i32)))
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -621,7 +621,7 @@ define i32 @print_mulacc_negated(ptr %a, ptr %b) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = compute-reduction-result (add, in-loop) vp<[[VP8]]>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1024>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<1024>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -684,7 +684,7 @@ define i64 @print_mulacc_sub_extended(ptr nocapture readonly %x, ptr nocapture r
 ; CHECK-NEXT:      vp<[[VP11:%[0-9]+]]> = vector-pointer inbounds i16, ir<%arrayidx1>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%load1> = load vp<[[VP11]]>, vp<[[VP8]]>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP12]]> = ir<%rdx> + reduce.sub (mul nsw (ir<%load0> sext to i64), (ir<%load1> sext to i64), vp<[[VP8]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -751,7 +751,7 @@ define i64 @print_mulacc_duplicate_extends(ptr nocapture readonly %x, ptr nocapt
 ; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = vector-pointer inbounds i16, ir<%arrayidx>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%load0> = load vp<[[VP10]]>, vp<[[VP8]]>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP11]]> = ir<%rdx> + reduce.sub (mul nsw (ir<%load0> sext to i64), (ir<%load0> sext to i64), vp<[[VP8]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -812,11 +812,11 @@ define i32 @print_mulacc_extended_const(ptr %start, ptr %end) {
 ; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = WIDEN-CANONICAL-INDUCTION nuw vp<[[VP6]]>
 ; CHECK-NEXT:      EMIT vp<[[VP9:%[0-9]+]]> = icmp ule vp<[[VP8]]>, vp<[[VP3]]>
 ; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = SCALAR-STEPS vp<[[VP6]]>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:      EMIT vp<%next.gep> = ptradd ir<%start>, vp<[[VP10]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%next.gep> = ptradd ir<%start>, vp<[[VP10]]>
 ; CHECK-NEXT:      vp<[[VP11:%[0-9]+]]> = vector-pointer i8, vp<%next.gep>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%l> = load vp<[[VP11]]>, vp<[[VP9]]>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP12]]> = ir<%red> + reduce.add (mul (ir<%l> zext to i32), (ir<63> zext to i32), vp<[[VP9]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP6]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP6]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -874,12 +874,12 @@ define i32 @print_mulacc_extended_const_lhs(ptr %start, ptr %end) {
 ; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = WIDEN-CANONICAL-INDUCTION nuw vp<[[VP6]]>
 ; CHECK-NEXT:      EMIT vp<[[VP9:%[0-9]+]]> = icmp ule vp<[[VP8]]>, vp<[[VP3]]>
 ; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = SCALAR-STEPS vp<[[VP6]]>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:      EMIT vp<%next.gep> = ptradd ir<%start>, vp<[[VP10]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%next.gep> = ptradd ir<%start>, vp<[[VP10]]>
 ; CHECK-NEXT:      vp<[[VP11:%[0-9]+]]> = vector-pointer i8, vp<%next.gep>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%l> = load vp<[[VP11]]>, vp<[[VP9]]>
 ; CHECK-NEXT:      WIDEN-CAST ir<%l.ext> = zext ir<%l> to i32
 ; CHECK-NEXT:      EXPRESSION vp<[[VP12]]> = ir<%red> + reduce.add (mul ir<63>, ir<%l.ext>, vp<[[VP9]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP6]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP6]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -938,12 +938,12 @@ define i32 @print_mulacc_not_extended_const(ptr %start, ptr %end) {
 ; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = WIDEN-CANONICAL-INDUCTION nuw vp<[[VP6]]>
 ; CHECK-NEXT:      EMIT vp<[[VP9:%[0-9]+]]> = icmp ule vp<[[VP8]]>, vp<[[VP3]]>
 ; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = SCALAR-STEPS vp<[[VP6]]>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:      EMIT vp<%next.gep> = ptradd ir<%start>, vp<[[VP10]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%next.gep> = ptradd ir<%start>, vp<[[VP10]]>
 ; CHECK-NEXT:      vp<[[VP11:%[0-9]+]]> = vector-pointer i8, vp<%next.gep>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%l> = load vp<[[VP11]]>, vp<[[VP9]]>
 ; CHECK-NEXT:      WIDEN-CAST ir<%l.ext> = sext ir<%l> to i32
 ; CHECK-NEXT:      EXPRESSION vp<[[VP12]]> = ir<%red> + reduce.add (mul ir<%l.ext>, ir<128>, vp<[[VP9]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP6]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP6]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -1002,11 +1002,11 @@ define i64 @print_ext_mulacc_extended_const(ptr %start, ptr %end) {
 ; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = WIDEN-CANONICAL-INDUCTION nuw vp<[[VP6]]>
 ; CHECK-NEXT:      EMIT vp<[[VP9:%[0-9]+]]> = icmp ule vp<[[VP8]]>, vp<[[VP3]]>
 ; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = SCALAR-STEPS vp<[[VP6]]>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:      EMIT vp<%next.gep> = ptradd ir<%start>, vp<[[VP10]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%next.gep> = ptradd ir<%start>, vp<[[VP10]]>
 ; CHECK-NEXT:      vp<[[VP11:%[0-9]+]]> = vector-pointer i8, vp<%next.gep>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%l> = load vp<[[VP11]]>, vp<[[VP9]]>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP12]]> = ir<%red> + reduce.add (mul (ir<%l> zext to i64), (ir<63> zext to i64), vp<[[VP9]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP6]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP6]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -1066,13 +1066,13 @@ define i64 @print_ext_mulacc_not_extended_const(ptr %start, ptr %end) {
 ; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = WIDEN-CANONICAL-INDUCTION nuw vp<[[VP6]]>
 ; CHECK-NEXT:      EMIT vp<[[VP9:%[0-9]+]]> = icmp ule vp<[[VP8]]>, vp<[[VP3]]>
 ; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = SCALAR-STEPS vp<[[VP6]]>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:      EMIT vp<%next.gep> = ptradd ir<%start>, vp<[[VP10]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%next.gep> = ptradd ir<%start>, vp<[[VP10]]>
 ; CHECK-NEXT:      vp<[[VP11:%[0-9]+]]> = vector-pointer i8, vp<%next.gep>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%l> = load vp<[[VP11]]>, vp<[[VP9]]>
 ; CHECK-NEXT:      WIDEN-CAST ir<%l.ext> = sext ir<%l> to i32
 ; CHECK-NEXT:      EMIT vp<[[VP12:%[0-9]+]]> = shl ir<%l.ext>, ir<7>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP13]]> = vp<[[VP9]]> + reduce.add (vp<[[VP12]]> sext to i64, vp<[[VP9]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP6]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP6]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -1135,7 +1135,7 @@ define i64 @print_ext_mul_two_uses(i64 %n, ptr %a, i16 %b, i32 %c) {
 ; CHECK-NEXT:      EMIT vp<[[VP7:%[0-9]+]]> = WIDEN-CANONICAL-INDUCTION nuw vp<[[VP5]]>
 ; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = icmp ule vp<[[VP7]]>, vp<[[VP2]]>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP9]]> = ir<%res2> + reduce.add (mul (ir<%b> sext to i64), (ir<%b> sext to i64), vp<[[VP8]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP5]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP5]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -1198,7 +1198,7 @@ define i32 @print_umax_reduction_out_of_loop(ptr %y) {
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%lv> = load vp<[[VP5]]>
 ; CHECK-NEXT:      WIDEN-INTRINSIC ir<%red.next> = call llvm.umax(ir<%lv>, ir<%red>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -1206,7 +1206,7 @@ define i32 @print_umax_reduction_out_of_loop(ptr %y) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = compute-reduction-result (umax) ir<%red.next>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<100>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<100>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -1257,7 +1257,7 @@ define i32 @print_umax_reduction(ptr %y) {
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%lv> = load vp<[[VP5]]>
 ; CHECK-NEXT:      WIDEN-INTRINSIC ir<%red.next> = call llvm.umax(ir<%red>, ir<%lv>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -1265,7 +1265,7 @@ define i32 @print_umax_reduction(ptr %y) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = compute-reduction-result (umax) ir<%red.next>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<100>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<100>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -1316,7 +1316,7 @@ define i32 @print_umin_reduction(ptr %y) {
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%lv> = load vp<[[VP5]]>
 ; CHECK-NEXT:      WIDEN-INTRINSIC ir<%red.next> = call llvm.umin(ir<%lv>, ir<%red>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -1324,7 +1324,7 @@ define i32 @print_umin_reduction(ptr %y) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = compute-reduction-result (umin) ir<%red.next>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<100>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<100>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -1375,7 +1375,7 @@ define i32 @print_smax_reduction(ptr %y) {
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%lv> = load vp<[[VP5]]>
 ; CHECK-NEXT:      WIDEN-INTRINSIC ir<%red.next> = call llvm.smax(ir<%red>, ir<%lv>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -1383,7 +1383,7 @@ define i32 @print_smax_reduction(ptr %y) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = compute-reduction-result (smax) ir<%red.next>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<100>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<100>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -1434,7 +1434,7 @@ define i32 @print_smin_reduction(ptr %y) {
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%lv> = load vp<[[VP5]]>
 ; CHECK-NEXT:      WIDEN-INTRINSIC ir<%red.next> = call llvm.smin(ir<%lv>, ir<%red>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -1442,7 +1442,7 @@ define i32 @print_smin_reduction(ptr %y) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = compute-reduction-result (smin) ir<%red.next>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<100>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<100>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:

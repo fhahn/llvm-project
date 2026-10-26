@@ -145,7 +145,7 @@ define void @predicated_block(ptr noalias %a, ptr noalias %idx) {
 ; REGION-NEXT:    Successor(s): if.then.0
 ; REGION-EMPTY:
 ; REGION-NEXT:    if.then.0:
-; REGION-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; REGION-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; REGION-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; REGION-NEXT:    No successors
 ; REGION-NEXT:  }
@@ -196,7 +196,7 @@ define void @predicated_block(ptr noalias %a, ptr noalias %idx) {
 ; DISSOLVE-NEXT:  Successor(s): pred.store.continue
 ; DISSOLVE-EMPTY:
 ; DISSOLVE-NEXT:  pred.store.continue:
-; DISSOLVE-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, vp<[[VP0]]>
+; DISSOLVE-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, vp<[[VP0]]>
 ; DISSOLVE-NEXT:    EMIT-SCALAR vp<[[VP9:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; DISSOLVE-NEXT:    EMIT branch-on-cond vp<[[VP9]]>
 ; DISSOLVE-NEXT:  Successor(s): middle.block, vector.body
@@ -335,7 +335,7 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ; REGION-NEXT:      CLONE ir<%gep.b> = getelementptr inbounds ir<%b>, vp<[[VP4]]>
 ; REGION-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep.b>, ir<1>
 ; REGION-NEXT:      WIDEN store vp<[[VP7]]>, ir<%sel.uniform>
-; REGION-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; REGION-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; REGION-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; REGION-NEXT:    No successors
 ; REGION-NEXT:  }
@@ -367,7 +367,7 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ; DISSOLVE-NEXT:    WIDEN store ir<%gep.a>, ir<%sel.varying>
 ; DISSOLVE-NEXT:    CLONE ir<%gep.b> = getelementptr inbounds ir<%b>, vp<%index>
 ; DISSOLVE-NEXT:    WIDEN store ir<%gep.b>, ir<%sel.uniform>
-; DISSOLVE-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, vp<[[VP0]]>
+; DISSOLVE-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, vp<[[VP0]]>
 ; DISSOLVE-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP1]]>
 ; DISSOLVE-NEXT:    EMIT branch-on-cond vp<[[VP3]]>
 ; DISSOLVE-NEXT:  Successor(s): middle.block, vector.body

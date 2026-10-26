@@ -171,14 +171,14 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; VECTOR-NEXT:      vp<[[VP31:%[0-9]+]]> = vector-pointer i8, ir<%gep.dst>, ir<1>, vp<[[VP29]]>
 ; VECTOR-NEXT:      WIDEN store vp<[[VP30]]>, ir<%pred.val>
 ; VECTOR-NEXT:      WIDEN store vp<[[VP31]]>, ir<%pred.val>.1
-; VECTOR-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP10]]>, vp<[[VP1]]>
+; VECTOR-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP10]]>, vp<[[VP1]]>
 ; VECTOR-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; VECTOR-NEXT:    No successors
 ; VECTOR-NEXT:  }
 ; VECTOR-NEXT:  Successor(s): middle.block
 ; VECTOR-EMPTY:
 ; VECTOR-NEXT:  middle.block:
-; VECTOR-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1024>, vp<[[VP2]]>
+; VECTOR-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<1024>, vp<[[VP2]]>
 ; VECTOR-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; VECTOR-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; VECTOR-EMPTY:

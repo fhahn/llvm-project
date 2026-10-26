@@ -39,7 +39,7 @@ define i32 @two_reductions(i64 %N, ptr %a, ptr %b) {
 ; UF1-NEXT:    WIDEN ir<%lb> = load ir<%gb>, vp<[[VP8]]>
 ; UF1-NEXT:    WIDEN ir<%sum.a.next> = add ir<%sum.a>, ir<%la>
 ; UF1-NEXT:    WIDEN ir<%sum.b.next> = add ir<%sum.b>, ir<%lb>
-; UF1-NEXT:    EMIT vp<%index.next> = add vp<%index>, ir<4>
+; UF1-NEXT:    EMIT-SCALAR vp<%index.next> = add vp<%index>, ir<4>
 ; UF1-NEXT:    EMIT vp<%vec.ind.next> = add nuw vp<[[VP7]]>, vp<[[VP6]]>
 ; UF1-NEXT:    EMIT-SCALAR vp<[[VP9:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; UF1-NEXT:    EMIT branch-on-cond vp<[[VP9]]>
@@ -113,7 +113,7 @@ define i32 @two_reductions(i64 %N, ptr %a, ptr %b) {
 ; UF4-NEXT:    WIDEN ir<%sum.b.next>.1 = add ir<%sum.b>.1, ir<%lb>.1
 ; UF4-NEXT:    WIDEN ir<%sum.b.next>.2 = add ir<%sum.b>.2, ir<%lb>.2
 ; UF4-NEXT:    WIDEN ir<%sum.b.next>.3 = add ir<%sum.b>.3, ir<%lb>.3
-; UF4-NEXT:    EMIT vp<%index.next> = add vp<%index>, ir<16>
+; UF4-NEXT:    EMIT-SCALAR vp<%index.next> = add vp<%index>, ir<16>
 ; UF4-NEXT:    EMIT-SCALAR vp<[[VP23:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; UF4-NEXT:    EMIT branch-on-cond vp<[[VP23]]>
 ; UF4-NEXT:  Successor(s): middle.block, vector.body

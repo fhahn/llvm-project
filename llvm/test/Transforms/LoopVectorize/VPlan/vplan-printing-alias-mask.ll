@@ -92,7 +92,7 @@ define void @alias_mask(ptr noalias %a, ptr %b, ptr %c, i64 %n) {
 ; FINAL-NEXT:    WIDEN ir<%add> = add ir<%ld.b>, ir<%ld.a>
 ; FINAL-NEXT:    CLONE ir<%ptr.c> = getelementptr inbounds ir<%c>, vp<%index>
 ; FINAL-NEXT:    WIDEN store ir<%ptr.c>, ir<%add>, vp<[[VP12]]>
-; FINAL-NEXT:    EMIT vp<%index.next> = add vp<%index>, vp<%num.active.lanes>
+; FINAL-NEXT:    EMIT-SCALAR vp<%index.next> = add vp<%index>, vp<%num.active.lanes>
 ; FINAL-NEXT:    EMIT vp<%vec.ind.next> = add nuw vp<[[VP10]]>, vp<[[VP9]]>
 ; FINAL-NEXT:    EMIT-SCALAR vp<[[VP13:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; FINAL-NEXT:    EMIT branch-on-cond vp<[[VP13]]>

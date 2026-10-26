@@ -27,19 +27,19 @@ define void @test_tc_less_than_16(ptr %A, i64 %N) {
 ; OPTIMIZE-EMPTY:
 ; OPTIMIZE-NEXT:    vector.body:
 ; OPTIMIZE-NEXT:      vp<[[VP6:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5]]>, ir<1>, vp<[[VP0]]>
-; OPTIMIZE-NEXT:      EMIT vp<%next.gep> = ptradd ir<%A>, vp<[[VP6]]>
+; OPTIMIZE-NEXT:      EMIT-SCALAR vp<%next.gep> = ptradd ir<%A>, vp<[[VP6]]>
 ; OPTIMIZE-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer i8, vp<%next.gep>, ir<1>
 ; OPTIMIZE-NEXT:      WIDEN ir<%l> = load vp<[[VP7]]>
 ; OPTIMIZE-NEXT:      WIDEN ir<%add> = add nsw ir<%l>, ir<10>
 ; OPTIMIZE-NEXT:      WIDEN store vp<[[VP7]]>, ir<%add>
-; OPTIMIZE-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
+; OPTIMIZE-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
 ; OPTIMIZE-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; OPTIMIZE-NEXT:    No successors
 ; OPTIMIZE-NEXT:  }
 ; OPTIMIZE-NEXT:  Successor(s): middle.block
 ; OPTIMIZE-EMPTY:
 ; OPTIMIZE-NEXT:  middle.block:
-; OPTIMIZE-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<16>, vp<[[VP2]]>
+; OPTIMIZE-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<16>, vp<[[VP2]]>
 ; OPTIMIZE-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; OPTIMIZE-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; OPTIMIZE-EMPTY:

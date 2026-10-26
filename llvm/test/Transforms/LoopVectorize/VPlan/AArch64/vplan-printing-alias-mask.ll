@@ -40,7 +40,7 @@ define void @alias_mask(ptr noalias %a, ptr %b, ptr %c, i64 %n) {
 ; FINAL-NEXT:    WIDEN ir<%add> = add ir<%ld.b>, ir<%ld.a>
 ; FINAL-NEXT:    CLONE ir<%ptr.c> = getelementptr inbounds ir<%c>, vp<%index>
 ; FINAL-NEXT:    WIDEN store ir<%ptr.c>, ir<%add>, vp<[[VP7]]>
-; FINAL-NEXT:    EMIT vp<%index.next> = add vp<%index>, vp<%num.active.lanes>
+; FINAL-NEXT:    EMIT-SCALAR vp<%index.next> = add vp<%index>, vp<%num.active.lanes>
 ; FINAL-NEXT:    EMIT vp<%active.lane.mask.next> = wide active lane mask vp<%index.next>, ir<%n>, ir<1>
 ; FINAL-NEXT:    EMIT vp<%extract.next.alm.part> = extract-vector-for-part vp<%active.lane.mask.next>, ir<0>
 ; FINAL-NEXT:    EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = not vp<%extract.next.alm.part>

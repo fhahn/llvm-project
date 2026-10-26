@@ -22,14 +22,14 @@ define void @test_unused_interleave(ptr %src, i32 %length) {
 ; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP2]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP2]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%length>, vp<[[VP1]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%length>, vp<[[VP1]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<for.end>, scalar.ph
 ; CHECK-EMPTY:

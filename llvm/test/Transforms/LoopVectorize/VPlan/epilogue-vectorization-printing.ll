@@ -31,7 +31,7 @@ define i64 @resume_values(ptr noalias %A, i64 %n) {
 ; CHECK-NEXT:    CLONE ir<%gep> = getelementptr inbounds ir<%A>, vp<%index>
 ; CHECK-NEXT:    WIDEN ir<%l> = load ir<%gep>
 ; CHECK-NEXT:    WIDEN ir<%red.next> = add ir<%red>, ir<%l>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<8>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<8>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP6:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP6]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
@@ -39,7 +39,7 @@ define i64 @resume_values(ptr noalias %A, i64 %n) {
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT-SCALAR vp<%{{.+}}> = resume-for-epilogue vp<%n.vec>, ir<0>
 ; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = compute-reduction-result (add) ir<%red.next>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<%n.vec>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT-SCALAR vp<%{{.+}}> = resume-for-epilogue vp<%n.vec>, ir<0>
 ; CHECK-NEXT:    EMIT-SCALAR vp<%{{.+}}> = resume-for-epilogue vp<[[VP8]]>, ir<5>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
@@ -102,14 +102,14 @@ define i64 @resume_values(ptr noalias %A, i64 %n) {
 ; CHECK-NEXT:    CLONE ir<%gep> = getelementptr inbounds ir<%A>, vp<%index>
 ; CHECK-NEXT:    WIDEN ir<%l> = load ir<%gep>
 ; CHECK-NEXT:    WIDEN ir<%red.next> = add ir<%red>, ir<%l>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP5:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP5]]>
 ; CHECK-NEXT:  Successor(s): vec.epilog.middle.block, vec.epilog.vector.body
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vec.epilog.middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = compute-reduction-result (add) ir<%red.next>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<%n.vec>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, ir-bb<vec.epilog.scalar.ph>
 ; CHECK-EMPTY:
@@ -197,7 +197,7 @@ define i64 @bypass_blocks(ptr %A, ptr %B, i32 %n) {
 ; CHECK-NEXT:    WIDEN ir<%red.next> = add ir<%red>, ir<%l>
 ; CHECK-NEXT:    CLONE ir<%gep.b> = getelementptr inbounds ir<%B>, ir<%iv.ext>
 ; CHECK-NEXT:    WIDEN store ir<%gep.b>, ir<%l>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<8>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<8>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP8]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
@@ -205,7 +205,7 @@ define i64 @bypass_blocks(ptr %A, ptr %B, i32 %n) {
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT-SCALAR vp<%{{.+}}> = resume-for-epilogue vp<%n.vec>, ir<0>
 ; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = compute-reduction-result (add) ir<%red.next>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<%n.vec>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT-SCALAR vp<%{{.+}}> = resume-for-epilogue vp<%n.vec>, ir<0>
 ; CHECK-NEXT:    EMIT-SCALAR vp<%{{.+}}> = resume-for-epilogue vp<[[VP6]]>, ir<0>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
@@ -282,14 +282,14 @@ define i64 @bypass_blocks(ptr %A, ptr %B, i32 %n) {
 ; CHECK-NEXT:    WIDEN ir<%red.next> = add ir<%red>, ir<%l>
 ; CHECK-NEXT:    CLONE ir<%gep.b> = getelementptr inbounds ir<%B>, ir<%iv.ext>
 ; CHECK-NEXT:    WIDEN store ir<%gep.b>, ir<%l>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP5:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP5]]>
 ; CHECK-NEXT:  Successor(s): vec.epilog.middle.block, vec.epilog.vector.body
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vec.epilog.middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = compute-reduction-result (add) ir<%red.next>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<%n.vec>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, ir-bb<vec.epilog.scalar.ph>
 ; CHECK-EMPTY:
@@ -372,7 +372,7 @@ define void @all_iterations_in_main_loop_with_memcheck(ptr %dst, ptr %src) {
 ; CHECK-NEXT:    WIDEN ir<%add> = add ir<%l>, ir<1>
 ; CHECK-NEXT:    CLONE ir<%gep.dst> = getelementptr inbounds ir<%dst>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%gep.dst>, ir<%add>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<8>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<8>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = icmp eq vp<%index.next>, ir<16>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP4]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
@@ -442,7 +442,7 @@ define void @all_iterations_in_main_loop_with_memcheck(ptr %dst, ptr %src) {
 ; CHECK-NEXT:    WIDEN ir<%add> = add ir<%l>, ir<1>
 ; CHECK-NEXT:    CLONE ir<%gep.dst> = getelementptr inbounds ir<%dst>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%gep.dst>, ir<%add>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = icmp eq vp<%index.next>, ir<16>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP2]]>
 ; CHECK-NEXT:  Successor(s): vec.epilog.middle.block, vec.epilog.vector.body
@@ -520,7 +520,7 @@ define void @all_iterations_in_main_loop_with_scevcheck(ptr %p, i32 %off) {
 ; CHECK-NEXT:    EMIT-SCALAR ir<%idx> = zext vp<[[VP6]]> to i64
 ; CHECK-NEXT:    CLONE ir<%gep> = getelementptr inbounds ir<%p>, ir<%idx>
 ; CHECK-NEXT:    WIDEN store ir<%gep>, ir<1>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<8>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<8>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP7:%[0-9]+]]> = icmp eq vp<%index.next>, ir<16>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP7]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
@@ -590,7 +590,7 @@ define void @all_iterations_in_main_loop_with_scevcheck(ptr %p, i32 %off) {
 ; CHECK-NEXT:    EMIT-SCALAR ir<%idx> = zext vp<[[VP4]]> to i64
 ; CHECK-NEXT:    CLONE ir<%gep> = getelementptr inbounds ir<%p>, ir<%idx>
 ; CHECK-NEXT:    WIDEN store ir<%gep>, ir<1>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP5:%[0-9]+]]> = icmp eq vp<%index.next>, ir<16>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP5]]>
 ; CHECK-NEXT:  Successor(s): vec.epilog.middle.block, vec.epilog.vector.body
@@ -665,7 +665,7 @@ define void @dead_main_vector_loop(ptr %dst, i64 %n) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT-SCALAR vp<%{{.+}}> = resume-for-epilogue vp<%n.vec>, ir<0>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%clamped>, vp<%n.vec>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%clamped>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT-SCALAR vp<%{{.+}}> = resume-for-epilogue vp<%n.vec>, ir<0>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, ir-bb<scalar.ph>
@@ -723,7 +723,7 @@ define void @dead_main_vector_loop(ptr %dst, i64 %n) {
 ; CHECK-NEXT:  Successor(s): vec.epilog.middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vec.epilog.middle.block:
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%clamped>, vp<%n.vec>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%clamped>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, ir-bb<vec.epilog.scalar.ph>
 ; CHECK-EMPTY:
@@ -791,14 +791,14 @@ define i32 @nested_loop(ptr noalias %p, ptr noalias %end, ptr noalias %dst, i64 
 ; CHECK-NEXT:    EMIT-SCALAR vp<%next.gep> = ptradd ir<%p>, vp<[[VP8]]>
 ; CHECK-NEXT:    CLONE ir<%l> = load vp<%next.gep>
 ; CHECK-NEXT:    CLONE store ir<%l>, ir<%dst>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<8>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<8>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP9:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP9]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT-SCALAR vp<%{{.+}}> = resume-for-epilogue vp<%n.vec>, ir<0>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%3>, vp<%n.vec>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%3>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT-SCALAR vp<%{{.+}}> = resume-for-epilogue vp<[[VP6]]>, ir<%p>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<inner.exit>, ir-bb<scalar.ph>
@@ -860,13 +860,13 @@ define i32 @nested_loop(ptr noalias %p, ptr noalias %end, ptr noalias %dst, i64 
 ; CHECK-NEXT:    EMIT-SCALAR vp<%next.gep> = ptradd ir<%p>, vp<[[VP7]]>
 ; CHECK-NEXT:    CLONE ir<%l> = load vp<%next.gep>
 ; CHECK-NEXT:    CLONE store ir<%l>, ir<%dst>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP8]]>
 ; CHECK-NEXT:  Successor(s): vec.epilog.middle.block, vec.epilog.vector.body
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vec.epilog.middle.block:
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%3>, vp<%n.vec>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%3>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<inner.exit>, ir-bb<vec.epilog.scalar.ph>
 ; CHECK-EMPTY:

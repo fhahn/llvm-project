@@ -49,14 +49,14 @@ define i32 @find_last_int_select(i64 %N, ptr %data, i32 %a) {
 ; IC2-NEXT:    EMIT vp<[[VP12]]> = select vp<[[VP10]]>, vp<[[VP9]]>, vp<[[VP6]]>
 ; IC2-NEXT:    EMIT vp<[[VP13]]> = select vp<[[VP10]]>, ir<%ld>, ir<%data.phi>
 ; IC2-NEXT:    EMIT vp<[[VP14]]> = select vp<[[VP10]]>, ir<%ld>.1, ir<%data.phi>.1
-; IC2-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<8>
+; IC2-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<8>
 ; IC2-NEXT:    EMIT-SCALAR vp<[[VP15:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; IC2-NEXT:    EMIT branch-on-cond vp<[[VP15]]>
 ; IC2-NEXT:  Successor(s): middle.block, vector.body
 ; IC2-EMPTY:
 ; IC2-NEXT:  middle.block:
 ; IC2-NEXT:    EMIT vp<[[VP17:%[0-9]+]]> = extract-last-active ir<-1>, vp<[[VP13]]>, vp<[[VP11]]>, vp<[[VP14]]>, vp<[[VP12]]>
-; IC2-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%N>, vp<%n.vec>
+; IC2-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%N>, vp<%n.vec>
 ; IC2-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; IC2-NEXT:  Successor(s): ir-bb<exit>, ir-bb<scalar.ph>
 ; IC2-EMPTY:
@@ -126,7 +126,7 @@ define i32 @find_last_int_select(i64 %N, ptr %data, i32 %a) {
 ; IC2-TF-NEXT:    EMIT vp<[[VP20]]> = select vp<[[VP18]]>, vp<[[VP17]]>, vp<[[VP6]]>
 ; IC2-TF-NEXT:    EMIT vp<[[VP21]]> = select vp<[[VP18]]>, ir<%ld>, ir<%data.phi>
 ; IC2-TF-NEXT:    EMIT vp<[[VP22]]> = select vp<[[VP18]]>, ir<%ld>.1, ir<%data.phi>.1
-; IC2-TF-NEXT:    EMIT vp<%index.next> = add vp<%index>, ir<8>
+; IC2-TF-NEXT:    EMIT-SCALAR vp<%index.next> = add vp<%index>, ir<8>
 ; IC2-TF-NEXT:    EMIT-SCALAR vp<[[VP23:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; IC2-TF-NEXT:    EMIT branch-on-cond vp<[[VP23]]>
 ; IC2-TF-NEXT:  Successor(s): middle.block, vector.body

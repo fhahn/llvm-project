@@ -83,13 +83,13 @@ define void @switch4_default_common_dest_with_case(ptr %start, ptr %end) {
 ; CHECK-NEXT:  Successor(s): pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  pred.store.continue:
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<2>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<2>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP23:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP23]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq vp<[[VP2]]>, vp<%n.vec>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq vp<[[VP2]]>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, ir-bb<scalar.ph>
 ; CHECK-EMPTY:

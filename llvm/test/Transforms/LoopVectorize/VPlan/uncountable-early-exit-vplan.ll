@@ -30,15 +30,15 @@ define i64 @multi_exiting_to_different_exits_live_in_exit_values() {
 ; CHECK-NEXT:      WIDEN ir<%c.1> = icmp eq ir<%l>, ir<10>
 ; CHECK-NEXT:      EMIT vp<[[VP6:%[0-9]+]]> = freeze ir<%c.1>
 ; CHECK-NEXT:      EMIT vp<[[VP7:%[0-9]+]]> = any-of vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:      EMIT branch-on-two-conds vp<[[VP7]]>, vp<[[VP8]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): vector.early.exit, middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<128>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<128>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<e2>, scalar.ph
 ; CHECK-EMPTY:
@@ -118,15 +118,15 @@ define i64 @multi_exiting_to_same_exit_live_in_exit_values() {
 ; CHECK-NEXT:      WIDEN ir<%c.1> = icmp eq ir<%l>, ir<10>
 ; CHECK-NEXT:      EMIT vp<[[VP6:%[0-9]+]]> = freeze ir<%c.1>
 ; CHECK-NEXT:      EMIT vp<[[VP7:%[0-9]+]]> = any-of vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:      EMIT branch-on-two-conds vp<[[VP7]]>, vp<[[VP8]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): vector.early.exit, middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<128>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<128>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -199,15 +199,15 @@ define i64 @multi_exiting_to_same_exit_live_in_exit_values_2() {
 ; CHECK-NEXT:      WIDEN ir<%c.1> = icmp eq ir<%l>, ir<10>
 ; CHECK-NEXT:      EMIT vp<[[VP6:%[0-9]+]]> = freeze ir<%c.1>
 ; CHECK-NEXT:      EMIT vp<[[VP7:%[0-9]+]]> = any-of vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:      EMIT branch-on-two-conds vp<[[VP7]]>, vp<[[VP8]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): vector.early.exit, middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<128>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<128>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -290,15 +290,15 @@ define i64 @two_early_exits_same_exit_with_constant_live_outs() {
 ; CHECK-NEXT:      EMIT vp<[[VP7:%[0-9]+]]> = logical-or ir<%cmp1>, ir<%cmp2>
 ; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = freeze vp<[[VP7]]>
 ; CHECK-NEXT:      EMIT vp<[[VP9:%[0-9]+]]> = any-of vp<[[VP8]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP10:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:      EMIT branch-on-two-conds vp<[[VP9]]>, vp<[[VP10]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): vector.early.exit.check, middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<67>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<67>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -312,7 +312,7 @@ define i64 @two_early_exits_same_exit_with_constant_live_outs() {
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.early.exit.0:
-; CHECK-NEXT:    EMIT vp<[[VP14:%[0-9]+]]> = add vp<[[VP3]]>, vp<%first.active.lane>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP14:%[0-9]+]]> = add vp<[[VP3]]>, vp<%first.active.lane>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<exit>:

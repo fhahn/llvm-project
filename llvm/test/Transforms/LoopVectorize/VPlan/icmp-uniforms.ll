@@ -35,7 +35,7 @@ define i32 @more_than_one_use(ptr %a, i64 %n) {
 ; CHECK-NEXT:      REPLICATE ir<%tmp1> = getelementptr inbounds ir<%a>, ir<%tmp0>
 ; CHECK-NEXT:      REPLICATE ir<%tmp2> = load ir<%tmp1>
 ; CHECK-NEXT:      WIDEN ir<%tmp3> = add ir<%r>, ir<%tmp2>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -43,7 +43,7 @@ define i32 @more_than_one_use(ptr %a, i64 %n) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = compute-reduction-result (add) ir<%tmp3>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq vp<[[VP3]]>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq vp<[[VP3]]>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<for.end>, scalar.ph
 ; CHECK-EMPTY:
@@ -130,7 +130,7 @@ define void @test(ptr %ptr) {
 ; CHECK-NEXT:    Successor(s): loop.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.0:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }

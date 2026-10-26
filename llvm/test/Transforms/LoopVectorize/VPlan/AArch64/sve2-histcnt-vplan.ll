@@ -82,14 +82,14 @@ target triple = "aarch64-unknown-linux-gnu"
 ; CHECK-NEXT:     WIDEN-CAST [[EXT_IDX:.*]] = zext [[IDX]] to i64
 ; CHECK-NEXT:     WIDEN-GEP [[GEP_BUCKET:.*]] = getelementptr inbounds ir<%buckets>, [[EXT_IDX]]
 ; CHECK-NEXT:     WIDEN-HISTOGRAM buckets: [[GEP_BUCKET]], inc: ir<1>
-; CHECK-NEXT:     EMIT [[IV_NEXT:.*]] = add nuw [[IV]], [[VFxUF]]
+; CHECK-NEXT:     EMIT-SCALAR [[IV_NEXT:.*]] = add nuw [[IV]], [[VFxUF]]
 ; CHECK-NEXT:     EMIT branch-on-count [[IV_NEXT]], [[VTC]]
 ; CHECK-NEXT:   No successors
 ; CHECK-NEXT: }
 ; CHECK-NEXT: Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT: middle.block:
-; CHECK-NEXT:   EMIT [[TC_CHECK:.*]] = icmp eq [[OTC]], [[VTC]]
+; CHECK-NEXT:   EMIT-SCALAR [[TC_CHECK:.*]] = icmp eq [[OTC]], [[VTC]]
 ; CHECK-NEXT:   EMIT branch-on-cond [[TC_CHECK]]
 ; CHECK-NEXT: Successor(s): ir-bb<for.exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -177,14 +177,14 @@ for.exit:
 ; CHECK-NEXT:     WIDEN-CAST [[EXT_IDX3:.*]] = zext [[IDX3]] to i64
 ; CHECK-NEXT:     WIDEN-GEP [[GEP_BUCKET3:.*]] = getelementptr inbounds ir<%buckets>, [[EXT_IDX3]]
 ; CHECK-NEXT:     WIDEN-HISTOGRAM buckets: [[GEP_BUCKET3]], saturated inc: ir<1>
-; CHECK-NEXT:     EMIT [[IV_NEXT3:.*]] = add nuw [[IV3]], [[VFxUF3]]
+; CHECK-NEXT:     EMIT-SCALAR [[IV_NEXT3:.*]] = add nuw [[IV3]], [[VFxUF3]]
 ; CHECK-NEXT:     EMIT branch-on-count [[IV_NEXT3]], [[VTC3]]
 ; CHECK-NEXT:   No successors
 ; CHECK-NEXT: }
 ; CHECK-NEXT: Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT: middle.block:
-; CHECK-NEXT:   EMIT [[TC_CHECK3:.*]] = icmp eq [[OTC3]], [[VTC3]]
+; CHECK-NEXT:   EMIT-SCALAR [[TC_CHECK3:.*]] = icmp eq [[OTC3]], [[VTC3]]
 ; CHECK-NEXT:   EMIT branch-on-cond [[TC_CHECK3]]
 ; CHECK-NEXT: Successor(s): ir-bb<for.exit>, scalar.ph
 ; CHECK-EMPTY:

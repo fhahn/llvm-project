@@ -68,7 +68,7 @@ define void @cast_flags_mixed(ptr noalias %A, ptr noalias %B) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.0:
 ; CHECK-NEXT:      CLONE store ir<0>, ir<%gep.trunc>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP7]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP7]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -164,7 +164,7 @@ define void @cast_flags_single(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    Successor(s): loop.2
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.2:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP6]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP6]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -224,7 +224,7 @@ define void @fpiv_wideivstep_flags(float %init, ptr %p, i64 %n) {
 ; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = vector-pointer inbounds float, ir<%arrayidx>, ir<1>, vp<[[VP8]]>
 ; CHECK-NEXT:      WIDEN store vp<[[VP9]]>, ir<%x>
 ; CHECK-NEXT:      WIDEN store vp<[[VP10]]>, vp<%step.add>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP6]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP6]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
