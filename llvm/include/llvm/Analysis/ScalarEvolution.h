@@ -1621,8 +1621,11 @@ public:
       return Guards;
     }
 
-    /// Try to apply the collected loop guards to \p Expr.
-    LLVM_ABI const SCEV *rewrite(const SCEV *Expr) const;
+    /// Try to apply the collected loop guards to \p Expr. If \p UsedKeys is
+    /// not null, add the expressions whose rewrites are used to it.
+    LLVM_ABI const SCEV *
+    rewrite(const SCEV *Expr,
+            SmallVectorImpl<const SCEV *> *UsedKeys = nullptr) const;
   };
 
   /// Try to apply information from loop guards for \p L to \p Expr.
