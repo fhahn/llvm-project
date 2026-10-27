@@ -4799,7 +4799,7 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
     Plan.getVF().replaceAllUsesWith(Plan.getConstantInt(CanIVTy, 1));
   }
   // Materialize vector trip count with the narrowed step.
-  materializeVectorTripCount(Plan, VectorPH, /*TailByMasking=*/false,
+  materializeVectorTripCount(Plan, /*TailByMasking=*/false,
                              RequiresScalarEpilogue, Step);
 
   CanIVInc->setOperand(1, Step);

@@ -481,7 +481,33 @@ static void expandVPDerivedIV(VPDerivedIVRecipe *R) {
   llvm_unreachable("Unhandled induction kind");
 }
 
-void VPlanTransforms::dissolveLoopRegions(VPlan &Plan) {
+static void materializeFactors(VPlan &Plan, ElementCount VFEC);
+
+void VPlanTransforms::dissolveLoopRegions(VPlan &Plan, ElementCount VF,
+                                          bool RequiresScalarEpilogue) {
+  // Materialize the canonical IV first, as its increment requires the symbolic
+  // VF * UF.
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  // Nothing to do if the vector loop has become dead.
+  if (!LoopRegion)
+    return;
+  VPRegionValue *CanIV = LoopRegion->getCanonicalIV();
+  if (!CanIV->user_empty()) {
+    VPInstruction *CanIVInc = LoopRegion->getOrCreateCanonicalIVIncrement();
+    VPBasicBlock *Header = LoopRegion->getEntryBasicBlock();
+    auto *ScalarR =
+        VPBuilder(Header->begin())
+            .createScalarPhi({Plan.getZero(CanIV->getType()), CanIVInc},
+                             CanIV->getDebugLoc(), "index");
+    CanIV->replaceAllUsesWith(ScalarR);
+  }
+  std::optional<uint64_t> MaxRuntimeStep = getMaxRuntimeElementCount(
+      VF * Plan.getConcreteUF(),
+      *Plan.getScalarHeader()->getIRBasicBlock()->getParent());
+  materializeVectorTripCount(Plan, Plan.hasTailFolded(), RequiresScalarEpilogue,
+                             &Plan.getVFxUF(), MaxRuntimeStep);
+  materializeFactors(Plan, VF);
+
   // Replace loop regions with explicity CFG.
   SmallVector<VPRegionBlock *> LoopRegions;
   for (VPRegionBlock *R : VPBlockUtils::blocksOnly<VPRegionBlock>(
@@ -856,18 +882,22 @@ void VPlanTransforms::materializeUnpacks(VPlan &Plan) {
 }
 
 void VPlanTransforms::materializeVectorTripCount(
-    VPlan &Plan, VPBasicBlock *VectorPHVPBB, bool TailByMasking,
-    bool RequiresScalarEpilogue, VPValue *Step,
+    VPlan &Plan, bool TailByMasking, bool RequiresScalarEpilogue, VPValue *Step,
     std::optional<uint64_t> MaxRuntimeStep) {
   VPSymbolicValue &VectorTC = Plan.getVectorTripCount();
-  // There's nothing to do if there are no users of the vector trip count or its
-  // IR value has already been set.
-  if (VectorTC.user_empty() || VectorTC.getUnderlyingValue())
+  // There's nothing to do if there are no users of the vector trip count.
+  if (VectorTC.user_empty())
     return;
+  // Use the constant vector trip count, if it has been computed already.
+  if (Value *ConstVecTC = VectorTC.getUnderlyingValue()) {
+    VectorTC.replaceAllUsesWith(Plan.getOrAddLiveIn(ConstVecTC));
+    return;
+  }
 
   const SCEV *TCScev = Plan.getTripCount();
   Type *TCTy = TCScev->getType();
   VPValue *TC = vputils::getOrCreateVPValueForSCEVExpr(Plan, TCScev);
+  VPBasicBlock *VectorPHVPBB = Plan.getVectorPreheader();
   VPBasicBlock::iterator InsertPt = VectorPHVPBB->getFirstNonPhi();
   if (auto *StepR = Step->getDefiningRecipe()) {
     assert(VPDominatorTree(Plan).dominates(StepR->getParent(), VectorPHVPBB) &&
@@ -927,8 +957,7 @@ void VPlanTransforms::materializeVectorTripCount(
   VectorTC.replaceAllUsesWith(Res);
 }
 
-void VPlanTransforms::materializeFactors(VPlan &Plan, VPBasicBlock *VectorPH,
-                                         ElementCount VFEC) {
+static void materializeFactors(VPlan &Plan, ElementCount VFEC) {
   // If VF and VFxUF have already been materialized (no remaining users),
   // there's nothing more to do.
   if (Plan.getVF().isMaterialized()) {
@@ -937,7 +966,7 @@ void VPlanTransforms::materializeFactors(VPlan &Plan, VPBasicBlock *VectorPH,
     return;
   }
 
-  VPBuilder Builder(VectorPH->getFirstNonPhi());
+  VPBuilder Builder(Plan.getVectorPreheader()->getFirstNonPhi());
   Type *TCTy = Plan.getTripCount()->getType();
   VPValue &VF = Plan.getVF();
   VPValue &VFxUF = Plan.getVFxUF();
@@ -1051,8 +1080,7 @@ void VPlanTransforms::materializeAliasMaskCheckBlock(
 
   // Materialize the trip count early as this will add a use of (VFxUF) that
   // needs to be replaced with the ClampedVF.
-  materializeVectorTripCount(Plan, Plan.getVectorPreheader(),
-                             /*TailByMasking=*/true,
+  materializeVectorTripCount(Plan, /*TailByMasking=*/true,
                              /*RequiresScalarEpilogue=*/false,
                              &Plan.getVFxUF());
 

@@ -5602,9 +5602,6 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
     ++LoopsPartialAliasVectorized;
   }
 
-  // Retrieving VectorPH now when it's easier while VPlan still has Regions.
-  VPBasicBlock *VectorPH = cast<VPBasicBlock>(BestVPlan.getVectorPreheader());
-
   RUN_VPLAN_PASS(VPlanTransforms::materializeConstantVectorTripCount, BestVPlan,
                  BestVF, BestUF, PSE);
   RUN_VPLAN_PASS(VPlanTransforms::optimizeForVFAndUF, BestVPlan, BestVF, BestUF,
@@ -5622,8 +5619,8 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   RUN_VPLAN_PASS(VPlanTransforms::convertEVLExitCond, BestVPlan);
   // Regions are dissolved after optimizing for VF and UF, which completely
   // removes unneeded loop regions first.
-  const bool HasTailFolded = BestVPlan.hasTailFolded();
-  RUN_VPLAN_PASS(VPlanTransforms::dissolveLoopRegions, BestVPlan);
+  RUN_VPLAN_PASS(VPlanTransforms::dissolveLoopRegions, BestVPlan, BestVF,
+                 RequiresScalarEpilogue);
   // Expand BranchOnTwoConds after dissolution, when latch has direct access to
   // its successors.
   RUN_VPLAN_PASS(VPlanTransforms::expandBranchOnTwoConds, BestVPlan);
@@ -5634,16 +5631,9 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // which may be needed for epilogue vectorization.
   RUN_VPLAN_PASS(VPlanTransforms::removeBranchOnConst, BestVPlan,
                  /*OnlyLatches=*/true);
-  std::optional<uint64_t> MaxRuntimeStep = getMaxRuntimeElementCount(
-      BestVF * BestUF, *OrigLoop->getHeader()->getParent());
 
   assert((LI->getUniqueLatchExitBlock(*OrigLoop) || RequiresScalarEpilogue) &&
          "loops not exiting via the latch without required epilogue?");
-  RUN_VPLAN_PASS(VPlanTransforms::materializeVectorTripCount, BestVPlan,
-                 VectorPH, HasTailFolded, RequiresScalarEpilogue,
-                 &BestVPlan.getVFxUF(), MaxRuntimeStep);
-  RUN_VPLAN_PASS(VPlanTransforms::materializeFactors, BestVPlan, VectorPH,
-                 BestVF);
   // Limit expansions to VPInstruction to when not vectorizing the epilogue.
   // Currently this code path still relies on code re-using SCEVs expanded
   // directly to IR instructions.

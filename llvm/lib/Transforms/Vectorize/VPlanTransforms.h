@@ -425,8 +425,10 @@ struct VPlanTransforms {
   ///   (branch-on-cond eq AVLNext, 0)
   static void convertEVLExitCond(VPlan &Plan);
 
-  /// Replace loop regions with explicit CFG.
-  static void dissolveLoopRegions(VPlan &Plan);
+  /// Materialize the canonical IV, vector trip count, VF and VF * UF, then
+  /// replace loop regions with explicit CFG.
+  static void dissolveLoopRegions(VPlan &Plan, ElementCount VF,
+                                  bool RequiresScalarEpilogue);
 
   /// Expand BranchOnTwoConds instructions into explicit CFG with
   /// BranchOnCond instructions. Should be called after dissolveLoopRegions.
@@ -506,17 +508,11 @@ struct VPlanTransforms {
   /// \p MaxRuntimeStep is the maximum possible runtime value of Step, used to
   /// prove the trip count is divisible by the step for scalable VFs.
   static void materializeVectorTripCount(
-      VPlan &Plan, VPBasicBlock *VectorPHVPBB, bool TailByMasking,
-      bool RequiresScalarEpilogue, VPValue *Step,
-      std::optional<uint64_t> MaxRuntimeStep = std::nullopt);
+      VPlan &Plan, bool TailByMasking, bool RequiresScalarEpilogue,
+      VPValue *Step, std::optional<uint64_t> MaxRuntimeStep = std::nullopt);
 
   /// Add explicit Unpack recipes to extract scalars from vectors as needed.
   static void materializeUnpacks(VPlan &Plan);
-
-  /// Materialize UF, VF and VFxUF to be computed explicitly using
-  /// VPInstructions.
-  static void materializeFactors(VPlan &Plan, VPBasicBlock *VectorPH,
-                                 ElementCount VF);
 
   /// Attaches the alias-mask to the existing header-mask.
   static void attachAliasMaskToHeaderMask(VPlan &Plan);

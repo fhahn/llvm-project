@@ -339,7 +339,6 @@ exit:
 define void @all_iterations_in_main_loop_with_memcheck(ptr %dst, ptr %src) {
 ; CHECK-LABEL: VPlan for loop in 'all_iterations_in_main_loop_with_memcheck'
 ; CHECK:  VPlan 'Final VPlan for VF={8},UF={1}' {
-; CHECK-NEXT:  Live-in ir<16> = vector-trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %dst4 = ptrtoaddr ptr %dst to i64
@@ -399,7 +398,6 @@ define void @all_iterations_in_main_loop_with_memcheck(ptr %dst, ptr %src) {
 ;
 ; CHECK-LABEL: VPlan for loop in 'all_iterations_in_main_loop_with_memcheck'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<16> = vector-trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %dst4 = ptrtoaddr ptr %dst to i64
@@ -488,7 +486,6 @@ exit:
 define void @all_iterations_in_main_loop_with_scevcheck(ptr %p, i32 %off) {
 ; CHECK-LABEL: VPlan for loop in 'all_iterations_in_main_loop_with_scevcheck'
 ; CHECK:  VPlan 'Final VPlan for VF={8},UF={1}' {
-; CHECK-NEXT:  Live-in ir<16> = vector-trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    EMIT branch-on-cond ir<false>
@@ -547,7 +544,6 @@ define void @all_iterations_in_main_loop_with_scevcheck(ptr %p, i32 %off) {
 ;
 ; CHECK-LABEL: VPlan for loop in 'all_iterations_in_main_loop_with_scevcheck'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<16> = vector-trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): ir-bb<vec.epilog.scalar.ph>, ir-bb<vector.scevcheck>
