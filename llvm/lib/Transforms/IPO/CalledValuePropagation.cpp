@@ -373,15 +373,54 @@ template <> struct LatticeKeyInfo<CVPLatticeKey> {
 };
 } // namespace llvm
 
+/// Returns true if the solver may compute a non-empty function set for any
+/// value in \p Worklist. Only constants, loads from trackable globals, calls of
+/// functions with trackable returns and arguments of functions with trackable
+/// arguments can introduce functions. Phis and selects merge their incoming
+/// values, all other values are overdefined.
+static bool mayBeFunctionSet(SmallVectorImpl<Value *> &Worklist) {
+  SmallPtrSet<Value *, 8> Visited;
+  while (!Worklist.empty()) {
+    Value *V = Worklist.pop_back_val();
+    if (auto *C = dyn_cast<Constant>(V)) {
+      if (isa<Function>(C->stripPointerCasts()))
+        return true;
+      continue;
+    }
+    if (!Visited.insert(V).second)
+      continue;
+    if (auto *LI = dyn_cast<LoadInst>(V)) {
+      // Check each global once. Constants are not added to Visited otherwise.
+      auto *GV = dyn_cast<GlobalVariable>(LI->getPointerOperand());
+      if (GV && Visited.insert(GV).second &&
+          canTrackGlobalVariableInterprocedurally(GV))
+        return true;
+    } else if (auto *CB = dyn_cast<CallBase>(V)) {
+      Function *F = CB->getCalledFunction();
+      if (F && canTrackReturnsInterprocedurally(F))
+        return true;
+    } else if (auto *A = dyn_cast<Argument>(V)) {
+      if (canTrackArgumentsInterprocedurally(A->getParent()))
+        return true;
+    } else if (auto *PN = dyn_cast<PHINode>(V)) {
+      append_range(Worklist, PN->incoming_values());
+    } else if (auto *SI = dyn_cast<SelectInst>(V)) {
+      Worklist.push_back(SI->getTrueValue());
+      Worklist.push_back(SI->getFalseValue());
+    }
+  }
+  return false;
+}
+
 static bool runCVP(Module &M) {
-  // Only indirect calls get metadata. Without any, the solver's results are
-  // unused.
-  if (none_of(M, [](Function &F) {
-        return any_of(instructions(F), [](Instruction &I) {
-          auto *CB = dyn_cast<CallBase>(&I);
-          return CB && !CB->getCalledFunction();
-        });
-      }))
+  // Only indirect calls get metadata, if the solver finds functions for their
+  // callees. Otherwise, the solver's results are unused.
+  SmallVector<Value *> Callees;
+  for (Function &F : M)
+    for (Instruction &I : instructions(F))
+      if (auto *CB = dyn_cast<CallBase>(&I); CB && !CB->getCalledFunction())
+        Callees.push_back(CB->getCalledOperand());
+  if (!mayBeFunctionSet(Callees))
     return false;
 
   // Our custom lattice function and generic sparse propagation solver.
