@@ -587,11 +587,13 @@ void VPlanTransforms::convertToVariableLengthStep(VPlan &Plan) {
   CurrentIteration->replaceAllUsesWith(ScalarR);
   CurrentIteration->eraseFromParent();
 
-  // Replace CanonicalIVInc with CurrentIteration increment if it exists.
+  // Replace the canonical IV increment with the CurrentIteration increment. If
+  // the canonical IV is used, it has been materialized as the first header
+  // phi, incremented by its backedge value.
   auto *CanonicalIV = cast<VPPhi>(&*HeaderVPBB->begin());
-  if (auto *CanIVInc = findUserOf(
-          CanonicalIV, m_c_Add(m_VPValue(), m_Specific(&Plan.getVFxUF())))) {
-    cast<VPInstruction>(CanIVInc)->replaceAllUsesWith(CurrentIterationIncr);
+  if (CanonicalIV != ScalarR) {
+    auto *CanIVInc = cast<VPInstruction>(CanonicalIV->getOperand(1));
+    CanIVInc->replaceAllUsesWith(CurrentIterationIncr);
     CanIVInc->eraseFromParent();
   }
 }

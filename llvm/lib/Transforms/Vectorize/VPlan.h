@@ -4822,6 +4822,11 @@ public:
   /// its entry, and its exiting block to its successor.
   void dissolveToCFGLoop();
 
+  /// Replace the canonical IV of the loop region, if used, by an explicit
+  /// scalar phi at the start of the header, incremented by the canonical IV
+  /// increment.
+  void materializeCanonicalIV();
+
   /// Get the canonical IV increment instruction if it exists. Otherwise, create
   /// a new increment before the terminator and return it. The canonical IV
   /// increment is subject to DCE if unused, unlike the canonical IV itself.

@@ -819,20 +819,24 @@ void VPRegionBlock::print(raw_ostream &O, const Twine &Indent,
 }
 #endif
 
+void VPRegionBlock::materializeCanonicalIV() {
+  auto *CanIV = getCanonicalIV();
+  if (CanIV->user_empty())
+    return;
+  VPlan &Plan = *getPlan();
+  auto *Zero = Plan.getZero(CanIV->getType());
+  DebugLoc DL = CanIV->getDebugLoc();
+  VPInstruction *CanIVInc = getOrCreateCanonicalIVIncrement();
+  auto *Header = cast<VPBasicBlock>(getEntry());
+  VPBuilder HeaderBuilder(Header, Header->begin());
+  auto *ScalarR = HeaderBuilder.createScalarPhi({Zero, CanIVInc}, DL, "index");
+  CanIV->replaceAllUsesWith(ScalarR);
+}
+
 void VPRegionBlock::dissolveToCFGLoop() {
   auto *Header = cast<VPBasicBlock>(getEntry());
   auto *ExitingLatch = cast<VPBasicBlock>(getExiting());
-  auto *CanIV = getCanonicalIV();
-  if (!CanIV->user_empty()) {
-    VPlan &Plan = *getPlan();
-    auto *Zero = Plan.getZero(CanIV->getType());
-    DebugLoc DL = CanIV->getDebugLoc();
-    VPInstruction *CanIVInc = getOrCreateCanonicalIVIncrement();
-    VPBuilder HeaderBuilder(Header, Header->begin());
-    auto *ScalarR =
-        HeaderBuilder.createScalarPhi({Zero, CanIVInc}, DL, "index");
-    CanIV->replaceAllUsesWith(ScalarR);
-  }
+  materializeCanonicalIV();
 
   VPBlockBase *Preheader = getSinglePredecessor();
   VPBlockUtils::disconnectBlocks(Preheader, this);

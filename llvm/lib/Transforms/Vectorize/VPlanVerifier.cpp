@@ -93,10 +93,11 @@ bool VPlanVerifier::verifyPhiRecipes(const VPBasicBlock *VPBB) {
       return false;
     }
 
-    // In region form, VPCurrentIterationPHIRecipe must be the first header phi
-    // recipe. In a plain CFG VPlan, it must either be the first or second.
+    // VPCurrentIterationPHIRecipe must be the first header phi recipe, or the
+    // second after the canonical IV once that is an explicit phi, i.e. in a
+    // plain CFG VPlan or after materializing it.
     if (isa<VPCurrentIterationPHIRecipe>(RecipeI) &&
-        (VPBB->getPlan()->getVectorLoopRegion()
+        (!isa<VPPhi>(VPBB->front())
              ? RecipeI->getIterator() != VPBB->begin()
              : RecipeI->getIterator() != VPBB->begin() &&
                    RecipeI->getIterator() != std::next(VPBB->begin()))) {

@@ -155,8 +155,7 @@ define void @predicated_block(ptr noalias %a, ptr noalias %idx) {
 ;
 ; DISSOLVE-LABEL: VPlan for loop in 'predicated_block'
 ; DISSOLVE:  VPlan 'Initial VPlan for VF={2},UF={1}' {
-; DISSOLVE-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF * UF
-; DISSOLVE-NEXT:  Live-in ir<1024> = vector-trip-count
+; DISSOLVE-NEXT:  Live-in ir<1024> = original trip-count
 ; DISSOLVE-EMPTY:
 ; DISSOLVE-NEXT:  ir-bb<entry>:
 ; DISSOLVE-NEXT:  Successor(s): vector.ph
@@ -191,12 +190,12 @@ define void @predicated_block(ptr noalias %a, ptr noalias %idx) {
 ; DISSOLVE-NEXT:  pred.store.if:
 ; DISSOLVE-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = extractelement ir<%ext>, ir<1>
 ; DISSOLVE-NEXT:    CLONE ir<%gep.a>.1 = getelementptr inbounds ir<%a>, vp<[[VP7]]>
-; DISSOLVE-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = extractelement ir<%add>, ir<1>
-; DISSOLVE-NEXT:    CLONE store vp<[[VP8]]>, ir<%gep.a>.1
+; DISSOLVE-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = extractelement ir<%add>, ir<1>
+; DISSOLVE-NEXT:    CLONE store vp<[[VP9]]>, ir<%gep.a>.1
 ; DISSOLVE-NEXT:  Successor(s): pred.store.continue
 ; DISSOLVE-EMPTY:
 ; DISSOLVE-NEXT:  pred.store.continue:
-; DISSOLVE-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, vp<[[VP0]]>
+; DISSOLVE-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<2>
 ; DISSOLVE-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; DISSOLVE-NEXT:    EMIT branch-on-cond vp<[[VP9]]>
 ; DISSOLVE-NEXT:  Successor(s): middle.block, vector.body
@@ -345,8 +344,6 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ;
 ; DISSOLVE-LABEL: VPlan for loop in 'selects'
 ; DISSOLVE:  VPlan 'Initial VPlan for VF={2},UF={1}' {
-; DISSOLVE-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF * UF
-; DISSOLVE-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
 ; DISSOLVE-NEXT:  Live-in ir<%n> = original trip-count
 ; DISSOLVE-EMPTY:
 ; DISSOLVE-NEXT:  ir-bb<entry>:
@@ -355,6 +352,8 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ; DISSOLVE-NEXT:  Successor(s): scalar.ph, vector.ph
 ; DISSOLVE-EMPTY:
 ; DISSOLVE-NEXT:  vector.ph:
+; DISSOLVE-NEXT:    EMIT vp<%n.mod.vf> = urem ir<%n>, ir<2>
+; DISSOLVE-NEXT:    EMIT vp<%n.vec> = sub ir<%n>, vp<%n.mod.vf>
 ; DISSOLVE-NEXT:    CLONE ir<%sel.uniform> = select ir<%c>, ir<20>, ir<10> (!prof {5, 3})
 ; DISSOLVE-NEXT:  Successor(s): vector.body
 ; DISSOLVE-EMPTY:
@@ -367,9 +366,9 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ; DISSOLVE-NEXT:    WIDEN store ir<%gep.a>, ir<%sel.varying>
 ; DISSOLVE-NEXT:    CLONE ir<%gep.b> = getelementptr inbounds ir<%b>, vp<%index>
 ; DISSOLVE-NEXT:    WIDEN store ir<%gep.b>, ir<%sel.uniform>
-; DISSOLVE-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, vp<[[VP0]]>
-; DISSOLVE-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP1]]>
-; DISSOLVE-NEXT:    EMIT branch-on-cond vp<[[VP3]]>
+; DISSOLVE-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<2>
+; DISSOLVE-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
+; DISSOLVE-NEXT:    EMIT branch-on-cond vp<[[VP2]]>
 ; DISSOLVE-NEXT:  Successor(s): middle.block, vector.body
 ; DISSOLVE-EMPTY:
 ; DISSOLVE-NEXT:  middle.block:

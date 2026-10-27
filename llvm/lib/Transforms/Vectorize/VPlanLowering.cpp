@@ -850,10 +850,14 @@ void VPlanTransforms::materializeVectorTripCount(
     bool RequiresScalarEpilogue, VPValue *Step,
     std::optional<uint64_t> MaxRuntimeStep) {
   VPSymbolicValue &VectorTC = Plan.getVectorTripCount();
-  // There's nothing to do if there are no users of the vector trip count or its
-  // IR value has already been set.
-  if (VectorTC.user_empty() || VectorTC.getUnderlyingValue())
+  // There's nothing to do if there are no users of the vector trip count.
+  if (VectorTC.user_empty())
     return;
+  // Use the constant vector trip count, if it has been computed already.
+  if (Value *ConstVecTC = VectorTC.getUnderlyingValue()) {
+    VectorTC.replaceAllUsesWith(Plan.getOrAddLiveIn(ConstVecTC));
+    return;
+  }
 
   VPValue *TC = Plan.getTripCount();
   Type *TCTy = TC->getScalarType();

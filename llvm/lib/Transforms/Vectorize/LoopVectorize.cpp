@@ -5590,9 +5590,22 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   RUN_VPLAN_PASS(VPlanTransforms::convertToConcreteRecipes, BestVPlan);
   // Convert the exit condition to AVLNext == 0 for EVL tail folded loops.
   RUN_VPLAN_PASS(VPlanTransforms::convertEVLExitCond, BestVPlan);
+  // Materialize the canonical IV, then the vector trip count, VF and VF * UF,
+  // before dissolving the loop region. The canonical IV increment must be
+  // created first, as findCanonicalIVIncrement cannot recognize a materialized
+  // VF * UF step.
+  BestVPlan.getVectorLoopRegion()->materializeCanonicalIV();
+  std::optional<uint64_t> MaxRuntimeStep = getMaxRuntimeElementCount(
+      BestVF * BestUF, *OrigLoop->getHeader()->getParent());
+  assert((LI->getUniqueLatchExitBlock(*OrigLoop) || RequiresScalarEpilogue) &&
+         "loops not exiting via the latch without required epilogue?");
+  RUN_VPLAN_PASS(VPlanTransforms::materializeVectorTripCount, BestVPlan,
+                 VectorPH, BestVPlan.hasTailFolded(), RequiresScalarEpilogue,
+                 &BestVPlan.getVFxUF(), MaxRuntimeStep);
+  RUN_VPLAN_PASS(VPlanTransforms::materializeFactors, BestVPlan, VectorPH,
+                 BestVF);
   // Regions are dissolved after optimizing for VF and UF, which completely
   // removes unneeded loop regions first.
-  const bool HasTailFolded = BestVPlan.hasTailFolded();
   RUN_VPLAN_PASS(VPlanTransforms::dissolveLoopRegions, BestVPlan);
   // Expand BranchOnTwoConds after dissolution, when latch has direct access to
   // its successors.
@@ -5604,16 +5617,6 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // which may be needed for epilogue vectorization.
   RUN_VPLAN_PASS(VPlanTransforms::removeBranchOnConst, BestVPlan,
                  /*OnlyLatches=*/true);
-  std::optional<uint64_t> MaxRuntimeStep = getMaxRuntimeElementCount(
-      BestVF * BestUF, *OrigLoop->getHeader()->getParent());
-
-  assert((LI->getUniqueLatchExitBlock(*OrigLoop) || RequiresScalarEpilogue) &&
-         "loops not exiting via the latch without required epilogue?");
-  RUN_VPLAN_PASS(VPlanTransforms::materializeVectorTripCount, BestVPlan,
-                 VectorPH, HasTailFolded, RequiresScalarEpilogue,
-                 &BestVPlan.getVFxUF(), MaxRuntimeStep);
-  RUN_VPLAN_PASS(VPlanTransforms::materializeFactors, BestVPlan, VectorPH,
-                 BestVF);
   // Limit expansions to VPInstruction to when not vectorizing the epilogue.
   // Currently this code path still relies on code re-using SCEVs expanded
   // directly to IR instructions.
