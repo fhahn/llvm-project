@@ -21,6 +21,7 @@
 #define LLVM_IR_VERIFIER_H
 
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Support/Compiler.h"
 #include <utility>
@@ -57,6 +58,9 @@ class TBAAVerifier {
   /// Maps an alleged scalar TBAA node to a boolean that is true if the said
   /// TBAA node is a valid scalar TBAA node or false otherwise.
   DenseMap<const MDNode *, bool> TBAAScalarNodes;
+
+  /// Access tags that passed the checks that do not depend on the instruction.
+  SmallPtrSet<const MDNode *, 16> VerifiedAccessTags;
 
   /// \name Helper functions used by \c visitTBAAMetadata.
   /// @{
