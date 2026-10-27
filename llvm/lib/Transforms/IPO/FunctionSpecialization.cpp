@@ -666,23 +666,52 @@ static unsigned getCostValue(const Cost &C) {
 ///
 /// \returns true if at least one function is specialized.
 bool FunctionSpecializer::run() {
+  auto AnalyzeFunction = [&](Function &F, CodeMetrics &Metrics) {
+    SmallPtrSet<const Value *, 32> EphValues;
+    CodeMetrics::collectEphemeralValues(&F, &GetAC(F), EphValues);
+    for (BasicBlock &BB : F)
+      Metrics.analyzeBasicBlock(&BB, GetTTI(F), EphValues);
+  };
+
+  // Returns true if F may be recursive or a call to F passes a candidate
+  // constant for an interesting argument, as findSpecializations requires.
+  auto MayHaveSpecializations = [&](Function &F) {
+    SmallVector<Argument *> Args;
+    for (Argument &Arg : F.args())
+      if (isArgumentInteresting(&Arg))
+        Args.push_back(&Arg);
+    return any_of(F.users(), [&](User *U) {
+      auto *CS = dyn_cast<CallBase>(U);
+      if (!CS || CS->getCalledFunction() != &F)
+        return false;
+      return CS->getFunction() == &F ||
+             (Solver.isBlockExecutable(CS->getParent()) &&
+              any_of(Args, [&](Argument *A) {
+                return getCandidateConstant(CS->getArgOperand(A->getArgNo()));
+              }));
+    });
+  };
+
   // Find possible specializations for each function.
   SpecMap SM;
   SmallVector<Spec, 32> AllSpecs;
+  SmallVector<Function *> Deferred;
   unsigned NumCandidates = 0;
   for (Function &F : M) {
     if (!isCandidateFunction(&F))
       continue;
 
+    // Defer analyzing a new function that cannot be specialized in this run.
+    if (!FunctionMetrics.contains(&F) && !MayHaveSpecializations(F)) {
+      Deferred.push_back(&F);
+      continue;
+    }
+
     auto [It, Inserted] = FunctionMetrics.try_emplace(&F);
     CodeMetrics &Metrics = It->second;
     //Analyze the function.
-    if (Inserted) {
-      SmallPtrSet<const Value *, 32> EphValues;
-      CodeMetrics::collectEphemeralValues(&F, &GetAC(F), EphValues);
-      for (BasicBlock &BB : F)
-        Metrics.analyzeBasicBlock(&BB, GetTTI(F), EphValues);
-    }
+    if (Inserted)
+      AnalyzeFunction(F, Metrics);
 
     // When specializing literal constants is enabled, always require functions
     // to be larger than MinFunctionSize, to prevent excessive specialization.
@@ -731,6 +760,11 @@ bool FunctionSpecializer::run() {
         << "FnSpecialization: No possible specializations found in module\n");
     return false;
   }
+
+  // Analyze the deferred functions before the module changes, as later runs
+  // use their metrics.
+  for (Function *F : Deferred)
+    AnalyzeFunction(*F, FunctionMetrics[F]);
 
   // Choose the most profitable specialisations, which fit in the module
   // specialization budget, which is derived from maximum number of
