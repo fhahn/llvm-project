@@ -2257,6 +2257,15 @@ bool VarLocBasedLDV::ExtendRanges(MachineFunction &MF,
       DICompileUnit::NoDebug)
     return false;
 
+  // All variable locations originate from DBG_VALUEs; without any there is
+  // nothing to track (e.g. at -O0, where variables live in stack slots). Still
+  // return true, as the dataflow below reports a change on visiting any block.
+  if (none_of(MF, [](const MachineBasicBlock &MBB) {
+        return any_of(MBB.instrs(),
+                      [](const MachineInstr &MI) { return MI.isDebugValue(); });
+      }))
+    return true;
+
   TRI = MF.getSubtarget().getRegisterInfo();
   TII = MF.getSubtarget().getInstrInfo();
   TFI = MF.getSubtarget().getFrameLowering();
