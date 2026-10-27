@@ -203,6 +203,10 @@ static bool iterativelySimplifyCFG(Function &F, const TargetTransformInfo &TTI,
   SmallVector<WeakVH, 16> LoopHeaders(UniqueLoopHeaders.begin(),
                                       UniqueLoopHeaders.end());
 
+  // The blocks after a sweep's last change already failed to simplify on the
+  // current IR. If the next sweep reaches them without a change, it would not
+  // change them either and can stop.
+  Function::iterator StopIt = F.end();
   unsigned IterCnt = 0;
   (void)IterCnt;
   while (LocalChange) {
@@ -211,6 +215,8 @@ static bool iterativelySimplifyCFG(Function &F, const TargetTransformInfo &TTI,
 
     // Loop over all of the basic blocks and remove them if they are unneeded.
     for (Function::iterator BBIt = F.begin(); BBIt != F.end(); ) {
+      if (!LocalChange && BBIt == StopIt)
+        break;
       BasicBlock &BB = *BBIt++;
       if (DTU) {
         assert(
@@ -224,6 +230,7 @@ static bool iterativelySimplifyCFG(Function &F, const TargetTransformInfo &TTI,
       if (simplifyCFG(&BB, TTI, DTU, Options, LoopHeaders)) {
         LocalChange = true;
         ++NumSimpl;
+        StopIt = BBIt;
       }
     }
     Changed |= LocalChange;
