@@ -10,7 +10,7 @@
 define void @two_masked_same_mask(ptr noalias %a, ptr noalias %b, ptr noalias %cond) {
 ; CHECK-LABEL: VPlan for loop in 'two_masked_same_mask'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<1024> = vector-trip-count
+; CHECK-NEXT:  Live-in ir<1024> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): vector.ph
@@ -67,7 +67,7 @@ exit:
 define void @two_masked_diff_mask(ptr noalias %a, ptr noalias %b, ptr noalias %c1, ptr noalias %c2) {
 ; CHECK-LABEL: VPlan for loop in 'two_masked_diff_mask'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<1024> = vector-trip-count
+; CHECK-NEXT:  Live-in ir<1024> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): vector.ph
@@ -140,7 +140,7 @@ exit:
 define void @masked_and_regular_mix(ptr noalias %a, ptr noalias %b, ptr noalias %cond, ptr noalias %out) {
 ; CHECK-LABEL: VPlan for loop in 'masked_and_regular_mix'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<1024> = vector-trip-count
+; CHECK-NEXT:  Live-in ir<1024> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): vector.ph

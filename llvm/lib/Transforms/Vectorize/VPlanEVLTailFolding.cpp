@@ -586,10 +586,11 @@ void VPlanTransforms::convertToVariableLengthStep(VPlan &Plan) {
   CurrentIteration->replaceAllUsesWith(ScalarR);
   CurrentIteration->eraseFromParent();
 
-  // Replace CanonicalIVInc with CurrentIteration increment if it exists.
+  // If the canonical IV has been materialized (as first header phi), replace
+  // its increment with the CurrentIteration increment.
   auto *CanonicalIV = cast<VPPhi>(&*HeaderVPBB->begin());
-  if (auto *CanIVInc = findSingleUser<VPInstruction>(
-          CanonicalIV, m_c_Add(m_VPValue(), m_Specific(&Plan.getVFxUF())))) {
+  if (CanonicalIV != ScalarR) {
+    auto *CanIVInc = cast<VPInstruction>(CanonicalIV->getIncomingValue(1));
     CanIVInc->replaceAllUsesWith(CurrentIterationIncr);
     CanIVInc->eraseFromParent();
   }

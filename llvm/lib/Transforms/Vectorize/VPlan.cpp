@@ -243,7 +243,7 @@ VPTransformState::VPTransformState(const TargetTransformInfo *TTI,
 Value *VPTransformState::get(const VPValue *Def, const VPLane &Lane) {
   assert(!isa<VPRegionValue>(Def) &&
          "VPRegionValue must be materialized before VPTransformState::get");
-  if (isa<VPIRValue, VPSymbolicValue>(Def))
+  if (isa<VPIRValue>(Def))
     return Def->getUnderlyingValue();
 
   if (hasScalarValue(Def, Lane))
@@ -271,8 +271,8 @@ Value *VPTransformState::get(const VPValue *Def, bool NeedsSingleScalar) {
   assert(!isa<VPRegionValue>(Def) &&
          "VPRegionValue must be materialized before VPTransformState::get");
   if (NeedsSingleScalar) {
-    assert((VF.isScalar() || isa<VPIRValue, VPSymbolicValue>(Def) ||
-            hasVectorValue(Def) || !vputils::onlyFirstLaneUsed(Def) ||
+    assert((VF.isScalar() || isa<VPIRValue>(Def) || hasVectorValue(Def) ||
+            !vputils::onlyFirstLaneUsed(Def) ||
             (hasScalarValue(Def, VPLane(0)) &&
              Data.VPV2Scalars[Def].size() == 1)) &&
            "Trying to access a single scalar per part but has multiple scalars "
@@ -822,17 +822,8 @@ void VPRegionBlock::print(raw_ostream &O, const Twine &Indent,
 void VPRegionBlock::dissolveToCFGLoop() {
   auto *Header = cast<VPBasicBlock>(getEntry());
   auto *ExitingLatch = cast<VPBasicBlock>(getExiting());
-  auto *CanIV = getCanonicalIV();
-  if (!CanIV->user_empty()) {
-    VPlan &Plan = *getPlan();
-    auto *Zero = Plan.getZero(CanIV->getType());
-    DebugLoc DL = CanIV->getDebugLoc();
-    VPInstruction *CanIVInc = getOrCreateCanonicalIVIncrement();
-    VPBuilder HeaderBuilder(Header->begin());
-    auto *ScalarR =
-        HeaderBuilder.createScalarPhi({Zero, CanIVInc}, DL, "index");
-    CanIV->replaceAllUsesWith(ScalarR);
-  }
+  assert(getCanonicalIV()->user_empty() &&
+         "canonical IV must be materialized before dissolving");
 
   VPBlockBase *Preheader = getSinglePredecessor();
   VPBlockUtils::disconnectBlocks(Preheader, this);

@@ -10,7 +10,7 @@
 define void @dup_gather(ptr noalias %a, ptr noalias %b, ptr noalias %out) {
 ; CHECK-LABEL: VPlan for loop in 'dup_gather'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<1024> = vector-trip-count
+; CHECK-NEXT:  Live-in ir<1024> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): vector.ph
@@ -57,7 +57,7 @@ exit:
 define void @dup_gather_diff_index(ptr noalias %a, ptr noalias %b, ptr noalias %c, ptr noalias %out) {
 ; CHECK-LABEL: VPlan for loop in 'dup_gather_diff_index'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<1024> = vector-trip-count
+; CHECK-NEXT:  Live-in ir<1024> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): vector.ph

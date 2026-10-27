@@ -405,8 +405,12 @@ struct VPlanTransforms {
   ///   (branch-on-cond eq AVLNext, 0)
   static void convertEVLExitCond(VPlan &Plan);
 
-  /// Replace loop regions with explicit CFG.
-  static void dissolveLoopRegions(VPlan &Plan);
+  /// Materialize the canonical IV, vector trip count, VF and VF * UF, then
+  /// replace loop regions with explicit CFG. \p MaxRuntimeStep is the maximum
+  /// possible runtime value of VF * UF.
+  static void dissolveLoopRegions(VPlan &Plan, ElementCount VF,
+                                  bool RequiresScalarEpilogue,
+                                  std::optional<uint64_t> MaxRuntimeStep);
 
   /// Expand BranchOnTwoConds instructions into explicit CFG with
   /// BranchOnCond instructions. Should be called after dissolveLoopRegions.
