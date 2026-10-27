@@ -6256,8 +6256,12 @@ bool SROA::splitAlloca(AllocaInst &AI, AllocaSlices &AS) {
         if (SameVariableFragment(OldDII, DbgVariable))
           OldDII->eraseFromParent();
       };
-      for_each(findDVRDeclares(Fragment.Alloca), RemoveOne);
-      for_each(findDVRValues(Fragment.Alloca), RemoveOne);
+      // Like findDVRDeclares + findDVRValues, but collecting the users once.
+      if (Fragment.Alloca->isUsedByMetadata())
+        if (auto *L = ValueAsMetadata::getIfExists(Fragment.Alloca))
+          for (DbgVariableRecord *DVR : L->getAllDbgVariableRecordUsers())
+            if (DVR->isDbgDeclare() || DVR->isValueOfVariable())
+              RemoveOne(DVR);
       insertNewDbgInst(DIB, DbgVariable, Fragment.Alloca, NewExpr, &AI,
                        NewDbgFragment, BitExtractOffset);
     }
