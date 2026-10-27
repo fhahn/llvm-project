@@ -2142,6 +2142,9 @@ bool DIExpression::isEqualExpression(const DIExpression *FirstExpr,
                                      bool FirstIndirect,
                                      const DIExpression *SecondExpr,
                                      bool SecondIndirect) {
+  // Canonicalization only depends on the expression and its indirectness.
+  if (FirstExpr == SecondExpr && FirstIndirect == SecondIndirect)
+    return true;
   SmallVector<uint64_t> FirstOps;
   DIExpression::canonicalizeExpressionOps(FirstOps, FirstExpr, FirstIndirect);
   SmallVector<uint64_t> SecondOps;
