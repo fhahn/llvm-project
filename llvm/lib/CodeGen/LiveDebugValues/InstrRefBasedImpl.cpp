@@ -490,6 +490,13 @@ public:
     ActiveMLocs.reserve(VLocs.size());
     ActiveVLocs.reserve(VLocs.size());
 
+    // Most locations hold values that no variable wants. Set a bit per def
+    // location of the wanted values, to skip searching ValueToLoc for others.
+    auto DefLocBit = [](ValueIDNum Num) { return 1ULL << (Num.getLoc() % 64); };
+    uint64_t WantedBits = 0;
+    for (const ValueLocPair &P : ValueToLoc)
+      WantedBits |= DefLocBit(P.first);
+
     // Produce a map of value numbers to the current machine locs they live
     // in. When emulating VarLocBasedImpl, there should only be one
     // location; when not, we get to pick.
@@ -501,6 +508,8 @@ public:
       VarLocs.push_back(VNum);
 
       // Is there a variable that wants a location for this value? If not, skip.
+      if (!(WantedBits & DefLocBit(VNum)))
+        continue;
       ValueLocPair Probe(VNum, LocationAndQuality());
       auto VIt = llvm::lower_bound(ValueToLoc, Probe, ValueToLocSort);
       if (VIt == ValueToLoc.end() || VIt->first != VNum)
