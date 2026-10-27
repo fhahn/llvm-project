@@ -898,6 +898,11 @@ VPlan::~VPlan() {
     for (VPRecipeBase &R : *VPBB)
       for (unsigned I = 0, E = R.getNumOperands(); I != E; I++)
         R.setOperand(I, &DummyValue);
+  // Drop the trip count uses of the loop parameters.
+  LoopParams.reset();
+  for (VPRegionBlock *R :
+       VPBlockUtils::blocksOnly<VPRegionBlock>(CreatedBlocks))
+    R->LoopParams.reset();
 
   for (auto [Idx, VPB] : enumerate(CreatedBlocks)) {
     assert(VPB->getNumber() == Idx && "block with mismatched number");
@@ -1084,8 +1089,8 @@ void VPlan::printLiveIns(raw_ostream &O) const {
   VPSlotTracker SlotTracker(this);
   static constexpr std::array<StringRef, 4> Names = {"VF", "UF", "VF * UF",
                                                      "vector-trip-count"};
-  for (auto [V, Name] :
-       zip_equal(getCurrentLoopParams().getSymbolicValues(), Names)) {
+  VPLoopParams &Params = getCurrentLoopParams();
+  for (auto [V, Name] : zip_equal(Params.getSymbolicValues(), Names)) {
     if (V->user_empty())
       continue;
     O << "\nLive-in ";
@@ -1094,13 +1099,15 @@ void VPlan::printLiveIns(raw_ostream &O) const {
   }
 
   O << "\n";
-  if (TripCount && !TripCount->user_empty()) {
-    if (isa<VPIRValue>(TripCount))
-      O << "Live-in ";
-    TripCount->printAsOperand(O, SlotTracker);
-    O << " = original trip-count";
-    O << "\n";
-  }
+  if (!Params.hasTripCount())
+    return;
+  VPValue *TripCount = Params.getTripCount();
+  if (none_of(TripCount->users(), IsaPred<VPRecipeBase>))
+    return;
+  if (isa<VPIRValue>(TripCount))
+    O << "Live-in ";
+  TripCount->printAsOperand(O, SlotTracker);
+  O << " = original trip-count\n";
 }
 
 LLVM_DUMP_METHOD
@@ -1215,11 +1222,6 @@ VPlan *VPlan::duplicate() {
   for (VPIRValue *OldLiveIn : getLiveIns())
     Old2NewVPValues[OldLiveIn] = NewPlan->getOrAddLiveIn(OldLiveIn);
 
-  if (auto *TripCountIRV = dyn_cast_or_null<VPIRValue>(TripCount))
-    Old2NewVPValues[TripCountIRV] = NewPlan->getOrAddLiveIn(TripCountIRV);
-  // else NewTripCount will be created and inserted into Old2NewVPValues when
-  // TripCount is cloned. In any case NewPlan->TripCount is updated below.
-
   assert(none_of(Old2NewVPValues.keys(), IsaPred<VPSymbolicValue>) &&
          "All VPSymbolicValues must be handled below");
 
@@ -1236,11 +1238,12 @@ VPlan *VPlan::duplicate() {
   // Map and propagate materialized state for symbolic values. The loop
   // parameters are either held by the plan or have been cloned together with
   // the vector loop region.
+  VPLoopParams &OldParams = getCurrentLoopParams();
   if (!LoopParams)
     NewPlan->LoopParams.reset();
-  for (auto [OldSV, NewSV] :
-       zip_equal(getCurrentLoopParams().getSymbolicValues(),
-                 NewPlan->getCurrentLoopParams().getSymbolicValues())) {
+  VPLoopParams &NewParams = NewPlan->getCurrentLoopParams();
+  for (auto [OldSV, NewSV] : zip_equal(OldParams.getSymbolicValues(),
+                                       NewParams.getSymbolicValues())) {
     Old2NewVPValues[OldSV] = NewSV;
     if (OldSV->isMaterialized())
       NewSV->markMaterialized();
@@ -1253,10 +1256,12 @@ VPlan *VPlan::duplicate() {
   NewPlan->UFs = UFs;
   // TODO: Adjust names.
   NewPlan->Name = Name;
-  if (TripCount) {
+  if (OldParams.hasTripCount()) {
+    // The trip count is either a live-in or defined by a cloned recipe.
+    VPValue *TripCount = OldParams.getTripCount();
     assert(Old2NewVPValues.contains(TripCount) &&
            "TripCount must have been added to Old2NewVPValues");
-    NewPlan->TripCount = Old2NewVPValues[TripCount];
+    NewParams.setTripCount(Old2NewVPValues[TripCount]);
   }
 
   // Transfer all cloned blocks (the second half of all current blocks) from

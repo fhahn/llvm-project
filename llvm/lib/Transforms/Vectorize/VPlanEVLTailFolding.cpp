@@ -518,7 +518,7 @@ void VPlanTransforms::addExplicitVectorLength(
   // Create the AVL (application vector length), starting from TC -> 0 in steps
   // of EVL.
   VPPhi *AVLPhi = Builder.createScalarPhi(
-      {Plan.getTripCount()}, DebugLoc::getCompilerGenerated(), "avl");
+      {LoopRegion->getTripCount()}, DebugLoc::getCompilerGenerated(), "avl");
   VPValue *AVL = AVLPhi;
 
   if (MaxSafeElements) {
@@ -626,9 +626,9 @@ void VPlanTransforms::convertEVLExitCond(VPlan &Plan) {
     AVL = UnsafeAVL;
 
   VPValue *AVLNext;
-  [[maybe_unused]] bool FoundAVLNext =
-      match(AVL, m_VPInstruction<Instruction::PHI>(
-                     m_Specific(Plan.getTripCount()), m_VPValue(AVLNext)));
+  [[maybe_unused]] bool FoundAVLNext = match(
+      AVL, m_VPInstruction<Instruction::PHI>(
+               m_Specific(LoopRegion->getTripCount()), m_VPValue(AVLNext)));
   assert(FoundAVLNext && "Didn't find AVL backedge?");
 
   VPBasicBlock *Latch = LoopRegion->getExitingBasicBlock();

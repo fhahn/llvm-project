@@ -148,7 +148,7 @@ addVPLaneMaskPhiAndUpdateExitBranch(VPlan &Plan) {
   DebugLoc DL = CanonicalIVIncrement->getDebugLoc();
   auto *VecPreheader = Plan.getVectorPreheader();
   VPBuilder Builder(VecPreheader);
-  VPValue *TC = Plan.getTripCount();
+  VPValue *TC = TopRegion->getTripCount();
 
   // Create the wide active lane mask instruction in the VPlan preheader.
   VPValue *ALMMultiplier =
@@ -204,7 +204,7 @@ void VPlanTransforms::materializeHeaderMask(
   VPValue *HeaderMask = LoopRegion->getUsedHeaderMask();
   if (!HeaderMask)
     return;
-  VPValue *TC = Plan.getTripCount();
+  VPValue *TC = LoopRegion->getTripCount();
 
   if (UseActiveLaneMaskForControlFlow) {
     HeaderMask->replaceAllUsesWith(addVPLaneMaskPhiAndUpdateExitBranch(Plan));
@@ -775,9 +775,7 @@ void VPlanTransforms::materializeConstantVectorTripCount(
   assert(Plan.hasUF(BestUF) && "BestUF is not available in Plan");
 
   VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
-  VPValue *TC = Plan.getTripCount();
-  if (TC->user_empty())
-    return;
+  VPValue *TC = LoopRegion->getTripCount();
 
   // Skip cases for which the trip count may be non-trivial to materialize.
   // I.e., when a scalar tail is absent - due to tail folding, or when a scalar
@@ -860,7 +858,7 @@ void VPlanTransforms::materializeVectorTripCount(
     return;
   }
 
-  VPValue *TC = Plan.getTripCount();
+  VPValue *TC = LoopRegion->getTripCount();
   Type *TCTy = TC->getScalarType();
   VPBasicBlock::iterator InsertPt = VectorPHVPBB->getFirstNonPhi();
   if (auto *StepR = Step->getDefiningRecipe()) {
@@ -935,7 +933,7 @@ void VPlanTransforms::materializeFactors(VPlan &Plan, VPBasicBlock *VectorPH,
   }
 
   VPBuilder Builder(VectorPH, VectorPH->getFirstNonPhi());
-  Type *TCTy = Plan.getTripCount()->getScalarType();
+  Type *TCTy = LoopRegion->getTripCount()->getScalarType();
   // If there are no users of the runtime VF, compute VFxUF by constant folding
   // the multiplication of VF and UF.
   if (VF.user_empty()) {
@@ -1017,7 +1015,7 @@ void VPlanTransforms::materializeAliasMaskCheckBlock(
   VPBuilder Builder(ClampedVFCheck);
   DebugLoc DL = DebugLoc::getCompilerGenerated();
   VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
-  VPValue *TripCount = Plan.getTripCount();
+  VPValue *TripCount = LoopRegion->getTripCount();
   Type *TCTy = TripCount->getScalarType();
 
   // Check the "ClampedVF" from the alias mask is larger than one.
@@ -1071,11 +1069,11 @@ void VPlanTransforms::expandSCEVsToVPInstructions(VPlan &Plan,
       continue;
     Builder.setInsertPoint(&ExpSCEV);
     VPValue *Expanded = Expander.expand(ExpSCEV.getSCEV());
-    ExpSCEV.replaceAllUsesWith(Expanded);
-    // TripCount should not be used after expansion to VPInstructions. Reset to
-    // poison to avoid dangling references.
-    if (Plan.getTripCount() == &ExpSCEV)
-      Plan.resetTripCount(Plan.getPoison(ExpSCEV.getScalarType()));
+    ExpSCEV.replaceUsesWithIf(Expanded, IsaPred<VPRecipeBase>);
+    // The trip count should not be used after expansion to VPInstructions.
+    // Replace it by poison in the loop parameters, so its expansion can be
+    // removed if otherwise unused.
+    ExpSCEV.replaceAllUsesWith(Plan.getPoison(ExpSCEV.getScalarType()));
     ExpSCEV.eraseFromParent();
   }
 }
@@ -1096,8 +1094,6 @@ VPlanTransforms::expandSCEVs(VPlan &Plan, ScalarEvolution &SE) {
     ExpandedSCEVs[Expr] = Res;
     VPValue *Exp = Plan.getOrAddLiveIn(Res);
     ExpSCEV.replaceAllUsesWith(Exp);
-    if (Plan.getTripCount() == &ExpSCEV)
-      Plan.resetTripCount(Exp);
     ExpSCEV.eraseFromParent();
   }
   assert(none_of(*Entry, IsaPred<VPExpandSCEVRecipe>) &&

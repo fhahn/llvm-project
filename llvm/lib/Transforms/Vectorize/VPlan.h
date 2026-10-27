@@ -528,7 +528,9 @@ public:
     return true;
   }
 
-  static inline bool classof(const VPUser *U) { return true; }
+  static inline bool classof(const VPUser *U) {
+    return U->getVPUserID() == VPUser::VPUserID::Recipe;
+  }
 
   /// Returns true if the recipe may have side-effects.
   bool mayHaveSideEffects() const;
@@ -4701,12 +4703,13 @@ public:
   void clearNUW() { HasNUW = false; }
 };
 
-/// The parameters of a vector loop: the symbolic VF, UF, VF * UF and vector
-/// trip count. They are loop-invariant and may be used anywhere in the plan;
-/// they must be materialized once VF and UF are fixed, before the owning loop
-/// region is dissolved. The parameters are owned by the vector loop region, and
-/// by the VPlan while there is none.
-class VPLoopParams {
+/// The parameters of a vector loop: its trip count and the symbolic VF, UF,
+/// VF * UF and vector trip count. The trip count is held as operand, so
+/// replacing it updates the parameters. The symbolic values are loop-invariant
+/// and may be used anywhere in the plan; they must be materialized once VF and
+/// UF are fixed, before the owning loop region is dissolved. The parameters
+/// are owned by the vector loop region, and by the VPlan while there is none.
+class VPLoopParams : public VPUser {
   VPSymbolicValue VF;
   VPSymbolicValue UF;
   VPSymbolicValue VFxUF;
@@ -4714,7 +4717,24 @@ class VPLoopParams {
 
 public:
   VPLoopParams(Type *IdxTy)
-      : VF(IdxTy), UF(IdxTy), VFxUF(IdxTy), VectorTripCount(IdxTy) {}
+      : VPUser({}, VPUserID::LoopParams), VF(IdxTy), UF(IdxTy), VFxUF(IdxTy),
+        VectorTripCount(IdxTy) {}
+
+  static inline bool classof(const VPUser *U) {
+    return U->getVPUserID() == VPUserID::LoopParams;
+  }
+
+  bool hasTripCount() const { return getNumOperands() == 1; }
+
+  VPValue *getTripCount() const {
+    assert(hasTripCount() && "trip count needs to be set before accessing it");
+    return getOperand(0);
+  }
+
+  void setTripCount(VPValue *TC) {
+    assert(!hasTripCount() && "trip count already set");
+    addOperand(TC);
+  }
 
   VPSymbolicValue &getVF() { return VF; }
   VPSymbolicValue &getUF() { return UF; }
@@ -4725,6 +4745,11 @@ public:
   std::array<VPSymbolicValue *, 4> getSymbolicValues() {
     return {&VF, &UF, &VFxUF, &VectorTripCount};
   }
+
+  /// The trip count is only used as a single scalar, so walks over the users
+  /// of a value that only handle recipes may skip VPLoopParams.
+  bool usesFirstLaneOnly(const VPValue *Op) const override { return true; }
+  bool usesFirstPartOnly(const VPValue *Op) const override { return true; }
 };
 
 /// VPRegionBlock represents a collection of VPBasicBlocks and VPRegionBlocks
@@ -4859,6 +4884,7 @@ public:
   void dissolveToCFGLoop();
 
   /// Accessors for the parameters of the vector loop region.
+  VPValue *getTripCount() const { return getLoopParams().getTripCount(); }
   VPSymbolicValue &getVF() const { return getLoopParams().getVF(); }
   VPSymbolicValue &getUF() const { return getLoopParams().getUF(); }
   VPSymbolicValue &getVFxUF() const { return getLoopParams().getVFxUF(); }
@@ -4974,10 +5000,6 @@ class VPlan {
 
   /// Holds the name of the VPlan, for printing.
   std::string Name;
-
-  /// Represents the trip count of the original loop, for folding
-  /// the tail.
-  VPValue *TripCount = nullptr;
 
   /// The index type of the vector loop.
   Type *IdxTy;
@@ -5116,25 +5138,12 @@ public:
   /// Returns true if \p VPBB is an exit block.
   bool isExitBlock(VPBlockBase *VPBB);
 
-  /// The trip count of the original loop.
-  VPValue *getTripCount() const {
-    assert(TripCount && "trip count needs to be set before accessing it");
-    return TripCount;
-  }
+  /// The trip count of the original loop, while there is no vector loop region.
+  VPValue *getTripCount() const { return getLoopParams().getTripCount(); }
 
-  /// Set the trip count assuming it is currently null; if it is not - use
-  /// resetTripCount().
+  /// Set the trip count, which must not have been set before.
   void setTripCount(VPValue *NewTripCount) {
-    assert(!TripCount && NewTripCount && "TripCount should not be set yet.");
-    TripCount = NewTripCount;
-  }
-
-  /// Resets the trip count for the VPlan. The caller must make sure all uses of
-  /// the original trip count have been replaced.
-  void resetTripCount(VPValue *NewTripCount) {
-    assert(TripCount && NewTripCount && TripCount->user_empty() &&
-           "TripCount must be set when resetting");
-    TripCount = NewTripCount;
+    getLoopParams().setTripCount(NewTripCount);
   }
 
   /// The vector trip count, while there is no vector loop region.

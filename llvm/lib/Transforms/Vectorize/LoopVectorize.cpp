@@ -3274,7 +3274,8 @@ std::unique_ptr<VPlan> LoopVectorizationPlanner::selectBestEpiloguePlan(
   Type *TCType = Legal->getWidestInductionType();
   const SCEV *RemainingIterations = nullptr;
   unsigned MaxTripCount = 0;
-  const SCEV *TC = vputils::getSCEVExprForVPValue(MainPlan.getTripCount(), PSE);
+  const SCEV *TC = vputils::getSCEVExprForVPValue(
+      MainPlan.getVectorLoopRegion()->getTripCount(), PSE);
   assert(!isa<SCEVCouldNotCompute>(TC) && "Trip count SCEV must be computable");
   const SCEV *KnownMinTC;
   bool ScalableTC = match(TC, m_scev_c_Mul(m_SCEV(KnownMinTC), m_SCEVVScale()));
@@ -5234,7 +5235,7 @@ bool VPCostContext::isMaskRequired(Instruction *I) const {
 
 bool VPCostContext::executesAtMostOnce(const VPlan &Plan, ElementCount VF) {
   auto *TC = dyn_cast_if_present<ConstantInt>(
-      Plan.getTripCount()->getUnderlyingValue());
+      Plan.getVectorLoopRegion()->getTripCount()->getUnderlyingValue());
   return TC && TC->getValue().ule(VF.getKnownMinValue());
 }
 
@@ -7289,8 +7290,6 @@ static void preparePlanForEpilogueVectorLoop(
     VPValue *ExpandedVal =
         Plan.getOrAddLiveIn(ExpandedSCEVs.lookup(ExpandR.getSCEV()));
     ExpandR.replaceAllUsesWith(ExpandedVal);
-    if (Plan.getTripCount() == &ExpandR)
-      Plan.resetTripCount(ExpandedVal);
     ExpandR.eraseFromParent();
   }
 

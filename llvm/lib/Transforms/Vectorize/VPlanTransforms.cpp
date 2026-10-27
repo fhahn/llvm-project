@@ -1141,7 +1141,7 @@ void VPlanTransforms::optimizeInductionLiveOutUsers(
   VPBuilder VectorPHBuilder(VectorPH, VectorPH->getFirstNonPhi());
   DenseMap<VPValue *, VPValue *> EndValues;
   VPValue *ResumeTC = Plan.hasTailFolded()
-                          ? Plan.getTripCount()
+                          ? VectorRegion->getTripCount()
                           : &VectorRegion->getVectorTripCount();
   for (VPWidenInductionRecipe &WideIV : make_isa_range<VPWidenInductionRecipe>(
            VectorRegion->getEntryBasicBlock()->phis())) {
@@ -2059,7 +2059,7 @@ static bool optimizeVectorInductionWidthForTCAndVFUF(VPlan &Plan,
   if (!VectorLoop)
     return false;
 
-  VPValue *TripCount = Plan.getTripCount();
+  VPValue *TripCount = VectorLoop->getTripCount();
   const APInt *TC;
   if (!BestVF.isFixed() || !match(TripCount, m_APInt(TC)))
     return false;
@@ -2154,7 +2154,8 @@ static bool isConditionTrueViaVFAndUF(VPValue *Cond, VPlan &Plan,
   const SCEV *VectorTripCount =
       vputils::getSCEVExprForVPValue(&VectorLoop->getVectorTripCount(), PSE);
   if (isa<SCEVCouldNotCompute>(VectorTripCount))
-    VectorTripCount = vputils::getSCEVExprForVPValue(Plan.getTripCount(), PSE);
+    VectorTripCount =
+        vputils::getSCEVExprForVPValue(VectorLoop->getTripCount(), PSE);
   assert(!isa<SCEVCouldNotCompute>(VectorTripCount) &&
          "Trip count SCEV must be computable");
   ScalarEvolution &SE = *PSE.getSE();
@@ -2250,7 +2251,7 @@ static bool simplifyBranchConditionForVFAndUF(VPlan &Plan, ElementCount BestVF,
         &VectorRegion->getVectorTripCount(), PSE);
     if (isa<SCEVCouldNotCompute>(VectorTripCount))
       VectorTripCount =
-          vputils::getSCEVExprForVPValue(Plan.getTripCount(), PSE);
+          vputils::getSCEVExprForVPValue(VectorRegion->getTripCount(), PSE);
     assert(!isa<SCEVCouldNotCompute>(VectorTripCount) &&
            "Trip count SCEV must be computable");
     ScalarEvolution &SE = *PSE.getSE();
@@ -2464,9 +2465,6 @@ void VPlanTransforms::cse(VPlan &Plan, const VPDominatorTree &VPDT) {
       if (auto *Call = dyn_cast<VPWidenCallRecipe>(V))
         Call->intersectAttrs(*cast<VPWidenCallRecipe>(Def), Plan.getContext());
       Def->replaceAllUsesWith(V);
-      // Reset Plan's TC when TC expressions are CSE'd.
-      if (Def == Plan.getTripCount())
-        Plan.resetTripCount(V);
     }
     LoadCSEMap.clear();
   }
@@ -2821,7 +2819,9 @@ void VPlanTransforms::replaceSymbolicStrides(
          "expected to run before loop regions are created");
   const auto &[Header, _] = VPBlockUtils::getPlainCFGHeaderAndLatch(Plan);
   auto CanUseVersionedStride = [&VPDT, Header = Header, &Plan](VPUser *U) {
-    auto *R = cast<VPRecipeBase>(U);
+    auto *R = dyn_cast<VPRecipeBase>(U);
+    if (!R)
+      return false;
     // Skip phis if the loop if loop is not yet guarded.
     if (isa<VPPhiAccessors>(R) &&
         Header == Plan.getEntry()->getSingleSuccessor())
@@ -2867,8 +2867,6 @@ void VPlanTransforms::replaceSymbolicStrides(
       continue;
     VPValue *NewExp = vputils::getOrCreateVPValueForSCEVExpr(Plan, NewSCEV);
     ExpSCEV.replaceAllUsesWith(NewExp);
-    if (Plan.getTripCount() == &ExpSCEV)
-      Plan.resetTripCount(NewExp);
   }
 }
 

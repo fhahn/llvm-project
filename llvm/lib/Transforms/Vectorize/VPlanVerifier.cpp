@@ -250,6 +250,15 @@ bool VPlanVerifier::verifyVPBasicBlock(const VPBasicBlock *VPBB) {
       }
 
       for (const VPUser *U : V->users()) {
+        // The trip count of the loop parameters must be defined outside loop
+        // regions.
+        if (isa<VPLoopParams>(U)) {
+          if (VPBB->getEnclosingLoopRegion()) {
+            errs() << "Trip count defined inside a loop region!\n";
+            return false;
+          }
+          continue;
+        }
         auto *UI = cast<VPRecipeBase>(U);
         if (isa<VPIRPhi>(UI) &&
             UI->getNumOperands() != UI->getParent()->getNumPredecessors()) {

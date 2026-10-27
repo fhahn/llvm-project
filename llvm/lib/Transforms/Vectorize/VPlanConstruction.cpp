@@ -1456,7 +1456,7 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
   // VectorTripCount now equals TripCount so simplify the MiddleVPBB branch.
   assert(match(Plan.getMiddleBlock()->getTerminator(),
                m_BranchOnCond(m_SpecificICmp(
-                   CmpInst::ICMP_EQ, m_Specific(Plan.getTripCount()),
+                   CmpInst::ICMP_EQ, m_Specific(LoopRegion->getTripCount()),
                    m_Specific(&LoopRegion->getVectorTripCount())))) &&
          "Unexpected MiddleVPBB branch");
   Plan.getMiddleBlock()->getTerminator()->setOperand(0, Plan.getTrue());
@@ -1693,7 +1693,7 @@ void VPlanTransforms::addMinimumIterationCheck(
   CmpInst::Predicate CmpPred =
       RequiresScalarEpilogue ? ICmpInst::ICMP_ULE : ICmpInst::ICMP_ULT;
   // If tail is to be folded, vector loop takes care of all iterations.
-  VPValue *TripCountVPV = Plan.getTripCount();
+  VPValue *TripCountVPV = Plan.getVectorLoopRegion()->getTripCount();
   const SCEV *TripCount = vputils::getSCEVExprForVPValue(TripCountVPV, PSE);
   Type *TripCountTy = TripCount->getType();
   ScalarEvolution &SE = *PSE.getSE();
@@ -1762,7 +1762,7 @@ void VPlanTransforms::addMinimumVectorEpilogueIterationCheck(
     ElementCount EpilogueVF, unsigned MainLoopStep, unsigned EpilogueLoopStep,
     ScalarEvolution &SE) {
   // Add the minimum iteration check for the epilogue vector loop.
-  VPValue *TC = Plan.getTripCount();
+  VPValue *TC = Plan.getVectorLoopRegion()->getTripCount();
   VPBuilder Builder(cast<VPBasicBlock>(Plan.getEntry()));
   VPValue *VFxUF = Builder.createExpandSCEV(
       SE.getElementCount(TC->getScalarType(), EpilogueVF, SCEV::FlagNUW));
@@ -1944,8 +1944,9 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
   // Update resume phis for inductions in the scalar preheader. If AnyNaNLane is
   // true, the resume from the start of the last vector iteration via the
   // canonical IV, otherwise from the original value.
-  auto IsTC = [&Plan, LoopRegion](VPValue *V) {
-    return V == &LoopRegion->getVectorTripCount() || V == Plan.getTripCount();
+  auto IsTC = [LoopRegion](VPValue *V) {
+    return V == &LoopRegion->getVectorTripCount() ||
+           V == LoopRegion->getTripCount();
   };
   for (auto &R : Plan.getScalarPreheader()->phis()) {
     auto *ResumeR = cast<VPPhi>(&R);
