@@ -1438,8 +1438,8 @@ static bool isInvalidNullPointer(const Value *V, const Function &F) {
 /// so pointers based on them cannot alias. Returns false if \p O1 == \p O2.
 /// Must hold for any dynamic instances of \p O1 and \p O2, which may be from
 /// different loop iterations.
-static bool areDistinctObjectsNoAlias(const Value *O1, const Value *O2,
-                                      const AAQueryInfo &AAQI) {
+static inline bool areDistinctObjectsNoAlias(const Value *O1, const Value *O2,
+                                             const AAQueryInfo &AAQI) {
   if (O1 == O2)
     return false;
   // Two different identified objects cannot alias.
@@ -1472,15 +1472,19 @@ static bool areDistinctObjectsNoAlias(const Value *O1, const Value *O2,
   return false;
 }
 
-/// Return true if no underlying object of \p V, looking through phis and
-/// selects, can alias \p Obj. Unlike getUnderlyingObjects, this bounds compile
-/// time by visiting at most MaxVisited values and giving up on phis with more
-/// incoming values.
-static bool allUnderlyingObjectsNoAlias(const Value *V, const Value *Obj,
+/// Return true if no underlying object of \p PN, starting from its incoming
+/// values \p Srcs and looking through phis and selects, can alias \p Obj.
+/// Unlike getUnderlyingObjects, this bounds compile time by visiting at most
+/// MaxVisited values and giving up on phis with more incoming values.
+static bool allUnderlyingObjectsNoAlias(const PHINode *PN,
+                                        ArrayRef<Value *> Srcs,
+                                        const Value *Obj, const Function &F,
                                         const AAQueryInfo &AAQI) {
   constexpr unsigned MaxVisited = 8;
-  SmallPtrSet<const Value *, 8> Visited;
-  SmallVector<const Value *> Worklist({V});
+  if (PN->getNumIncomingValues() > MaxVisited)
+    return false;
+  SmallPtrSet<const Value *, 8> Visited({PN});
+  SmallVector<const Value *> Worklist(Srcs);
   do {
     const Value *P = getUnderlyingObject(Worklist.pop_back_val());
     if (!Visited.insert(P).second)
@@ -1566,7 +1570,8 @@ AliasResult BasicAAResult::aliasPHI(const PHINode *PN, LocationSize PNSize,
   // handling) simple pointer induction variables. Otherwise, check the
   // underlying objects of the phi instead.
   if (V1Srcs.size() > 1 && any_of(V1Srcs, IsaPred<PHINode>))
-    return allUnderlyingObjectsNoAlias(PN, getUnderlyingObject(V2), AAQI)
+    return allUnderlyingObjectsNoAlias(PN, V1Srcs, getUnderlyingObject(V2), F,
+                                       AAQI)
                ? AliasResult::NoAlias
                : AliasResult::MayAlias;
 
