@@ -2622,28 +2622,36 @@ void InstrRefBasedLDV::placeMLocPHIs(
     RegUnitsToPHIUp.insert_range(FoundRegUnits);
   }
 
-  // Lambda to fetch PHIs for a given location, and write into the PHIBlocks
-  // collection.
-  SmallVector<MachineBasicBlock *, 32> PHIBlocks;
+  // Lambda to fetch PHIs for a given location, and point PHIBlocks at them.
+  // Many locations are defined in the same blocks (e.g. registers clobbered by
+  // calls), so only place PHIs once per distinct set of defining blocks.
+  std::map<SmallVector<MachineBasicBlock *, 8>,
+           SmallVector<MachineBasicBlock *, 32>>
+      PHIBlocksForDefs;
+  ArrayRef<MachineBasicBlock *> PHIBlocks;
   auto CollectPHIsForLoc = [&](LocIdx L) {
-    // Collect the set of defs.
-    SmallPtrSet<MachineBasicBlock *, 32> DefBlocks;
+    // Collect the defs.
+    SmallVector<MachineBasicBlock *, 8> Defs;
     for (MachineBasicBlock *MBB : OrderToBB) {
       const auto &TransferFunc = MLocTransfer[MBB->getNumber()];
       if (TransferFunc.contains(L))
-        DefBlocks.insert(MBB);
+        Defs.push_back(MBB);
     }
 
-    // The entry block defs the location too: it's the live-in / argument value.
-    // Only insert if there are other defs though; everything is trivially live
-    // through otherwise.
-    if (!DefBlocks.empty())
-      DefBlocks.insert(&*MF.begin());
+    auto [It, Inserted] = PHIBlocksForDefs.try_emplace(std::move(Defs));
+    if (Inserted) {
+      SmallPtrSet<MachineBasicBlock *, 32> DefBlocks(It->first.begin(),
+                                                     It->first.end());
+      // The entry block defs the location too: it's the live-in / argument
+      // value. Only insert if there are other defs though; everything is
+      // trivially live through otherwise.
+      if (!DefBlocks.empty())
+        DefBlocks.insert(&*MF.begin());
 
-    // Ask the SSA construction algorithm where we should put PHIs. Clear
-    // anything that might have been hanging around from earlier.
-    PHIBlocks.clear();
-    BlockPHIPlacement(AllBlocks, DefBlocks, PHIBlocks);
+      // Ask the SSA construction algorithm where we should put PHIs.
+      BlockPHIPlacement(AllBlocks, DefBlocks, It->second);
+    }
+    PHIBlocks = It->second;
   };
 
   auto InstallPHIsAtLoc = [&PHIBlocks, &MInLocs](LocIdx L) {
