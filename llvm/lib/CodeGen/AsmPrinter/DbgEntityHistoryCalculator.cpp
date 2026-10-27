@@ -294,7 +294,7 @@ using RegDescribedVarsMap = std::map<Register, SmallVector<InlinedEntity, 1>>;
 // inlined entity. As the history map entries are stored in a SmallVector, they
 // may be moved at insertion of new entries, so store indices rather than
 // pointers.
-using DbgValueEntriesMap = std::map<InlinedEntity, SmallSet<EntryIndex, 1>>;
+using DbgValueEntriesMap = MapVector<InlinedEntity, SmallSet<EntryIndex, 1>>;
 
 } // end anonymous namespace
 
