@@ -1176,6 +1176,73 @@ end:
   ret <4 x i32> %2
 }
 
+; The zext of %load2 feeds both a udot and a zext-only partial reduction (also
+; a udot), so it must not be converted to tbl.
+define <4 x i32> @udot_and_zext_sum_in_loop(ptr %p1, ptr %p2) {
+; CHECK-COMMON-LABEL: udot_and_zext_sum_in_loop:
+; CHECK-COMMON:       // %bb.0: // %entry
+; CHECK-COMMON-NEXT:    adrp x8, .LCPI30_0
+; CHECK-COMMON-NEXT:    movi v0.2d, #0000000000000000
+; CHECK-COMMON-NEXT:    movi v2.2d, #0000000000000000
+; CHECK-COMMON-NEXT:    ldr q1, [x8, :lo12:.LCPI30_0]
+; CHECK-COMMON-NEXT:    adrp x8, .LCPI30_1
+; CHECK-COMMON-NEXT:    adrp x9, .LCPI30_2
+; CHECK-COMMON-NEXT:    adrp x10, .LCPI30_3
+; CHECK-COMMON-NEXT:    ldr q3, [x8, :lo12:.LCPI30_1]
+; CHECK-COMMON-NEXT:    ldr q4, [x9, :lo12:.LCPI30_2]
+; CHECK-COMMON-NEXT:    ldr q5, [x10, :lo12:.LCPI30_3]
+; CHECK-COMMON-NEXT:    mov x8, xzr
+; CHECK-COMMON-NEXT:  .LBB30_1: // %vector.body
+; CHECK-COMMON-NEXT:    // =>This Inner Loop Header: Depth=1
+; CHECK-COMMON-NEXT:    ldr q6, [x1, x8]
+; CHECK-COMMON-NEXT:    ldr q17, [x0, x8]
+; CHECK-COMMON-NEXT:    add x8, x8, #16
+; CHECK-COMMON-NEXT:    cmp x8, #1024
+; CHECK-COMMON-NEXT:    tbl v7.16b, { v6.16b }, v1.16b
+; CHECK-COMMON-NEXT:    tbl v16.16b, { v6.16b }, v3.16b
+; CHECK-COMMON-NEXT:    ushll v19.8h, v17.8b, #0
+; CHECK-COMMON-NEXT:    tbl v20.16b, { v6.16b }, v4.16b
+; CHECK-COMMON-NEXT:    tbl v6.16b, { v6.16b }, v5.16b
+; CHECK-COMMON-NEXT:    ushll2 v17.8h, v17.16b, #0
+; CHECK-COMMON-NEXT:    uzp1 v18.8h, v16.8h, v7.8h
+; CHECK-COMMON-NEXT:    add v2.4s, v2.4s, v16.4s
+; CHECK-COMMON-NEXT:    uzp1 v21.8h, v6.8h, v20.8h
+; CHECK-COMMON-NEXT:    add v6.4s, v7.4s, v6.4s
+; CHECK-COMMON-NEXT:    umlal v0.4s, v19.4h, v18.4h
+; CHECK-COMMON-NEXT:    add v2.4s, v2.4s, v6.4s
+; CHECK-COMMON-NEXT:    add v2.4s, v2.4s, v20.4s
+; CHECK-COMMON-NEXT:    umlal2 v0.4s, v19.8h, v18.8h
+; CHECK-COMMON-NEXT:    umlal v0.4s, v17.4h, v21.4h
+; CHECK-COMMON-NEXT:    umlal2 v0.4s, v17.8h, v21.8h
+; CHECK-COMMON-NEXT:    b.ne .LBB30_1
+; CHECK-COMMON-NEXT:  // %bb.2: // %end
+; CHECK-COMMON-NEXT:    sub v0.4s, v0.4s, v2.4s
+; CHECK-COMMON-NEXT:    ret
+entry:
+  br label %vector.body
+
+vector.body:
+  %index = phi i64 [ 0, %entry ], [ %index.next, %vector.body ]
+  %acc = phi <4 x i32> [ zeroinitializer, %entry ], [ %partial.reduce, %vector.body ]
+  %acc.sum = phi <4 x i32> [ zeroinitializer, %entry ], [ %partial.reduce.sum, %vector.body ]
+  %gep1 = getelementptr i8, ptr %p1, i64 %index
+  %load1 = load <16 x i8>, ptr %gep1, align 16
+  %load1.wide = zext <16 x i8> %load1 to <16 x i32>
+  %gep2 = getelementptr i8, ptr %p2, i64 %index
+  %load2 = load <16 x i8>, ptr %gep2, align 16
+  %load2.wide = zext <16 x i8> %load2 to <16 x i32>
+  %mul = mul nuw nsw <16 x i32> %load1.wide, %load2.wide
+  %partial.reduce = tail call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> %acc, <16 x i32> %mul)
+  %partial.reduce.sum = tail call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> %acc.sum, <16 x i32> %load2.wide)
+  %index.next = add nuw i64 %index, 16
+  %cmp = icmp eq i64 %index.next, 1024
+  br i1 %cmp, label %end, label %vector.body
+
+end:
+  %res = sub <4 x i32> %partial.reduce, %partial.reduce.sum
+  ret <4 x i32> %res
+}
+
 define <2 x i64> @udot_16to64(<2 x i64> %acc, <8 x i16> %input){
 ; CHECK-COMMON-LABEL: udot_16to64:
 ; CHECK-COMMON:       // %bb.0: // %entry
