@@ -199,6 +199,14 @@ static bool reduceDbgValsBackwardScan(MachineBasicBlock &MBB) {
 bool RemoveRedundantDebugValuesImpl::reduceDbgValues(MachineFunction &MF) {
   LLVM_DEBUG(dbgs() << "\nDebug Value Reduction\n");
 
+  // Both scans only remove DBG_VALUEs; skip them for functions without any
+  // (e.g. at -O0, where variables live in stack slots).
+  if (none_of(MF, [](const MachineBasicBlock &MBB) {
+        return any_of(MBB,
+                      [](const MachineInstr &MI) { return MI.isDebugValue(); });
+      }))
+    return false;
+
   bool Changed = false;
 
   for (auto &MBB : MF) {
