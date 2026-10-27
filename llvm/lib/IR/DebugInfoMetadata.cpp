@@ -1794,11 +1794,11 @@ DIExpression *DIExpression::getImpl(LLVMContext &Context,
   DEFINE_GETIMPL_STORE_NO_OPS(DIExpression, (Elements));
 }
 bool DIExpression::isEntryValue() const {
-  if (auto singleLocElts = getSingleLocationExpressionElements()) {
-    return singleLocElts->size() > 0 &&
-           (*singleLocElts)[0] == dwarf::DW_OP_LLVM_entry_value;
-  }
-  return false;
+  // Check the first operation before validating the whole expression.
+  ArrayRef<uint64_t> Elts = getElements();
+  size_t First = !Elts.empty() && Elts[0] == dwarf::DW_OP_LLVM_arg ? 2 : 0;
+  return Elts.size() > First && Elts[First] == dwarf::DW_OP_LLVM_entry_value &&
+         isSingleLocationExpression();
 }
 bool DIExpression::startsWithDeref() const {
   if (auto singleLocElts = getSingleLocationExpressionElements())
