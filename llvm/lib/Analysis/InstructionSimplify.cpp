@@ -8009,6 +8009,18 @@ Value *llvm::simplifyInstructionWithOperands(Instruction *I,
 }
 
 Value *llvm::simplifyInstruction(Instruction *I, const SimplifyQuery &SQ) {
+  // Bail out early for instructions that cannot be simplified: calls to
+  // functions that are neither intrinsics nor constant foldable (see
+  // simplifyCall), and other void instructions, which cannot be constant
+  // folded.
+  if (auto *CI = dyn_cast<CallInst>(I)) {
+    Function *F = CI->getCalledFunction();
+    if (F && !F->isIntrinsic() && !canConstantFoldCallTo(CI, F, SQ.TLI))
+      return nullptr;
+  } else if (I->getType()->isVoidTy()) {
+    return nullptr;
+  }
+
   SmallVector<Value *, 8> Ops(I->operands());
   Value *Result = ::simplifyInstructionWithOperands(I, Ops, SQ, RecursionLimit);
 
