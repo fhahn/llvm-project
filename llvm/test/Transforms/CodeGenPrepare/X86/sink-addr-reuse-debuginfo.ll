@@ -16,8 +16,7 @@ define void @sunk_addr_reuse_after_phi_simplification(ptr %base, i1 %ec) !dbg !3
 ; DBG-NEXT:      #dbg_value(ptr [[BASE]], [[META6:![0-9]+]], !DIExpression(DW_OP_plus_uconst, 16, DW_OP_stack_value), [[META8:![0-9]+]])
 ; DBG-NEXT:    [[SUNKADDR:%.*]] = getelementptr i8, ptr [[BASE]], i64 16
 ; DBG-NEXT:    [[L_0:%.*]] = load i32, ptr [[SUNKADDR]], align 4
-; DBG-NEXT:    [[SUNKADDR1:%.*]] = getelementptr i8, ptr [[BASE]], i64 16
-; DBG-NEXT:    [[L_1:%.*]] = load i32, ptr [[SUNKADDR1]], align 4
+; DBG-NEXT:    [[L_1:%.*]] = load i32, ptr [[SUNKADDR]], align 4
 ; DBG-NEXT:    call void @use(ptr [[BASE]])
 ; DBG-NEXT:    br i1 [[EC]], label %[[LOOP]], label %[[EXIT:.*]]
 ; DBG:       [[EXIT]]:
