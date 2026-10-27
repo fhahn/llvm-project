@@ -2250,8 +2250,14 @@ void DwarfDebug::beginInstruction(const MachineInstr *MI) {
       DL->getScope()->getSubprogram()->getKeyInstructionsEnabled();
 
   bool IsKey = false;
-  if (ScopeUsesKeyInstructions && DL && DL.getLine())
+  if (ScopeUsesKeyInstructions && DL && DL.getLine()) {
+    // Compute the Key Instructions of the function on first use.
+    if (!KeyInstructionsComputed) {
+      computeKeyInstructions(&MF);
+      KeyInstructionsComputed = true;
+    }
     IsKey = KeyInstructions.contains(MI);
+  }
 
   if (!DL && MI == PrologEndLoc) {
     // In rare situations, we might want to place the end of the prologue
@@ -2853,9 +2859,9 @@ void DwarfDebug::beginFunctionImpl(const MachineFunction *MF) {
 
   // Run both `findForceIsStmtInstrs` and `computeKeyInstructions` because
   // Not-Key-Instructions functions may be inlined into Key Instructions
-  // functions and vice versa.
-  if (KeyInstructionsAreStmts)
-    computeKeyInstructions(MF);
+  // functions and vice versa. Key Instructions are only computed once an
+  // instruction from a scope using them is emitted.
+  KeyInstructionsComputed = false;
   findForceIsStmtInstrs(MF);
 }
 
