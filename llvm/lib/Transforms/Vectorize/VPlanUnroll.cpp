@@ -187,9 +187,10 @@ void UnrollState::unrollWidenInductionByUF(
   VPValue *ScalarStep = IV->getStepValue();
   VPBuilder Builder(PH);
   Type *VectorStepTy = IVTy->isPointerTy() ? ScalarStep->getScalarType() : IVTy;
-  VPInstruction *VectorStep = Builder.createNaryOp(
-      VPInstruction::WideIVStep, {&Plan.getVF(), ScalarStep}, VectorStepTy, FMF,
-      IV->getDebugLoc());
+  VPInstruction *VectorStep =
+      Builder.createNaryOp(VPInstruction::WideIVStep,
+                           {&Plan.getVectorLoopRegion()->getVF(), ScalarStep},
+                           VectorStepTy, FMF, IV->getDebugLoc());
 
   ToSkip.insert(VectorStep);
 
@@ -349,8 +350,9 @@ void UnrollState::unrollRecipeByUF(VPRecipeBase &R) {
           isa<VPWidenCanonicalIVRecipe>(R)
               ? Plan.getVectorLoopRegion()->getCanonicalIVType()
               : DL.getIndexType(R.getVPSingleValue()->getScalarType());
-      VPValue *VF = Builder.createScalarZExtOrTrunc(&Plan.getVF(), IndexTy,
-                                                    DebugLoc::getUnknown());
+      VPValue *VF =
+          Builder.createScalarZExtOrTrunc(&Plan.getVectorLoopRegion()->getVF(),
+                                          IndexTy, DebugLoc::getUnknown());
       // VFxUF does not wrap, so VF * Part also cannot wrap.
       VPValue *VFxPart = Builder.createOverflowingOp(
           Instruction::Mul, {VF, Plan.getConstantInt(IndexTy, Part)},
@@ -522,7 +524,8 @@ void UnrollState::unrollBlock(VPBlockBase *VPB) {
 void VPlanTransforms::unrollByUF(VPlan &Plan, unsigned UF) {
   assert(UF > 0 && "Unroll factor must be positive");
   Plan.setUF(UF);
-  llvm::scope_exit Cleanup([&Plan, UF]() {
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  llvm::scope_exit Cleanup([&Plan, LoopRegion, UF]() {
     auto Iter = vp_depth_first_deep(Plan.getEntry());
     // Remove recipes that are redundant after unrolling.
     for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(Iter)) {
@@ -540,7 +543,7 @@ void VPlanTransforms::unrollByUF(VPlan &Plan, unsigned UF) {
           continue;
         }
         if (VPI.getOpcode() == VPInstruction::CanonicalIVIncrementForPart &&
-            VPI.getOperand(1) == &Plan.getVF()) {
+            VPI.getOperand(1) == &LoopRegion->getVF()) {
           VPI.replaceAllUsesWith(VPI.getOperand(0));
           VPI.eraseFromParent();
         }
@@ -548,7 +551,7 @@ void VPlanTransforms::unrollByUF(VPlan &Plan, unsigned UF) {
     }
 
     Type *TCTy = Plan.getTripCount()->getType();
-    Plan.getUF().replaceAllUsesWith(Plan.getConstantInt(TCTy, UF));
+    LoopRegion->getUF().replaceAllUsesWith(Plan.getConstantInt(TCTy, UF));
   });
   if (UF == 1) {
     return;

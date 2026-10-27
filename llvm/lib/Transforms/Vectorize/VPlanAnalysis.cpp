@@ -127,8 +127,9 @@ llvm::calculateRegisterUsageForPlan(VPlan &Plan, ArrayRef<ElementCount> VFs,
   // the loop (not including non-recipe values such as arguments and
   // constants).
   SmallSetVector<VPValue *, 8> LoopInvariants;
-  if (!Plan.getVectorTripCount().user_empty())
-    LoopInvariants.insert(&Plan.getVectorTripCount());
+  VPSymbolicValue &VectorTC = Plan.getVectorLoopRegion()->getVectorTripCount();
+  if (!VectorTC.user_empty())
+    LoopInvariants.insert(&VectorTC);
 
   // We scan the loop in a topological order in order and assign a number to
   // each recipe. We use RPO to ensure that defs are met before their users. We
