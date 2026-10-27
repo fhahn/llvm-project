@@ -19252,19 +19252,26 @@ bool AArch64TargetLowering::optimizeExtendOrTruncateConversion(
     // mul(zext(i8), sext) can be transformed into smull(zext, sext) which
     // performs one extend implicitly. If DstWidth is at most 4 * SrcWidth, at
     // most one extra extend step is needed and using tbl is not profitable.
-    // Similarly, bail out if partial_reduce(acc, zext(i8)) can be lowered to a
-    // udot instruction.
+    // Similarly, bail out if partial_reduce(acc, zext(i8)) or
+    // partial_reduce(acc, mul(zext(i8), zext(i8))) can be lowered to a udot
+    // instruction.
     if (SrcWidth * 4 <= DstWidth) {
+      using namespace llvm::PatternMatch;
+      auto IsPartialReduceOf = [](Value *U, Value *Op) {
+        return match(U, m_Intrinsic<Intrinsic::vector_partial_reduce_add>(
+                            m_Value(), m_Specific(Op)));
+      };
       if (all_of(I->users(), [&](auto *U) {
-            using namespace llvm::PatternMatch;
             auto *SingleUser = cast<Instruction>(&*U);
             if (match(SingleUser, m_c_Mul(m_Specific(I), m_SExt(m_Value()))))
               return true;
-            if (match(SingleUser,
-                      m_Intrinsic<Intrinsic::vector_partial_reduce_add>(
-                          m_Value(), m_Specific(I))))
+            if (IsPartialReduceOf(SingleUser, I))
               return true;
-            return false;
+            Value *Other;
+            return match(SingleUser,
+                         m_c_Mul(m_Specific(I), m_ZExt(m_Value(Other)))) &&
+                   Other->getType() == SrcTy && SingleUser->hasOneUse() &&
+                   IsPartialReduceOf(SingleUser->user_back(), SingleUser);
           }))
         return false;
     }
