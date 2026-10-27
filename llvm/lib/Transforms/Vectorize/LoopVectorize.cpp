@@ -3257,8 +3257,10 @@ std::unique_ptr<VPlan> LoopVectorizationPlanner::selectBestEpiloguePlan(
   auto GetEffectiveVF = [](VPlan &Plan, ElementCount VF) -> ElementCount {
     auto *Exiting = Plan.getVectorLoopRegion()->getExitingBasicBlock();
     if (match(&Exiting->back(),
-              m_BranchOnCount(m_Add(m_CanonicalIV(), m_Specific(&Plan.getUF())),
-                              m_VPValue())))
+              m_BranchOnCount(
+                  m_Add(m_CanonicalIV(),
+                        m_Specific(&Plan.getVectorLoopRegion()->getUF())),
+                  m_VPValue())))
       return ElementCount::get(1, VF.isScalable());
     return VF;
   };

@@ -824,6 +824,11 @@ void VPRegionBlock::dissolveToCFGLoop() {
   auto *ExitingLatch = cast<VPBasicBlock>(getExiting());
   assert(getCanonicalIV()->user_empty() &&
          "canonical IV must be materialized before dissolving");
+  assert((!LoopParams ||
+          all_of(LoopParams->getSymbolicValues(),
+                 [](VPSymbolicValue *V) { return V->user_empty(); })) &&
+         "loop parameters must be materialized before dissolving the region");
+  LoopParams.reset();
 
   VPBlockBase *Preheader = getSinglePredecessor();
   VPBlockUtils::disconnectBlocks(Preheader, this);
@@ -844,17 +849,17 @@ VPInstruction *VPRegionBlock::getOrCreateCanonicalIVIncrement() {
   if (auto *Inc = vputils::findCanonicalIVIncrement(*getPlan()))
     return Inc;
 
-  assert(!getPlan()->getVFxUF().isMaterialized() &&
+  assert(!getVFxUF().isMaterialized() &&
          "VFxUF can be used only before it is materialized.");
   auto *ExitingLatch = cast<VPBasicBlock>(getExiting());
   return VPBuilder(ExitingLatch->getTerminator())
-      .createOverflowingOp(Instruction::Add, {CanIV, &getPlan()->getVFxUF()},
+      .createOverflowingOp(Instruction::Add, {CanIV, &getVFxUF()},
                            {hasCanonicalIVNUW(), /* HasNSW */ false},
                            CanIV->getDebugLoc(), "index.next");
 }
 
 VPlan::VPlan(Loop *L, Type *IdxTy)
-    : VectorTripCount(IdxTy), VF(IdxTy), UF(IdxTy), VFxUF(IdxTy) {
+    : IdxTy(IdxTy), LoopParams(std::make_unique<VPLoopParams>(IdxTy)) {
   setEntry(createVPIRBasicBlock(L->getLoopPreheader()));
   ScalarHeader = createVPIRBasicBlock(L->getHeader());
 
@@ -1042,6 +1047,13 @@ const VPRegionBlock *VPlan::getVectorLoopRegion() const {
   return const_cast<VPlan *>(this)->getVectorLoopRegion();
 }
 
+VPLoopParams *VPlan::getCurrentLoopParams() const {
+  if (LoopParams)
+    return LoopParams.get();
+  const VPRegionBlock *LoopRegion = getVectorLoopRegion();
+  return LoopRegion ? LoopRegion->LoopParams.get() : nullptr;
+}
+
 bool VPlan::isOuterLoop() const {
   const VPRegionBlock *LoopRegion = getVectorLoopRegion();
   assert(LoopRegion && "expected a vector loop region");
@@ -1053,29 +1065,17 @@ bool VPlan::isOuterLoop() const {
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 void VPlan::printLiveIns(raw_ostream &O) const {
   VPSlotTracker SlotTracker(this);
-
-  if (!VF.user_empty()) {
-    O << "\nLive-in ";
-    VF.printAsOperand(O, SlotTracker);
-    O << " = VF";
-  }
-
-  if (!UF.user_empty()) {
-    O << "\nLive-in ";
-    UF.printAsOperand(O, SlotTracker);
-    O << " = UF";
-  }
-
-  if (!VFxUF.user_empty()) {
-    O << "\nLive-in ";
-    VFxUF.printAsOperand(O, SlotTracker);
-    O << " = VF * UF";
-  }
-
-  if (!VectorTripCount.user_empty()) {
-    O << "\nLive-in ";
-    VectorTripCount.printAsOperand(O, SlotTracker);
-    O << " = vector-trip-count";
+  static constexpr std::array<StringRef, 4> Names = {"VF", "UF", "VF * UF",
+                                                     "vector-trip-count"};
+  VPLoopParams *Params = getCurrentLoopParams();
+  if (Params) {
+    for (auto [V, Name] : zip_equal(Params->getSymbolicValues(), Names)) {
+      if (V->user_empty())
+        continue;
+      O << "\nLive-in ";
+      V->printAsOperand(O, SlotTracker);
+      O << " = " << Name;
+    }
   }
 
   O << "\n";
@@ -1218,12 +1218,16 @@ VPlan *VPlan::duplicate() {
     }
   }
 
-  // Map and propagate materialized state for symbolic values.
-  for (auto [OldSV, NewSV] :
-       {std::pair{&VectorTripCount, &NewPlan->VectorTripCount},
-        {&VF, &NewPlan->VF},
-        {&UF, &NewPlan->UF},
-        {&VFxUF, &NewPlan->VFxUF}}) {
+  // Map and propagate materialized state for symbolic values. The loop
+  // parameters are either held by the plan or by the vector loop region.
+  assert(getCurrentLoopParams() &&
+         "cannot duplicate a plan after dissolving its vector loop region");
+  VPLoopParams &OldParams = *getCurrentLoopParams();
+  if (!LoopParams)
+    NewPlan->transferLoopParams(NewPlan->getVectorLoopRegion());
+  VPLoopParams &NewParams = *NewPlan->getCurrentLoopParams();
+  for (auto [OldSV, NewSV] : zip_equal(OldParams.getSymbolicValues(),
+                                       NewParams.getSymbolicValues())) {
     Old2NewVPValues[OldSV] = NewSV;
     if (OldSV->isMaterialized())
       NewSV->markMaterialized();
@@ -1518,13 +1522,10 @@ void VPSlotTracker::assignName(const VPValue *V) {
 }
 
 void VPSlotTracker::assignNames(const VPlan &Plan) {
-  if (!Plan.VF.user_empty())
-    assignName(&Plan.VF);
-  if (!Plan.UF.user_empty())
-    assignName(&Plan.UF);
-  if (!Plan.VFxUF.user_empty())
-    assignName(&Plan.VFxUF);
-  assignName(&Plan.VectorTripCount);
+  if (VPLoopParams *Params = Plan.getCurrentLoopParams())
+    for (VPSymbolicValue *V : Params->getSymbolicValues())
+      if (!V->user_empty() || V == &Params->getVectorTripCount())
+        assignName(V);
   for (VPValue *LI : Plan.getLiveIns())
     assignName(LI);
 

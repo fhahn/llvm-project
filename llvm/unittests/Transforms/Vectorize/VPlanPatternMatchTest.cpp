@@ -27,12 +27,13 @@ TEST_F(VPPatternMatchTest, ScalarIVSteps) {
   IntegerType *I64Ty = IntegerType::get(C, 64);
   VPRegionBlock *VPR =
       Plan.createLoopRegion(I64Ty, DebugLoc::getCompilerGenerated());
+  Plan.transferLoopParams(VPR);
   VPValue *CanIV = VPR->getCanonicalIV();
   VPBasicBlock *VPBB = Plan.createVPBasicBlock("");
   VPBuilder Builder(VPBB);
 
   VPValue *Inc = Plan.getOrAddLiveIn(ConstantInt::get(I64Ty, 1));
-  VPValue *VF = &Plan.getVF();
+  VPValue *VF = &VPR->getVF();
   VPValue *Steps = Builder.createScalarIVSteps(Instruction::Add, nullptr, CanIV,
                                                Inc, VF, DebugLoc());
 

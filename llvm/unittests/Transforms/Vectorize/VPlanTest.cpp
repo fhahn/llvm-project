@@ -2246,6 +2246,7 @@ TEST_F(VPBasicBlockTest, VPRegionBlockCloneSyncsCanonicalIVNUW) {
 
   VPRegionBlock *Region = Plan.createLoopRegion(Type::getInt64Ty(C), DebugLoc(),
                                                 "loop", Header, Latch);
+  Plan.transferLoopParams(Region);
   VPBlockUtils::connectBlocks(Header, Latch);
   VPBlockUtils::connectBlocks(Preheader, Region);
   VPBlockUtils::connectBlocks(Region, Plan.getScalarHeader());
