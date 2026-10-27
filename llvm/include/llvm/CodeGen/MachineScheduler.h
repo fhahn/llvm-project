@@ -982,6 +982,9 @@ private:
   // Is the scheduled region resource limited vs. latency limited.
   bool IsResourceLimited;
 
+  // Whether any instance in ReservedCycles has been reserved in this zone.
+  bool HasReservedCycles;
+
 public:
 private:
   /// Record how resources have been allocated across the cycles of

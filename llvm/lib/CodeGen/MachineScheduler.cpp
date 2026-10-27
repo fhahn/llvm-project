@@ -2817,6 +2817,7 @@ void SchedBoundary::reset() {
   MaxExecutedResCount = 0;
   ZoneCritResIdx = 0;
   IsResourceLimited = false;
+  HasReservedCycles = false;
   ReservedCycles.clear();
   ReservedResourceSegments.clear();
   ReservedCyclesIndex.clear();
@@ -3234,6 +3235,11 @@ unsigned SchedBoundary::countResource(const MCSchedClassDesc *SC, unsigned PIdx,
                       << getResourceCount(PIdx) / SchedModel->getLatencyFactor()
                       << "c\n");
   }
+  // Without any reserved cycles, every resource is available now.
+  if (!HasReservedCycles && !SchedModel->enableIntervals() &&
+      !MischedDetailResourceBooking)
+    return CurrCycle;
+
   // For reserved resources, record the highest cycle using the resource.
   unsigned NextAvailable, InstanceIdx;
   std::tie(NextAvailable, InstanceIdx) =
@@ -3347,6 +3353,7 @@ void SchedBoundary::bumpNode(SUnit *SU) {
                   std::max(ReservedUntil, NextCycle + PI->ReleaseAtCycle);
             } else
               ReservedCycles[InstanceIdx] = NextCycle;
+            HasReservedCycles = true;
           }
         }
       }
