@@ -16169,8 +16169,35 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
 
   // Now that all rewrite information is collect, rewrite the collected
   // expressions with the information in the map. This applies information to
-  // sub-expressions.
+  // sub-expressions. Rewrite each expression after the collected expressions
+  // whose rewrites its rewrite uses, so it picks up their final form. If there
+  // is a cycle or a long dependency chain, keep the collection order for all
+  // of them.
   if (ExprsToRewrite.size() > 1) {
+    constexpr unsigned MaxDepth = 16;
+    SmallPtrSet<const SCEV *, 16> ToVisit(llvm::from_range, ExprsToRewrite);
+    SmallPtrSet<const SCEV *, MaxDepth> InProgress;
+    SmallVector<SCEVUse> Order;
+    // Returns false on a cycle or if the chain is longer than MaxDepth.
+    std::function<bool(const SCEV *)> Visit = [&](const SCEV *Expr) {
+      if (!ToVisit.erase(Expr))
+        return !InProgress.contains(Expr);
+      if (InProgress.size() >= MaxDepth)
+        return false;
+      InProgress.insert(Expr);
+      const SCEV *RewriteTo = Guards.RewriteMap[Expr];
+      Guards.RewriteMap.erase(Expr);
+      SmallVector<const SCEV *> UsedKeys;
+      Guards.rewrite(RewriteTo, &UsedKeys);
+      Guards.RewriteMap[Expr] = RewriteTo;
+      if (!all_of(UsedKeys, Visit))
+        return false;
+      InProgress.erase(Expr);
+      Order.push_back(Expr);
+      return true;
+    };
+    if (all_of(ExprsToRewrite, Visit))
+      ExprsToRewrite = std::move(Order);
     for (const SCEV *Expr : ExprsToRewrite) {
       const SCEV *RewriteTo = Guards.RewriteMap[Expr];
       Guards.RewriteMap.erase(Expr);
@@ -16179,7 +16206,8 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   }
 }
 
-const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
+const SCEV *ScalarEvolution::LoopGuards::rewrite(
+    const SCEV *Expr, SmallVectorImpl<const SCEV *> *UsedKeys) const {
   /// A rewriter to replace SCEV expressions in Map with the corresponding entry
   /// in the map. It skips AddRecExpr because we cannot guarantee that the
   /// replacement is loop invariant in the loop of the AddRec.
@@ -16187,14 +16215,23 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
       : public SCEVRewriteVisitor<SCEVLoopGuardRewriter> {
     const DenseMap<const SCEV *, const SCEV *> &Map;
     const SmallDenseSet<std::pair<const SCEV *, const SCEV *>> &NotEqual;
+    SmallVectorImpl<const SCEV *> *UsedKeys;
 
     SCEVFlags FlagMask = SCEV::FlagNone;
 
+    const SCEV *lookup(const SCEV *Key) {
+      const SCEV *S = Map.lookup(Key);
+      if (S && UsedKeys)
+        UsedKeys->push_back(Key);
+      return S;
+    }
+
   public:
     SCEVLoopGuardRewriter(ScalarEvolution &SE,
-                          const ScalarEvolution::LoopGuards &Guards)
+                          const ScalarEvolution::LoopGuards &Guards,
+                          SmallVectorImpl<const SCEV *> *UsedKeys)
         : SCEVRewriteVisitor(SE), Map(Guards.RewriteMap),
-          NotEqual(Guards.NotEqual) {
+          NotEqual(Guards.NotEqual), UsedKeys(UsedKeys) {
       if (Guards.PreserveNUW)
         FlagMask = ScalarEvolution::setFlags(FlagMask, SCEV::FlagNUW);
       if (Guards.PreserveNSW)
@@ -16204,18 +16241,19 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
     const SCEV *visitAddRecExpr(const SCEVAddRecExpr *Expr) { return Expr; }
 
     const SCEV *visitUnknown(const SCEVUnknown *Expr) {
-      return Map.lookup_or(Expr, Expr);
+      const SCEV *S = lookup(Expr);
+      return S ? S : Expr;
     }
 
     const SCEV *visitPtrToAddrExpr(const SCEVPtrToAddrExpr *Expr) {
-      if (const SCEV *S = Map.lookup(Expr))
+      if (const SCEV *S = lookup(Expr))
         return S;
       return SCEVRewriteVisitor<SCEVLoopGuardRewriter>::visitPtrToAddrExpr(
           Expr);
     }
 
     const SCEV *visitZeroExtendExpr(const SCEVZeroExtendExpr *Expr) {
-      if (const SCEV *S = Map.lookup(Expr))
+      if (const SCEV *S = lookup(Expr))
         return S;
 
       // If we didn't find the extact ZExt expr in the map, check if there's
@@ -16237,26 +16275,26 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
     }
 
     const SCEV *visitSignExtendExpr(const SCEVSignExtendExpr *Expr) {
-      if (const SCEV *S = Map.lookup(Expr))
+      if (const SCEV *S = lookup(Expr))
         return S;
       return SCEVRewriteVisitor<SCEVLoopGuardRewriter>::visitSignExtendExpr(
           Expr);
     }
 
     const SCEV *visitUMinExpr(const SCEVUMinExpr *Expr) {
-      if (const SCEV *S = Map.lookup(Expr))
+      if (const SCEV *S = lookup(Expr))
         return S;
       return SCEVRewriteVisitor<SCEVLoopGuardRewriter>::visitUMinExpr(Expr);
     }
 
     const SCEV *visitSMinExpr(const SCEVSMinExpr *Expr) {
-      if (const SCEV *S = Map.lookup(Expr))
+      if (const SCEV *S = lookup(Expr))
         return S;
       return SCEVRewriteVisitor<SCEVLoopGuardRewriter>::visitSMinExpr(Expr);
     }
 
     const SCEV *visitAddExpr(const SCEVAddExpr *Expr) {
-      if (const SCEV *S = Map.lookup(Expr))
+      if (const SCEV *S = lookup(Expr))
         return S;
 
       // Helper to check if S is a subtraction (A - B) where A != B, and if so,
@@ -16291,7 +16329,7 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
             return SE.getAddExpr(
                 Expr->getOperand(0), Rewritten,
                 ScalarEvolution::maskFlags(Expr->getNoWrapFlags(), FlagMask));
-          if (const SCEV *S = Map.lookup(Add))
+          if (const SCEV *S = lookup(Add))
             return SE.getAddExpr(Expr->getOperand(0), S);
         }
 
@@ -16303,11 +16341,11 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
           const SCEV *S = nullptr;
           // Handle (-1 + 1 + A) without constructing SCEVs.
           if (match(Expr->getOperand(0), m_scev_AllOnes())) {
-            S = Map.lookup(Expr->getOperand(1));
+            S = lookup(Expr->getOperand(1));
           } else {
             const SCEV *NewC =
                 SE.getAddExpr(Expr->getOperand(0), SE.getOne(Expr->getType()));
-            S = Map.lookup(SE.getAddExpr(NewC, Expr->getOperand(1)));
+            S = lookup(SE.getAddExpr(NewC, Expr->getOperand(1)));
           }
           if (S)
             return SE.getAddExpr(S, SE.getMinusOne(Expr->getType()));
@@ -16348,7 +16386,7 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
   if (RewriteMap.empty() && NotEqual.empty())
     return Expr;
 
-  SCEVLoopGuardRewriter Rewriter(SE, *this);
+  SCEVLoopGuardRewriter Rewriter(SE, *this, UsedKeys);
   return Rewriter.visit(Expr);
 }
 
