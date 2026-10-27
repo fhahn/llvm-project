@@ -8508,6 +8508,10 @@ bool TBAAVerifier::visitTBAAMetadata(const Instruction *I, const MDNode *MD) {
                   isa<AtomicCmpXchgInst>(I),
               "This instruction shall not have a TBAA access tag!", I);
 
+  // The remaining checks only depend on the tag.
+  if (VerifiedAccessTags.contains(MD))
+    return true;
+
   bool IsStructPathTBAA =
       isa<MDNode>(MD->getOperand(0)) && MD->getNumOperands() >= 3;
 
@@ -8607,6 +8611,8 @@ bool TBAAVerifier::visitTBAAMetadata(const Instruction *I, const MDNode *MD) {
 
   CheckTBAA(SeenAccessTypeInPath, "Did not see access type in access path!", I,
             MD);
+  if (!Diagnostic || !Diagnostic->Broken)
+    VerifiedAccessTags.insert(MD);
   return true;
 }
 
