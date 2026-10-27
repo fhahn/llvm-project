@@ -94,8 +94,8 @@ define i32 @reduction(ptr %a, i64 %n, i32 %start) {
 ; IF-EVL-OUTLOOP-NEXT:      WIDEN ir<%add> = add ir<%0>, ir<%rdx>
 ; IF-EVL-OUTLOOP-NEXT:      WIDEN-INTRINSIC vp<[[VP9]]> = call llvm.vp.merge(ir<true>, ir<%add>, ir<%rdx>, vp<%evl>)
 ; IF-EVL-OUTLOOP-NEXT:      EMIT-SCALAR vp<[[VP10:%[0-9]+]]> = zext vp<%evl> to i64
-; IF-EVL-OUTLOOP-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP10]]>, vp<[[VP5]]>
-; IF-EVL-OUTLOOP-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP10]]>
+; IF-EVL-OUTLOOP-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add vp<[[VP10]]>, vp<[[VP5]]>
+; IF-EVL-OUTLOOP-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP10]]>
 ; IF-EVL-OUTLOOP-NEXT:      EMIT vp<%index.next> = add vp<[[VP3]]>, vp<[[VP0]]>
 ; IF-EVL-OUTLOOP-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; IF-EVL-OUTLOOP-NEXT:    No successors
@@ -140,8 +140,8 @@ define i32 @reduction(ptr %a, i64 %n, i32 %start) {
 ; IF-EVL-INLOOP-NEXT:      WIDEN ir<%0> = vp.load vp<[[VP8]]>, vp<%evl>
 ; IF-EVL-INLOOP-NEXT:      REDUCE ir<%add> = ir<%rdx> +  vp.reduce.add (ir<%0>, vp<%evl>)
 ; IF-EVL-INLOOP-NEXT:      EMIT-SCALAR vp<[[VP9:%[0-9]+]]> = zext vp<%evl> to i64
-; IF-EVL-INLOOP-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP9]]>, vp<[[VP5]]>
-; IF-EVL-INLOOP-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP9]]>
+; IF-EVL-INLOOP-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add vp<[[VP9]]>, vp<[[VP5]]>
+; IF-EVL-INLOOP-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP9]]>
 ; IF-EVL-INLOOP-NEXT:      EMIT vp<%index.next> = add vp<[[VP3]]>, vp<[[VP0]]>
 ; IF-EVL-INLOOP-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; IF-EVL-INLOOP-NEXT:    No successors

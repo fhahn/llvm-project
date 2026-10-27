@@ -13,6 +13,7 @@
 #include "VPlanDominatorTree.h"
 #include "VPlanPatternMatch.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -962,6 +963,11 @@ VPValue *VPSCEVExpander::expandAsPtrAdd(const SCEVNAryExpr *S) {
 VPValue *VPSCEVExpander::expand(const SCEV *S) {
   if (VPValue *V = tryToReuseIRValue(S))
     return V;
+
+  // Expanded SCEVs are single scalars.
+  bool CreateSingleScalars = Builder.setCreateSingleScalars();
+  scope_exit Restore{
+      [&]() { Builder.setCreateSingleScalars(CreateSingleScalars); }};
 
   switch (S->getSCEVType()) {
   case scConstant:

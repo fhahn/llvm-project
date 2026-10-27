@@ -42,8 +42,8 @@ define void @foo(ptr noalias %a, ptr noalias %b, ptr noalias %c, i64 %N) {
 ; IF-EVL-NEXT:      vp<[[VP9:%[0-9]+]]> = vector-pointer inbounds i32, ir<%arrayidx4>, ir<1>
 ; IF-EVL-NEXT:      WIDEN vp.store vp<[[VP9]]>, ir<%add>, vp<%evl>
 ; IF-EVL-NEXT:      EMIT-SCALAR vp<[[VP10:%[0-9]+]]> = zext vp<%evl> to i64
-; IF-EVL-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP10]]>, vp<[[VP4]]>
-; IF-EVL-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP10]]>
+; IF-EVL-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add vp<[[VP10]]>, vp<[[VP4]]>
+; IF-EVL-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP10]]>
 ; IF-EVL-NEXT:      EMIT vp<%index.next> = add vp<[[VP2]]>, vp<[[VP0]]>
 ; IF-EVL-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; IF-EVL-NEXT:    No successors

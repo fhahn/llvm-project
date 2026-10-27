@@ -12,7 +12,7 @@ define void @scev_ptradd_strided(ptr noalias %a, ptr noalias %dst, i64 %n) {
 ; CHECK-NEXT:  Successor(s): vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = ptradd nuw ir<%a>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = ptradd nuw ir<%a>, ir<4>
 ; CHECK-NEXT:  Successor(s): vector.body
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.body:
@@ -25,9 +25,9 @@ define void @scev_ptradd_strided(ptr noalias %a, ptr noalias %dst, i64 %n) {
 ; CHECK-NEXT:    CLONE ir<%gd> = getelementptr inbounds ir<%dst>, vp<%index>
 ; CHECK-NEXT:    WIDEN vp.store ir<%gd>, vp<[[VP5]]>, vp<%evl>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP6:%[0-9]+]]> = zext vp<%evl> to i64
-; CHECK-NEXT:    EMIT vp<%current.iteration.next> = add vp<[[VP6]]>, vp<%index>
-; CHECK-NEXT:    EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP6]]>
-; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = icmp eq vp<%avl.next>, ir<0>
+; CHECK-NEXT:    EMIT-SCALAR vp<%current.iteration.next> = add vp<[[VP6]]>, vp<%index>
+; CHECK-NEXT:    EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP6]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP7:%[0-9]+]]> = icmp eq vp<%avl.next>, ir<0>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP7]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ; CHECK-EMPTY:
@@ -64,9 +64,9 @@ define void @scev_ptradd_strided_var_offset(ptr noalias %a, ptr noalias %dst, i6
 ; CHECK-NEXT:  Successor(s): vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = shl ir<%m>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = add nuw nsw vp<[[VP2]]>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = ptradd ir<%a>, vp<[[VP3]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = shl ir<%m>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = add nuw nsw vp<[[VP2]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = ptradd ir<%a>, vp<[[VP3]]>
 ; CHECK-NEXT:  Successor(s): vector.body
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.body:
@@ -79,9 +79,9 @@ define void @scev_ptradd_strided_var_offset(ptr noalias %a, ptr noalias %dst, i6
 ; CHECK-NEXT:    CLONE ir<%gd> = getelementptr inbounds ir<%dst>, vp<%index>
 ; CHECK-NEXT:    WIDEN vp.store ir<%gd>, vp<[[VP7]]>, vp<%evl>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = zext vp<%evl> to i64
-; CHECK-NEXT:    EMIT vp<%current.iteration.next> = add vp<[[VP8]]>, vp<%index>
-; CHECK-NEXT:    EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP8]]>
-; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = icmp eq vp<%avl.next>, ir<0>
+; CHECK-NEXT:    EMIT-SCALAR vp<%current.iteration.next> = add vp<[[VP8]]>, vp<%index>
+; CHECK-NEXT:    EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP8]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP9:%[0-9]+]]> = icmp eq vp<%avl.next>, ir<0>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP9]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ; CHECK-EMPTY:

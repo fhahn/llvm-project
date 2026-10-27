@@ -33,8 +33,8 @@ define i32 @vdota4(ptr %a, ptr %b) vscale_range(2, 1024) {
 ; CHECK-NEXT:      WIDEN ir<%load.b> = vp.load vp<[[VP9]]>, vp<%evl>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP10]]> = ir<%accum> + partial.reduce.add (mul (ir<%load.b> zext to i32), (ir<%load.a> sext to i32), vp<%evl>)
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP11:%[0-9]+]]> = zext vp<%evl> to i64
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add nuw vp<[[VP11]]>, vp<[[VP5]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP11]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add nuw vp<[[VP11]]>, vp<[[VP5]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP11]]>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors

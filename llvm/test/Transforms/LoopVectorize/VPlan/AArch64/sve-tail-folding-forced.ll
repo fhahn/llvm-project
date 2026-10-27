@@ -35,7 +35,7 @@ target triple = "aarch64-unknown-linux-gnu"
 ; VPLANS-NEXT:     EMIT vp<[[INDV_UPDATE:%.+]]> = add vp<[[INDV]]>, vp<[[VFxUF]]>
 ; VPLANS-NEXT:     EMIT vp<[[LANEMASK_LOOP_MASK:%.+]]> = wide active lane mask vp<[[INDV]]>, vp<[[TRIP_COUNT_MINUS_VF]]>, ir<1>
 ; VPLANS-NEXT:     EMIT vp<[[LANEMASK_LOOP]]> = extract-vector-for-part vp<[[LANEMASK_LOOP_MASK]]>, ir<0>
-; VPLANS-NEXT:     EMIT vp<[[NOT:%[0-9]+]]> = not vp<[[LANEMASK_LOOP]]>
+; VPLANS-NEXT:     EMIT-SCALAR vp<[[NOT:%[0-9]+]]> = not vp<[[LANEMASK_LOOP]]>
 ; VPLANS-NEXT:     EMIT branch-on-cond vp<[[NOT]]>
 ; VPLANS-NEXT:   No successors
 ; VPLANS-NEXT: }

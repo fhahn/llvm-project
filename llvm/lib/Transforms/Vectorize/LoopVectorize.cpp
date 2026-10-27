@@ -6991,6 +6991,7 @@ static MainPlanResumeMarkers preparePlanForMainVectorLoop(VPlan &MainPlan) {
   // used to compute the reduction result after the epilogue vector loop. The
   // epilogue plan re-uses the frozen values.
   VPBuilder Builder(MainPlan.getEntry());
+  Builder.setCreateSingleScalars();
   for (VPInstruction &VPI :
        make_isa_range<VPInstruction>(*MainPlan.getMiddleBlock())) {
     VPValue *OrigStart;
@@ -7137,6 +7138,7 @@ static void preparePlanForEpilogueVectorLoop(
 
   // Resume values must be created in the vector preheader.
   VPBuilder PHBuilder(VectorPH, VectorPH->getFirstNonPhi());
+  PHBuilder.setCreateSingleScalars();
 
   // Ensure that the start values for all header phi recipes are updated before
   // vectorizing the epilogue loop.

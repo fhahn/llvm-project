@@ -192,7 +192,9 @@ addVPLaneMaskPhiAndUpdateExitBranch(VPlan &Plan) {
   LaneMaskPhi->addBackedgeValue(ALM);
 
   // Replace the original terminator with BranchOnCond. We have to invert the
-  // mask here because a true condition means jumping to the exit block.
+  // mask here because a true condition means jumping to the exit block. The
+  // branch only uses the first lane.
+  Builder.setCreateSingleScalars();
   auto *NotMask = Builder.createNot(ALM, DL);
   Builder.createNaryOp(VPInstruction::BranchOnCond, {NotMask}, DL);
   OriginalTerminator->eraseFromParent();
@@ -333,7 +335,9 @@ expandVPWidenIntOrFpInduction(VPWidenIntOrFpInductionRecipe *WidenIVR) {
     else
       VF = Builder.createScalarZExtOrTrunc(VF, StepTy, DL);
 
+    Builder.setCreateSingleScalars();
     Inc = Builder.createNaryOp(MulOp, {Step, VF}, Flags);
+    Builder.setCreateSingleScalars(false);
     Inc = Builder.createNaryOp(VPInstruction::Broadcast, Inc);
     Prev = WidePHI;
   }
@@ -401,6 +405,7 @@ static void expandVPWidenPointerInduction(VPWidenPointerInductionRecipe *R) {
   // Create the backedge value for the scalar pointer phi.
   VPBasicBlock *ExitingBB = Plan->getVectorLoopRegion()->getExitingBasicBlock();
   Builder.setInsertPoint(ExitingBB, ExitingBB->getTerminator()->getIterator());
+  Builder.setCreateSingleScalars();
   VF = Builder.createScalarZExtOrTrunc(VF, StepTy, DL);
   VPValue *Inc = Builder.createOverflowingOp(Instruction::Mul, {Step, VF});
 
@@ -412,6 +417,7 @@ static void expandVPWidenPointerInduction(VPWidenPointerInductionRecipe *R) {
 /// Expand a VPDerivedIVRecipe into executable recipes.
 static void expandVPDerivedIV(VPDerivedIVRecipe *R) {
   VPBuilder Builder(R);
+  Builder.setCreateSingleScalars();
   VPValue *Start = R->getStartValue();
   VPValue *Step = R->getStepValue();
   VPValue *Index = R->getIndex();
@@ -504,6 +510,7 @@ void VPlanTransforms::expandBranchOnTwoConds(VPlan &Plan) {
     // two conditions and plant a single conditional branch.
     if (Succ0 == Succ1) {
       VPBuilder Builder(Br);
+      Builder.setCreateSingleScalars();
       VPValue *Combined = Builder.createOr(Cond0, Cond1, DL);
       Builder.createNaryOp(VPInstruction::BranchOnCond, {Combined}, DL);
       VPBlockUtils::connectBlocks(BrOnTwoCondsBB, Succ0);
@@ -593,6 +600,7 @@ void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
       // Expand VPBlendRecipe into VPInstruction::Select.
       if (auto *Blend = dyn_cast<VPBlendRecipe>(&R)) {
         VPValue *Select = Blend->getIncomingValue(0);
+        Builder.setCreateSingleScalars(vputils::onlyFirstLaneUsed(Blend));
         for (unsigned I = 1; I != Blend->getNumIncomingValues(); ++I)
           Select = Builder.createSelect(Blend->getMask(I),
                                         Blend->getIncomingValue(I), Select,
@@ -635,6 +643,7 @@ void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
         // Subtract 1 to get the last active lane.
         VPValue *One =
             Plan.getConstantInt(FirstInactiveLane->getScalarType(), 1);
+        Builder.setCreateSingleScalars();
         VPValue *LastLane =
             Builder.createSub(FirstInactiveLane, One,
                               LastActiveL->getDebugLoc(), "last.active.lane");
@@ -673,6 +682,7 @@ void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
       if (match(&R, m_BranchOnCount(m_VPValue(IV), m_VPValue(TC)))) {
         auto *BranchOnCountInst = cast<VPInstruction>(&R);
         DebugLoc DL = BranchOnCountInst->getDebugLoc();
+        Builder.setCreateSingleScalars();
         VPValue *Cond = Builder.createICmp(CmpInst::ICMP_EQ, IV, TC, DL);
         Builder.createNaryOp(VPInstruction::BranchOnCond, Cond, DL);
         BranchOnCountInst->eraseFromParent();
@@ -802,6 +812,7 @@ void VPlanTransforms::materializeBackedgeTakenCount(VPlan &Plan,
     return;
 
   VPBuilder Builder(VectorPH, VectorPH->getFirstNonPhi());
+  Builder.setCreateSingleScalars();
   auto *TCTy = Plan.getTripCount()->getScalarType();
   auto *TCMO =
       Builder.createSub(Plan.getTripCount(), Plan.getConstantInt(TCTy, 1),
@@ -872,6 +883,7 @@ void VPlanTransforms::materializeVectorTripCount(
     InsertPt = std::next(StepR->getIterator());
   }
   VPBuilder Builder(VectorPHVPBB, InsertPt);
+  Builder.setCreateSingleScalars();
 
   // For scalable steps, if TC is a constant and is divisible by the maximum
   // possible runtime step, then TC % Step == 0 for all valid vscale values
@@ -934,6 +946,7 @@ void VPlanTransforms::materializeFactors(VPlan &Plan, VPBasicBlock *VectorPH,
   }
 
   VPBuilder Builder(VectorPH, VectorPH->getFirstNonPhi());
+  Builder.setCreateSingleScalars();
   Type *TCTy = Plan.getTripCount()->getScalarType();
   VPValue &VF = Plan.getVF();
   VPValue &VFxUF = Plan.getVFxUF();
@@ -978,8 +991,10 @@ VPlanTransforms::materializeAliasMask(VPlan &Plan, VPBasicBlock *AliasCheckVPBB,
 
     // TODO: Only freeze the required pointer (not both src and sink).
     if (Check.NeedsFreeze) {
+      Builder.setCreateSingleScalars();
       Src = Builder.createFreeze(Src);
       Sink = Builder.createFreeze(Sink);
+      Builder.setCreateSingleScalars(false);
     }
 
     // TODO: Generate loop_dependence_raw_mask when there's a read-after-write
@@ -1016,6 +1031,7 @@ void VPlanTransforms::materializeAliasMaskCheckBlock(
 
   VPValue *ClampedVF = materializeAliasMask(Plan, ClampedVFCheck, DiffChecks);
   VPBuilder Builder(ClampedVFCheck);
+  Builder.setCreateSingleScalars();
   DebugLoc DL = DebugLoc::getCompilerGenerated();
   Type *TCTy = Plan.getTripCount()->getScalarType();
 

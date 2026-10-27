@@ -9,15 +9,15 @@ define void @scalar_intrinsic_print(i64 %x, ptr %p) {
 ; CHECK-NEXT:  Live-in ir<128> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = call i64 @llvm.vscale(){{$}}
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = shl nuw vp<[[VP2]]>, ir<2>
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<128>, vp<[[VP3]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = call i64 @llvm.vscale()
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = shl nuw vp<[[VP2]]>, ir<2>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult ir<128>, vp<[[VP3]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:    EMIT vp<%n.mod.vf> = urem ir<128>, vp<[[VP3]]>
-; CHECK-NEXT:    EMIT vp<%n.vec> = sub ir<128>, vp<%n.mod.vf>
+; CHECK-NEXT:    EMIT-SCALAR vp<%n.mod.vf> = urem ir<128>, vp<[[VP3]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%n.vec> = sub ir<128>, vp<%n.mod.vf>
 ; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = broadcast ir<%x>
 ; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = step-vector i64
 ; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = broadcast vp<[[VP3]]>
@@ -28,7 +28,7 @@ define void @scalar_intrinsic_print(i64 %x, ptr %p) {
 ; CHECK-NEXT:    WIDEN-PHI vp<[[VP8:%[0-9]+]]> = phi [ vp<[[VP6]]>, vector.ph ], [ vp<%vec.ind.next>, vector.body ]
 ; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, vp<[[VP3]]>
 ; CHECK-NEXT:    EMIT vp<%vec.ind.next> = add nuw nsw vp<[[VP8]]>, vp<[[VP7]]>
-; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP9:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP9]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ; CHECK-EMPTY:

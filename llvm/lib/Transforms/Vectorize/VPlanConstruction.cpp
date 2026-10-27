@@ -1667,6 +1667,7 @@ void VPlanTransforms::attachMemoryChecks(
 
   auto *MemCheckVPBB = Plan.createVPBasicBlock("vector.memcheck");
   VPBuilder Builder(MemCheckVPBB);
+  Builder.setCreateSingleScalars();
   VPSCEVExpander Expander(Builder, SE, DL);
   auto DiffChecks = RtPtrChecking.getDiffChecks();
   VPValue *Cond = DiffChecks
@@ -1709,6 +1710,7 @@ void VPlanTransforms::addMinimumIterationCheck(
   };
 
   VPBuilder Builder(CheckBlock);
+  Builder.setCreateSingleScalars();
   VPValue *TripCountCheck = Plan.getFalse();
   const SCEV *Step = GetMinTripCount();
   // TripCountCheck = false, folding tail implies positive vector trip
@@ -1761,6 +1763,7 @@ void VPlanTransforms::addMinimumVectorEpilogueIterationCheck(
   // Add the minimum iteration check for the epilogue vector loop.
   VPValue *TC = Plan.getTripCount();
   VPBuilder Builder(cast<VPBasicBlock>(Plan.getEntry()));
+  Builder.setCreateSingleScalars();
   VPValue *VFxUF = Builder.createExpandSCEV(
       SE.getElementCount(TC->getScalarType(), EpilogueVF, SCEV::FlagNUW));
   Builder.setInsertPoint(

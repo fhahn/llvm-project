@@ -41,8 +41,8 @@ define void @vector_reverse_i64(ptr nocapture noundef writeonly %A, ptr nocaptur
 ; CHECK-NEXT:      CLONE ir<%arrayidx3> = getelementptr inbounds ir<%A>, ir<%idxprom>
 ; CHECK-NEXT:      vp<[[VP9:%[0-9]+]]> = vector-end-pointer i32, ir<%arrayidx3>, vp<%evl>
 ; CHECK-NEXT:      WIDEN vp.store vp<[[VP9]]>, ir<%add9>, vp<%evl>
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<%evl>, vp<[[VP5]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<%evl>
+; CHECK-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add vp<%evl>, vp<[[VP5]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<%evl>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP3]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors

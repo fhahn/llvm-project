@@ -195,7 +195,8 @@ static VPRecipeBase *optimizeMaskToEVL(VPValue *HeaderMask,
     VPValue *ZExt = VPBuilder(&CurRecipe).createScalarZExtOrTrunc(&EVL, Ty, DL);
     return new VPInstruction(
         Instruction::Sub, {ZExt, Plan->getConstantInt(Ty, 1)},
-        VPIRFlags::getDefaultFlags(Instruction::Sub), {}, DL);
+        VPIRFlags::getDefaultFlags(Instruction::Sub), {}, DL, "",
+        /*ResultTy=*/nullptr, /*GeneratesSingleScalar=*/true);
   }
 
   // lhs | (headermask && rhs) -> vp.merge rhs, true, lhs, evl
@@ -514,6 +515,7 @@ void VPlanTransforms::addExplicitVectorLength(
       new VPCurrentIterationPHIRecipe(StartV, DebugLoc::getUnknown());
   CurrentIteration->insertBefore(*Header, Header->begin());
   VPBuilder Builder(Header, Header->getFirstNonPhi());
+  Builder.setCreateSingleScalars();
   // Create the AVL (application vector length), starting from TC -> 0 in steps
   // of EVL.
   VPPhi *AVLPhi = Builder.createScalarPhi(
@@ -646,6 +648,7 @@ void VPlanTransforms::convertEVLExitCond(VPlan &Plan) {
 
   Type *AVLTy = AVLNext->getScalarType();
   VPBuilder Builder(LatchBr);
+  Builder.setCreateSingleScalars();
   LatchBr->setOperand(
       0, Builder.createICmp(CmpInst::ICMP_EQ, AVLNext, Plan.getZero(AVLTy)));
 }

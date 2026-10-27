@@ -1798,6 +1798,12 @@ void VPlanTransforms::combineRecipes(VPlan &Plan) {
            "Worklist is growing large, possible cycle?");
     VPSingleDefRecipe *Def = Worklist.pop_back_val();
     Builder.setInsertPoint(Def);
+    // Recipes replacing Def produce a single scalar if Def does.
+    auto *DefVPI = dyn_cast<VPInstruction>(Def);
+    auto *DefRepR = dyn_cast<VPReplicateRecipe>(Def);
+    Builder.setCreateSingleScalars(
+        (DefVPI && DefVPI->doesGenerateSingleScalar()) ||
+        (DefRepR && DefRepR->isSingleScalar()));
     VPSingleDefRecipe *New = combineRecipe(Plan, Def, Builder);
     if (!New)
       continue;
@@ -1914,6 +1920,7 @@ static void narrowToSingleScalarRecipes(VPlan &Plan) {
         if (!Opc)
           continue;
         VPBuilder Builder(IntrR);
+        Builder.setCreateSingleScalars();
         VPValue *SafeDivisor = Builder.createSelect(
             IntrR->getOperand(2), IntrR->getOperand(1),
             Plan.getConstantInt(IntrR->getScalarType(), 1));
@@ -4269,6 +4276,7 @@ void VPlanTransforms::sinkPredicatedStores(VPlan &Plan,
     VPBuilder Builder(InsertBB, LastStore->getIterator());
 
     bool IsSingleScalar = Group[0]->isSingleScalar();
+    Builder.setCreateSingleScalars(IsSingleScalar);
     for (unsigned I = 1; I < Group.size(); ++I) {
       assert(IsSingleScalar == Group[I]->isSingleScalar() &&
              "all members in group must agree on IsSingleScalar");

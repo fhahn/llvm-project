@@ -197,7 +197,7 @@ define void @predicated_block(ptr noalias %a, ptr noalias %idx) {
 ; DISSOLVE-EMPTY:
 ; DISSOLVE-NEXT:  pred.store.continue:
 ; DISSOLVE-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, vp<[[VP0]]>
-; DISSOLVE-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; DISSOLVE-NEXT:    EMIT-SCALAR vp<[[VP9:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; DISSOLVE-NEXT:    EMIT branch-on-cond vp<[[VP9]]>
 ; DISSOLVE-NEXT:  Successor(s): middle.block, vector.body
 ; DISSOLVE-EMPTY:
@@ -350,7 +350,7 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ; DISSOLVE-NEXT:  Live-in ir<%n> = original trip-count
 ; DISSOLVE-EMPTY:
 ; DISSOLVE-NEXT:  ir-bb<entry>:
-; DISSOLVE-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%n>, ir<2>
+; DISSOLVE-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult ir<%n>, ir<2>
 ; DISSOLVE-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; DISSOLVE-NEXT:  Successor(s): scalar.ph, vector.ph
 ; DISSOLVE-EMPTY:
@@ -368,7 +368,7 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ; DISSOLVE-NEXT:    CLONE ir<%gep.b> = getelementptr inbounds ir<%b>, vp<%index>
 ; DISSOLVE-NEXT:    WIDEN store ir<%gep.b>, ir<%sel.uniform>
 ; DISSOLVE-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, vp<[[VP0]]>
-; DISSOLVE-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP1]]>
+; DISSOLVE-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP1]]>
 ; DISSOLVE-NEXT:    EMIT branch-on-cond vp<[[VP3]]>
 ; DISSOLVE-NEXT:  Successor(s): middle.block, vector.body
 ; DISSOLVE-EMPTY:

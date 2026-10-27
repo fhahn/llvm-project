@@ -202,7 +202,7 @@ define void @fpiv_wideivstep_flags(float %init, ptr %p, i64 %n) {
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%n>, ir<8>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult ir<%n>, ir<8>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
@@ -219,7 +219,7 @@ define void @fpiv_wideivstep_flags(float %init, ptr %p, i64 %n) {
 ; CHECK-NEXT:      EMIT vp<%step.add> = fadd fast ir<%x>, vp<[[VP5]]>
 ; CHECK-NEXT:      vp<[[VP7:%[0-9]+]]> = SCALAR-STEPS vp<[[VP6]]>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      CLONE ir<%arrayidx> = getelementptr inbounds ir<%p>, vp<[[VP7]]>
-; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = mul nuw nsw vp<[[VP0]]>, ir<1>
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = mul nuw nsw vp<[[VP0]]>, ir<1>
 ; CHECK-NEXT:      vp<[[VP9:%[0-9]+]]> = vector-pointer inbounds float, ir<%arrayidx>, ir<1>
 ; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = vector-pointer inbounds float, ir<%arrayidx>, ir<1>, vp<[[VP8]]>
 ; CHECK-NEXT:      WIDEN store vp<[[VP9]]>, ir<%x>

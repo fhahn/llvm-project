@@ -856,10 +856,12 @@ VPInstruction *VPRegionBlock::getOrCreateCanonicalIVIncrement() {
   assert(!getPlan()->getVFxUF().isMaterialized() &&
          "VFxUF can be used only before it is materialized.");
   auto *ExitingLatch = cast<VPBasicBlock>(getExiting());
-  return VPBuilder(ExitingLatch->getTerminator())
-      .createOverflowingOp(Instruction::Add, {CanIV, &getPlan()->getVFxUF()},
-                           {hasCanonicalIVNUW(), /* HasNSW */ false},
-                           CanIV->getDebugLoc(), "index.next");
+  VPBuilder Builder(ExitingLatch->getTerminator());
+  Builder.setCreateSingleScalars();
+  return Builder.createOverflowingOp(
+      Instruction::Add, {CanIV, &getPlan()->getVFxUF()},
+      {hasCanonicalIVNUW(), /* HasNSW */ false}, CanIV->getDebugLoc(),
+      "index.next");
 }
 
 VPlan::VPlan(Loop *L, Type *IdxTy)

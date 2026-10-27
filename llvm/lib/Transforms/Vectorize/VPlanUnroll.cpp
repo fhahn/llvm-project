@@ -130,6 +130,7 @@ static void addStartIndexForScalarSteps(VPScalarIVStepsRecipe *Steps,
     return;
 
   VPBuilder Builder(Steps);
+  Builder.setCreateSingleScalars();
   Type *BaseIVTy = Steps->getOperand(0)->getScalarType();
   Type *IntStepTy =
       IntegerType::get(BaseIVTy->getContext(), BaseIVTy->getScalarSizeInBits());
@@ -342,6 +343,7 @@ void UnrollState::unrollRecipeByUF(VPRecipeBase &R) {
     }
     if (isa<VPVectorPointerRecipe, VPWidenCanonicalIVRecipe>(R)) {
       VPBuilder Builder(&R);
+      Builder.setCreateSingleScalars();
       const DataLayout &DL = Plan.getDataLayout();
       Type *IndexTy =
           isa<VPWidenCanonicalIVRecipe>(R)
@@ -661,6 +663,10 @@ cloneForLane(VPlan &Plan, VPBuilder &Builder, Type *IdxTy,
     New = VPBuilder::createSingleScalarOp(
         RepR->getOpcode(), NewOps, /*Mask=*/nullptr, *RepR, *RepR,
         RepR->getDebugLoc(), RepR->getScalarType(), RepR->getUnderlyingInstr());
+  } else if (auto *VPI = dyn_cast<VPInstruction>(DefR)) {
+    New = VPI->cloneWithOperands(
+        NewOps, VPI->getScalarType(),
+        VPInstruction::canGenerateScalarForFirstLane(VPI->getOpcode()));
   } else {
     New = DefR->clone();
     for (const auto &[Idx, Op] : enumerate(NewOps)) {

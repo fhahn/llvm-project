@@ -10,18 +10,18 @@ define i32 @cse_reduction_start_vector_multiple_users(ptr %a, i64 %n) {
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%n>, ir<2>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult ir<%n>, ir<2>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.main.loop.iter.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.main.loop.iter.check:
-; CHECK-NEXT:    EMIT vp<%min.iters.check>.1 = icmp ult ir<%n>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check>.1 = icmp ult ir<%n>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>.1
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = and ir<%n>, ir<3>
-; CHECK-NEXT:    EMIT vp<%n.vec> = sub ir<%n>, vp<[[VP4]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = and ir<%n>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<%n.vec> = sub ir<%n>, vp<[[VP4]]>
 ; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = reduction-start-vector ir<0>, ir<0>, ir<1>
 ; CHECK-NEXT:  Successor(s): vector.body
 ; CHECK-EMPTY:
@@ -34,7 +34,7 @@ define i32 @cse_reduction_start_vector_multiple_users(ptr %a, i64 %n) {
 ; CHECK-NEXT:    WIDEN ir<%rdx1.next> = add ir<%rdx1>, ir<%ld.a>
 ; CHECK-NEXT:    WIDEN ir<%rdx2.next> = xor ir<%rdx2>, ir<%ld.a>
 ; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP6:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP6]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ; CHECK-EMPTY:

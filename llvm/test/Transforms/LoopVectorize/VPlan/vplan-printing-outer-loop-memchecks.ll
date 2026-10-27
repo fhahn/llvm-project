@@ -22,7 +22,7 @@ define void @may_alias_load(ptr %A, ptr %B, i64 %N, i64 %M) {
 ; FINAL-NEXT:  Live-in ir<%N> = original trip-count
 ; FINAL-EMPTY:
 ; FINAL-NEXT:  ir-bb<entry>:
-; FINAL-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%N>, ir<4>
+; FINAL-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult ir<%N>, ir<4>
 ; FINAL-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; FINAL-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ; FINAL-EMPTY:

@@ -736,22 +736,30 @@ bool VPInstruction::doesGeneratePerAllLanes() const {
          (Opcode == VPInstruction::PtrAdd && !vputils::onlyFirstLaneUsed(this));
 }
 
-bool VPInstruction::inferGeneratesSingleScalar() const {
-  if (doesGenerateSingleScalar() || isVectorToScalar())
-    return true;
+bool VPInstruction::canGenerateScalarForFirstLane(unsigned Opcode) {
   switch (Opcode) {
   case Instruction::Freeze:
   case Instruction::ICmp:
   case Instruction::Select:
-  case VPInstruction::BranchOnCond:
-  case VPInstruction::BranchOnTwoConds:
-  case VPInstruction::BranchOnCount:
   case VPInstruction::CanonicalIVIncrementForPart:
   case VPInstruction::PtrAdd:
   case VPInstruction::Not:
+    return true;
+  default:
+    return Instruction::isBinaryOp(Opcode) || Instruction::isCast(Opcode);
+  }
+}
+
+bool VPInstruction::inferGeneratesSingleScalar() const {
+  if (doesGenerateSingleScalar() || isVectorToScalar())
+    return true;
+  switch (Opcode) {
+  case VPInstruction::BranchOnCond:
+  case VPInstruction::BranchOnTwoConds:
+  case VPInstruction::BranchOnCount:
     return vputils::onlyFirstLaneUsed(this);
   default:
-    return (Instruction::isBinaryOp(Opcode) || Instruction::isCast(Opcode)) &&
+    return canGenerateScalarForFirstLane(Opcode) &&
            vputils::onlyFirstLaneUsed(this);
   }
 }
@@ -3485,6 +3493,7 @@ void VPWidenGEPRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
 void VPVectorEndPointerRecipe::materializeOffset(unsigned Part) {
   assert(!getOffset() && "Unexpected offset operand");
   VPBuilder Builder(this);
+  Builder.setCreateSingleScalars();
   VPlan &Plan = *getParent()->getPlan();
   VPValue *VFVal = getVFValue();
   const DataLayout &DL = Plan.getDataLayout();

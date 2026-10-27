@@ -143,6 +143,10 @@ private:
 
   VPInsertPoint InsertPt;
 
+  /// Whether to create VPInstructions as single scalars, if their opcode can
+  /// generate one.
+  bool CreateSingleScalars = false;
+
 protected:
   /// Insert \p VPI in BB at InsertPt if BB is set.
   template <typename T> T *tryInsertInstruction(T *R) {
@@ -155,8 +159,18 @@ protected:
                                    ArrayRef<VPValue *> Operands,
                                    const VPIRMetadata &MD, DebugLoc DL,
                                    const Twine &Name = "") {
-    return tryInsertInstruction(
-        new VPInstruction(Opcode, Operands, {}, MD, DL, Name));
+    return createInstruction(Opcode, Operands, {}, MD, DL, Name);
+  }
+
+  VPInstruction *createInstruction(unsigned Opcode,
+                                   ArrayRef<VPValue *> Operands,
+                                   const VPIRFlags &Flags,
+                                   const VPIRMetadata &MD, DebugLoc DL,
+                                   const Twine &Name, Type *ResultTy = nullptr) {
+    return tryInsertInstruction(new VPInstruction(
+        Opcode, Operands, Flags, MD, DL, Name, ResultTy,
+        CreateSingleScalars &&
+            VPInstruction::canGenerateScalarForFirstLane(Opcode)));
   }
 
 public:
@@ -170,6 +184,12 @@ public:
   VPBuilderBase(InserterTy Inserter) : InserterTy(Inserter) {}
   VPBuilderBase(VPBasicBlock *TheBB, VPBasicBlock::iterator IP)
       : InsertPt(TheBB, IP) {}
+
+  /// Create VPInstructions whose opcode can generate a single scalar as
+  /// single-scalar VPInstructions if \p V is true. Returns the previous value.
+  bool setCreateSingleScalars(bool V = true) {
+    return std::exchange(CreateSingleScalars, V);
+  }
 
   /// Get the recipe at the current insert point or nullptr if the insert point
   /// is the end of the block.
@@ -208,8 +228,8 @@ public:
                               DebugLoc DL = DebugLoc::getUnknown(),
                               const Twine &Name = "",
                               Type *ResultTy = nullptr) {
-    VPInstruction *NewVPInst = tryInsertInstruction(
-        new VPInstruction(Opcode, Operands, Flags, MD, DL, Name, ResultTy));
+    VPInstruction *NewVPInst =
+        createInstruction(Opcode, Operands, Flags, MD, DL, Name, ResultTy);
     NewVPInst->setUnderlyingValue(Inst);
     return NewVPInst;
   }
@@ -221,16 +241,14 @@ public:
                               const VPIRFlags &Flags,
                               DebugLoc DL = DebugLoc::getUnknown(),
                               const Twine &Name = "") {
-    return tryInsertInstruction(
-        new VPInstruction(Opcode, Operands, Flags, {}, DL, Name));
+    return createInstruction(Opcode, Operands, Flags, {}, DL, Name);
   }
 
   VPInstruction *createNaryOp(unsigned Opcode, ArrayRef<VPValue *> Operands,
                               Type *ResultTy, const VPIRFlags &Flags = {},
                               DebugLoc DL = DebugLoc::getUnknown(),
                               const Twine &Name = "") {
-    return tryInsertInstruction(
-        new VPInstruction(Opcode, Operands, Flags, {}, DL, Name, ResultTy));
+    return createInstruction(Opcode, Operands, Flags, {}, DL, Name, ResultTy);
   }
 
   VPInstruction *createFirstActiveLane(ArrayRef<VPValue *> Masks,
@@ -259,8 +277,7 @@ public:
       unsigned Opcode, ArrayRef<VPValue *> Operands,
       VPRecipeWithIRFlags::WrapFlagsTy WrapFlags = {false, false},
       DebugLoc DL = DebugLoc::getUnknown(), const Twine &Name = "") {
-    return tryInsertInstruction(
-        new VPInstruction(Opcode, Operands, WrapFlags, {}, DL, Name));
+    return createInstruction(Opcode, Operands, WrapFlags, {}, DL, Name);
   }
 
   VPInstruction *createNot(VPValue *Operand,
@@ -280,9 +297,9 @@ public:
                           DebugLoc DL = DebugLoc::getUnknown(),
                           const Twine &Name = "") {
 
-    return tryInsertInstruction(new VPInstruction(
-        Instruction::BinaryOps::Or, {LHS, RHS},
-        VPRecipeWithIRFlags::DisjointFlagsTy(false), {}, DL, Name));
+    return createInstruction(Instruction::BinaryOps::Or, {LHS, RHS},
+                             VPRecipeWithIRFlags::DisjointFlagsTy(false), {},
+                             DL, Name);
   }
 
   VPInstruction *
@@ -320,11 +337,11 @@ public:
                               DebugLoc DL = DebugLoc::getUnknown(),
                               const Twine &Name = "",
                               std::optional<VPIRFlags> Flags = std::nullopt) {
-    return tryInsertInstruction(
-        new VPInstruction(Instruction::Select, {Cond, TrueVal, FalseVal},
-                          Flags.value_or(VPIRFlags::getDefaultFlags(
-                              Instruction::Select, TrueVal->getScalarType())),
-                          {}, DL, Name));
+    return createInstruction(
+        Instruction::Select, {Cond, TrueVal, FalseVal},
+        Flags.value_or(VPIRFlags::getDefaultFlags(Instruction::Select,
+                                                  TrueVal->getScalarType())),
+        {}, DL, Name);
   }
 
   /// Create a new ICmp VPInstruction with predicate \p Pred and operands \p A
@@ -334,8 +351,7 @@ public:
                             const Twine &Name = "") {
     assert(Pred >= CmpInst::FIRST_ICMP_PREDICATE &&
            Pred <= CmpInst::LAST_ICMP_PREDICATE && "invalid predicate");
-    return tryInsertInstruction(
-        new VPInstruction(Instruction::ICmp, {A, B}, Pred, {}, DL, Name));
+    return createInstruction(Instruction::ICmp, {A, B}, Pred, {}, DL, Name);
   }
 
   /// Create a new FCmp VPInstruction with predicate \p Pred and operands \p A
@@ -345,9 +361,8 @@ public:
                             const Twine &Name = "") {
     assert(Pred >= CmpInst::FIRST_FCMP_PREDICATE &&
            Pred <= CmpInst::LAST_FCMP_PREDICATE && "invalid predicate");
-    return tryInsertInstruction(
-        new VPInstruction(Instruction::FCmp, {A, B},
-                          VPIRFlags(Pred, FastMathFlags()), {}, DL, Name));
+    return createInstruction(Instruction::FCmp, {A, B},
+                             VPIRFlags(Pred, FastMathFlags()), {}, DL, Name);
   }
 
   /// Create an AnyOf reduction pattern: or-reduce \p ChainOp, freeze the
@@ -375,8 +390,8 @@ public:
                                     GEPNoWrapFlags GEPFlags,
                                     DebugLoc DL = DebugLoc::getUnknown(),
                                     const Twine &Name = "") {
-    return tryInsertInstruction(new VPInstruction(
-        VPInstruction::PtrAdd, {Ptr, Offset}, GEPFlags, {}, DL, Name));
+    return createInstruction(VPInstruction::PtrAdd, {Ptr, Offset}, GEPFlags, {},
+                             DL, Name);
   }
 
   VPInstruction *createWidePtrAdd(VPValue *Ptr, VPValue *Offset,

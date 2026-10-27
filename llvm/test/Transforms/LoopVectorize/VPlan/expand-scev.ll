@@ -8,8 +8,8 @@ define void @scev_add_expanded(ptr %dst, i64 %n) {
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<loop.preheader>:
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = add ir<%n>, ir<2>
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = add ir<%n>, ir<2>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -34,10 +34,10 @@ define void @scev_add_lshr_expanded(ptr %dst, i64 %n) {
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<loop.preheader>:
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = add ir<%n>, ir<-1>
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = lshr vp<[[VP2]]>, ir<1>
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = add nuw vp<[[VP3]]>, ir<1>
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = add ir<%n>, ir<-1>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = lshr vp<[[VP2]]>, ir<1>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = add nuw vp<[[VP3]]>, ir<1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -62,10 +62,10 @@ define void @scev_add_udiv3_expanded(ptr %dst, i64 %n) {
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<loop.preheader>:
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = add ir<%n>, ir<-1>
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = udiv vp<[[VP2]]>, ir<3>
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = add nuw nsw vp<[[VP3]]>, ir<1>
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = add ir<%n>, ir<-1>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = udiv vp<[[VP2]]>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = add nuw nsw vp<[[VP3]]>, ir<1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -92,8 +92,8 @@ define void @scev_expand_vscale_mul(ptr %dst, i64 %n) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<loop.preheader>:
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = call i64 @llvm.vscale()
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = shl nuw vp<[[VP2]]>, ir<2>
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%n>, vp<[[VP3]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = shl nuw vp<[[VP2]]>, ir<2>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult ir<%n>, vp<[[VP3]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -118,7 +118,7 @@ define void @scev_expand_udiv(ptr %dst, i64 %n) {
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<loop.preheader>:
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%div>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult ir<%div>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -149,7 +149,7 @@ define void @scev_zext_expanded(ptr %dst, i32 %a, i32 %b) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<loop.preheader>:
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = zext ir<%p> to i64
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -178,7 +178,7 @@ define void @scev_sext_expanded(ptr %dst, i32 %a, i32 %b) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<loop.preheader>:
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = sext ir<%p> to i64
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -207,7 +207,7 @@ define void @scev_smax_expanded(ptr %dst, i64 %n) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = call i64 @llvm.smax(ir<%n>, ir<1>)
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -232,10 +232,10 @@ define void @scev_smin_expanded(ptr %dst, i64 %n) {
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = add nsw ir<%n>, ir<-1>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = add nsw ir<%n>, ir<-1>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = call i64 @llvm.smin(vp<[[VP2]]>, ir<0>)
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = sub ir<%n>, vp<[[VP3]]>
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = sub ir<%n>, vp<[[VP3]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -264,8 +264,8 @@ define void @scev_ptrtoint_expanded(ptr %start, ptr %end) {
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %end2 = ptrtoaddr ptr %end to i64
 ; CHECK-NEXT:    IR   %start1 = ptrtoaddr ptr %start to i64
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = sub ir<%end2>, ir<%start1>
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = sub ir<%end2>, ir<%start1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -292,9 +292,9 @@ define i32 @mul_by_signed_min_expanded_to_shl(i1 %a) {
 ; CHECK-NEXT:    IR   %rem.neg = zext i1 %a to i32
 ; CHECK-NEXT:    IR   %sub = sub i32 %rem.neg, 1
 ; CHECK-NEXT:    IR   %shl = shl i32 %sub, 31
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = shl nuw ir<%rem.neg>, ir<31>
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = sub ir<-2147483547>, vp<[[VP2]]>
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP3]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = shl nuw ir<%rem.neg>, ir<31>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = sub ir<-2147483547>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP3]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -323,10 +323,10 @@ define void @scev_addrec_expanded(ptr %dst) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<outer>:
 ; CHECK-NEXT:    IR   %outer.iv = phi i64 [ 0, %entry ], [ %outer.iv.next, %outer.latch ]
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = add nuw ir<4>, ir<%outer.iv>
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = udiv vp<[[VP2]]>, ir<3>
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = add nuw nsw vp<[[VP3]]>, ir<1>
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = add nuw ir<4>, ir<%outer.iv>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = udiv vp<[[VP2]]>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = add nuw nsw vp<[[VP3]]>, ir<1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -362,7 +362,7 @@ define void @addrec_outer_iv_narrow(ptr %dst) {
 ; CHECK-NEXT:  ir-bb<outer>:
 ; CHECK-NEXT:    IR   %outer.iv = phi i32 [ 0, %entry ], [ %outer.iv.next, %outer.latch ]
 ; CHECK-NEXT:    IR   %ext = zext i32 %outer.iv to i64
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = add nuw ir<5>, ir<%ext>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = add nuw ir<5>, ir<%ext>
 ; CHECK-NEXT:  Successor(s): vector.ph
 ;
 entry:
@@ -400,10 +400,10 @@ define void @addrec_non_unit_outer_stride(ptr %dst) {
 ; CHECK-NEXT:  ir-bb<outer>:
 ; CHECK-NEXT:    IR   %outer.iv = phi i64 [ 0, %entry ], [ %outer.iv.next, %outer.latch ]
 ; CHECK-NEXT:    IR   %outer.iv.next = add nuw i64 %outer.iv, 2
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = add nuw ir<6>, ir<%outer.iv>
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = udiv vp<[[VP2]]>, ir<3>
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = add nuw nsw vp<[[VP3]]>, ir<1>
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = add nuw ir<6>, ir<%outer.iv>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = udiv vp<[[VP2]]>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = add nuw nsw vp<[[VP3]]>, ir<1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -439,10 +439,10 @@ define void @addrec_over_grandparent_loop(ptr %dst) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<middle>:
 ; CHECK-NEXT:    IR   %mid = phi i64 [ 0, %outermost ], [ %mid.next, %mid.latch ]
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = add nuw ir<4>, ir<%outer.iv>
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = udiv vp<[[VP2]]>, ir<3>
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = add nuw nsw vp<[[VP3]]>, ir<1>
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = add nuw ir<4>, ir<%outer.iv>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = udiv vp<[[VP2]]>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = add nuw nsw vp<[[VP3]]>, ir<1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -485,10 +485,10 @@ define void @addrec_phi_not_in_inner_preheader(ptr %dst) {
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<inner.ph>:
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = add nuw ir<4>, ir<%outer.iv>
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = udiv vp<[[VP2]]>, ir<3>
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = add nuw nsw vp<[[VP3]]>, ir<1>
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = add nuw ir<4>, ir<%outer.iv>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = udiv vp<[[VP2]]>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = add nuw nsw vp<[[VP3]]>, ir<1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -529,10 +529,10 @@ define void @addrec_nuw_flags(ptr %dst) {
 ; CHECK-NEXT:    IR   %outer.iv = phi i64 [ 0, %entry ], [ %outer.iv.next, %outer.latch ]
 ; CHECK-NEXT:    IR   %m = mul nuw i64 %outer.iv, 4
 ; CHECK-NEXT:    IR   %bound = add nuw i64 %m, 5
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = add nuw ir<4>, ir<%m>
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = udiv vp<[[VP2]]>, ir<3>
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = add nuw nsw vp<[[VP3]]>, ir<1>
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = add nuw ir<4>, ir<%m>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = udiv vp<[[VP2]]>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = add nuw nsw vp<[[VP3]]>, ir<1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -573,10 +573,10 @@ define void @addrec_non_affine_outer_recurrence_no_canonical_iv(ptr %dst) {
 ; CHECK-NEXT:    IR   %outer.iv = phi i64 [ 5, %entry ], [ %outer.iv.next, %outer.latch ]
 ; CHECK-NEXT:    IR   %ar = phi i64 [ 4, %entry ], [ %ar.next, %outer.latch ]
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = call i64 @llvm.umax(ir<%induction.iv>, ir<3>)
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = add vp<[[VP2]]>, ir<-1>
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = udiv vp<[[VP3]]>, ir<3>
-; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = add nuw nsw vp<[[VP4]]>, ir<1>
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP5]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = add vp<[[VP2]]>, ir<-1>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = udiv vp<[[VP3]]>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP5:%[0-9]+]]> = add nuw nsw vp<[[VP4]]>, ir<1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP5]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -618,10 +618,10 @@ define void @addrec_non_affine_outer_recurrence_with_canonical_iv(ptr %dst) {
 ; CHECK-NEXT:    IR   %outer.iv = phi i64 [ 0, %entry ], [ %outer.iv.next, %outer.latch ]
 ; CHECK-NEXT:    IR   %ar = phi i64 [ 4, %entry ], [ %ar.next, %outer.latch ]
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = call i64 @llvm.umax(ir<%induction.iv>, ir<3>)
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = add vp<[[VP2]]>, ir<-1>
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = udiv vp<[[VP3]]>, ir<3>
-; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = add nuw nsw vp<[[VP4]]>, ir<1>
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP5]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = add vp<[[VP2]]>, ir<-1>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = udiv vp<[[VP3]]>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP5:%[0-9]+]]> = add nuw nsw vp<[[VP4]]>, ir<1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP5]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -661,10 +661,10 @@ define void @scev_add_all_operands_negative(ptr %dst, i64 %x, i64 %y) mustprogre
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %end = mul i64 %y, -3
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = sub ir<0>, ir<%x>
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = mul ir<%y>, ir<3>
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = sub vp<[[VP2]]>, vp<[[VP3]]>
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = sub ir<0>, ir<%x>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = mul ir<%y>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = sub vp<[[VP2]]>, vp<[[VP3]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -691,10 +691,10 @@ define void @addrec_nonscevable(ptr %dst) {
 ; CHECK-NEXT:  ir-bb<outer>:
 ; CHECK-NEXT:    IR   %fp.phi = phi float [ 0.000000e+00, %entry ], [ %fp.next, %outer.latch ]
 ; CHECK-NEXT:    IR   %outer.iv = phi i64 [ 0, %entry ], [ %outer.iv.next, %outer.latch ]
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = add nuw ir<4>, ir<%outer.iv>
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = udiv vp<[[VP2]]>, ir<3>
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = add nuw nsw vp<[[VP3]]>, ir<1>
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = add nuw ir<4>, ir<%outer.iv>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = udiv vp<[[VP2]]>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = add nuw nsw vp<[[VP3]]>, ir<1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP4]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -732,8 +732,8 @@ define void @addrec_zero_start_mul_nowrap(ptr %dst) {
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<inner.preheader>:
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = mul nuw nsw ir<%i>, ir<3>
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = mul nuw nsw ir<%i>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -769,8 +769,8 @@ define void @addrec_zero_start_mul_may_wrap(ptr %dst, i64 %n) {
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<inner.preheader>:
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = mul ir<%i>, ir<3>
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = mul ir<%i>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;

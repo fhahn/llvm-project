@@ -12,7 +12,7 @@ define void @urem_fold(ptr %dst, ptr %src, i64 %n) {
 ; CHECK:    [[ORIG:%.*]] = urem i64 [[IV:%.*]], 16, !dbg [[DBG]]
 ;
 ; VPLAN-LABEL: VPlan for loop in 'urem_fold' after printOptimizedVPlan
-; VPLAN: EMIT vp{{.*}} = and vp{{.*}}, ir<15>, !dbg
+; VPLAN: EMIT-SCALAR vp{{.*}} = and vp{{.*}}, ir<15>, !dbg
 entry:
   br label %loop
 
