@@ -1145,7 +1145,7 @@ void MLocTracker::writeRegMask(const MachineOperand *MO, unsigned CurBB,
   for (auto Location : locations()) {
     unsigned ID = LocIdxToLocID[Location.Idx];
     // Don't clobber SP, even if the mask says it's clobbered.
-    if (ID < NumRegs && !SPAliases.count(ID) && MO->clobbersPhysReg(ID))
+    if (ID < NumRegs && MO->clobbersPhysReg(ID) && !SPAliases.count(ID))
       defReg(ID, CurBB, InstID);
   }
   Masks.push_back(std::make_pair(MO, InstID));
@@ -1984,11 +1984,8 @@ void InstrRefBasedLDV::transferRegisterDef(MachineInstr &MI) {
         continue;
 
       Register Reg = MTracker->LocIdxToLocID[L.Idx];
-      if (IgnoreSPAlias(Reg))
-        continue;
-
       for (const auto *MO : RegMaskPtrs)
-        if (MO->clobbersPhysReg(Reg))
+        if (MO->clobbersPhysReg(Reg) && !IgnoreSPAlias(Reg))
           TTracker->clobberMloc(L.Idx, MI.getIterator(), false);
     }
   }
