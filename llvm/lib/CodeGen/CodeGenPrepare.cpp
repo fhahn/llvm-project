@@ -9019,12 +9019,18 @@ bool CodeGenPrepare::fixupDbgVariableRecord(DbgVariableRecord &DVR) {
     return false;
 
   // Does this DbgVariableRecord refer to a sunk address calculation?
+  if (SunkAddrs.empty())
+    return false;
   bool AnyChange = false;
   SmallDenseSet<Value *> LocationOps(DVR.location_ops().begin(),
                                      DVR.location_ops().end());
   for (Value *Location : LocationOps) {
-    WeakTrackingVH SunkAddrVH = SunkAddrs[Location];
-    Value *SunkAddr = SunkAddrVH.pointsToAliveValue() ? SunkAddrVH : nullptr;
+    // Use find, as a null entry for Location inserted by operator[] would
+    // prevent RAUW from moving another entry to Location.
+    auto It = SunkAddrs.find(Location);
+    if (It == SunkAddrs.end())
+      continue;
+    Value *SunkAddr = It->second.pointsToAliveValue() ? It->second : nullptr;
     if (SunkAddr) {
       // Point dbg.value at locally computed address, which should give the best
       // opportunity to be accurately lowered. This update may change the type
