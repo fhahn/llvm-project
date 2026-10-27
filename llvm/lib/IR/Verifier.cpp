@@ -200,6 +200,10 @@ class Verifier : public InstVisitor<Verifier>, VerifierSupport {
   /// Cache of attribute lists verified.
   SmallPtrSet<const void *, 32> AttributeListsVisited;
 
+  /// Function types and attribute lists that passed verifyFunctionAttrs.
+  DenseSet<std::tuple<FunctionType *, AttributeList, unsigned>>
+      VerifiedFunctionAttrs;
+
   // Verify that this GlobalValue is only used in this module.
   // This map is used to avoid visiting uses twice. We can arrive at a user
   // twice, if they have multiple operands. In particular for very large
@@ -474,6 +478,9 @@ private:
                                     const Value *V);
   void verifyFunctionAttrs(FunctionType *FT, AttributeList Attrs,
                            const Value *V, bool IsIntrinsic, bool IsInlineAsm);
+  void verifyFunctionAttrsOnce(FunctionType *FT, AttributeList Attrs,
+                               const Value *V, bool IsIntrinsic,
+                               bool IsInlineAsm);
   void verifyFunctionMetadata(ArrayRef<std::pair<unsigned, MDNode *>> MDs);
   void verifyUnknownProfileMetadata(MDNode *MD);
   void visitConstantExprsRecursively(const Constant *EntryC);
@@ -2846,6 +2853,21 @@ void Verifier::verifyFunctionAttrs(FunctionType *FT, AttributeList Attrs,
   }
 }
 
+// Apart from 'jumptable' and 'alloc-variant-zeroed', verifyFunctionAttrs only
+// uses V for diagnostics, so combinations that passed need no re-verification.
+void Verifier::verifyFunctionAttrsOnce(FunctionType *FT, AttributeList Attrs,
+                                       const Value *V, bool IsIntrinsic,
+                                       bool IsInlineAsm) {
+  std::tuple<FunctionType *, AttributeList, unsigned> Key(
+      FT, Attrs, IsIntrinsic | IsInlineAsm << 1);
+  if (VerifiedFunctionAttrs.contains(Key))
+    return;
+  verifyFunctionAttrs(FT, Attrs, V, IsIntrinsic, IsInlineAsm);
+  if (!Broken && !Attrs.hasFnAttr(Attribute::JumpTable) &&
+      !Attrs.hasFnAttr("alloc-variant-zeroed"))
+    VerifiedFunctionAttrs.insert(Key);
+}
+
 void Verifier::verifyUnknownProfileMetadata(MDNode *MD) {
   Check(MD->getNumOperands() == 2,
         "'unknown' !prof should have a single additional operand", MD);
@@ -3285,7 +3307,7 @@ void Verifier::visitFunction(const Function &F) {
   bool IsIntrinsic = F.isIntrinsic();
 
   // Check function attributes.
-  verifyFunctionAttrs(FT, Attrs, &F, IsIntrinsic, /* IsInlineAsm */ false);
+  verifyFunctionAttrsOnce(FT, Attrs, &F, IsIntrinsic, /* IsInlineAsm */ false);
 
   // On function declarations/definitions, we do not support the builtin
   // attribute. We do not check this in VerifyFunctionAttrs since that is
@@ -4148,7 +4170,7 @@ void Verifier::visitCallBase(CallBase &Call) {
         "denormal_fpenv attribute may not apply to call sites", Call);
 
   // Verify call attributes.
-  verifyFunctionAttrs(FTy, Attrs, &Call, IsIntrinsic, Call.isInlineAsm());
+  verifyFunctionAttrsOnce(FTy, Attrs, &Call, IsIntrinsic, Call.isInlineAsm());
 
   // Conservatively check the inalloca argument.
   // We have a bug if we can find that there is an underlying alloca without
