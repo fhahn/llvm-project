@@ -32,7 +32,7 @@ TEST_F(VPPatternMatchTest, ScalarIVSteps) {
   VPBuilder Builder(VPBB);
 
   VPValue *Inc = Plan.getOrAddLiveIn(ConstantInt::get(I64Ty, 1));
-  VPValue *VF = &Plan.getVF();
+  VPValue *VF = &VPR->getVF();
   VPValue *Steps = Builder.createScalarIVSteps(Instruction::Add, nullptr, CanIV,
                                                Inc, VF, DebugLoc());
 

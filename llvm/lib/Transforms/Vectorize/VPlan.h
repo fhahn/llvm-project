@@ -4701,6 +4701,32 @@ public:
   void clearNUW() { HasNUW = false; }
 };
 
+/// The parameters of a vector loop: the symbolic VF, UF, VF * UF and vector
+/// trip count. They are loop-invariant and may be used anywhere in the plan;
+/// they must be materialized once VF and UF are fixed, before the owning loop
+/// region is dissolved. The parameters are owned by the vector loop region, and
+/// by the VPlan while there is none.
+class VPLoopParams {
+  VPSymbolicValue VF;
+  VPSymbolicValue UF;
+  VPSymbolicValue VFxUF;
+  VPSymbolicValue VectorTripCount;
+
+public:
+  VPLoopParams(Type *IdxTy)
+      : VF(IdxTy), UF(IdxTy), VFxUF(IdxTy), VectorTripCount(IdxTy) {}
+
+  VPSymbolicValue &getVF() { return VF; }
+  VPSymbolicValue &getUF() { return UF; }
+  VPSymbolicValue &getVFxUF() { return VFxUF; }
+  VPSymbolicValue &getVectorTripCount() { return VectorTripCount; }
+
+  /// Return the symbolic values in printing order.
+  std::array<VPSymbolicValue *, 4> getSymbolicValues() {
+    return {&VF, &UF, &VFxUF, &VectorTripCount};
+  }
+};
+
 /// VPRegionBlock represents a collection of VPBasicBlocks and VPRegionBlocks
 /// which form a Single-Entry-Single-Exiting subgraph of the output IR CFG.
 /// A VPRegionBlock may indicate that its contents are to be replicated several
@@ -4724,6 +4750,16 @@ class LLVM_ABI_FOR_TEST VPRegionBlock : public VPBlockBase {
   /// Loop regions retain their canonical IVs until they are dissolved, even if
   /// the canonical IV has no users.
   std::unique_ptr<VPCanonicalIVInfo> CanIVInfo;
+
+  /// The parameters of the vector loop, set for the outermost loop region
+  /// only.
+  std::unique_ptr<VPLoopParams> LoopParams;
+
+  /// Return the parameters of the vector loop region.
+  VPLoopParams &getLoopParams() const {
+    assert(LoopParams && "only the vector loop region has loop parameters");
+    return *LoopParams;
+  }
 
   /// Use VPlan::createLoopRegion() and VPlan::createReplicateRegion() to create
   /// VPRegionBlocks.
@@ -4822,6 +4858,14 @@ public:
   /// its entry, and its exiting block to its successor.
   void dissolveToCFGLoop();
 
+  /// Accessors for the parameters of the vector loop region.
+  VPSymbolicValue &getVF() const { return getLoopParams().getVF(); }
+  VPSymbolicValue &getUF() const { return getLoopParams().getUF(); }
+  VPSymbolicValue &getVFxUF() const { return getLoopParams().getVFxUF(); }
+  VPSymbolicValue &getVectorTripCount() const {
+    return getLoopParams().getVectorTripCount();
+  }
+
   /// Replace the canonical IV of the loop region, if used, by an explicit
   /// scalar phi at the start of the header, incremented by the canonical IV
   /// increment.
@@ -4903,6 +4947,7 @@ inline const VPRegionBlock *VPRecipeBase::getRegion() const {
 /// VPBasicBlock.
 class VPlan {
   friend class VPlanPrinter;
+  friend class VPRegionBlock;
   friend class VPSlotTracker;
 
   /// VPBasicBlock corresponding to the original preheader. Used to place
@@ -4934,17 +4979,13 @@ class VPlan {
   /// the tail.
   VPValue *TripCount = nullptr;
 
-  /// Represents the vector trip count.
-  VPSymbolicValue VectorTripCount;
+  /// The index type of the vector loop.
+  Type *IdxTy;
 
-  /// Represents the vectorization factor of the loop.
-  VPSymbolicValue VF;
-
-  /// Represents the unroll factor of the loop.
-  VPSymbolicValue UF;
-
-  /// Represents the loop-invariant VF * UF of the vector loop region.
-  VPSymbolicValue VFxUF;
+  /// The parameters of the vector loop while there is no vector loop region.
+  /// They are transferred to the vector loop region when it is created, and
+  /// back when it is dissolved.
+  std::unique_ptr<VPLoopParams> LoopParams;
 
   /// Contains all the external definitions created for this VPlan, as a mapping
   /// from IR Values to VPIRValues.
@@ -4954,12 +4995,23 @@ class VPlan {
   /// VPlan is destroyed.
   SmallVector<VPBlockBase *> CreatedBlocks;
 
+  /// Return the parameters of the vector loop while there is no vector loop
+  /// region. Otherwise they must be accessed via the region.
+  VPLoopParams &getLoopParams() const {
+    assert(LoopParams && "loop parameters are owned by the vector loop region");
+    return *LoopParams;
+  }
+
+  /// Return the parameters of the vector loop, held by the plan or by the
+  /// vector loop region.
+  VPLoopParams &getCurrentLoopParams() const;
+
   /// Construct a VPlan with \p Entry to the plan and with \p ScalarHeader
   /// wrapping the original header of the scalar loop. The vector loop will have
   /// index type \p IdxTy.
   VPlan(VPBasicBlock *Entry, VPIRBasicBlock *ScalarHeader, Type *IdxTy)
-      : Entry(Entry), ScalarHeader(ScalarHeader), VectorTripCount(IdxTy),
-        VF(IdxTy), UF(IdxTy), VFxUF(IdxTy) {
+      : Entry(Entry), ScalarHeader(ScalarHeader), IdxTy(IdxTy),
+        LoopParams(std::make_unique<VPLoopParams>(IdxTy)) {
     Entry->setPlan(this);
     assert(ScalarHeader->getNumSuccessors() == 0 &&
            "scalar header must be a leaf node");
@@ -4975,7 +5027,7 @@ public:
   /// Construct a VPlan with a new VPBasicBlock as entry, a VPIRBasicBlock
   /// wrapping \p ScalarHeaderBB and vector loop index of type \p IdxTy.
   VPlan(BasicBlock *ScalarHeaderBB, Type *IdxTy)
-      : VectorTripCount(IdxTy), VF(IdxTy), UF(IdxTy), VFxUF(IdxTy) {
+      : IdxTy(IdxTy), LoopParams(std::make_unique<VPLoopParams>(IdxTy)) {
     setEntry(createVPBasicBlock("preheader"));
     ScalarHeader = createVPIRBasicBlock(ScalarHeaderBB);
   }
@@ -5085,18 +5137,16 @@ public:
     TripCount = NewTripCount;
   }
 
-  /// The vector trip count.
-  VPSymbolicValue &getVectorTripCount() { return VectorTripCount; }
+  /// The vector trip count, while there is no vector loop region.
+  VPSymbolicValue &getVectorTripCount() {
+    return getLoopParams().getVectorTripCount();
+  }
 
-  /// Returns the VF of the vector loop region.
-  VPSymbolicValue &getVF() { return VF; };
-  const VPSymbolicValue &getVF() const { return VF; };
+  /// Returns the VF, while there is no vector loop region.
+  VPSymbolicValue &getVF() { return getLoopParams().getVF(); };
 
-  /// Returns the UF of the vector loop region.
-  VPSymbolicValue &getUF() { return UF; };
-
-  /// Returns VF * UF of the vector loop region.
-  VPSymbolicValue &getVFxUF() { return VFxUF; }
+  /// Returns VF * UF, while there is no vector loop region.
+  VPSymbolicValue &getVFxUF() { return getLoopParams().getVFxUF(); }
 
   LLVMContext &getContext() const {
     return getScalarHeader()->getIRBasicBlock()->getContext();
@@ -5275,6 +5325,10 @@ public:
                                   VPBlockBase *Entry = nullptr,
                                   VPBlockBase *Exiting = nullptr) {
     auto *VPB = new VPRegionBlock(CanIVTy, DL, Entry, Exiting, Name);
+    // The first loop region with a canonical IV is the vector loop region and
+    // takes over the loop parameters.
+    if (CanIVTy && LoopParams)
+      VPB->LoopParams = std::move(LoopParams);
     VPB->setPlan(this);
     VPB->setNumber(CreatedBlocks.size());
     CreatedBlocks.push_back(VPB);
@@ -5337,7 +5391,7 @@ public:
   }
 
   /// The type of the canonical induction variable of the vector loop.
-  Type *getIndexType() const { return VF.getType(); }
+  Type *getIndexType() const { return IdxTy; }
 };
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)

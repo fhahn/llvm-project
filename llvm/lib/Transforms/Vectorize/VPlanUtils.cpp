@@ -690,7 +690,7 @@ VPScalarIVStepsRecipe *vputils::createScalarIVSteps(
     Step = Builder.createScalarZExtOrTrunc(Step, ResultTy, DL);
   }
   return Builder.createScalarIVSteps(InductionOpcode, FPBinOp, BaseIV, Step,
-                                     &Plan.getVF(), DL);
+                                     &LoopRegion->getVF(), DL);
 }
 
 VPValue *
@@ -790,7 +790,7 @@ VPInstruction *vputils::findCanonicalIVIncrement(VPlan &Plan) {
   VPRegionValue *CanIV = LoopRegion->getCanonicalIV();
   assert(CanIV && "Expected loop region to have a canonical IV");
 
-  VPSymbolicValue &VFxUF = Plan.getVFxUF();
+  VPSymbolicValue &VFxUF = LoopRegion->getVFxUF();
 
   // Check if \p Step matches the expected increment step, accounting for
   // materialization of VFxUF and UF.
@@ -798,10 +798,9 @@ VPInstruction *vputils::findCanonicalIVIncrement(VPlan &Plan) {
     if (!VFxUF.isMaterialized())
       return Step == &VFxUF;
 
-    VPSymbolicValue &UF = Plan.getUF();
+    VPSymbolicValue &UF = LoopRegion->getUF();
     if (!UF.isMaterialized())
-      return Step == &UF ||
-             match(Step, m_c_Mul(m_Specific(&Plan.getUF()), m_VScale()));
+      return Step == &UF || match(Step, m_c_Mul(m_Specific(&UF), m_VScale()));
 
     // Alias masking: step is number of active lanes of a dependence mask.
     if (match(Step, m_ZExtOrTruncOrSelf(

@@ -3250,9 +3250,11 @@ std::unique_ptr<VPlan> LoopVectorizationPlanner::selectBestEpiloguePlan(
   // the adjusted, effective VF.
   using namespace VPlanPatternMatch;
   auto GetEffectiveVF = [](VPlan &Plan, ElementCount VF) -> ElementCount {
-    auto *Exiting = Plan.getVectorLoopRegion()->getExitingBasicBlock();
+    VPRegionBlock *VectorLoop = Plan.getVectorLoopRegion();
+    auto *Exiting = VectorLoop->getExitingBasicBlock();
+    VPValue *UF = &VectorLoop->getUF();
     if (match(&Exiting->back(),
-              m_BranchOnCount(m_Add(m_CanonicalIV(), m_Specific(&Plan.getUF())),
+              m_BranchOnCount(m_Add(m_CanonicalIV(), m_Specific(UF)),
                               m_VPValue())))
       return ElementCount::get(1, VF.isScalable());
     return VF;
@@ -5594,14 +5596,15 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // before dissolving the loop region. The canonical IV increment must be
   // created first, as findCanonicalIVIncrement cannot recognize a materialized
   // VF * UF step.
-  BestVPlan.getVectorLoopRegion()->materializeCanonicalIV();
+  VPRegionBlock *VectorLoop = BestVPlan.getVectorLoopRegion();
+  VectorLoop->materializeCanonicalIV();
   std::optional<uint64_t> MaxRuntimeStep = getMaxRuntimeElementCount(
       BestVF * BestUF, *OrigLoop->getHeader()->getParent());
   assert((LI->getUniqueLatchExitBlock(*OrigLoop) || RequiresScalarEpilogue) &&
          "loops not exiting via the latch without required epilogue?");
   RUN_VPLAN_PASS(VPlanTransforms::materializeVectorTripCount, BestVPlan,
                  VectorPH, BestVPlan.hasTailFolded(), RequiresScalarEpilogue,
-                 &BestVPlan.getVFxUF(), MaxRuntimeStep);
+                 &VectorLoop->getVFxUF(), MaxRuntimeStep);
   RUN_VPLAN_PASS(VPlanTransforms::materializeFactors, BestVPlan, VectorPH,
                  BestVF);
   // Regions are dissolved after optimizing for VF and UF, which completely

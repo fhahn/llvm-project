@@ -1140,8 +1140,9 @@ void VPlanTransforms::optimizeInductionLiveOutUsers(
   auto *VectorPH = cast<VPBasicBlock>(VectorRegion->getSinglePredecessor());
   VPBuilder VectorPHBuilder(VectorPH, VectorPH->getFirstNonPhi());
   DenseMap<VPValue *, VPValue *> EndValues;
-  VPValue *ResumeTC =
-      Plan.hasTailFolded() ? Plan.getTripCount() : &Plan.getVectorTripCount();
+  VPValue *ResumeTC = Plan.hasTailFolded()
+                          ? Plan.getTripCount()
+                          : &VectorRegion->getVectorTripCount();
   for (VPWidenInductionRecipe &WideIV : make_isa_range<VPWidenInductionRecipe>(
            VectorRegion->getEntryBasicBlock()->phis())) {
     if (VPValue *EndValue = tryToComputeEndValueForInduction(
@@ -2054,11 +2055,13 @@ static bool optimizeVectorInductionWidthForTCAndVFUF(VPlan &Plan,
                                                      ElementCount BestVF,
                                                      unsigned BestUF) {
   // Only proceed if we have not completely removed the vector region.
-  if (!Plan.getVectorLoopRegion())
+  VPRegionBlock *VectorLoop = Plan.getVectorLoopRegion();
+  if (!VectorLoop)
     return false;
 
+  VPValue *TripCount = Plan.getTripCount();
   const APInt *TC;
-  if (!BestVF.isFixed() || !match(Plan.getTripCount(), m_APInt(TC)))
+  if (!BestVF.isFixed() || !match(TripCount, m_APInt(TC)))
     return false;
 
   // Calculate the minimum power-of-2 bit width that can fit the known TC, VF
@@ -2078,7 +2081,7 @@ static bool optimizeVectorInductionWidthForTCAndVFUF(VPlan &Plan,
 
   bool MadeChange = false;
 
-  VPBasicBlock *HeaderVPBB = Plan.getVectorLoopRegion()->getEntryBasicBlock();
+  VPBasicBlock *HeaderVPBB = VectorLoop->getEntryBasicBlock();
   for (VPRecipeBase &Phi : HeaderVPBB->phis()) {
     // Currently only handle canonical IVs as it is trivial to replace the start
     // and stop values, and we currently only perform the optimization when the
@@ -2095,11 +2098,10 @@ static bool optimizeVectorInductionWidthForTCAndVFUF(VPlan &Plan,
     VPUser *SingleUser = WideIV->getSingleUser();
     VPValue *BTC;
     if (!SingleUser ||
-        !match(
-            SingleUser,
-            m_ICmp(m_Specific(WideIV),
-                   m_Broadcast(m_VPValue(
-                       BTC, m_Sub(m_Specific(Plan.getTripCount()), m_One()))))))
+        !match(SingleUser,
+               m_ICmp(m_Specific(WideIV),
+                      m_Broadcast(m_VPValue(
+                          BTC, m_Sub(m_Specific(TripCount), m_One()))))))
       continue;
 
     // Update IV operands and comparison bound to use new narrower type.
@@ -2136,11 +2138,13 @@ static bool isConditionTrueViaVFAndUF(VPValue *Cond, VPlan &Plan,
       return isConditionTrueViaVFAndUF(C, Plan, BestVF, BestUF, PSE);
     });
 
-  auto *CanIV = Plan.getVectorLoopRegion()->getCanonicalIV();
-  if (!match(Cond, m_SpecificICmp(
-                       CmpInst::ICMP_EQ,
-                       m_c_Add(m_Specific(CanIV), m_Specific(&Plan.getVFxUF())),
-                       m_Specific(&Plan.getVectorTripCount()))))
+  VPRegionBlock *VectorLoop = Plan.getVectorLoopRegion();
+  auto *CanIV = VectorLoop->getCanonicalIV();
+  if (!match(Cond,
+             m_SpecificICmp(CmpInst::ICMP_EQ,
+                            m_c_Add(m_Specific(CanIV),
+                                    m_Specific(&VectorLoop->getVFxUF())),
+                            m_Specific(&VectorLoop->getVectorTripCount()))))
     return false;
 
   // The compare checks CanIV + VFxUF == vector trip count. The vector trip
@@ -2148,7 +2152,7 @@ static bool isConditionTrueViaVFAndUF(VPValue *Cond, VPlan &Plan,
   // against the original trip count. This is stricter than necessary, as we
   // will only return true if the trip count == vector trip count.
   const SCEV *VectorTripCount =
-      vputils::getSCEVExprForVPValue(&Plan.getVectorTripCount(), PSE);
+      vputils::getSCEVExprForVPValue(&VectorLoop->getVectorTripCount(), PSE);
   if (isa<SCEVCouldNotCompute>(VectorTripCount))
     VectorTripCount = vputils::getSCEVExprForVPValue(Plan.getTripCount(), PSE);
   assert(!isa<SCEVCouldNotCompute>(VectorTripCount) &&
@@ -2202,11 +2206,12 @@ static bool replaceMaskWithCompareForScalarPlan(VPlan &Plan,
 
 /// Return true if the branch \p Term with condition \p Cond (null if \p Term
 /// has no condition operand) is the vector loop's latch check.
-static bool isVectorLatchCheck(VPRecipeBase *Term, VPValue *Cond, VPlan &Plan) {
+static bool isVectorLatchCheck(VPRecipeBase *Term, VPValue *Cond,
+                               VPRegionBlock *VectorRegion) {
   // BranchOnCount compares the canonical IV increment against the vector trip
   // count, plus an offset for epilogue loops.
   VPValue *Offset = nullptr;
-  auto m_CanIVInc = m_Add(m_VPValue(), m_Specific(&Plan.getVFxUF()));
+  auto m_CanIVInc = m_Add(m_VPValue(), m_Specific(&VectorRegion->getVFxUF()));
   if (match(Term,
             m_BranchOnCount(
                 m_CombineOr(m_CanIVInc, m_c_Add(m_CanIVInc, m_VPValue(Offset))),
@@ -2237,12 +2242,12 @@ static bool simplifyBranchConditionForVFAndUF(VPlan &Plan, ElementCount BestVF,
   if (!match(Term, m_BranchOnCond(m_VPValue(Cond))))
     match(Term, m_BranchOnTwoConds(m_VPValue(), m_VPValue(Cond)));
 
-  if (isVectorLatchCheck(Term, Cond, Plan)) {
+  if (isVectorLatchCheck(Term, Cond, VectorRegion)) {
     // Try to simplify the branch condition if VectorTC <= VF * UF when the
     // latch terminator is BranchOnCount or
     // BranchOnCond(Not(ExtractVectorForPart(WideActiveLaneMask), 0))
-    const SCEV *VectorTripCount =
-        vputils::getSCEVExprForVPValue(&Plan.getVectorTripCount(), PSE);
+    const SCEV *VectorTripCount = vputils::getSCEVExprForVPValue(
+        &VectorRegion->getVectorTripCount(), PSE);
     if (isa<SCEVCouldNotCompute>(VectorTripCount))
       VectorTripCount =
           vputils::getSCEVExprForVPValue(Plan.getTripCount(), PSE);
@@ -3060,8 +3065,9 @@ void VPlanTransforms::createInterleaveGroups(
     // the pointer operand of the interleaved access is supposed to be uniform.
     if (IG->isReverse()) {
       auto *ReversePtr = new VPVectorEndPointerRecipe(
-          Addr, &Plan.getVF(), getLoadStoreType(IRInsertPos),
-          -(int64_t)IG->getFactor(), NW, InsertPosR->getDebugLoc());
+          Addr, &Plan.getVectorLoopRegion()->getVF(),
+          getLoadStoreType(IRInsertPos), -(int64_t)IG->getFactor(), NW,
+          InsertPosR->getDebugLoc());
       ReversePtr->insertBefore(InsertPosR);
       Addr = ReversePtr;
     }
@@ -4589,8 +4595,9 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
     return nullptr;
 
   assert(match(&Exiting->back(),
-               m_BranchOnCount(m_Add(m_VPValue(), m_Specific(&Plan.getVFxUF())),
-                               m_Specific(&Plan.getVectorTripCount()))) &&
+               m_BranchOnCount(
+                   m_Add(m_VPValue(), m_Specific(&VectorLoop->getVFxUF())),
+                   m_Specific(&VectorLoop->getVectorTripCount()))) &&
          "unexpected branch-on-count");
 
   SmallVector<VPInterleaveRecipe *> StoreGroups;
@@ -4720,24 +4727,24 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
   VPBasicBlock *VectorPH = Plan.getVectorPreheader();
   VPBuilder PHBuilder(VectorPH, VectorPH->getFirstNonPhi());
 
-  VPValue *UF = &Plan.getUF();
+  VPValue *UF = &VectorLoop->getUF();
   VPValue *Step;
   if (VFToOptimize->isScalable()) {
     VPValue *VScale =
         PHBuilder.createElementCount(CanIVTy, ElementCount::getScalable(1));
     Step = PHBuilder.createOverflowingOp(Instruction::Mul, {VScale, UF},
                                          {true, false});
-    Plan.getVF().replaceAllUsesWith(VScale);
+    VectorLoop->getVF().replaceAllUsesWith(VScale);
   } else {
     Step = UF;
-    Plan.getVF().replaceAllUsesWith(Plan.getConstantInt(CanIVTy, 1));
+    VectorLoop->getVF().replaceAllUsesWith(Plan.getConstantInt(CanIVTy, 1));
   }
   // Materialize vector trip count with the narrowed step.
   materializeVectorTripCount(Plan, VectorPH, /*TailByMasking=*/false,
                              RequiresScalarEpilogue, Step);
 
   CanIVInc->setOperand(1, Step);
-  Plan.getVFxUF().replaceAllUsesWith(Step);
+  VectorLoop->getVFxUF().replaceAllUsesWith(Step);
 
   removeDeadRecipes(Plan);
   assert(none_of(*VectorLoop->getEntryBasicBlock(),
@@ -6404,8 +6411,8 @@ void VPlanTransforms::convertToStridedAccesses(VPlan &Plan,
       if (!I32VF) {
         VPBuilder Builder(Plan.getVectorPreheader());
         I32VF = Builder.createScalarZExtOrTrunc(
-            &Plan.getVF(), Type::getInt32Ty(Plan.getContext()),
-            DebugLoc::getUnknown());
+            &Plan.getVectorLoopRegion()->getVF(),
+            Type::getInt32Ty(Plan.getContext()), DebugLoc::getUnknown());
       }
 
       VPBuilder Builder(&R);

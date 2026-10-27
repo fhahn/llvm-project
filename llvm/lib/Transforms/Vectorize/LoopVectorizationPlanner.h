@@ -556,9 +556,9 @@ public:
       GEPNoWrapFlags ReverseFlags = Plan.hasTailFolded()
                                         ? GEPNoWrapFlags::none()
                                         : Flags.withoutNoUnsignedWrap();
-      return tryInsertInstruction(
-          new VPVectorEndPointerRecipe(Ptr, &Plan.getVF(), SourceElementTy,
-                                       /*Stride=*/-1, ReverseFlags, DL));
+      return tryInsertInstruction(new VPVectorEndPointerRecipe(
+          Ptr, &Plan.getVectorLoopRegion()->getVF(), SourceElementTy,
+          /*Stride=*/-1, ReverseFlags, DL));
     }
     Type *StrideTy = Plan.getDataLayout().getIndexType(Ptr->getScalarType());
     VPValue *StrideOne = Plan.getConstantInt(StrideTy, 1);

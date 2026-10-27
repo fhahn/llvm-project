@@ -86,6 +86,7 @@ static std::optional<Intrinsic::ID> getVPDivRemIntrinsic(Intrinsic::ID IntrID) {
 static VPRecipeBase *optimizeMaskToEVL(VPValue *HeaderMask,
                                        VPRecipeBase &CurRecipe, VPValue &EVL) {
   VPlan *Plan = CurRecipe.getParent()->getPlan();
+  VPValue *VF = &Plan->getVectorLoopRegion()->getVF();
   DebugLoc DL = CurRecipe.getDebugLoc();
   VPValue *Addr, *Mask, *EndPtr;
 
@@ -120,7 +121,7 @@ static VPRecipeBase *optimizeMaskToEVL(VPValue *HeaderMask,
   if (match(&CurRecipe,
             m_MaskedLoad(m_VPValue(EndPtr),
                          m_Reverse(m_RemoveMask(HeaderMask, Mask)))) &&
-      match(EndPtr, m_VecEndPtr(m_VPValue(), m_Specific(&Plan->getVF())))) {
+      match(EndPtr, m_VecEndPtr(m_VPValue(), m_Specific(VF)))) {
     Mask = GetVPReverse(Mask);
     Addr = AdjustEndPtr(EndPtr);
     auto *LoadR = new VPWidenLoadEVLRecipe(cast<VPWidenLoadRecipe>(CurRecipe),
@@ -135,7 +136,7 @@ static VPRecipeBase *optimizeMaskToEVL(VPValue *HeaderMask,
   if (match(&CurRecipe,
             m_Intrinsic<Intrinsic::experimental_vp_strided_load>(
                 m_VPValue(), m_VPValue(), m_RemoveMask(HeaderMask, Mask),
-                m_TruncOrSelf(m_Specific(&Plan->getVF()))))) {
+                m_TruncOrSelf(m_Specific(VF))))) {
     auto *NewLoad = cast<VPWidenMemIntrinsicRecipe>(&CurRecipe)->clone();
     NewLoad->setOperand(2, Mask ? Mask : Plan->getTrue());
     NewLoad->setOperand(3, &EVL);
@@ -151,7 +152,7 @@ static VPRecipeBase *optimizeMaskToEVL(VPValue *HeaderMask,
   if (match(&CurRecipe,
             m_MaskedStore(m_VPValue(EndPtr), m_VPValue(StoredVal),
                           m_Reverse(m_RemoveMask(HeaderMask, Mask)))) &&
-      match(EndPtr, m_VecEndPtr(m_VPValue(), m_Specific(&Plan->getVF())))) {
+      match(EndPtr, m_VecEndPtr(m_VPValue(), m_Specific(VF)))) {
     Mask = GetVPReverse(Mask);
     Addr = AdjustEndPtr(EndPtr);
     VPValue *Poison = Plan->getPoison(StoredVal->getScalarType());
@@ -166,7 +167,7 @@ static VPRecipeBase *optimizeMaskToEVL(VPValue *HeaderMask,
   if (match(&CurRecipe, m_Intrinsic<Intrinsic::experimental_vp_strided_store>(
                             m_VPValue(), m_VPValue(), m_VPValue(),
                             m_RemoveMask(HeaderMask, Mask),
-                            m_TruncOrSelf(m_Specific(&Plan->getVF()))))) {
+                            m_TruncOrSelf(m_Specific(VF))))) {
     auto *NewStore = cast<VPWidenMemIntrinsicRecipe>(&CurRecipe)->clone();
     NewStore->setOperand(3, Mask ? Mask : Plan->getTrue());
     NewStore->setOperand(4, &EVL);
@@ -371,16 +372,16 @@ static void fixupVFUsersForEVL(VPlan &Plan, VPValue &EVL) {
   // EVL is i32 but VF/VFxUF are IdxTy. Convert as needed.
   VPValue *EVLAsIdx =
       VPBuilder::getToInsertAfter(EVL.getDefiningRecipe())
-          .createScalarZExtOrTrunc(&EVL, Plan.getVF().getScalarType(),
+          .createScalarZExtOrTrunc(&EVL, LoopRegion->getVF().getScalarType(),
                                    DebugLoc::getUnknown());
 
-  Plan.getVF().replaceUsesWithIf(
+  LoopRegion->getVF().replaceUsesWithIf(
       EVLAsIdx, IsaPred<VPWidenIntOrFpInductionRecipe, VPScalarIVStepsRecipe>);
 
   // Only replace uses in VPWidenPointerInductionRecipe; The increment of the
   // canonical induction must not be updated.
-  Plan.getVFxUF().replaceUsesWithIf(EVLAsIdx,
-                                    IsaPred<VPWidenPointerInductionRecipe>);
+  LoopRegion->getVFxUF().replaceUsesWithIf(
+      EVLAsIdx, IsaPred<VPWidenPointerInductionRecipe>);
 
   // Create a scalar phi to track the previous EVL if fixed-order recurrence is
   // contained.
@@ -388,7 +389,7 @@ static void fixupVFUsersForEVL(VPlan &Plan, VPValue &EVL) {
       any_of(Header->phis(), IsaPred<VPFirstOrderRecurrencePHIRecipe>);
   if (ContainsFORs) {
     // TODO: Use VPInstruction::ExplicitVectorLength to get maximum EVL.
-    VPValue *MaxEVL = &Plan.getVF();
+    VPValue *MaxEVL = &LoopRegion->getVF();
     // Emit VPScalarCastRecipe in preheader if VF is not a 32 bits integer.
     VPBuilder Builder(LoopRegion->getPreheaderVPBB());
     MaxEVL = Builder.createScalarZExtOrTrunc(
@@ -636,13 +637,13 @@ void VPlanTransforms::convertEVLExitCond(VPlan &Plan) {
     return;
 
   VPValue *CanIVInc;
-  [[maybe_unused]] bool FoundIncrement = match(
-      LatchBr,
-      m_BranchOnCond(m_SpecificCmp(CmpInst::ICMP_EQ, m_VPValue(CanIVInc),
-                                   m_Specific(&Plan.getVectorTripCount()))));
+  [[maybe_unused]] bool FoundIncrement =
+      match(LatchBr, m_BranchOnCond(m_SpecificCmp(
+                         CmpInst::ICMP_EQ, m_VPValue(CanIVInc),
+                         m_Specific(&LoopRegion->getVectorTripCount()))));
   assert(FoundIncrement &&
          match(CanIVInc, m_Add(m_Specific(LoopRegion->getCanonicalIV()),
-                               m_Specific(&Plan.getVFxUF()))) &&
+                               m_Specific(&LoopRegion->getVFxUF()))) &&
          "Expected BranchOnCond with ICmp comparing CanIV + VFxUF with vector "
          "trip count");
 

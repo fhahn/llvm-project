@@ -108,7 +108,7 @@ void VPlanTransforms::replaceWideCanonicalIVWithWideIV(
       InductionDescriptor::getCanonicalIntInduction(CanIVTy, SE);
   VPValue *StepV = Plan.getConstantInt(CanIVTy, 1);
   auto *NewWideIV = new VPWidenIntOrFpInductionRecipe(
-      /*IV=*/nullptr, Plan.getZero(CanIVTy), StepV, &Plan.getVF(), ID,
+      /*IV=*/nullptr, Plan.getZero(CanIVTy), StepV, &LoopRegion->getVF(), ID,
       WideCanIV->getNoWrapFlags(), WideCanIV->getDebugLoc());
   NewWideIV->insertBefore(&*Header->getFirstNonPhi());
   WideCanIV->replaceAllUsesWith(NewWideIV);
@@ -173,10 +173,9 @@ addVPLaneMaskPhiAndUpdateExitBranch(VPlan &Plan) {
   if (!TopRegion->hasCanonicalIVNUW() &&
       !vputils::findIncomingAliasMask(Plan)) {
     IncrementValue = TopRegion->getCanonicalIV();
-    VPValue &VFxUF = Plan.getVFxUF();
-    TC = Builder.createScalarIntrinsic(Intrinsic::usub_sat, {TC, &VFxUF},
-                                       TC->getScalarType(), DL,
-                                       "trip.count.minus.vf");
+    TC = Builder.createScalarIntrinsic(
+        Intrinsic::usub_sat, {TC, &TopRegion->getVFxUF()}, TC->getScalarType(),
+        DL, "trip.count.minus.vf");
   }
 
   // Create the active lane mask for the next iteration of the loop before the
@@ -205,6 +204,7 @@ void VPlanTransforms::materializeHeaderMask(
   VPValue *HeaderMask = LoopRegion->getUsedHeaderMask();
   if (!HeaderMask)
     return;
+  VPValue *TC = Plan.getTripCount();
 
   if (UseActiveLaneMaskForControlFlow) {
     HeaderMask->replaceAllUsesWith(addVPLaneMaskPhiAndUpdateExitBranch(Plan));
@@ -219,13 +219,12 @@ void VPlanTransforms::materializeHeaderMask(
   VPValue *Mask;
   if (UseActiveLaneMask) {
     Mask = Builder.createNaryOp(VPInstruction::ActiveLaneMask,
-                                {WideCanonicalIV, Plan.getTripCount()}, nullptr,
+                                {WideCanonicalIV, TC}, nullptr,
                                 "active.lane.mask");
   } else {
     // Compare against the backedge-taken count, TC - 1, computed in the vector
     // preheader.
     VPBasicBlock *VectorPH = Plan.getVectorPreheader();
-    VPValue *TC = Plan.getTripCount();
     VPValue *BTC =
         VPBuilder(VectorPH, VectorPH->getFirstNonPhi())
             .createSub(TC, Plan.getConstantInt(TC->getScalarType(), 1),
@@ -775,6 +774,7 @@ void VPlanTransforms::materializeConstantVectorTripCount(
   assert(Plan.hasVF(BestVF) && "BestVF is not available in Plan");
   assert(Plan.hasUF(BestUF) && "BestUF is not available in Plan");
 
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
   VPValue *TC = Plan.getTripCount();
   if (TC->user_empty())
     return;
@@ -799,7 +799,7 @@ void VPlanTransforms::materializeConstantVectorTripCount(
   const SCEV *VFxUF = SE.getElementCount(TCScev->getType(), BestVF * BestUF);
   const SCEV *VecTCScev = SE.getMulExpr(SE.getUDivExpr(TCScev, VFxUF), VFxUF);
   if (auto *ConstVecTC = dyn_cast<SCEVConstant>(VecTCScev))
-    Plan.getVectorTripCount().setUnderlyingValue(ConstVecTC->getValue());
+    LoopRegion->getVectorTripCount().setUnderlyingValue(ConstVecTC->getValue());
 }
 
 void VPlanTransforms::materializeUnpacks(VPlan &Plan) {
@@ -849,7 +849,8 @@ void VPlanTransforms::materializeVectorTripCount(
     VPlan &Plan, VPBasicBlock *VectorPHVPBB, bool TailByMasking,
     bool RequiresScalarEpilogue, VPValue *Step,
     std::optional<uint64_t> MaxRuntimeStep) {
-  VPSymbolicValue &VectorTC = Plan.getVectorTripCount();
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  VPSymbolicValue &VectorTC = LoopRegion->getVectorTripCount();
   // There's nothing to do if there are no users of the vector trip count.
   if (VectorTC.user_empty())
     return;
@@ -924,16 +925,17 @@ void VPlanTransforms::materializeFactors(VPlan &Plan, VPBasicBlock *VectorPH,
                                          ElementCount VFEC) {
   // If VF and VFxUF have already been materialized (no remaining users),
   // there's nothing more to do.
-  if (Plan.getVF().isMaterialized()) {
-    assert(Plan.getVFxUF().isMaterialized() &&
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  VPSymbolicValue &VF = LoopRegion->getVF();
+  VPSymbolicValue &VFxUF = LoopRegion->getVFxUF();
+  if (VF.isMaterialized()) {
+    assert(VFxUF.isMaterialized() &&
            "VF and VFxUF must be materialized together");
     return;
   }
 
   VPBuilder Builder(VectorPH, VectorPH->getFirstNonPhi());
   Type *TCTy = Plan.getTripCount()->getScalarType();
-  VPValue &VF = Plan.getVF();
-  VPValue &VFxUF = Plan.getVFxUF();
   // If there are no users of the runtime VF, compute VFxUF by constant folding
   // the multiplication of VF and UF.
   if (VF.user_empty()) {
@@ -1014,14 +1016,15 @@ void VPlanTransforms::materializeAliasMaskCheckBlock(
   VPValue *ClampedVF = materializeAliasMask(Plan, ClampedVFCheck, DiffChecks);
   VPBuilder Builder(ClampedVFCheck);
   DebugLoc DL = DebugLoc::getCompilerGenerated();
-  Type *TCTy = Plan.getTripCount()->getScalarType();
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  VPValue *TripCount = Plan.getTripCount();
+  Type *TCTy = TripCount->getScalarType();
 
   // Check the "ClampedVF" from the alias mask is larger than one.
   VPValue *IsScalar =
       Builder.createICmp(CmpInst::ICMP_ULE, ClampedVF,
                          Plan.getConstantInt(TCTy, 1), DL, "vf.is.scalar");
 
-  VPValue *TripCount = Plan.getTripCount();
   VPValue *MaxUIntTripCount =
       Plan.getConstantInt(cast<IntegerType>(TCTy)->getMask());
   VPValue *DistanceToMax = Builder.createSub(MaxUIntTripCount, TripCount);
@@ -1043,12 +1046,12 @@ void VPlanTransforms::materializeAliasMaskCheckBlock(
   materializeVectorTripCount(Plan, Plan.getVectorPreheader(),
                              /*TailByMasking=*/true,
                              /*RequiresScalarEpilogue=*/false,
-                             &Plan.getVFxUF());
+                             &LoopRegion->getVFxUF());
 
   assert(Plan.getConcreteUF() == 1 &&
          "Clamped VF not supported with interleaving");
-  Plan.getVF().replaceAllUsesWith(ClampedVF);
-  Plan.getVFxUF().replaceAllUsesWith(ClampedVF);
+  LoopRegion->getVF().replaceAllUsesWith(ClampedVF);
+  LoopRegion->getVFxUF().replaceAllUsesWith(ClampedVF);
 }
 
 void VPlanTransforms::expandSCEVsToVPInstructions(VPlan &Plan,

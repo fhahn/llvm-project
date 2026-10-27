@@ -480,7 +480,7 @@ static void createLoopRegion(VPlan &Plan, VPBlockBase *HeaderVPB, DebugLoc DL) {
   bool IsOutermost = HeaderVPB == OutermostHeaderVPBB;
   Type *CanIVTy = nullptr;
   if (IsOutermost)
-    CanIVTy = Plan.getVectorTripCount().getType();
+    CanIVTy = Plan.getIndexType();
   else
     DL = DebugLoc::getUnknown();
   auto *R = Plan.createLoopRegion(CanIVTy, DL);
@@ -505,11 +505,11 @@ static void createLoopRegion(VPlan &Plan, VPBlockBase *HeaderVPB, DebugLoc DL) {
   // Initially the induction increment is guaranteed to not wrap, but that may
   // change later, e.g. when tail-folding, when the flags need to be dropped.
   auto *CanonicalIVIncrement = Builder.createAdd(
-      R->getCanonicalIV(), &Plan.getVFxUF(), DL, "index.next", {true, false});
+      R->getCanonicalIV(), &R->getVFxUF(), DL, "index.next", {true, false});
 
   if (match(LatchTerm, m_BranchOnTwoConds())) {
     auto *IsLatchExitTaken = Builder.createICmp(
-        CmpInst::ICMP_EQ, CanonicalIVIncrement, &Plan.getVectorTripCount());
+        CmpInst::ICMP_EQ, CanonicalIVIncrement, &R->getVectorTripCount());
     LatchTerm->setOperand(1, IsLatchExitTaken);
   } else {
     // We are replacing the branch to exit the region. Remove the original
@@ -517,7 +517,7 @@ static void createLoopRegion(VPlan &Plan, VPBlockBase *HeaderVPB, DebugLoc DL) {
     assert(match(LatchTerm, m_BranchOnCond()) && "Unexpected terminator");
     DebugLoc LatchDL = LatchTerm->getDebugLoc();
     Builder.createNaryOp(VPInstruction::BranchOnCount,
-                         {CanonicalIVIncrement, &Plan.getVectorTripCount()},
+                         {CanonicalIVIncrement, &R->getVectorTripCount()},
                          LatchDL);
     LatchTerm->eraseFromParent();
   }
@@ -1386,10 +1386,10 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
   [[maybe_unused]] bool TermBranchOnCount =
       match(OrigLatch->getTerminator(),
             m_BranchOnCount(m_VPValue(IVInc),
-                            m_Specific(&Plan.getVectorTripCount())));
+                            m_Specific(&LoopRegion->getVectorTripCount())));
   assert(TermBranchOnCount &&
          match(IVInc, m_Add(m_Specific(LoopRegion->getCanonicalIV()),
-                            m_Specific(&Plan.getVFxUF()))) &&
+                            m_Specific(&LoopRegion->getVFxUF()))) &&
          std::next(IVInc->getDefiningRecipe()->getIterator()) ==
              OrigLatch->getTerminator()->getIterator() &&
          "Unexpected canonical iv increment");
@@ -1457,7 +1457,7 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
   assert(match(Plan.getMiddleBlock()->getTerminator(),
                m_BranchOnCond(m_SpecificICmp(
                    CmpInst::ICMP_EQ, m_Specific(Plan.getTripCount()),
-                   m_Specific(&Plan.getVectorTripCount())))) &&
+                   m_Specific(&LoopRegion->getVectorTripCount())))) &&
          "Unexpected MiddleVPBB branch");
   Plan.getMiddleBlock()->getTerminator()->setOperand(0, Plan.getTrue());
 }
@@ -1944,8 +1944,8 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
   // Update resume phis for inductions in the scalar preheader. If AnyNaNLane is
   // true, the resume from the start of the last vector iteration via the
   // canonical IV, otherwise from the original value.
-  auto IsTC = [&Plan](VPValue *V) {
-    return V == &Plan.getVectorTripCount() || V == Plan.getTripCount();
+  auto IsTC = [&Plan, LoopRegion](VPValue *V) {
+    return V == &LoopRegion->getVectorTripCount() || V == Plan.getTripCount();
   };
   for (auto &R : Plan.getScalarPreheader()->phis()) {
     auto *ResumeR = cast<VPPhi>(&R);
