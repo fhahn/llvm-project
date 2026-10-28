@@ -59,6 +59,7 @@ struct VPTransformState;
 class raw_ostream;
 class SCEV;
 class SCEVPredicate;
+class ScalarEvolution;
 class Type;
 class VPBasicBlock;
 struct VPBuilderDefaultInserter;
@@ -4956,6 +4957,103 @@ inline const VPRegionBlock *VPRecipeBase::getRegion() const {
   return getParent()->getParent();
 }
 
+/// A condition that must hold for a VPlan's vector loop to be executed. Like
+/// the predicates of PredicatedScalarEvolution, it is recorded on the plan and
+/// only turned into a runtime check for the executed plan, by
+/// VPlanTransforms::materializePredicates().
+class VPPredicate {
+public:
+  /// An enumeration for keeping track of the concrete subclass of VPPredicate.
+  enum VPPredicateKind { VPMemoryChecksPredicateSC };
+
+  virtual ~VPPredicate() = default;
+
+  VPPredicateKind getKind() const { return Kind; }
+
+  virtual std::unique_ptr<VPPredicate> clone() const = 0;
+
+  /// Name of the block the runtime check is generated in.
+  virtual StringRef getCheckBlockName() const = 0;
+
+  /// Expand the condition under which the predicate does not hold for \p VF
+  /// and \p UF using \p Builder. May also add recipes to the plan's entry, e.g.
+  /// for expressions hoisted out of an outer loop.
+  virtual VPValue *expandNegated(VPBuilder &Builder, ScalarEvolution &SE,
+                                 ElementCount VF, unsigned UF) const = 0;
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  /// Print the predicate to \p O, each line prefixed by \p Indent.
+  virtual void print(raw_ostream &O, const Twine &Indent) const = 0;
+#endif
+
+protected:
+  explicit VPPredicate(VPPredicateKind Kind) : Kind(Kind) {}
+
+private:
+  const VPPredicateKind Kind;
+};
+
+/// The memory accesses of a loop do not alias: the ranges of each pair in
+/// RangeChecks do not overlap and the pointers of each of DiffChecks are far
+/// enough apart for the VF and UF of the plan.
+class VPMemoryChecksPredicate : public VPPredicate {
+public:
+  /// The range [Low, High) of memory accessed in the loop. If NeedsFreeze is
+  /// set, the bounds may be poison and are frozen.
+  struct Range {
+    const SCEV *Low;
+    const SCEV *High;
+    bool NeedsFreeze;
+  };
+
+  /// The ranges at indices A and B into Ranges do not overlap. Strides holds
+  /// the strides the bounds of A and B were widened by that no earlier
+  /// RangeCheck holds; each must be non-negative.
+  struct RangeCheck {
+    unsigned A;
+    unsigned B;
+    SmallVector<const SCEV *, 2> Strides;
+  };
+
+  /// The distance Diff from a source to a sink pointer, each accessing
+  /// AccessSize bytes, is 0 or at least VF * UF * AccessSize. If NeedsFreeze
+  /// is set, the check may be poison and is frozen.
+  struct DiffCheck {
+    const SCEV *Diff;
+    unsigned AccessSize;
+    bool NeedsFreeze;
+  };
+
+private:
+  SmallVector<Range> Ranges;
+  SmallVector<RangeCheck> RangeChecks;
+  SmallVector<DiffCheck> DiffChecks;
+  const Loop *TheLoop;
+
+public:
+  /// Check the runtime checks of \p RtPtrChecking, computed by
+  /// LoopAccessInfo for \p TheLoop.
+  VPMemoryChecksPredicate(const RuntimePointerChecking &RtPtrChecking,
+                          const Loop *TheLoop);
+
+  static bool classof(const VPPredicate *P) {
+    return P->getKind() == VPMemoryChecksPredicateSC;
+  }
+
+  std::unique_ptr<VPPredicate> clone() const override {
+    return std::make_unique<VPMemoryChecksPredicate>(*this);
+  }
+
+  StringRef getCheckBlockName() const override { return "vector.memcheck"; }
+
+  VPValue *expandNegated(VPBuilder &Builder, ScalarEvolution &SE,
+                         ElementCount VF, unsigned UF) const override;
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  void print(raw_ostream &O, const Twine &Indent) const override;
+#endif
+};
+
 /// VPlan models a candidate for vectorization, encoding various decisions take
 /// to produce efficient output IR, including which branches, basic-blocks and
 /// output IR instructions to generate, and their cost. VPlan holds a
@@ -5013,6 +5111,9 @@ class VPlan {
   /// Blocks allocated and owned by the VPlan. They will be deleted once the
   /// VPlan is destroyed.
   SmallVector<VPBlockBase *> CreatedBlocks;
+
+  /// Conditions that must hold for the vector loop to be executed.
+  SmallVector<std::unique_ptr<VPPredicate>> Predicates;
 
   /// Construct a VPlan with \p Entry to the plan and with \p ScalarHeader
   /// wrapping the original header of the scalar loop. The vector loop will have
@@ -5123,6 +5224,31 @@ public:
 
   /// Returns true if \p VPBB is an exit block.
   bool isExitBlock(VPBlockBase *VPBB);
+
+  /// Add \p P to the conditions the vector loop needs.
+  void addPredicate(std::unique_ptr<VPPredicate> P) {
+    Predicates.push_back(std::move(P));
+  }
+
+  /// Return the predicates not materialized as runtime checks yet.
+  ArrayRef<std::unique_ptr<VPPredicate>> getPredicates() const {
+    return Predicates;
+  }
+
+  /// Return the predicate of type \p PredTy, or nullptr if there is none.
+  template <typename PredTy> const PredTy *getPredicate() const {
+    auto It =
+        find_if(Predicates, [](const auto &P) { return isa<PredTy>(P.get()); });
+    return It == Predicates.end() ? nullptr : cast<PredTy>(It->get());
+  }
+
+  /// Remove the predicate of type \p PredTy, if any.
+  template <typename PredTy> void removePredicate() {
+    erase_if(Predicates, [](const auto &P) { return isa<PredTy>(P.get()); });
+  }
+
+  /// Remove all predicates, e.g. once they have been materialized.
+  void clearPredicates() { Predicates.clear(); }
 
   /// The trip count of the original loop.
   VPValue *getTripCount() const {

@@ -1604,38 +1604,74 @@ void VPlanTransforms::attachCheckBlock(VPlan &Plan, Value *Cond,
   attachVPCheckBlock(Plan, CondVPV, CheckBlockVPBB, AddBranchWeights);
 }
 
-/// Generate recipes for the memory runtime checks \p Checks of \p TheLoop
-/// using \p Builder and return the condition that is true if any check fails.
-static VPValue *createRuntimeChecks(VPlan &Plan, VPBuilder &Builder,
-                                    VPSCEVExpander &Expander,
-                                    ArrayRef<RuntimePointerCheck> Checks,
-                                    const Loop *TheLoop, ScalarEvolution &SE,
-                                    DebugLoc DL) {
-  // Expand each group's bounds once so all checks reuse the same frozen values.
-  SmallDenseMap<const RuntimeCheckingPtrGroup *,
-                std::tuple<VPValue *, VPValue *, const SCEV *>, 8>
-      GroupToBounds;
-  for (const auto &[A, B] : Checks) {
-    for (const RuntimeCheckingPtrGroup *CG : {A, B}) {
-      if (GroupToBounds.contains(CG))
-        continue;
-      auto [Low, High, Stride] = getRuntimeCheckBounds(
-          CG, TheLoop, SE, VectorizerParams::HoistRuntimeChecks);
-      VPValue *Start = Expander.expand(Low);
-      VPValue *End = Expander.expand(High);
-      if (CG->NeedsFreeze) {
-        Start = Builder.createFreeze(Start, DL);
-        End = Builder.createFreeze(End, DL);
-      }
-      GroupToBounds[CG] = {Start, End, Stride};
+VPMemoryChecksPredicate::VPMemoryChecksPredicate(
+    const RuntimePointerChecking &RtPtrChecking, const Loop *TheLoop)
+    : VPPredicate(VPMemoryChecksPredicateSC), TheLoop(TheLoop) {
+  assert(!RtPtrChecking.getChecks().empty() && "No checks to generate");
+  ScalarEvolution &SE = *RtPtrChecking.getSE();
+  if (auto LAADiffChecks = RtPtrChecking.getDiffChecks()) {
+    // Record each distance once per access size.
+    SmallDenseSet<std::pair<const SCEV *, unsigned>, 8> Seen;
+    for (const auto &[SrcStart, SinkStart, AccessSize, NeedsFreeze] :
+         *LAADiffChecks) {
+      const SCEV *Diff = SE.getMinusSCEV(SinkStart, SrcStart);
+      if (Seen.insert({Diff, AccessSize}).second)
+        DiffChecks.push_back({Diff, AccessSize, NeedsFreeze});
     }
+    return;
   }
 
-  VPValue *Cond = Plan.getFalse();
+  // Record the range of each group once, in the order of the checks. A stride
+  // the bounds of a range were widened by is checked once, with the first
+  // check using the range. Return the index of the range of CG, adding it and
+  // its stride to Check on its first use.
+  SmallDenseMap<const RuntimeCheckingPtrGroup *, unsigned, 8> GroupToRange;
   SmallPtrSet<const SCEV *, 4> CheckedStrides;
-  for (const auto &[A, B] : Checks) {
-    auto [AStart, AEnd, AStride] = GroupToBounds[A];
-    auto [BStart, BEnd, BStride] = GroupToBounds[B];
+  auto GetOrAddRange = [&](const RuntimeCheckingPtrGroup *CG,
+                           RangeCheck &Check) {
+    auto [It, Inserted] = GroupToRange.try_emplace(CG, Ranges.size());
+    if (Inserted) {
+      auto [Low, High, Stride] = getRuntimeCheckBounds(
+          CG, TheLoop, SE, VectorizerParams::HoistRuntimeChecks);
+      Ranges.push_back({Low, High, CG->NeedsFreeze});
+      if (Stride && CheckedStrides.insert(Stride).second)
+        Check.Strides.push_back(Stride);
+    }
+    return It->second;
+  };
+  for (const auto &[A, B] : RtPtrChecking.getChecks()) {
+    RangeCheck &Check = RangeChecks.emplace_back();
+    Check.A = GetOrAddRange(A, Check);
+    Check.B = GetOrAddRange(B, Check);
+  }
+}
+
+VPValue *VPMemoryChecksPredicate::expandNegated(VPBuilder &Builder,
+                                                ScalarEvolution &SE,
+                                                ElementCount VF,
+                                                unsigned UF) const {
+  VPlan &Plan = Builder.getPlan();
+  DebugLoc DL = TheLoop->getStartLoc();
+  // For inner loops of loop nests, expand the parts of the checks invariant in
+  // the parent loop outside of it.
+  VPSCEVExpander Expander(Builder, SE, DL, TheLoop->getParentLoop());
+  VPValue *Cond = Plan.getFalse();
+
+  // Expand the bounds of each range once, before all checks, so they reuse the
+  // same frozen values.
+  SmallVector<std::pair<VPValue *, VPValue *>> Bounds;
+  for (const auto &[Low, High, NeedsFreeze] : Ranges) {
+    VPValue *Start = Expander.expand(Low);
+    VPValue *End = Expander.expand(High);
+    if (NeedsFreeze) {
+      Start = Builder.createFreeze(Start, DL);
+      End = Builder.createFreeze(End, DL);
+    }
+    Bounds.emplace_back(Start, End);
+  }
+  for (const auto &[AIdx, BIdx, Strides] : RangeChecks) {
+    auto [AStart, AEnd] = Bounds[AIdx];
+    auto [BStart, BEnd] = Bounds[BIdx];
     // Compare B's bounds in A's address space, see addRuntimeChecks.
     Type *PtrTy = AStart->getScalarType();
     if (BStart->getScalarType() != PtrTy) {
@@ -1650,9 +1686,7 @@ static VPValue *createRuntimeChecks(VPlan &Plan, VPBuilder &Builder,
         Builder.createICmp(CmpInst::ICMP_ULT, BStart, AEnd, DL, "bound1");
     VPValue *IsConflict =
         Builder.createAnd(Bound0, Bound1, DL, "found.conflict");
-    for (const SCEV *Stride : {AStride, BStride}) {
-      if (!Stride || !CheckedStrides.insert(Stride).second)
-        continue;
+    for (const SCEV *Stride : Strides) {
       VPValue *StrideV = Expander.expand(Stride);
       VPValue *IsNegative = Builder.createICmp(
           CmpInst::ICMP_SLT, StrideV, Plan.getZero(StrideV->getScalarType()),
@@ -1661,41 +1695,19 @@ static VPValue *createRuntimeChecks(VPlan &Plan, VPBuilder &Builder,
     }
     Cond = Builder.createOr(Cond, IsConflict, DL, "conflict.rdx");
   }
-  return Cond;
-}
 
-/// Generate recipes for the memory runtime difference checks \p Checks using
-/// \p Builder and return the condition that is true if any check fails. Each
-/// difference is compared against a threshold derived from \p VF and \p UF.
-static VPValue *createDiffRuntimeChecks(VPlan &Plan, VPBuilder &Builder,
-                                        VPSCEVExpander &Expander,
-                                        ArrayRef<PointerDiffInfo> Checks,
-                                        ScalarEvolution &SE, ElementCount VF,
-                                        unsigned UF, DebugLoc DL) {
-  // Set of operand pairs of already created compares, to allow detecting and
-  // re-using redundant compares.
-  SmallDenseSet<std::pair<const SCEV *, const SCEV *>, 8> SeenCompares;
-  VPValue *Cond = Plan.getFalse();
-  for (const auto &[SrcStart, SinkStart, AccessSize, NeedsFreeze] : Checks) {
+  for (const auto &[Diff, AccessSize, NeedsFreeze] : DiffChecks) {
     assert(UF * AccessSize > 0 &&
            "Threshold must be non-zero to use diff-check");
-    Type *Ty = SinkStart->getType();
+    Type *Ty = Diff->getType();
     const SCEV *TotalAccessSize = SE.getElementCount(Ty, VF * UF * AccessSize);
-    const SCEV *ThresholdMinusOneSCEV =
-        SE.getMinusSCEV(TotalAccessSize, SE.getOne(Ty));
-    const SCEV *DiffSCEV = SE.getMinusSCEV(SinkStart, SrcStart);
-
-    // If the same compare has already been created earlier, there is no need to
-    // check it again.
-    if (!SeenCompares.insert({DiffSCEV, ThresholdMinusOneSCEV}).second)
-      continue;
-
-    VPValue *ThresholdMinusOne = Expander.expand(ThresholdMinusOneSCEV);
-    VPValue *Diff = Expander.expand(DiffSCEV);
+    VPValue *ThresholdMinusOne =
+        Expander.expand(SE.getMinusSCEV(TotalAccessSize, SE.getOne(Ty)));
+    VPValue *DiffV = Expander.expand(Diff);
     // Use (Diff - 1) <u (Threshold - 1), equivalent to 0 <u Diff <u Threshold,
     // to exclude Diff == 0 (equal pointers are safe).
     VPValue *DiffMinusOne =
-        Builder.createSub(Diff, Plan.getConstantInt(Ty, 1), DL);
+        Builder.createSub(DiffV, Plan.getConstantInt(Ty, 1), DL);
     VPValue *IsConflict = Builder.createICmp(
         CmpInst::ICMP_ULT, DiffMinusOne, ThresholdMinusOne, DL, "diff.check");
     if (NeedsFreeze)
@@ -1705,24 +1717,33 @@ static VPValue *createDiffRuntimeChecks(VPlan &Plan, VPBuilder &Builder,
   return Cond;
 }
 
-void VPlanTransforms::attachMemoryChecks(
-    VPlan &Plan, const RuntimePointerChecking &RtPtrChecking,
-    const Loop *TheLoop, ScalarEvolution &SE, ElementCount VF, unsigned UF,
-    bool AddBranchWeights) {
-  assert(!RtPtrChecking.getChecks().empty() && "No checks to generate");
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+void VPMemoryChecksPredicate::print(raw_ostream &O, const Twine &Indent) const {
+  // Print the checks in the order expandNegated generates them. The stride and
+  // difference checks are negated to the condition that must hold.
+  for (const auto &[AIdx, BIdx, Strides] : RangeChecks) {
+    const Range &A = Ranges[AIdx], &B = Ranges[BIdx];
+    O << Indent << "memory range check: [" << *A.Low << ", " << *A.High
+      << ") and [" << *B.Low << ", " << *B.High << ")\n";
+    for (const SCEV *Stride : Strides)
+      O << Indent << "memory stride check: " << *Stride << " sge 0\n";
+  }
+  for (const DiffCheck &DC : DiffChecks)
+    O << Indent << "memory diff check: (" << *DC.Diff << " - 1) uge (VF * UF * "
+      << DC.AccessSize << " - 1)\n";
+}
+#endif
 
-  DebugLoc DL = TheLoop->getStartLoc();
-  auto *MemCheckVPBB = Plan.createVPBasicBlock("vector.memcheck");
-  VPBuilder Builder(MemCheckVPBB);
-  VPSCEVExpander Expander(Builder, SE, DL, TheLoop->getParentLoop());
-  auto DiffChecks = RtPtrChecking.getDiffChecks();
-  VPValue *Cond =
-      DiffChecks
-          ? createDiffRuntimeChecks(Plan, Builder, Expander, *DiffChecks, SE,
-                                    VF, UF, DL)
-          : createRuntimeChecks(Plan, Builder, Expander,
-                                RtPtrChecking.getChecks(), TheLoop, SE, DL);
-  attachVPCheckBlock(Plan, Cond, MemCheckVPBB, AddBranchWeights);
+void VPlanTransforms::materializePredicates(VPlan &Plan, ScalarEvolution &SE,
+                                            ElementCount VF, unsigned UF,
+                                            bool AddBranchWeights) {
+  for (const auto &P : Plan.getPredicates()) {
+    auto *CheckVPBB = Plan.createVPBasicBlock(P->getCheckBlockName());
+    VPBuilder Builder(CheckVPBB);
+    attachVPCheckBlock(Plan, P->expandNegated(Builder, SE, VF, UF), CheckVPBB,
+                       AddBranchWeights);
+  }
+  Plan.clearPredicates();
 }
 
 void VPlanTransforms::addMinimumIterationCheck(
