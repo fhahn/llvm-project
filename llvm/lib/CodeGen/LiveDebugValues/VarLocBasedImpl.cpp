@@ -2257,13 +2257,19 @@ bool VarLocBasedLDV::ExtendRanges(MachineFunction &MF,
       DICompileUnit::NoDebug)
     return false;
 
+  // Scan all DBG_VALUEs, including those inside bundles, for fragment overlaps.
+  OverlapMap OverlapFragments;
+  VarToFragments SeenFragments;
+  for (auto &MBB : MF)
+    for (auto &MI : MBB.instrs())
+      if (MI.isDebugValue())
+        accumulateFragmentMap(MI, SeenFragments, OverlapFragments);
+
   // All variable locations originate from DBG_VALUEs; without any there is
-  // nothing to track (e.g. at -O0, where variables live in stack slots). Still
-  // return true, as the dataflow below reports a change on visiting any block.
-  if (none_of(MF, [](const MachineBasicBlock &MBB) {
-        return any_of(MBB.instrs(),
-                      [](const MachineInstr &MI) { return MI.isDebugValue(); });
-      }))
+  // nothing to track (e.g. at -O0, where stack variables are described by the
+  // MachineFunction's variable table instead). Still return true, as the
+  // dataflow below reports a change on visiting any block.
+  if (SeenFragments.empty())
     return true;
 
   TRI = MF.getSubtarget().getRegisterInfo();
@@ -2279,7 +2285,6 @@ bool VarLocBasedLDV::ExtendRanges(MachineFunction &MF,
   bool MBBJoined = false;
 
   VarLocMap VarLocIDs;         // Map VarLoc<>unique ID for use in bitvectors.
-  OverlapMap OverlapFragments; // Map of overlapping variable fragments.
   OpenRangesSet OpenRanges(Alloc, OverlapFragments);
                               // Ranges that are open until end of bb.
   VarLocInMBB OutLocs;        // Ranges that exist beyond bb.
@@ -2290,8 +2295,6 @@ bool VarLocBasedLDV::ExtendRanges(MachineFunction &MF,
   InstToEntryLocMap EntryValTransfers;
   // Map a Register to the last MI which clobbered it.
   RegDefToInstMap RegSetInstrs;
-
-  VarToFragments SeenFragments;
 
   // Blocks which are artificial, i.e. blocks which exclusively contain
   // instructions without locations, or with line 0 locations.
@@ -2318,12 +2321,6 @@ bool VarLocBasedLDV::ExtendRanges(MachineFunction &MF,
     if (MI.isDebugValue())
       recordEntryValue(MI, DefinedRegs, OpenRanges, VarLocIDs);
   }
-
-  // Initialize per-block structures and scan for fragment overlaps.
-  for (auto &MBB : MF)
-    for (auto &MI : MBB)
-      if (MI.isDebugValue())
-        accumulateFragmentMap(MI, SeenFragments, OverlapFragments);
 
   auto hasNonArtificialLocation = [](const MachineInstr &MI) -> bool {
     if (const DebugLoc &DL = MI.getDebugLoc())
