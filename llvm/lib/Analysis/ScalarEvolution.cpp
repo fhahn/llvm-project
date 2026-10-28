@@ -16169,45 +16169,33 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
 
   // Now that all rewrite information is collect, rewrite the collected
   // expressions with the information in the map. This applies information to
-  // sub-expressions. Rewrite each expression after the collected expressions
-  // whose rewrites its rewrite uses, so it picks up their final form. If there
-  // is a cycle or a long dependency chain, keep the collection order for all
-  // of them.
+  // sub-expressions. The rewriter uses the rewrite of a collected expression
+  // as is, so finalize it before its first use. An expression is removed from
+  // the map while it is finalized, so its rewrite is not applied to itself. If
+  // rewrites depend on each other in a cycle, the rewriter thus does not see
+  // the one being finalized, and rewrites its sub-expressions instead.
   if (ExprsToRewrite.size() > 1) {
+    // Bound the recursion. Beyond MaxDepth, rewrites are used unfinalized.
     constexpr unsigned MaxDepth = 16;
-    SmallPtrSet<const SCEV *, 16> ToVisit(llvm::from_range, ExprsToRewrite);
-    SmallPtrSet<const SCEV *, MaxDepth> InProgress;
-    SmallVector<SCEVUse> Order;
-    // Returns false on a cycle or if the chain is longer than MaxDepth.
-    std::function<bool(const SCEV *)> Visit = [&](const SCEV *Expr) {
-      if (!ToVisit.erase(Expr))
-        return !InProgress.contains(Expr);
-      if (InProgress.size() >= MaxDepth)
-        return false;
-      InProgress.insert(Expr);
+    unsigned FinalizeDepth = 0;
+    SmallPtrSet<const SCEV *, 16> ToFinalize(llvm::from_range, ExprsToRewrite);
+    std::function<void(const SCEV *)> Finalize = [&](const SCEV *Expr) {
+      if (FinalizeDepth == MaxDepth || !ToFinalize.erase(Expr))
+        return;
       const SCEV *RewriteTo = Guards.RewriteMap[Expr];
       Guards.RewriteMap.erase(Expr);
-      SmallVector<const SCEV *> UsedKeys;
-      Guards.rewrite(RewriteTo, &UsedKeys);
+      ++FinalizeDepth;
+      RewriteTo = Guards.rewrite(RewriteTo, Finalize);
+      --FinalizeDepth;
       Guards.RewriteMap[Expr] = RewriteTo;
-      if (!all_of(UsedKeys, Visit))
-        return false;
-      InProgress.erase(Expr);
-      Order.push_back(Expr);
-      return true;
     };
-    if (all_of(ExprsToRewrite, Visit))
-      ExprsToRewrite = std::move(Order);
-    for (const SCEV *Expr : ExprsToRewrite) {
-      const SCEV *RewriteTo = Guards.RewriteMap[Expr];
-      Guards.RewriteMap.erase(Expr);
-      Guards.RewriteMap.insert({Expr, Guards.rewrite(RewriteTo)});
-    }
+    for (const SCEV *Expr : ExprsToRewrite)
+      Finalize(Expr);
   }
 }
 
 const SCEV *ScalarEvolution::LoopGuards::rewrite(
-    const SCEV *Expr, SmallVectorImpl<const SCEV *> *UsedKeys) const {
+    const SCEV *Expr, function_ref<void(const SCEV *)> BeforeUse) const {
   /// A rewriter to replace SCEV expressions in Map with the corresponding entry
   /// in the map. It skips AddRecExpr because we cannot guarantee that the
   /// replacement is loop invariant in the loop of the AddRec.
@@ -16215,23 +16203,22 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(
       : public SCEVRewriteVisitor<SCEVLoopGuardRewriter> {
     const DenseMap<const SCEV *, const SCEV *> &Map;
     const SmallDenseSet<std::pair<const SCEV *, const SCEV *>> &NotEqual;
-    SmallVectorImpl<const SCEV *> *UsedKeys;
+    function_ref<void(const SCEV *)> BeforeUse;
 
     SCEVFlags FlagMask = SCEV::FlagNone;
 
     const SCEV *lookup(const SCEV *Key) {
-      const SCEV *S = Map.lookup(Key);
-      if (S && UsedKeys)
-        UsedKeys->push_back(Key);
-      return S;
+      if (BeforeUse && Map.contains(Key))
+        BeforeUse(Key);
+      return Map.lookup(Key);
     }
 
   public:
     SCEVLoopGuardRewriter(ScalarEvolution &SE,
                           const ScalarEvolution::LoopGuards &Guards,
-                          SmallVectorImpl<const SCEV *> *UsedKeys)
+                          function_ref<void(const SCEV *)> BeforeUse)
         : SCEVRewriteVisitor(SE), Map(Guards.RewriteMap),
-          NotEqual(Guards.NotEqual), UsedKeys(UsedKeys) {
+          NotEqual(Guards.NotEqual), BeforeUse(BeforeUse) {
       if (Guards.PreserveNUW)
         FlagMask = ScalarEvolution::setFlags(FlagMask, SCEV::FlagNUW);
       if (Guards.PreserveNSW)
@@ -16265,7 +16252,7 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(
              Bitwidth > Op->getType()->getScalarSizeInBits()) {
         Type *NarrowTy = IntegerType::get(SE.getContext(), Bitwidth);
         auto *NarrowExt = SE.getZeroExtendExpr(Op, NarrowTy);
-        if (const SCEV *S = Map.lookup(NarrowExt))
+        if (const SCEV *S = lookup(NarrowExt))
           return SE.getZeroExtendExpr(S, Ty);
         Bitwidth = Bitwidth / 2;
       }
@@ -16386,7 +16373,7 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(
   if (RewriteMap.empty() && NotEqual.empty())
     return Expr;
 
-  SCEVLoopGuardRewriter Rewriter(SE, *this, UsedKeys);
+  SCEVLoopGuardRewriter Rewriter(SE, *this, BeforeUse);
   return Rewriter.visit(Expr);
 }
 

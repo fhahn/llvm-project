@@ -183,9 +183,10 @@ exit:
   ret void
 }
 
-; The rewrites of %tc and %c contain each other. Finalizing them in dependency
-; order would rewrite %c with the not yet finalized rewrite of %tc and lose
-; the bound on %j, so the collection order is kept.
+; The rewrites of %tc and %c contain each other. Rewriting %c with the not yet
+; finalized rewrite of %tc would lose the bound on %j. While %tc is finalized,
+; %c is finalized without the rewrite of %tc, applying the bound on %j to the
+; operands of %tc instead.
 define void @cycle_keeps_order(i64 %c, i8 %j) {
 ; CHECK-LABEL: 'cycle_keeps_order'
 ; CHECK-NEXT:  Determining loop execution counts for: @cycle_keeps_order
@@ -219,12 +220,12 @@ exit:
 }
 
 ; Same as @umin_uge_16, but with the cycle from @cycle_keeps_order in the same
-; block. The collection order is kept for all expressions.
+; block. The cycle does not prevent picking up the bound on %k.
 define void @umin_plus_unrelated_cycle(i64 %n, i8 %k, i64 %c, i8 %j) {
 ; CHECK-LABEL: 'umin_plus_unrelated_cycle'
 ; CHECK-NEXT:  Determining loop execution counts for: @umin_plus_unrelated_cycle
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-16 + (16 * (zext i3 (trunc i64 (((zext i8 (64 + (-1 * %k)) to i64) umin %n) /u 16) to i3) to i64))<nuw><nsw>)<nsw> /u 16)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 1152921504606846975
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 3
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-16 + (16 * (zext i3 (trunc i64 (((zext i8 (64 + (-1 * %k)) to i64) umin %n) /u 16) to i3) to i64))<nuw><nsw>)<nsw> /u 16)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;

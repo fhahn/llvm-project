@@ -1625,11 +1625,12 @@ public:
       return Guards;
     }
 
-    /// Try to apply the collected loop guards to \p Expr. If \p UsedKeys is
-    /// not null, add the expressions whose rewrites are used to it.
+    /// Try to apply the collected loop guards to \p Expr. If \p BeforeUse is
+    /// set, it is called with each expression whose rewrite is about to be
+    /// used, and may update that rewrite.
     LLVM_ABI const SCEV *
     rewrite(const SCEV *Expr,
-            SmallVectorImpl<const SCEV *> *UsedKeys = nullptr) const;
+            function_ref<void(const SCEV *)> BeforeUse = nullptr) const;
   };
 
   /// Try to apply information from loop guards for \p L to \p Expr.
