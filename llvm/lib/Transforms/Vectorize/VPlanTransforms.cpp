@@ -5341,10 +5341,11 @@ createPartialReductionExpression(VPReductionRecipe *Red) {
 }
 
 // Helper to transform a PartialReductionDescriptor into a partial reduction
-// recipe. Assumes profitability has been checked.
-static void transformToPartialReduction(const PartialReductionDescriptor &Link,
-                                        VPlan &Plan,
-                                        VPReductionPHIRecipe *RdxPhi) {
+// recipe. Assumes profitability has been checked. Returns the condition of the
+// partial reduction.
+static VPValue *
+transformToPartialReduction(const PartialReductionDescriptor &Link, VPlan &Plan,
+                            VPReductionPHIRecipe *RdxPhi) {
   VPWidenRecipe *WidenRecipe = Link.ReductionBinOp;
   assert(WidenRecipe->getNumOperands() == 2 && "Expected binary operation");
 
@@ -5436,8 +5437,8 @@ static void transformToPartialReduction(const PartialReductionDescriptor &Link,
       RdxKind,
       RdxKind == RecurKind::FAdd ? WidenRecipe->getFastMathFlagsOrNone()
                                  : FastMathFlags(),
-      WidenRecipe->getUnderlyingInstr(), Accumulator, ExtendedOp, Cond,
-      RdxUnordered{/*VFScaleFactor=*/Link.ScaleFactor});
+      cast_or_null<Instruction>(WidenRecipe->getUnderlyingValue()), Accumulator,
+      ExtendedOp, Cond, RdxUnordered{/*VFScaleFactor=*/Link.ScaleFactor});
   PartialRed->insertBefore(WidenRecipe);
 
   if (ExitValue)
@@ -5450,6 +5451,7 @@ static void transformToPartialReduction(const PartialReductionDescriptor &Link,
   VPExpressionRecipe *E = createPartialReductionExpression(PartialRed);
   E->insertBefore(WidenRecipe);
   PartialRed->replaceAllUsesWith(E);
+  return Cond;
 }
 
 /// Returns the cost of a link in a partial-reduction chain for a given VF.
@@ -5721,6 +5723,101 @@ static void updatePartialReductionPhiAndResult(VPlan &Plan,
   RdxResult->replaceUsesWithIf(NewResult, not_equal_to(NewResult));
 }
 
+/// Emulate \p Link if it is add(acc, mul(sext(S), zext(U))) and the target has
+/// no native mixed-sign partial reduction (i.e. it is more expensive than an
+/// unsigned one), using sext(S) == zext(S ^ SignMask) - SignMask:
+///   sum(sext(S) * zext(U)) == sum(zext(S ^ SignMask) * zext(U))
+///                             - (sum(zext(U)) << (bits(S) - 1))
+/// sum(zext(U)) is accumulated by a separate add reduction, shared by all
+/// links with the same U and condition, and subtracted after the loop, keeping
+/// it off the loop-carried dependency chain. Returns true if \p Link has been
+/// transformed.
+static bool emulateMixedSignLink(
+    VPlan &Plan, VPCostContext &CostCtx, VFRange &Range,
+    const PartialReductionDescriptor &Link, VPReductionPHIRecipe *RdxPhi,
+    SmallDenseMap<std::pair<VPValue *, VPValue *>, VPValue *> &ZExtSums) {
+  VPWidenRecipe *Mul = Link.ExtendedOp.ExtendsUser;
+  VPValue *S, *U;
+  Type *RdxTy = RdxPhi->getScalarType();
+  if (Link.RK != RecurKind::Add ||
+      Link.ReductionBinOp->getOpcode() != Instruction::Add ||
+      !match(Mul, m_c_Mul(m_SExt(m_VPValue(S)), m_ZExt(m_VPValue(U)))) ||
+      S->getScalarType() != U->getScalarType() || Mul->getScalarType() != RdxTy)
+    return false;
+  Type *SrcTy = S->getScalarType();
+  auto GetCost = [&](ElementCount VF, ExtendKind ExtS, Type *TyU) {
+    return CostCtx.TTI.getPartialReductionCost(
+        Instruction::Add, SrcTy, TyU, RdxTy, VF, ExtS,
+        TyU ? ExtendKind::PR_ZeroExtend : ExtendKind::PR_None,
+        TyU ? std::optional<unsigned>(Instruction::Mul) : std::nullopt,
+        CostCtx.CostKind, std::nullopt);
+  };
+  if (!LoopVectorizationPlanner::getDecisionAndClampRange(
+          [&](ElementCount VF) {
+            return GetCost(VF, ExtendKind::PR_ZeroExtend, nullptr).isValid() &&
+                   GetCost(VF, ExtendKind::PR_ZeroExtend, SrcTy) <
+                       GetCost(VF, ExtendKind::PR_SignExtend, SrcTy);
+          },
+          Range))
+    return false;
+
+  // Replace sext(S) by zext(S ^ SignMask).
+  unsigned SExtIdx = match(Mul->getOperand(0), m_SExt(m_VPValue())) ? 0 : 1;
+  unsigned Bits = SrcTy->getScalarSizeInBits();
+  VPBuilder Builder(Mul);
+  VPValue *Flipped = Builder.insert(new VPWidenRecipe(
+      Instruction::Xor, {S, Plan.getConstantInt(APInt::getSignMask(Bits))},
+      VPIRFlags::getDefaultFlags(Instruction::Xor)));
+  Mul->setOperand(SExtIdx,
+                  Builder.createWidenCast(Instruction::ZExt, Flipped, RdxTy));
+  // zext(S ^ SignMask) * zext(U) may wrap where sext(S) * zext(U) does not.
+  Mul->dropPoisonGeneratingFlags();
+  VPValue *Cond = transformToPartialReduction(Link, Plan, RdxPhi);
+
+  // Create the reduction of zext(U), masked by Cond, and turn it into a
+  // partial reduction.
+  VPValue *&Sum = ZExtSums[{U, Cond}];
+  if (!Sum) {
+    VPValue *Zero = Plan.getZero(RdxTy);
+    VPValue *Start =
+        VPBuilder(Plan.getVectorPreheader())
+            .createNaryOp(VPInstruction::ReductionStartVector,
+                          {Zero, Zero, Plan.getConstantInt(32, 1)});
+    auto *SumPhi = new VPReductionPHIRecipe(
+        /*Phi=*/nullptr, RecurKind::Add, *Start, *Start, RdxUnordered{1}, {},
+        /*HasUsesOutsideReductionChain=*/false);
+    VPBasicBlock *Header = RdxPhi->getParent();
+    SumPhi->insertBefore(Header->getFirstNonPhi());
+    Builder.setInsertPoint(Link.ReductionBinOp);
+    VPValue *Next = Builder.insert(new VPWidenRecipe(
+        Instruction::Add,
+        {SumPhi, Builder.createWidenCast(Instruction::ZExt, U, RdxTy)},
+        VPIRFlags::getDefaultFlags(Instruction::Add)));
+    if (Cond)
+      Next = Builder.createSelect(Cond, Next, SumPhi);
+    SumPhi->setOperand(1, Next);
+    VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
+    Sum = VPBuilder(MiddleVPBB->getFirstNonPhi())
+              .createNaryOp(VPInstruction::ComputeReductionResult, {Next},
+                            VPIRFlags(RecurKind::Add, /*IsOrdered=*/false,
+                                      /*IsInLoop=*/false, FastMathFlags()));
+    const PartialReductionDescriptor &SumLink =
+        getScaledReductionChain(SumPhi)->front();
+    transformToPartialReduction(SumLink, Plan, SumPhi);
+    updatePartialReductionPhiAndResult(Plan, SumPhi, SumLink.ScaleFactor,
+                                       RecurKind::Add);
+  }
+
+  VPInstruction *RdxResult = vputils::findComputeReductionResult(RdxPhi);
+  VPBuilder MiddleBuilder = VPBuilder::getToInsertAfter(RdxResult);
+  DebugLoc DL = RdxPhi->getDebugLoc();
+  VPValue *Scaled = MiddleBuilder.createOverflowingOp(
+      Instruction::Shl, {Sum, Plan.getConstantInt(RdxTy, Bits - 1)}, {}, DL);
+  VPInstruction *Corrected = MiddleBuilder.createSub(RdxResult, Scaled, DL);
+  RdxResult->replaceUsesWithIf(Corrected, not_equal_to(Corrected));
+  return true;
+}
+
 void VPlanTransforms::createPartialReductions(VPlan &Plan,
                                               VPCostContext &CostCtx,
                                               VFRange &Range) {
@@ -5885,12 +5982,14 @@ void VPlanTransforms::createPartialReductions(VPlan &Plan,
       Chain.clear();
   }
 
+  SmallDenseMap<std::pair<VPValue *, VPValue *>, VPValue *> ZExtSums;
   for (auto &[Phi, Chain] : PhiToChain) {
     if (Chain.empty())
       continue;
 
     for (const PartialReductionDescriptor &Link : Chain)
-      transformToPartialReduction(Link, Plan, Phi);
+      if (!emulateMixedSignLink(Plan, CostCtx, Range, Link, Phi, ZExtSums))
+        transformToPartialReduction(Link, Plan, Phi);
 
     // After transforming all links in the chain, the PHI node and result need
     // updating. Note that we can pick any link in the chain for this, as the

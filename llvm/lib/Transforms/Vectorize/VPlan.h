@@ -3362,9 +3362,10 @@ public:
   ~VPReductionRecipe() override = default;
 
   VPReductionRecipe *clone() override {
-    return new VPReductionRecipe(RdxKind, getFastMathFlagsOrNone(),
-                                 getUnderlyingInstr(), getChainOp(), getVecOp(),
-                                 getCondOp(), Style, getDebugLoc());
+    return new VPReductionRecipe(
+        RdxKind, getFastMathFlagsOrNone(),
+        cast_or_null<Instruction>(getUnderlyingValue()), getChainOp(),
+        getVecOp(), getCondOp(), Style, getDebugLoc());
   }
 
   static inline bool classof(const VPRecipeBase *R) {

@@ -19,6 +19,8 @@ define i32 @sudot(ptr %a, ptr %b) {
 ; DOTPROD-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; DOTPROD-NEXT:    [[VEC_PHI:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE:%.*]], %[[VECTOR_BODY]] ]
 ; DOTPROD-NEXT:    [[VEC_PHI1:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE5:%.*]], %[[VECTOR_BODY]] ]
+; DOTPROD-NEXT:    [[VEC_PHI2:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE8:%.*]], %[[VECTOR_BODY]] ]
+; DOTPROD-NEXT:    [[VEC_PHI3:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE9:%.*]], %[[VECTOR_BODY]] ]
 ; DOTPROD-NEXT:    [[TMP0:%.*]] = getelementptr i8, ptr [[A]], i64 [[INDEX]]
 ; DOTPROD-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[TMP0]], i64 16
 ; DOTPROD-NEXT:    [[WIDE_LOAD:%.*]] = load <16 x i8>, ptr [[TMP0]], align 1
@@ -27,23 +29,31 @@ define i32 @sudot(ptr %a, ptr %b) {
 ; DOTPROD-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[TMP2]], i64 16
 ; DOTPROD-NEXT:    [[WIDE_LOAD3:%.*]] = load <16 x i8>, ptr [[TMP2]], align 1
 ; DOTPROD-NEXT:    [[WIDE_LOAD4:%.*]] = load <16 x i8>, ptr [[TMP3]], align 1
-; DOTPROD-NEXT:    [[TMP4:%.*]] = sext <16 x i8> [[WIDE_LOAD]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP12:%.*]] = xor <16 x i8> [[WIDE_LOAD]], splat (i8 -128)
+; DOTPROD-NEXT:    [[TMP13:%.*]] = xor <16 x i8> [[WIDE_LOAD2]], splat (i8 -128)
+; DOTPROD-NEXT:    [[TMP4:%.*]] = zext <16 x i8> [[TMP12]] to <16 x i32>
 ; DOTPROD-NEXT:    [[TMP5:%.*]] = zext <16 x i8> [[WIDE_LOAD3]] to <16 x i32>
 ; DOTPROD-NEXT:    [[TMP6:%.*]] = mul <16 x i32> [[TMP4]], [[TMP5]]
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI]], <16 x i32> [[TMP6]])
-; DOTPROD-NEXT:    [[TMP7:%.*]] = sext <16 x i8> [[WIDE_LOAD2]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP7:%.*]] = zext <16 x i8> [[TMP13]] to <16 x i32>
 ; DOTPROD-NEXT:    [[TMP8:%.*]] = zext <16 x i8> [[WIDE_LOAD4]] to <16 x i32>
 ; DOTPROD-NEXT:    [[TMP9:%.*]] = mul <16 x i32> [[TMP7]], [[TMP8]]
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE5]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI1]], <16 x i32> [[TMP9]])
+; DOTPROD-NEXT:    [[PARTIAL_REDUCE8]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI2]], <16 x i32> [[TMP5]])
+; DOTPROD-NEXT:    [[PARTIAL_REDUCE9]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI3]], <16 x i32> [[TMP8]])
 ; DOTPROD-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 32
 ; DOTPROD-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
 ; DOTPROD-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; DOTPROD:       [[MIDDLE_BLOCK]]:
-; DOTPROD-NEXT:    [[BIN_RDX:%.*]] = add <4 x i32> [[PARTIAL_REDUCE5]], [[PARTIAL_REDUCE]]
+; DOTPROD-NEXT:    [[BIN_RDX:%.*]] = add <4 x i32> [[PARTIAL_REDUCE9]], [[PARTIAL_REDUCE8]]
 ; DOTPROD-NEXT:    [[TMP11:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX]])
+; DOTPROD-NEXT:    [[BIN_RDX10:%.*]] = add <4 x i32> [[PARTIAL_REDUCE5]], [[PARTIAL_REDUCE]]
+; DOTPROD-NEXT:    [[TMP14:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX10]])
+; DOTPROD-NEXT:    [[TMP15:%.*]] = shl i32 [[TMP11]], 7
+; DOTPROD-NEXT:    [[TMP16:%.*]] = sub i32 [[TMP14]], [[TMP15]]
 ; DOTPROD-NEXT:    br label %[[EXIT:.*]]
 ; DOTPROD:       [[EXIT]]:
-; DOTPROD-NEXT:    ret i32 [[TMP11]]
+; DOTPROD-NEXT:    ret i32 [[TMP16]]
 ;
 ; I8MM-LABEL: define i32 @sudot(
 ; I8MM-SAME: ptr [[A:%.*]], ptr [[B:%.*]]) #[[ATTR0:[0-9]+]] {
@@ -117,6 +127,8 @@ define i32 @usdot_start(ptr %a, ptr %b, i32 %start) {
 ; DOTPROD-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; DOTPROD-NEXT:    [[VEC_PHI:%.*]] = phi <4 x i32> [ [[TMP0]], %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE:%.*]], %[[VECTOR_BODY]] ]
 ; DOTPROD-NEXT:    [[VEC_PHI1:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE5:%.*]], %[[VECTOR_BODY]] ]
+; DOTPROD-NEXT:    [[VEC_PHI2:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE8:%.*]], %[[VECTOR_BODY]] ]
+; DOTPROD-NEXT:    [[VEC_PHI3:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE9:%.*]], %[[VECTOR_BODY]] ]
 ; DOTPROD-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[INDEX]]
 ; DOTPROD-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[TMP1]], i64 16
 ; DOTPROD-NEXT:    [[WIDE_LOAD:%.*]] = load <16 x i8>, ptr [[TMP1]], align 1
@@ -125,23 +137,31 @@ define i32 @usdot_start(ptr %a, ptr %b, i32 %start) {
 ; DOTPROD-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[TMP3]], i64 16
 ; DOTPROD-NEXT:    [[WIDE_LOAD3:%.*]] = load <16 x i8>, ptr [[TMP3]], align 1
 ; DOTPROD-NEXT:    [[WIDE_LOAD4:%.*]] = load <16 x i8>, ptr [[TMP4]], align 1
+; DOTPROD-NEXT:    [[TMP9:%.*]] = xor <16 x i8> [[WIDE_LOAD3]], splat (i8 -128)
+; DOTPROD-NEXT:    [[TMP6:%.*]] = xor <16 x i8> [[WIDE_LOAD4]], splat (i8 -128)
 ; DOTPROD-NEXT:    [[TMP5:%.*]] = zext <16 x i8> [[WIDE_LOAD]] to <16 x i32>
-; DOTPROD-NEXT:    [[TMP6:%.*]] = sext <16 x i8> [[WIDE_LOAD3]] to <16 x i32>
-; DOTPROD-NEXT:    [[TMP7:%.*]] = mul nsw <16 x i32> [[TMP5]], [[TMP6]]
+; DOTPROD-NEXT:    [[TMP13:%.*]] = zext <16 x i8> [[TMP9]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP7:%.*]] = mul <16 x i32> [[TMP5]], [[TMP13]]
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI]], <16 x i32> [[TMP7]])
 ; DOTPROD-NEXT:    [[TMP8:%.*]] = zext <16 x i8> [[WIDE_LOAD2]] to <16 x i32>
-; DOTPROD-NEXT:    [[TMP9:%.*]] = sext <16 x i8> [[WIDE_LOAD4]] to <16 x i32>
-; DOTPROD-NEXT:    [[TMP10:%.*]] = mul nsw <16 x i32> [[TMP8]], [[TMP9]]
+; DOTPROD-NEXT:    [[TMP14:%.*]] = zext <16 x i8> [[TMP6]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP10:%.*]] = mul <16 x i32> [[TMP8]], [[TMP14]]
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE5]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI1]], <16 x i32> [[TMP10]])
+; DOTPROD-NEXT:    [[PARTIAL_REDUCE8]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI2]], <16 x i32> [[TMP5]])
+; DOTPROD-NEXT:    [[PARTIAL_REDUCE9]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI3]], <16 x i32> [[TMP8]])
 ; DOTPROD-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 32
 ; DOTPROD-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
 ; DOTPROD-NEXT:    br i1 [[TMP11]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; DOTPROD:       [[MIDDLE_BLOCK]]:
-; DOTPROD-NEXT:    [[BIN_RDX:%.*]] = add <4 x i32> [[PARTIAL_REDUCE5]], [[PARTIAL_REDUCE]]
+; DOTPROD-NEXT:    [[BIN_RDX:%.*]] = add <4 x i32> [[PARTIAL_REDUCE9]], [[PARTIAL_REDUCE8]]
 ; DOTPROD-NEXT:    [[TMP12:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX]])
+; DOTPROD-NEXT:    [[BIN_RDX10:%.*]] = add <4 x i32> [[PARTIAL_REDUCE5]], [[PARTIAL_REDUCE]]
+; DOTPROD-NEXT:    [[TMP15:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX10]])
+; DOTPROD-NEXT:    [[TMP16:%.*]] = shl i32 [[TMP12]], 7
+; DOTPROD-NEXT:    [[TMP17:%.*]] = sub i32 [[TMP15]], [[TMP16]]
 ; DOTPROD-NEXT:    br label %[[EXIT:.*]]
 ; DOTPROD:       [[EXIT]]:
-; DOTPROD-NEXT:    ret i32 [[TMP12]]
+; DOTPROD-NEXT:    ret i32 [[TMP17]]
 ;
 ; I8MM-LABEL: define i32 @usdot_start(
 ; I8MM-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i32 [[START:%.*]]) #[[ATTR0]] {
@@ -207,10 +227,7 @@ exit:
 define void @sudot_shared_unsigned(ptr %x, ptr %w0, ptr %w1, ptr %w2, ptr %out, i64 %n) {
 ; DOTPROD-LABEL: define void @sudot_shared_unsigned(
 ; DOTPROD-SAME: ptr [[X:%.*]], ptr [[W0:%.*]], ptr [[W1:%.*]], ptr [[W2:%.*]], ptr [[OUT:%.*]], i64 [[N:%.*]]) #[[ATTR0]] {
-; DOTPROD-NEXT:  [[ITER_CHECK:.*]]:
-; DOTPROD-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 8
-; DOTPROD-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH:.*]], label %[[VECTOR_MAIN_LOOP_ITER_CHECK:.*]]
-; DOTPROD:       [[VECTOR_MAIN_LOOP_ITER_CHECK]]:
+; DOTPROD-NEXT:  [[VECTOR_MAIN_LOOP_ITER_CHECK:.*:]]
 ; DOTPROD-NEXT:    [[MIN_ITERS_CHECK1:%.*]] = icmp ult i64 [[N]], 32
 ; DOTPROD-NEXT:    br i1 [[MIN_ITERS_CHECK1]], label %[[VEC_EPILOG_PH:.*]], label %[[VECTOR_PH:.*]]
 ; DOTPROD:       [[VECTOR_PH]]:
@@ -225,6 +242,8 @@ define void @sudot_shared_unsigned(ptr %x, ptr %w0, ptr %w1, ptr %w2, ptr %out, 
 ; DOTPROD-NEXT:    [[VEC_PHI4:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE14:%.*]], %[[VECTOR_BODY]] ]
 ; DOTPROD-NEXT:    [[VEC_PHI5:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE17:%.*]], %[[VECTOR_BODY]] ]
 ; DOTPROD-NEXT:    [[VEC_PHI6:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE18:%.*]], %[[VECTOR_BODY]] ]
+; DOTPROD-NEXT:    [[VEC_PHI8:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE12:%.*]], %[[VECTOR_BODY]] ]
+; DOTPROD-NEXT:    [[VEC_PHI7:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE15:%.*]], %[[VECTOR_BODY]] ]
 ; DOTPROD-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[X]], i64 [[INDEX]]
 ; DOTPROD-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[TMP1]], i64 16
 ; DOTPROD-NEXT:    [[WIDE_LOAD:%.*]] = load <16 x i8>, ptr [[TMP1]], align 1
@@ -233,134 +252,61 @@ define void @sudot_shared_unsigned(ptr %x, ptr %w0, ptr %w1, ptr %w2, ptr %out, 
 ; DOTPROD-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[TMP3]], i64 16
 ; DOTPROD-NEXT:    [[WIDE_LOAD8:%.*]] = load <16 x i8>, ptr [[TMP3]], align 1
 ; DOTPROD-NEXT:    [[WIDE_LOAD9:%.*]] = load <16 x i8>, ptr [[TMP4]], align 1
-; DOTPROD-NEXT:    [[TMP5:%.*]] = sext <16 x i8> [[WIDE_LOAD8]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP5:%.*]] = xor <16 x i8> [[WIDE_LOAD8]], splat (i8 -128)
+; DOTPROD-NEXT:    [[TMP8:%.*]] = xor <16 x i8> [[WIDE_LOAD9]], splat (i8 -128)
+; DOTPROD-NEXT:    [[TMP13:%.*]] = zext <16 x i8> [[TMP5]] to <16 x i32>
 ; DOTPROD-NEXT:    [[TMP6:%.*]] = zext <16 x i8> [[WIDE_LOAD]] to <16 x i32>
-; DOTPROD-NEXT:    [[TMP7:%.*]] = mul nsw <16 x i32> [[TMP5]], [[TMP6]]
+; DOTPROD-NEXT:    [[TMP7:%.*]] = mul <16 x i32> [[TMP13]], [[TMP6]]
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI]], <16 x i32> [[TMP7]])
-; DOTPROD-NEXT:    [[TMP8:%.*]] = sext <16 x i8> [[WIDE_LOAD9]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP21:%.*]] = zext <16 x i8> [[TMP8]] to <16 x i32>
 ; DOTPROD-NEXT:    [[TMP9:%.*]] = zext <16 x i8> [[WIDE_LOAD7]] to <16 x i32>
-; DOTPROD-NEXT:    [[TMP10:%.*]] = mul nsw <16 x i32> [[TMP8]], [[TMP9]]
+; DOTPROD-NEXT:    [[TMP10:%.*]] = mul <16 x i32> [[TMP21]], [[TMP9]]
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE10]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI2]], <16 x i32> [[TMP10]])
+; DOTPROD-NEXT:    [[PARTIAL_REDUCE12]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI8]], <16 x i32> [[TMP6]])
+; DOTPROD-NEXT:    [[PARTIAL_REDUCE15]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI7]], <16 x i32> [[TMP9]])
 ; DOTPROD-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr [[W1]], i64 [[INDEX]]
 ; DOTPROD-NEXT:    [[TMP12:%.*]] = getelementptr i8, ptr [[TMP11]], i64 16
 ; DOTPROD-NEXT:    [[WIDE_LOAD11:%.*]] = load <16 x i8>, ptr [[TMP11]], align 1
 ; DOTPROD-NEXT:    [[WIDE_LOAD12:%.*]] = load <16 x i8>, ptr [[TMP12]], align 1
-; DOTPROD-NEXT:    [[TMP13:%.*]] = sext <16 x i8> [[WIDE_LOAD11]] to <16 x i32>
-; DOTPROD-NEXT:    [[TMP14:%.*]] = mul nsw <16 x i32> [[TMP13]], [[TMP6]]
+; DOTPROD-NEXT:    [[TMP15:%.*]] = xor <16 x i8> [[WIDE_LOAD11]], splat (i8 -128)
+; DOTPROD-NEXT:    [[TMP28:%.*]] = xor <16 x i8> [[WIDE_LOAD12]], splat (i8 -128)
+; DOTPROD-NEXT:    [[TMP29:%.*]] = zext <16 x i8> [[TMP15]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP14:%.*]] = mul <16 x i32> [[TMP29]], [[TMP6]]
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE13]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI3]], <16 x i32> [[TMP14]])
-; DOTPROD-NEXT:    [[TMP15:%.*]] = sext <16 x i8> [[WIDE_LOAD12]] to <16 x i32>
-; DOTPROD-NEXT:    [[TMP16:%.*]] = mul nsw <16 x i32> [[TMP15]], [[TMP9]]
+; DOTPROD-NEXT:    [[TMP19:%.*]] = zext <16 x i8> [[TMP28]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP16:%.*]] = mul <16 x i32> [[TMP19]], [[TMP9]]
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE14]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI4]], <16 x i32> [[TMP16]])
 ; DOTPROD-NEXT:    [[TMP17:%.*]] = getelementptr i8, ptr [[W2]], i64 [[INDEX]]
 ; DOTPROD-NEXT:    [[TMP18:%.*]] = getelementptr i8, ptr [[TMP17]], i64 16
 ; DOTPROD-NEXT:    [[WIDE_LOAD15:%.*]] = load <16 x i8>, ptr [[TMP17]], align 1
 ; DOTPROD-NEXT:    [[WIDE_LOAD16:%.*]] = load <16 x i8>, ptr [[TMP18]], align 1
-; DOTPROD-NEXT:    [[TMP19:%.*]] = sext <16 x i8> [[WIDE_LOAD15]] to <16 x i32>
-; DOTPROD-NEXT:    [[TMP20:%.*]] = mul nsw <16 x i32> [[TMP6]], [[TMP19]]
+; DOTPROD-NEXT:    [[TMP30:%.*]] = xor <16 x i8> [[WIDE_LOAD15]], splat (i8 -128)
+; DOTPROD-NEXT:    [[TMP31:%.*]] = xor <16 x i8> [[WIDE_LOAD16]], splat (i8 -128)
+; DOTPROD-NEXT:    [[TMP34:%.*]] = zext <16 x i8> [[TMP30]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP20:%.*]] = mul <16 x i32> [[TMP6]], [[TMP34]]
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE17]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI5]], <16 x i32> [[TMP20]])
-; DOTPROD-NEXT:    [[TMP21:%.*]] = sext <16 x i8> [[WIDE_LOAD16]] to <16 x i32>
-; DOTPROD-NEXT:    [[TMP22:%.*]] = mul nsw <16 x i32> [[TMP9]], [[TMP21]]
+; DOTPROD-NEXT:    [[TMP27:%.*]] = zext <16 x i8> [[TMP31]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP22:%.*]] = mul <16 x i32> [[TMP9]], [[TMP27]]
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE18]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI6]], <16 x i32> [[TMP22]])
 ; DOTPROD-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 32
 ; DOTPROD-NEXT:    [[TMP23:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; DOTPROD-NEXT:    br i1 [[TMP23]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; DOTPROD:       [[MIDDLE_BLOCK]]:
-; DOTPROD-NEXT:    [[BIN_RDX:%.*]] = add <4 x i32> [[PARTIAL_REDUCE10]], [[PARTIAL_REDUCE]]
+; DOTPROD-NEXT:    [[BIN_RDX:%.*]] = add <4 x i32> [[PARTIAL_REDUCE15]], [[PARTIAL_REDUCE12]]
 ; DOTPROD-NEXT:    [[TMP24:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX]])
-; DOTPROD-NEXT:    [[BIN_RDX19:%.*]] = add <4 x i32> [[PARTIAL_REDUCE14]], [[PARTIAL_REDUCE13]]
+; DOTPROD-NEXT:    [[BIN_RDX19:%.*]] = add <4 x i32> [[PARTIAL_REDUCE10]], [[PARTIAL_REDUCE]]
 ; DOTPROD-NEXT:    [[TMP25:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX19]])
-; DOTPROD-NEXT:    [[BIN_RDX20:%.*]] = add <4 x i32> [[PARTIAL_REDUCE18]], [[PARTIAL_REDUCE17]]
+; DOTPROD-NEXT:    [[TMP32:%.*]] = shl i32 [[TMP24]], 7
+; DOTPROD-NEXT:    [[TMP33:%.*]] = sub i32 [[TMP25]], [[TMP32]]
+; DOTPROD-NEXT:    [[BIN_RDX20:%.*]] = add <4 x i32> [[PARTIAL_REDUCE14]], [[PARTIAL_REDUCE13]]
 ; DOTPROD-NEXT:    [[TMP26:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX20]])
+; DOTPROD-NEXT:    [[TMP35:%.*]] = sub i32 [[TMP26]], [[TMP32]]
+; DOTPROD-NEXT:    [[BIN_RDX24:%.*]] = add <4 x i32> [[PARTIAL_REDUCE18]], [[PARTIAL_REDUCE17]]
+; DOTPROD-NEXT:    [[TMP36:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX24]])
+; DOTPROD-NEXT:    [[TMP37:%.*]] = sub i32 [[TMP36]], [[TMP32]]
 ; DOTPROD-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
-; DOTPROD-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
-; DOTPROD:       [[VEC_EPILOG_ITER_CHECK]]:
-; DOTPROD-NEXT:    [[MIN_EPILOG_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 8
-; DOTPROD-NEXT:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF5:![0-9]+]]
+; DOTPROD-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[VEC_EPILOG_PH]]
 ; DOTPROD:       [[VEC_EPILOG_PH]]:
-; DOTPROD-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
-; DOTPROD-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i32 [ [[TMP24]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
-; DOTPROD-NEXT:    [[BC_MERGE_RDX21:%.*]] = phi i32 [ [[TMP25]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
-; DOTPROD-NEXT:    [[BC_MERGE_RDX22:%.*]] = phi i32 [ [[TMP26]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
-; DOTPROD-NEXT:    [[TMP27:%.*]] = and i64 [[N]], 7
-; DOTPROD-NEXT:    [[N_VEC23:%.*]] = sub i64 [[N]], [[TMP27]]
-; DOTPROD-NEXT:    [[TMP28:%.*]] = insertelement <2 x i32> zeroinitializer, i32 [[BC_MERGE_RDX]], i64 0
-; DOTPROD-NEXT:    [[TMP29:%.*]] = insertelement <2 x i32> zeroinitializer, i32 [[BC_MERGE_RDX21]], i64 0
-; DOTPROD-NEXT:    [[TMP30:%.*]] = insertelement <2 x i32> zeroinitializer, i32 [[BC_MERGE_RDX22]], i64 0
-; DOTPROD-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
-; DOTPROD:       [[VEC_EPILOG_VECTOR_BODY]]:
-; DOTPROD-NEXT:    [[INDEX24:%.*]] = phi i64 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT35:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
-; DOTPROD-NEXT:    [[VEC_PHI25:%.*]] = phi <2 x i32> [ [[TMP28]], %[[VEC_EPILOG_PH]] ], [ [[PARTIAL_REDUCE30:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
-; DOTPROD-NEXT:    [[VEC_PHI26:%.*]] = phi <2 x i32> [ [[TMP29]], %[[VEC_EPILOG_PH]] ], [ [[PARTIAL_REDUCE32:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
-; DOTPROD-NEXT:    [[VEC_PHI27:%.*]] = phi <2 x i32> [ [[TMP30]], %[[VEC_EPILOG_PH]] ], [ [[PARTIAL_REDUCE34:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
-; DOTPROD-NEXT:    [[TMP31:%.*]] = getelementptr i8, ptr [[X]], i64 [[INDEX24]]
-; DOTPROD-NEXT:    [[WIDE_LOAD28:%.*]] = load <8 x i8>, ptr [[TMP31]], align 1
-; DOTPROD-NEXT:    [[TMP32:%.*]] = getelementptr i8, ptr [[W0]], i64 [[INDEX24]]
-; DOTPROD-NEXT:    [[WIDE_LOAD29:%.*]] = load <8 x i8>, ptr [[TMP32]], align 1
-; DOTPROD-NEXT:    [[TMP33:%.*]] = sext <8 x i8> [[WIDE_LOAD29]] to <8 x i32>
-; DOTPROD-NEXT:    [[TMP34:%.*]] = zext <8 x i8> [[WIDE_LOAD28]] to <8 x i32>
-; DOTPROD-NEXT:    [[TMP35:%.*]] = mul nsw <8 x i32> [[TMP33]], [[TMP34]]
-; DOTPROD-NEXT:    [[PARTIAL_REDUCE30]] = call <2 x i32> @llvm.vector.partial.reduce.add.v2i32.v8i32(<2 x i32> [[VEC_PHI25]], <8 x i32> [[TMP35]])
-; DOTPROD-NEXT:    [[TMP36:%.*]] = getelementptr i8, ptr [[W1]], i64 [[INDEX24]]
-; DOTPROD-NEXT:    [[WIDE_LOAD31:%.*]] = load <8 x i8>, ptr [[TMP36]], align 1
-; DOTPROD-NEXT:    [[TMP37:%.*]] = sext <8 x i8> [[WIDE_LOAD31]] to <8 x i32>
-; DOTPROD-NEXT:    [[TMP38:%.*]] = mul nsw <8 x i32> [[TMP37]], [[TMP34]]
-; DOTPROD-NEXT:    [[PARTIAL_REDUCE32]] = call <2 x i32> @llvm.vector.partial.reduce.add.v2i32.v8i32(<2 x i32> [[VEC_PHI26]], <8 x i32> [[TMP38]])
-; DOTPROD-NEXT:    [[TMP39:%.*]] = getelementptr i8, ptr [[W2]], i64 [[INDEX24]]
-; DOTPROD-NEXT:    [[WIDE_LOAD33:%.*]] = load <8 x i8>, ptr [[TMP39]], align 1
-; DOTPROD-NEXT:    [[TMP40:%.*]] = sext <8 x i8> [[WIDE_LOAD33]] to <8 x i32>
-; DOTPROD-NEXT:    [[TMP41:%.*]] = mul nsw <8 x i32> [[TMP34]], [[TMP40]]
-; DOTPROD-NEXT:    [[PARTIAL_REDUCE34]] = call <2 x i32> @llvm.vector.partial.reduce.add.v2i32.v8i32(<2 x i32> [[VEC_PHI27]], <8 x i32> [[TMP41]])
-; DOTPROD-NEXT:    [[INDEX_NEXT35]] = add nuw i64 [[INDEX24]], 8
-; DOTPROD-NEXT:    [[TMP42:%.*]] = icmp eq i64 [[INDEX_NEXT35]], [[N_VEC23]]
-; DOTPROD-NEXT:    br i1 [[TMP42]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
-; DOTPROD:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
-; DOTPROD-NEXT:    [[TMP43:%.*]] = call i32 @llvm.vector.reduce.add.v2i32(<2 x i32> [[PARTIAL_REDUCE30]])
-; DOTPROD-NEXT:    [[TMP44:%.*]] = call i32 @llvm.vector.reduce.add.v2i32(<2 x i32> [[PARTIAL_REDUCE32]])
-; DOTPROD-NEXT:    [[TMP45:%.*]] = call i32 @llvm.vector.reduce.add.v2i32(<2 x i32> [[PARTIAL_REDUCE34]])
-; DOTPROD-NEXT:    [[CMP_N36:%.*]] = icmp eq i64 [[N]], [[N_VEC23]]
-; DOTPROD-NEXT:    br i1 [[CMP_N36]], label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]]
-; DOTPROD:       [[VEC_EPILOG_SCALAR_PH]]:
-; DOTPROD-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC23]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[N_VEC]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[ITER_CHECK]] ]
-; DOTPROD-NEXT:    [[BC_MERGE_RDX37:%.*]] = phi i32 [ [[TMP43]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP24]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[ITER_CHECK]] ]
-; DOTPROD-NEXT:    [[BC_MERGE_RDX38:%.*]] = phi i32 [ [[TMP44]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP25]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[ITER_CHECK]] ]
-; DOTPROD-NEXT:    [[BC_MERGE_RDX39:%.*]] = phi i32 [ [[TMP45]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP26]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[ITER_CHECK]] ]
-; DOTPROD-NEXT:    br label %[[LOOP:.*]]
-; DOTPROD:       [[LOOP]]:
-; DOTPROD-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; DOTPROD-NEXT:    [[ACC0:%.*]] = phi i32 [ [[BC_MERGE_RDX37]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[ADD0:%.*]], %[[LOOP]] ]
-; DOTPROD-NEXT:    [[ACC1:%.*]] = phi i32 [ [[BC_MERGE_RDX38]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[ADD1:%.*]], %[[LOOP]] ]
-; DOTPROD-NEXT:    [[ACC2:%.*]] = phi i32 [ [[BC_MERGE_RDX39]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[ADD2:%.*]], %[[LOOP]] ]
-; DOTPROD-NEXT:    [[GEP_X:%.*]] = getelementptr i8, ptr [[X]], i64 [[IV]]
-; DOTPROD-NEXT:    [[LOAD_X:%.*]] = load i8, ptr [[GEP_X]], align 1
-; DOTPROD-NEXT:    [[EXT_X:%.*]] = zext i8 [[LOAD_X]] to i32
-; DOTPROD-NEXT:    [[GEP_W0:%.*]] = getelementptr i8, ptr [[W0]], i64 [[IV]]
-; DOTPROD-NEXT:    [[LOAD_W0:%.*]] = load i8, ptr [[GEP_W0]], align 1
-; DOTPROD-NEXT:    [[EXT_W0:%.*]] = sext i8 [[LOAD_W0]] to i32
-; DOTPROD-NEXT:    [[MUL0:%.*]] = mul nsw i32 [[EXT_W0]], [[EXT_X]]
-; DOTPROD-NEXT:    [[ADD0]] = add i32 [[MUL0]], [[ACC0]]
-; DOTPROD-NEXT:    [[GEP_W1:%.*]] = getelementptr i8, ptr [[W1]], i64 [[IV]]
-; DOTPROD-NEXT:    [[LOAD_W1:%.*]] = load i8, ptr [[GEP_W1]], align 1
-; DOTPROD-NEXT:    [[EXT_W1:%.*]] = sext i8 [[LOAD_W1]] to i32
-; DOTPROD-NEXT:    [[MUL1:%.*]] = mul nsw i32 [[EXT_W1]], [[EXT_X]]
-; DOTPROD-NEXT:    [[ADD1]] = add i32 [[MUL1]], [[ACC1]]
-; DOTPROD-NEXT:    [[GEP_W2:%.*]] = getelementptr i8, ptr [[W2]], i64 [[IV]]
-; DOTPROD-NEXT:    [[LOAD_W2:%.*]] = load i8, ptr [[GEP_W2]], align 1
-; DOTPROD-NEXT:    [[EXT_W2:%.*]] = sext i8 [[LOAD_W2]] to i32
-; DOTPROD-NEXT:    [[MUL2:%.*]] = mul nsw i32 [[EXT_X]], [[EXT_W2]]
-; DOTPROD-NEXT:    [[ADD2]] = add i32 [[ACC2]], [[MUL2]]
-; DOTPROD-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
-; DOTPROD-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
-; DOTPROD-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP7:![0-9]+]]
-; DOTPROD:       [[EXIT]]:
-; DOTPROD-NEXT:    [[ADD0_LCSSA:%.*]] = phi i32 [ [[ADD0]], %[[LOOP]] ], [ [[TMP24]], %[[MIDDLE_BLOCK]] ], [ [[TMP43]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ]
-; DOTPROD-NEXT:    [[ADD1_LCSSA:%.*]] = phi i32 [ [[ADD1]], %[[LOOP]] ], [ [[TMP25]], %[[MIDDLE_BLOCK]] ], [ [[TMP44]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ]
-; DOTPROD-NEXT:    [[ADD2_LCSSA:%.*]] = phi i32 [ [[ADD2]], %[[LOOP]] ], [ [[TMP26]], %[[MIDDLE_BLOCK]] ], [ [[TMP45]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ]
-; DOTPROD-NEXT:    store i32 [[ADD0_LCSSA]], ptr [[OUT]], align 4
-; DOTPROD-NEXT:    [[OUT_1:%.*]] = getelementptr i32, ptr [[OUT]], i64 1
-; DOTPROD-NEXT:    store i32 [[ADD1_LCSSA]], ptr [[OUT_1]], align 4
-; DOTPROD-NEXT:    [[OUT_2:%.*]] = getelementptr i32, ptr [[OUT]], i64 2
-; DOTPROD-NEXT:    store i32 [[ADD2_LCSSA]], ptr [[OUT_2]], align 4
-; DOTPROD-NEXT:    ret void
 ;
 ; I8MM-LABEL: define void @sudot_shared_unsigned(
 ; I8MM-SAME: ptr [[X:%.*]], ptr [[W0:%.*]], ptr [[W1:%.*]], ptr [[W2:%.*]], ptr [[OUT:%.*]], i64 [[N:%.*]]) #[[ATTR0]] {
@@ -571,6 +517,8 @@ define i32 @sudot_chain_shared_unsigned(ptr %x, ptr %w0, ptr %w1) {
 ; DOTPROD-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; DOTPROD-NEXT:    [[VEC_PHI:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE8:%.*]], %[[VECTOR_BODY]] ]
 ; DOTPROD-NEXT:    [[VEC_PHI1:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE9:%.*]], %[[VECTOR_BODY]] ]
+; DOTPROD-NEXT:    [[VEC_PHI2:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE10:%.*]], %[[VECTOR_BODY]] ]
+; DOTPROD-NEXT:    [[VEC_PHI3:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE11:%.*]], %[[VECTOR_BODY]] ]
 ; DOTPROD-NEXT:    [[TMP0:%.*]] = getelementptr i8, ptr [[X]], i64 [[INDEX]]
 ; DOTPROD-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[TMP0]], i64 16
 ; DOTPROD-NEXT:    [[WIDE_LOAD:%.*]] = load <16 x i8>, ptr [[TMP0]], align 1
@@ -579,33 +527,44 @@ define i32 @sudot_chain_shared_unsigned(ptr %x, ptr %w0, ptr %w1) {
 ; DOTPROD-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[TMP2]], i64 16
 ; DOTPROD-NEXT:    [[WIDE_LOAD3:%.*]] = load <16 x i8>, ptr [[TMP2]], align 1
 ; DOTPROD-NEXT:    [[WIDE_LOAD4:%.*]] = load <16 x i8>, ptr [[TMP3]], align 1
-; DOTPROD-NEXT:    [[TMP4:%.*]] = sext <16 x i8> [[WIDE_LOAD3]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP4:%.*]] = xor <16 x i8> [[WIDE_LOAD3]], splat (i8 -128)
+; DOTPROD-NEXT:    [[TMP7:%.*]] = xor <16 x i8> [[WIDE_LOAD4]], splat (i8 -128)
+; DOTPROD-NEXT:    [[TMP12:%.*]] = zext <16 x i8> [[TMP4]] to <16 x i32>
 ; DOTPROD-NEXT:    [[TMP5:%.*]] = zext <16 x i8> [[WIDE_LOAD]] to <16 x i32>
-; DOTPROD-NEXT:    [[TMP6:%.*]] = mul nsw <16 x i32> [[TMP4]], [[TMP5]]
+; DOTPROD-NEXT:    [[TMP6:%.*]] = mul <16 x i32> [[TMP12]], [[TMP5]]
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE:%.*]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI]], <16 x i32> [[TMP6]])
-; DOTPROD-NEXT:    [[TMP7:%.*]] = sext <16 x i8> [[WIDE_LOAD4]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP19:%.*]] = zext <16 x i8> [[TMP7]] to <16 x i32>
 ; DOTPROD-NEXT:    [[TMP8:%.*]] = zext <16 x i8> [[WIDE_LOAD2]] to <16 x i32>
-; DOTPROD-NEXT:    [[TMP9:%.*]] = mul nsw <16 x i32> [[TMP7]], [[TMP8]]
+; DOTPROD-NEXT:    [[TMP9:%.*]] = mul <16 x i32> [[TMP19]], [[TMP8]]
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE5:%.*]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI1]], <16 x i32> [[TMP9]])
+; DOTPROD-NEXT:    [[PARTIAL_REDUCE10]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI2]], <16 x i32> [[TMP5]])
+; DOTPROD-NEXT:    [[PARTIAL_REDUCE11]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI3]], <16 x i32> [[TMP8]])
 ; DOTPROD-NEXT:    [[TMP10:%.*]] = getelementptr i8, ptr [[W1]], i64 [[INDEX]]
 ; DOTPROD-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr [[TMP10]], i64 16
 ; DOTPROD-NEXT:    [[WIDE_LOAD6:%.*]] = load <16 x i8>, ptr [[TMP10]], align 1
 ; DOTPROD-NEXT:    [[WIDE_LOAD7:%.*]] = load <16 x i8>, ptr [[TMP11]], align 1
-; DOTPROD-NEXT:    [[TMP12:%.*]] = sext <16 x i8> [[WIDE_LOAD6]] to <16 x i32>
-; DOTPROD-NEXT:    [[TMP13:%.*]] = mul nsw <16 x i32> [[TMP12]], [[TMP5]]
+; DOTPROD-NEXT:    [[TMP14:%.*]] = xor <16 x i8> [[WIDE_LOAD6]], splat (i8 -128)
+; DOTPROD-NEXT:    [[TMP20:%.*]] = xor <16 x i8> [[WIDE_LOAD7]], splat (i8 -128)
+; DOTPROD-NEXT:    [[TMP21:%.*]] = zext <16 x i8> [[TMP14]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP13:%.*]] = mul <16 x i32> [[TMP21]], [[TMP5]]
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE8]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[PARTIAL_REDUCE]], <16 x i32> [[TMP13]])
-; DOTPROD-NEXT:    [[TMP14:%.*]] = sext <16 x i8> [[WIDE_LOAD7]] to <16 x i32>
-; DOTPROD-NEXT:    [[TMP15:%.*]] = mul nsw <16 x i32> [[TMP14]], [[TMP8]]
+; DOTPROD-NEXT:    [[TMP18:%.*]] = zext <16 x i8> [[TMP20]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP15:%.*]] = mul <16 x i32> [[TMP18]], [[TMP8]]
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE9]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[PARTIAL_REDUCE5]], <16 x i32> [[TMP15]])
 ; DOTPROD-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 32
 ; DOTPROD-NEXT:    [[TMP16:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
-; DOTPROD-NEXT:    br i1 [[TMP16]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
+; DOTPROD-NEXT:    br i1 [[TMP16]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; DOTPROD:       [[MIDDLE_BLOCK]]:
-; DOTPROD-NEXT:    [[BIN_RDX:%.*]] = add <4 x i32> [[PARTIAL_REDUCE9]], [[PARTIAL_REDUCE8]]
+; DOTPROD-NEXT:    [[BIN_RDX:%.*]] = add <4 x i32> [[PARTIAL_REDUCE11]], [[PARTIAL_REDUCE10]]
 ; DOTPROD-NEXT:    [[TMP17:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX]])
+; DOTPROD-NEXT:    [[BIN_RDX14:%.*]] = add <4 x i32> [[PARTIAL_REDUCE9]], [[PARTIAL_REDUCE8]]
+; DOTPROD-NEXT:    [[TMP22:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX14]])
+; DOTPROD-NEXT:    [[TMP23:%.*]] = shl i32 [[TMP17]], 7
+; DOTPROD-NEXT:    [[TMP24:%.*]] = sub i32 [[TMP22]], [[TMP23]]
+; DOTPROD-NEXT:    [[TMP25:%.*]] = sub i32 [[TMP24]], [[TMP23]]
 ; DOTPROD-NEXT:    br label %[[EXIT:.*]]
 ; DOTPROD:       [[EXIT]]:
-; DOTPROD-NEXT:    ret i32 [[TMP17]]
+; DOTPROD-NEXT:    ret i32 [[TMP25]]
 ;
 ; I8MM-LABEL: define i32 @sudot_chain_shared_unsigned(
 ; I8MM-SAME: ptr [[X:%.*]], ptr [[W0:%.*]], ptr [[W1:%.*]]) #[[ATTR0]] {
@@ -692,6 +651,8 @@ define i32 @sudot_predicated(ptr dereferenceable(1024) %a, ptr dereferenceable(1
 ; DOTPROD-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; DOTPROD-NEXT:    [[VEC_PHI:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE:%.*]], %[[VECTOR_BODY]] ]
 ; DOTPROD-NEXT:    [[VEC_PHI1:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE7:%.*]], %[[VECTOR_BODY]] ]
+; DOTPROD-NEXT:    [[VEC_PHI2:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE10:%.*]], %[[VECTOR_BODY]] ]
+; DOTPROD-NEXT:    [[VEC_PHI3:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE11:%.*]], %[[VECTOR_BODY]] ]
 ; DOTPROD-NEXT:    [[TMP0:%.*]] = getelementptr i8, ptr [[C]], i64 [[INDEX]]
 ; DOTPROD-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[TMP0]], i64 16
 ; DOTPROD-NEXT:    [[WIDE_LOAD:%.*]] = load <16 x i8>, ptr [[TMP0]], align 1
@@ -706,25 +667,35 @@ define i32 @sudot_predicated(ptr dereferenceable(1024) %a, ptr dereferenceable(1
 ; DOTPROD-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[TMP6]], i64 16
 ; DOTPROD-NEXT:    [[WIDE_LOAD5:%.*]] = load <16 x i8>, ptr [[TMP6]], align 1
 ; DOTPROD-NEXT:    [[WIDE_LOAD6:%.*]] = load <16 x i8>, ptr [[TMP7]], align 1
-; DOTPROD-NEXT:    [[TMP8:%.*]] = sext <16 x i8> [[WIDE_LOAD3]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP20:%.*]] = xor <16 x i8> [[WIDE_LOAD3]], splat (i8 -128)
+; DOTPROD-NEXT:    [[TMP21:%.*]] = xor <16 x i8> [[WIDE_LOAD4]], splat (i8 -128)
+; DOTPROD-NEXT:    [[TMP8:%.*]] = zext <16 x i8> [[TMP20]] to <16 x i32>
 ; DOTPROD-NEXT:    [[TMP9:%.*]] = zext <16 x i8> [[WIDE_LOAD5]] to <16 x i32>
 ; DOTPROD-NEXT:    [[TMP10:%.*]] = mul <16 x i32> [[TMP8]], [[TMP9]]
 ; DOTPROD-NEXT:    [[TMP11:%.*]] = select <16 x i1> [[TMP2]], <16 x i32> [[TMP10]], <16 x i32> zeroinitializer
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI]], <16 x i32> [[TMP11]])
-; DOTPROD-NEXT:    [[TMP12:%.*]] = sext <16 x i8> [[WIDE_LOAD4]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP12:%.*]] = zext <16 x i8> [[TMP21]] to <16 x i32>
 ; DOTPROD-NEXT:    [[TMP13:%.*]] = zext <16 x i8> [[WIDE_LOAD6]] to <16 x i32>
 ; DOTPROD-NEXT:    [[TMP14:%.*]] = mul <16 x i32> [[TMP12]], [[TMP13]]
 ; DOTPROD-NEXT:    [[TMP15:%.*]] = select <16 x i1> [[TMP3]], <16 x i32> [[TMP14]], <16 x i32> zeroinitializer
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE7]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI1]], <16 x i32> [[TMP15]])
+; DOTPROD-NEXT:    [[TMP18:%.*]] = select <16 x i1> [[TMP2]], <16 x i32> [[TMP9]], <16 x i32> zeroinitializer
+; DOTPROD-NEXT:    [[PARTIAL_REDUCE10]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI2]], <16 x i32> [[TMP18]])
+; DOTPROD-NEXT:    [[TMP19:%.*]] = select <16 x i1> [[TMP3]], <16 x i32> [[TMP13]], <16 x i32> zeroinitializer
+; DOTPROD-NEXT:    [[PARTIAL_REDUCE11]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI3]], <16 x i32> [[TMP19]])
 ; DOTPROD-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 32
 ; DOTPROD-NEXT:    [[TMP16:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
-; DOTPROD-NEXT:    br i1 [[TMP16]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
+; DOTPROD-NEXT:    br i1 [[TMP16]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; DOTPROD:       [[MIDDLE_BLOCK]]:
-; DOTPROD-NEXT:    [[BIN_RDX:%.*]] = add <4 x i32> [[PARTIAL_REDUCE7]], [[PARTIAL_REDUCE]]
+; DOTPROD-NEXT:    [[BIN_RDX:%.*]] = add <4 x i32> [[PARTIAL_REDUCE11]], [[PARTIAL_REDUCE10]]
 ; DOTPROD-NEXT:    [[TMP17:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX]])
+; DOTPROD-NEXT:    [[BIN_RDX12:%.*]] = add <4 x i32> [[PARTIAL_REDUCE7]], [[PARTIAL_REDUCE]]
+; DOTPROD-NEXT:    [[TMP22:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX12]])
+; DOTPROD-NEXT:    [[TMP23:%.*]] = shl i32 [[TMP17]], 7
+; DOTPROD-NEXT:    [[TMP24:%.*]] = sub i32 [[TMP22]], [[TMP23]]
 ; DOTPROD-NEXT:    br label %[[EXIT:.*]]
 ; DOTPROD:       [[EXIT]]:
-; DOTPROD-NEXT:    ret i32 [[TMP17]]
+; DOTPROD-NEXT:    ret i32 [[TMP24]]
 ;
 ; I8MM-LABEL: define i32 @sudot_predicated(
 ; I8MM-SAME: ptr dereferenceable(1024) [[A:%.*]], ptr dereferenceable(1024) [[B:%.*]], ptr [[C:%.*]]) #[[ATTR0]] {
@@ -817,6 +788,10 @@ define void @sudot_shared_unsigned_different_conds(ptr dereferenceable(1024) %x,
 ; DOTPROD-NEXT:    [[VEC_PHI1:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE9:%.*]], %[[VECTOR_BODY]] ]
 ; DOTPROD-NEXT:    [[VEC_PHI2:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE12:%.*]], %[[VECTOR_BODY]] ]
 ; DOTPROD-NEXT:    [[VEC_PHI3:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE13:%.*]], %[[VECTOR_BODY]] ]
+; DOTPROD-NEXT:    [[VEC_PHI4:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE14:%.*]], %[[VECTOR_BODY]] ]
+; DOTPROD-NEXT:    [[VEC_PHI5:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE15:%.*]], %[[VECTOR_BODY]] ]
+; DOTPROD-NEXT:    [[VEC_PHI6:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE20:%.*]], %[[VECTOR_BODY]] ]
+; DOTPROD-NEXT:    [[VEC_PHI7:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PARTIAL_REDUCE21:%.*]], %[[VECTOR_BODY]] ]
 ; DOTPROD-NEXT:    [[TMP0:%.*]] = getelementptr i8, ptr [[C]], i64 [[INDEX]]
 ; DOTPROD-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[TMP0]], i64 16
 ; DOTPROD-NEXT:    [[WIDE_LOAD:%.*]] = load <16 x i8>, ptr [[TMP0]], align 1
@@ -831,43 +806,63 @@ define void @sudot_shared_unsigned_different_conds(ptr dereferenceable(1024) %x,
 ; DOTPROD-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[TMP6]], i64 16
 ; DOTPROD-NEXT:    [[WIDE_LOAD7:%.*]] = load <16 x i8>, ptr [[TMP6]], align 1
 ; DOTPROD-NEXT:    [[WIDE_LOAD8:%.*]] = load <16 x i8>, ptr [[TMP7]], align 1
-; DOTPROD-NEXT:    [[TMP8:%.*]] = sext <16 x i8> [[WIDE_LOAD7]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP8:%.*]] = xor <16 x i8> [[WIDE_LOAD7]], splat (i8 -128)
+; DOTPROD-NEXT:    [[TMP12:%.*]] = xor <16 x i8> [[WIDE_LOAD8]], splat (i8 -128)
+; DOTPROD-NEXT:    [[TMP20:%.*]] = zext <16 x i8> [[TMP8]] to <16 x i32>
 ; DOTPROD-NEXT:    [[TMP9:%.*]] = zext <16 x i8> [[WIDE_LOAD5]] to <16 x i32>
-; DOTPROD-NEXT:    [[TMP10:%.*]] = mul nsw <16 x i32> [[TMP8]], [[TMP9]]
+; DOTPROD-NEXT:    [[TMP10:%.*]] = mul <16 x i32> [[TMP20]], [[TMP9]]
 ; DOTPROD-NEXT:    [[TMP11:%.*]] = select <16 x i1> [[TMP4]], <16 x i32> [[TMP10]], <16 x i32> zeroinitializer
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI]], <16 x i32> [[TMP11]])
-; DOTPROD-NEXT:    [[TMP12:%.*]] = sext <16 x i8> [[WIDE_LOAD8]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP23:%.*]] = zext <16 x i8> [[TMP12]] to <16 x i32>
 ; DOTPROD-NEXT:    [[TMP13:%.*]] = zext <16 x i8> [[WIDE_LOAD6]] to <16 x i32>
-; DOTPROD-NEXT:    [[TMP14:%.*]] = mul nsw <16 x i32> [[TMP12]], [[TMP13]]
+; DOTPROD-NEXT:    [[TMP14:%.*]] = mul <16 x i32> [[TMP23]], [[TMP13]]
 ; DOTPROD-NEXT:    [[TMP15:%.*]] = select <16 x i1> [[TMP5]], <16 x i32> [[TMP14]], <16 x i32> zeroinitializer
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE9]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI1]], <16 x i32> [[TMP15]])
+; DOTPROD-NEXT:    [[TMP30:%.*]] = select <16 x i1> [[TMP4]], <16 x i32> [[TMP9]], <16 x i32> zeroinitializer
+; DOTPROD-NEXT:    [[PARTIAL_REDUCE14]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI4]], <16 x i32> [[TMP30]])
+; DOTPROD-NEXT:    [[TMP31:%.*]] = select <16 x i1> [[TMP5]], <16 x i32> [[TMP13]], <16 x i32> zeroinitializer
+; DOTPROD-NEXT:    [[PARTIAL_REDUCE15]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI5]], <16 x i32> [[TMP31]])
 ; DOTPROD-NEXT:    [[TMP16:%.*]] = icmp sgt <16 x i8> [[WIDE_LOAD]], splat (i8 7)
 ; DOTPROD-NEXT:    [[TMP17:%.*]] = icmp sgt <16 x i8> [[WIDE_LOAD4]], splat (i8 7)
 ; DOTPROD-NEXT:    [[TMP18:%.*]] = getelementptr i8, ptr [[W1]], i64 [[INDEX]]
 ; DOTPROD-NEXT:    [[TMP19:%.*]] = getelementptr i8, ptr [[TMP18]], i64 16
 ; DOTPROD-NEXT:    [[WIDE_LOAD10:%.*]] = load <16 x i8>, ptr [[TMP18]], align 1
 ; DOTPROD-NEXT:    [[WIDE_LOAD11:%.*]] = load <16 x i8>, ptr [[TMP19]], align 1
-; DOTPROD-NEXT:    [[TMP20:%.*]] = sext <16 x i8> [[WIDE_LOAD10]] to <16 x i32>
-; DOTPROD-NEXT:    [[TMP21:%.*]] = mul nsw <16 x i32> [[TMP20]], [[TMP9]]
+; DOTPROD-NEXT:    [[TMP34:%.*]] = xor <16 x i8> [[WIDE_LOAD10]], splat (i8 -128)
+; DOTPROD-NEXT:    [[TMP35:%.*]] = xor <16 x i8> [[WIDE_LOAD11]], splat (i8 -128)
+; DOTPROD-NEXT:    [[TMP36:%.*]] = zext <16 x i8> [[TMP34]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP21:%.*]] = mul <16 x i32> [[TMP36]], [[TMP9]]
 ; DOTPROD-NEXT:    [[TMP22:%.*]] = select <16 x i1> [[TMP16]], <16 x i32> [[TMP21]], <16 x i32> zeroinitializer
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE12]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI2]], <16 x i32> [[TMP22]])
-; DOTPROD-NEXT:    [[TMP23:%.*]] = sext <16 x i8> [[WIDE_LOAD11]] to <16 x i32>
-; DOTPROD-NEXT:    [[TMP24:%.*]] = mul nsw <16 x i32> [[TMP23]], [[TMP13]]
+; DOTPROD-NEXT:    [[TMP29:%.*]] = zext <16 x i8> [[TMP35]] to <16 x i32>
+; DOTPROD-NEXT:    [[TMP24:%.*]] = mul <16 x i32> [[TMP29]], [[TMP13]]
 ; DOTPROD-NEXT:    [[TMP25:%.*]] = select <16 x i1> [[TMP17]], <16 x i32> [[TMP24]], <16 x i32> zeroinitializer
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE13]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI3]], <16 x i32> [[TMP25]])
+; DOTPROD-NEXT:    [[TMP32:%.*]] = select <16 x i1> [[TMP16]], <16 x i32> [[TMP9]], <16 x i32> zeroinitializer
+; DOTPROD-NEXT:    [[PARTIAL_REDUCE20]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI6]], <16 x i32> [[TMP32]])
+; DOTPROD-NEXT:    [[TMP33:%.*]] = select <16 x i1> [[TMP17]], <16 x i32> [[TMP13]], <16 x i32> zeroinitializer
+; DOTPROD-NEXT:    [[PARTIAL_REDUCE21]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI7]], <16 x i32> [[TMP33]])
 ; DOTPROD-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 32
 ; DOTPROD-NEXT:    [[TMP26:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
-; DOTPROD-NEXT:    br i1 [[TMP26]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
+; DOTPROD-NEXT:    br i1 [[TMP26]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; DOTPROD:       [[MIDDLE_BLOCK]]:
-; DOTPROD-NEXT:    [[BIN_RDX:%.*]] = add <4 x i32> [[PARTIAL_REDUCE9]], [[PARTIAL_REDUCE]]
+; DOTPROD-NEXT:    [[BIN_RDX:%.*]] = add <4 x i32> [[PARTIAL_REDUCE21]], [[PARTIAL_REDUCE20]]
 ; DOTPROD-NEXT:    [[TMP27:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX]])
-; DOTPROD-NEXT:    [[BIN_RDX14:%.*]] = add <4 x i32> [[PARTIAL_REDUCE13]], [[PARTIAL_REDUCE12]]
+; DOTPROD-NEXT:    [[BIN_RDX14:%.*]] = add <4 x i32> [[PARTIAL_REDUCE15]], [[PARTIAL_REDUCE14]]
 ; DOTPROD-NEXT:    [[TMP28:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX14]])
+; DOTPROD-NEXT:    [[BIN_RDX23:%.*]] = add <4 x i32> [[PARTIAL_REDUCE9]], [[PARTIAL_REDUCE]]
+; DOTPROD-NEXT:    [[TMP37:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX23]])
+; DOTPROD-NEXT:    [[TMP38:%.*]] = shl i32 [[TMP28]], 7
+; DOTPROD-NEXT:    [[TMP39:%.*]] = sub i32 [[TMP37]], [[TMP38]]
+; DOTPROD-NEXT:    [[BIN_RDX24:%.*]] = add <4 x i32> [[PARTIAL_REDUCE13]], [[PARTIAL_REDUCE12]]
+; DOTPROD-NEXT:    [[TMP40:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX24]])
+; DOTPROD-NEXT:    [[TMP41:%.*]] = shl i32 [[TMP27]], 7
+; DOTPROD-NEXT:    [[TMP42:%.*]] = sub i32 [[TMP40]], [[TMP41]]
 ; DOTPROD-NEXT:    br label %[[EXIT:.*]]
 ; DOTPROD:       [[EXIT]]:
-; DOTPROD-NEXT:    store i32 [[TMP27]], ptr [[OUT]], align 4
+; DOTPROD-NEXT:    store i32 [[TMP39]], ptr [[OUT]], align 4
 ; DOTPROD-NEXT:    [[OUT_1:%.*]] = getelementptr i32, ptr [[OUT]], i64 1
-; DOTPROD-NEXT:    store i32 [[TMP28]], ptr [[OUT_1]], align 4
+; DOTPROD-NEXT:    store i32 [[TMP42]], ptr [[OUT_1]], align 4
 ; DOTPROD-NEXT:    ret void
 ;
 ; I8MM-LABEL: define void @sudot_shared_unsigned_different_conds(
@@ -1014,7 +1009,7 @@ define i32 @sudot_sub(ptr %a, ptr %b) {
 ; DOTPROD-NEXT:    [[PARTIAL_REDUCE5]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v16i32(<4 x i32> [[VEC_PHI1]], <16 x i32> [[TMP9]])
 ; DOTPROD-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 32
 ; DOTPROD-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
-; DOTPROD-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
+; DOTPROD-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
 ; DOTPROD:       [[MIDDLE_BLOCK]]:
 ; DOTPROD-NEXT:    [[BIN_RDX:%.*]] = add <4 x i32> [[PARTIAL_REDUCE5]], [[PARTIAL_REDUCE]]
 ; DOTPROD-NEXT:    [[TMP11:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX]])
@@ -1103,7 +1098,7 @@ define i64 @sudot_i64(ptr %a, ptr %b) {
 ; DOTPROD-NEXT:    [[TMP5]] = add <16 x i64> [[VEC_PHI]], [[TMP4]]
 ; DOTPROD-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; DOTPROD-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
-; DOTPROD-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
+; DOTPROD-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
 ; DOTPROD:       [[MIDDLE_BLOCK]]:
 ; DOTPROD-NEXT:    [[TMP7:%.*]] = call i64 @llvm.vector.reduce.add.v16i64(<16 x i64> [[TMP5]])
 ; DOTPROD-NEXT:    br label %[[EXIT:.*]]
@@ -1163,14 +1158,11 @@ exit:
 ; DOTPROD: [[META2]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; DOTPROD: [[LOOP3]] = distinct !{[[LOOP3]], [[META1]], [[META2]]}
 ; DOTPROD: [[LOOP4]] = distinct !{[[LOOP4]], [[META1]], [[META2]]}
-; DOTPROD: [[PROF5]] = !{!"branch_weights", i32 8, i32 24}
 ; DOTPROD: [[LOOP6]] = distinct !{[[LOOP6]], [[META1]], [[META2]]}
-; DOTPROD: [[LOOP7]] = distinct !{[[LOOP7]], [[META2]], [[META1]]}
+; DOTPROD: [[LOOP7]] = distinct !{[[LOOP7]], [[META1]], [[META2]]}
 ; DOTPROD: [[LOOP8]] = distinct !{[[LOOP8]], [[META1]], [[META2]]}
 ; DOTPROD: [[LOOP9]] = distinct !{[[LOOP9]], [[META1]], [[META2]]}
 ; DOTPROD: [[LOOP10]] = distinct !{[[LOOP10]], [[META1]], [[META2]]}
-; DOTPROD: [[LOOP11]] = distinct !{[[LOOP11]], [[META1]], [[META2]]}
-; DOTPROD: [[LOOP12]] = distinct !{[[LOOP12]], [[META1]], [[META2]]}
 ;.
 ; I8MM: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]], [[META2:![0-9]+]]}
 ; I8MM: [[META1]] = !{!"llvm.loop.isvectorized", i32 1}
