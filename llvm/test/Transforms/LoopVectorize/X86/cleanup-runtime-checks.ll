@@ -72,8 +72,63 @@ exit:
   ret void
 }
 
+; The branch weights and the checks of the two wrap predicates make
+; vectorization unprofitable. Costing the SCEV checks, which reuse %n.minus.1,
+; must not drop its nsw flag.
+define void @scev_checks_reuse_value_with_flags(i64 %n, ptr %out, ptr %dst.0, i32 %start.0, ptr %dst.1, i32 %start.1) {
+; CHECK-LABEL: define void @scev_checks_reuse_value_with_flags(
+; CHECK-SAME: i64 [[N:%.*]], ptr [[OUT:%.*]], ptr [[DST_0:%.*]], i32 [[START_0:%.*]], ptr [[DST_1:%.*]], i32 [[START_1:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[N_MINUS_1:%.*]] = add nsw i64 [[N]], -1
+; CHECK-NEXT:    store i64 [[N_MINUS_1]], ptr [[OUT]], align 8
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV_0:%.*]] = phi i32 [ [[START_0]], %[[ENTRY]] ], [ [[IV_0_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV_1:%.*]] = phi i32 [ [[START_1]], %[[ENTRY]] ], [ [[IV_1_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[EXT_0:%.*]] = zext i32 [[IV_0]] to i64
+; CHECK-NEXT:    [[GEP_0:%.*]] = getelementptr i32, ptr [[DST_0]], i64 [[EXT_0]]
+; CHECK-NEXT:    store i32 0, ptr [[GEP_0]], align 4
+; CHECK-NEXT:    [[IV_0_NEXT]] = add i32 [[IV_0]], 1
+; CHECK-NEXT:    [[EXT_1:%.*]] = zext i32 [[IV_1]] to i64
+; CHECK-NEXT:    [[GEP_1:%.*]] = getelementptr i32, ptr [[DST_1]], i64 [[EXT_1]]
+; CHECK-NEXT:    store i32 0, ptr [[GEP_1]], align 4
+; CHECK-NEXT:    [[IV_1_NEXT]] = add i32 [[IV_1]], 1
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]], !prof [[PROF1:![0-9]+]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %n.minus.1 = add nsw i64 %n, -1
+  store i64 %n.minus.1, ptr %out
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.0 = phi i32 [ %start.0, %entry ], [ %iv.0.next, %loop ]
+  %iv.1 = phi i32 [ %start.1, %entry ], [ %iv.1.next, %loop ]
+  %ext.0 = zext i32 %iv.0 to i64
+  %gep.0 = getelementptr i32, ptr %dst.0, i64 %ext.0
+  store i32 0, ptr %gep.0, align 4
+  %iv.0.next = add i32 %iv.0, 1
+  %ext.1 = zext i32 %iv.1 to i64
+  %gep.1 = getelementptr i32, ptr %dst.1, i64 %ext.1
+  store i32 0, ptr %gep.1, align 4
+  %iv.1.next = add i32 %iv.1, 1
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop, !prof !1
+
+exit:
+  ret void
+}
+
 attributes #0 = { "target-features"="+avx2" }
 !0 = !{!"branch_weights", i32 89478484, i32 1879048192}
+!1 = !{!"branch_weights", i32 1, i32 16}
 ;.
 ; CHECK: [[PROF0]] = !{!"branch_weights", i32 89478484, i32 1879048192}
+; CHECK: [[PROF1]] = !{!"branch_weights", i32 1, i32 16}
 ;.

@@ -1181,9 +1181,10 @@ public:
 namespace {
 /// Helper struct to manage generating runtime checks for vectorization.
 ///
-/// The runtime checks are created up-front in temporary blocks to allow better
-/// estimating the cost and un-linked from the existing IR. The temporary blocks
-/// are removed again; the checks are generated from the VPlan's predicates.
+/// The runtime checks are created up-front in temporary blocks un-linked from
+/// the existing IR, to detect checks folding to a constant and to estimate the
+/// cost of the memory checks. The temporary blocks are removed again; the
+/// checks are generated from the VPlan's predicates.
 class GeneratedRTChecks {
   const VectorizeOptions &Opts;
 
@@ -1231,9 +1232,9 @@ public:
         MemCheckExp(*PSE.getSE(), "scev.check", /*PreserveLCSSA=*/false),
         PSE(PSE), CostKind(CostKind) {}
 
-  /// Generate runtime checks in SCEVCheckBlock and MemCheckBlock, so we can
-  /// accurately estimate the cost of the runtime checks of the predicates of
-  /// \p Plan. The blocks are un-linked from the IR and only used for costing.
+  /// Generate the runtime checks of the predicates of \p Plan in SCEVCheckBlock
+  /// and MemCheckBlock, to detect checks folding to a constant and to estimate
+  /// the cost of the memory checks. The blocks are un-linked from the IR.
   /// \p LAI may only be nullptr (outer loops have no LoopAccessInfo) if \p Plan
   /// has no memory checks predicate.
   void create(Loop *L, const LoopAccessInfo *LAI, const VPlan &Plan,
@@ -1347,8 +1348,14 @@ public:
     OuterLoop = L->getParentLoop();
   }
 
-  InstructionCost getCost() {
-    if (SCEVCheckBlock || MemCheckBlock)
+  /// Return the cost of the runtime checks for \p Plan with \p VF and \p IC.
+  /// The memory checks are costed as the instructions of the pre-built block,
+  /// the SCEV checks as the recipes they are generated as, using \p CostCtx.
+  /// Erases the pre-built check blocks.
+  InstructionCost getCost(VPlan &Plan, ElementCount VF, unsigned IC,
+                          VPCostContext &CostCtx) {
+    bool HasCheckBlocks = SCEVCheckBlock || MemCheckBlock;
+    if (HasCheckBlocks)
       LLVM_DEBUG(dbgs() << "Calculating cost of runtime checks:\n");
 
     if (CostTooHigh) {
@@ -1359,14 +1366,6 @@ public:
     }
 
     InstructionCost RTCheckCost = 0;
-    if (SCEVCheckBlock)
-      for (Instruction &I : *SCEVCheckBlock) {
-        if (SCEVCheckBlock->getTerminator() == &I)
-          continue;
-        InstructionCost C = TTI->getInstructionCost(&I, CostKind);
-        LLVM_DEBUG(dbgs() << "  " << C << "  for " << I << "\n");
-        RTCheckCost += C;
-      }
     if (MemCheckBlock) {
       InstructionCost MemCheckCost = 0;
       for (Instruction &I : *MemCheckBlock) {
@@ -1419,7 +1418,15 @@ public:
       RTCheckCost += MemCheckCost;
     }
 
-    if (SCEVCheckBlock || MemCheckBlock)
+    // Erase the pre-built blocks first, so the SCEV checks are expanded
+    // without reusing values expanded for them, like materializePredicates.
+    eraseCheckBlocks();
+    if (const VPPredicate *P =
+            Plan.getPredicate(VPPredicate::VPSCEVPredicateSC))
+      RTCheckCost +=
+          VPlanTransforms::computePredicateCost(Plan, *P, VF, IC, CostCtx);
+
+    if (HasCheckBlocks)
       LLVM_DEBUG(dbgs() << "Total cost of runtime checks: " << RTCheckCost
                         << "\n");
 
@@ -1428,10 +1435,9 @@ public:
 
   ~GeneratedRTChecks() { eraseCheckBlocks(); }
 
-  /// Erase the pre-built check blocks, which were only needed to cost the
-  /// checks, as they are generated from the plan's predicates instead. The
-  /// memory checks may reuse values expanded for the SCEV checks, so they are
-  /// erased first.
+  /// Erase the pre-built check blocks, as the checks are generated from the
+  /// plan's predicates instead. The memory checks may reuse values expanded for
+  /// the SCEV checks, so they are erased first.
   void eraseCheckBlocks() {
     if (MemCheckBlock)
       eraseCheckBlock(MemCheckBlock, MemRuntimeCheckCond, MemCheckExp);
@@ -6893,12 +6899,12 @@ static InstructionCost calculateEarlyExitCost(VPCostContext &CostCtx,
 ///     exit values of variables used outside the loop.
 ///  3. The middle block.
 static bool isOutsideLoopWorkProfitable(GeneratedRTChecks &Checks,
-                                        VectorizationFactor &VF, Loop *L,
-                                        PredicatedScalarEvolution &PSE,
+                                        VectorizationFactor &VF, unsigned IC,
+                                        Loop *L, PredicatedScalarEvolution &PSE,
                                         VPCostContext &CostCtx, VPlan &Plan,
                                         EpilogueLowering SEL,
                                         std::optional<unsigned> VScale) {
-  InstructionCost RtC = Checks.getCost();
+  InstructionCost RtC = Checks.getCost(Plan, VF.Width, IC, CostCtx);
   if (!RtC.isValid())
     return false;
 
@@ -7590,8 +7596,9 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     VPCostContext CostCtx(*TLI, *BestPlanPtr, LVP.getCostModel(), Config,
                           /*ReusePrintingSlotTracker=*/true);
     if (!ForceVectorization &&
-        !isOutsideLoopWorkProfitable(Checks, VF, L, PSE, CostCtx, *BestPlanPtr,
-                                     SEL, Config.getVScaleForTuning())) {
+        !isOutsideLoopWorkProfitable(Checks, VF, SelectedIC, L, PSE, CostCtx,
+                                     *BestPlanPtr, SEL,
+                                     Config.getVScaleForTuning())) {
       ORE->emit([&]() {
         return OptimizationRemarkAnalysisAliasing(
                    DEBUG_TYPE, "CantReorderMemOps", L->getStartLoc(),
