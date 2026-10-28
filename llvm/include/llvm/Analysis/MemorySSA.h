@@ -858,7 +858,7 @@ private:
   Loop *L = nullptr;
 
   // Memory for MemoryUses and MemoryDefs.
-  BumpPtrAllocatorImpl<MallocAllocator, 512, 512, 1> UseOrDefAllocator;
+  BumpPtrAllocatorImpl<MallocAllocator, 512, 512, 4> UseOrDefAllocator;
 
   // Memory SSA mappings
   DenseMap<const Value *, MemoryAccess *> ValueToMemoryAccess;
