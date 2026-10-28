@@ -214,14 +214,12 @@ struct VPlanTransforms {
   static void attachCheckBlock(VPlan &Plan, Value *Cond, BasicBlock *CheckBlock,
                                bool AddBranchWeights);
 
-  /// Generate the memory runtime checks of \p RtPtrChecking for \p TheLoop as
-  /// recipes and attach the check block to \p Plan. \p VF and \p UF are used
-  /// to compute the thresholds of difference checks.
-  static void attachMemoryChecks(VPlan &Plan,
-                                 const RuntimePointerChecking &RtPtrChecking,
-                                 const Loop *TheLoop, ScalarEvolution &SE,
-                                 ElementCount VF, unsigned UF,
-                                 bool AddBranchWeights);
+  /// Expand each predicate of \p Plan into a check block bypassing the vector
+  /// loop if it does not hold, inserted before the vector preheader, and remove
+  /// the predicates. \p VF and \p UF are those of the executed plan.
+  static void materializePredicates(VPlan &Plan, ScalarEvolution &SE,
+                                    ElementCount VF, unsigned UF,
+                                    bool AddBranchWeights);
 
   /// Model the blocks the executed \p MainPlan generated for the main vector
   /// loop in \p EpiPlan during epilogue vectorization, wrapping each in a

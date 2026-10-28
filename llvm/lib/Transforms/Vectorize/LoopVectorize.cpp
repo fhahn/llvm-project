@@ -1222,30 +1222,26 @@ class GeneratedRTChecks {
   /// The kind of cost that we are calculating
   TTI::TargetCostKind CostKind;
 
-  /// True if the loop is alias-masked (which allows us to omit diff checks).
-  bool LoopUsesPartialAliasMasking = false;
-
 public:
   GeneratedRTChecks(const VectorizeOptions &Opts,
                     PredicatedScalarEvolution &PSE, DominatorTree *DT,
                     LoopInfo *LI, TargetTransformInfo *TTI,
-                    TTI::TargetCostKind CostKind,
-                    bool LoopUsesPartialAliasMasking)
+                    TTI::TargetCostKind CostKind)
       : Opts(Opts), DT(DT), LI(LI), TTI(TTI),
         SCEVExp(*PSE.getSE(), "scev.check", /*PreserveLCSSA=*/false),
         MemCheckExp(*PSE.getSE(), "scev.check", /*PreserveLCSSA=*/false),
-        PSE(PSE), CostKind(CostKind),
-        LoopUsesPartialAliasMasking(LoopUsesPartialAliasMasking) {}
+        PSE(PSE), CostKind(CostKind) {}
 
   /// Generate runtime checks in SCEVCheckBlock and MemCheckBlock, so we can
-  /// accurately estimate the cost of the runtime checks. The blocks are
+  /// accurately estimate the cost of the runtime checks. The memory checks are
+  /// generated if \p Plan has a memory checks predicate. The blocks are
   /// un-linked from the IR and attached to VPlan as IR or recipes if
-  /// profitable. Otherwise, the check blocks are removed completely. If \p LAI
-  /// is nullptr (outer loops have no LoopAccessInfo), no memory runtime checks
-  /// are generated.
+  /// profitable. Otherwise, the check blocks are removed completely. \p LAI
+  /// may only be nullptr (outer loops have no LoopAccessInfo) if \p Plan has
+  /// no memory checks predicate.
   void create(Loop *L, const LoopAccessInfo *LAI,
-              const SCEVPredicate &UnionPred, ElementCount VF, unsigned IC,
-              OptimizationRemarkEmitter &ORE) {
+              const SCEVPredicate &UnionPred, const VPlan &Plan,
+              ElementCount VF, unsigned IC, OptimizationRemarkEmitter &ORE) {
 
     // Hard cutoff to limit compile-time increase in case a very large number of
     // runtime checks needs to be generated.
@@ -1291,8 +1287,7 @@ public:
     // TODO: We need to estimate the cost of alias-masking in
     // GeneratedRTChecks::getCost(). We can't check the MemCheckBlock as the
     // alias-mask is generated later in VPlan.
-    if (LAI && LAI->getRuntimePointerChecking()->Need &&
-        !LoopUsesPartialAliasMasking) {
+    if (!Plan.getPredicates().empty()) {
       const auto &RtPtrChecking = *LAI->getRuntimePointerChecking();
       auto *Pred = SCEVCheckBlock ? SCEVCheckBlock : Preheader;
       MemCheckBlock = SplitBlock(Pred, Pred->getTerminator(), DT, LI, nullptr,
@@ -5535,6 +5530,8 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
          "Trying to execute plan with unsupported VF");
   assert(BestVPlan.hasUF(BestUF) &&
          "Trying to execute plan with unsupported UF");
+  assert(BestVPlan.getPredicates().empty() &&
+         "Predicates must be materialized before executing the plan");
   if (BestVPlan.hasEarlyExit())
     ++LoopsEarlyExitVectorized;
 
@@ -6184,6 +6181,12 @@ LoopVectorizationPlanner::tryToBuildVPlan1(LoopVectorizationCostModel &PlanCM) {
                       OptForSize, SCEVCheckThreshold, ORE, OrigLoop))
     return nullptr;
 
+  // Alias-masked loops need no memory runtime checks.
+  if (IsInnerLoop && !PlanCM.maskPartialAliasing() &&
+      Legal->getRuntimePointerChecking()->Need)
+    VPlan0->addPredicate(std::make_unique<VPMemoryChecksPredicate>(
+        *Legal->getRuntimePointerChecking(), OrigLoop));
+
   RUN_VPLAN_PASS(VPlanTransforms::addMiddleCheck, *VPlan0);
 
   // If we're vectorizing a loop with an uncountable exit, make sure that the
@@ -6724,8 +6727,7 @@ void LoopVectorizationPlanner::attachRuntimeChecks(
     RUN_VPLAN_PASS(VPlanTransforms::attachCheckBlock, Plan, SCEVCheckCond,
                    SCEVCheckBlock, HasBranchWeights);
   }
-  const auto &[MemCheckCond, MemCheckBlock] = RTChecks.getMemRuntimeChecks();
-  if (MemCheckBlock && MemCheckBlock->hasNPredecessors(0)) {
+  if (!Plan.getPredicates().empty()) {
     // VPlan-native path does not do any analysis for memory runtime checks
     // currently.
     assert((!Opts.enable_vplan_native_path || !Plan.isOuterLoop()) &&
@@ -6746,11 +6748,10 @@ void LoopVectorizationPlanner::attachRuntimeChecks(
                   "(e.g., adding 'restrict').";
       });
     }
-    const auto &RtPtrChecking = *Legal->getRuntimePointerChecking();
     // Erase the temporary IR before recipe expansion can reuse its values.
     RTChecks.eraseMemCheckBlock();
-    RUN_VPLAN_PASS(VPlanTransforms::attachMemoryChecks, Plan, RtPtrChecking,
-                   OrigLoop, *PSE.getSE(), VF, UF, HasBranchWeights);
+    RUN_VPLAN_PASS(VPlanTransforms::materializePredicates, Plan, *PSE.getSE(),
+                   VF, UF, HasBranchWeights);
   }
 }
 
@@ -7079,6 +7080,9 @@ static void preparePlanForEpilogueVectorLoop(
     ElementCount MainLoopVF, unsigned MainLoopUF, ElementCount EpilogueVF,
     VFSelectionContext &Config, ScalarEvolution &SE,
     const MainPlanResumeMarkers &Markers, VPBasicBlock *MainCheck) {
+  // The runtime checks of the main plan bypass both vector loops.
+  Plan.clearPredicates();
+
   // Build a map from the scalar-header PHI to the ResumeForEpilogue markers
   // from the main plan.
   // TODO: Replace the IR PHI key.
@@ -7536,8 +7540,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
   assert((IsInnerLoop || !LVP.getCostModel().maskPartialAliasing()) &&
          "Did not expect to alias-mask outer loop");
 
-  GeneratedRTChecks Checks(Opts, PSE, DT, LI, TTI, Config.CostKind,
-                           LVP.getCostModel().maskPartialAliasing());
+  GeneratedRTChecks Checks(Opts, PSE, DT, LI, TTI, Config.CostKind);
   if (LVP.hasPlanWithVF(VF.Width)) {
     // Select the interleave count. Outer loops are not interleaved.
     if (IsInnerLoop)
@@ -7547,8 +7550,8 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     //  Optimistically generate runtime checks if they are needed. Drop them if
     //  they turn out to not be profitable.
     if (VF.Width.isVector() || SelectedIC > 1) {
-      Checks.create(L, LVL.getLAI(), PSE.getPredicate(), VF.Width, SelectedIC,
-                    *ORE);
+      Checks.create(L, LVL.getLAI(), PSE.getPredicate(), *BestPlanPtr,
+                    VF.Width, SelectedIC, *ORE);
 
       // Bail out early if either the SCEV or memory runtime checks are known to
       // fail. In that case, the vector loop would never execute.
@@ -7564,6 +7567,11 @@ bool LoopVectorizePass::processLoop(Loop *L) {
         return false;
       }
     }
+    // The predicates hold if their checks are not needed or the pre-built
+    // checks fold to false.
+    // TODO: Fold the predicates in VPlan once the pre-built blocks are gone.
+    if (!Checks.getMemRuntimeChecks().first)
+      BestPlanPtr->clearPredicates();
 
     // Check if it is profitable to vectorize with runtime checks.
     bool ForceVectorization =

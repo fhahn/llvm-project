@@ -15,6 +15,8 @@ define void @vector_reverse_i64(ptr nocapture noundef writeonly %A, ptr nocaptur
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = original trip-count
+; CHECK-NEXT:  Predicates:
+; CHECK-NEXT:    Safe distance: ((-1 * (ptrtoaddr ptr %A to i64)) + (ptrtoaddr ptr %B to i64)) == 0 or ((-1 * (ptrtoaddr ptr %A to i64)) + (ptrtoaddr ptr %B to i64)) uge VF * UF * 4
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    EMIT vp<[[VP2]]> = EXPAND SCEV (1 + (-1 * (1 umin %n))<nuw><nsw> + %n)

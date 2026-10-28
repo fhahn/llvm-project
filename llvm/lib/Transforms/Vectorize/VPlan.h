@@ -62,6 +62,7 @@ class raw_ostream;
 class RecurrenceDescriptor;
 class SCEV;
 class SCEVPredicate;
+class ScalarEvolution;
 class Type;
 class VPBasicBlock;
 struct VPBuilderDefaultInserter;
@@ -4904,6 +4905,58 @@ inline const VPRegionBlock *VPRecipeBase::getRegion() const {
   return getParent()->getParent();
 }
 
+/// A condition that must hold for a VPlan's vector loop to be executed. Like
+/// the predicates of PredicatedScalarEvolution, it is recorded on the plan and
+/// only turned into a runtime check for the executed plan, by
+/// VPlanTransforms::materializePredicates().
+class VPPredicate {
+public:
+  virtual ~VPPredicate() = default;
+
+  virtual std::unique_ptr<VPPredicate> clone() const = 0;
+
+  /// Name of the block the runtime check is generated in.
+  virtual StringRef getCheckBlockName() const = 0;
+
+  /// Expand the condition under which the predicate does not hold for \p VF
+  /// and \p UF using \p Builder. May also add recipes to the plan's entry, e.g.
+  /// for expressions hoisted out of an outer loop.
+  virtual VPValue *expandNegated(VPBuilder &Builder, ScalarEvolution &SE,
+                                 ElementCount VF, unsigned UF) const = 0;
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  /// Print the predicate to \p O, each line prefixed by \p Indent.
+  virtual void print(raw_ostream &O, const Twine &Indent) const = 0;
+#endif
+};
+
+/// The memory accesses of a loop do not alias, as checked by the runtime
+/// checks of a RuntimePointerChecking, which is owned by LoopAccessInfo.
+class VPMemoryChecksPredicate : public VPPredicate {
+  const RuntimePointerChecking &RtPtrChecking;
+  const Loop *TheLoop;
+
+public:
+  VPMemoryChecksPredicate(const RuntimePointerChecking &RtPtrChecking,
+                          const Loop *TheLoop)
+      : RtPtrChecking(RtPtrChecking), TheLoop(TheLoop) {
+    assert(!RtPtrChecking.getChecks().empty() && "No checks to generate");
+  }
+
+  std::unique_ptr<VPPredicate> clone() const override {
+    return std::make_unique<VPMemoryChecksPredicate>(*this);
+  }
+
+  StringRef getCheckBlockName() const override { return "vector.memcheck"; }
+
+  VPValue *expandNegated(VPBuilder &Builder, ScalarEvolution &SE,
+                         ElementCount VF, unsigned UF) const override;
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  void print(raw_ostream &O, const Twine &Indent) const override;
+#endif
+};
+
 /// VPlan models a candidate for vectorization, encoding various decisions take
 /// to produce efficient output IR, including which branches, basic-blocks and
 /// output IR instructions to generate, and their cost. VPlan holds a
@@ -4961,6 +5014,9 @@ class VPlan {
   /// Blocks allocated and owned by the VPlan. They will be deleted once the
   /// VPlan is destroyed.
   SmallVector<VPBlockBase *> CreatedBlocks;
+
+  /// Conditions that must hold for the vector loop to be executed.
+  SmallVector<std::unique_ptr<VPPredicate>> Predicates;
 
   /// Construct a VPlan with \p Entry to the plan and with \p ScalarHeader
   /// wrapping the original header of the scalar loop. The vector loop will have
@@ -5071,6 +5127,19 @@ public:
 
   /// Returns true if \p VPBB is an exit block.
   bool isExitBlock(VPBlockBase *VPBB);
+
+  /// Add \p P to the conditions the vector loop needs.
+  void addPredicate(std::unique_ptr<VPPredicate> P) {
+    Predicates.push_back(std::move(P));
+  }
+
+  /// Return the predicates not materialized as runtime checks yet.
+  ArrayRef<std::unique_ptr<VPPredicate>> getPredicates() const {
+    return Predicates;
+  }
+
+  /// Remove all predicates, e.g. once they are known to hold.
+  void clearPredicates() { Predicates.clear(); }
 
   /// The trip count of the original loop.
   VPValue *getTripCount() const {
