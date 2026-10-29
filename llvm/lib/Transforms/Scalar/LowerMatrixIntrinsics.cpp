@@ -1669,9 +1669,7 @@ public:
       return;
 
     FusedInsts.insert(MatMul);
-    IRBuilder<> Builder(MatMul);
-    auto FlattenArg = [&Builder, &FusedInsts, &CanBeFlattened,
-                       this](Value *Op) {
+    auto FlattenArg = [&FusedInsts, &CanBeFlattened, this](Value *Op) {
       // Matmul must be the only user of loads because we don't use LowerLoad
       // for row vectors (LowerLoad results in scalar loads and shufflevectors
       // instead of single vector load).
@@ -1695,6 +1693,9 @@ public:
         bool IsVolatile = cast<ConstantInt>(MatLoad->getArgOperand(2))->isOne();
         // Preserve the volatile flag and alignment of the original load.
         Align Alignment = MatLoad->getParamAlign(0).valueOrOne();
+        // Create the load in place; it may feed binops or precede stores
+        // before MatMul.
+        IRBuilder<> Builder(MatLoad);
         auto *NewLoad = Builder.CreateAlignedLoad(Op->getType(), Arg, Alignment,
                                                   IsVolatile);
         Op->replaceAllUsesWith(NewLoad);
@@ -1711,6 +1712,7 @@ public:
     for (auto *V : ToFlatten)
       FlattenArg(V);
 
+    IRBuilder<> Builder(MatMul);
     LHS = MatMul->getArgOperand(0);
 
     // Insert mul/fmul and llvm.vector.reduce.fadd
