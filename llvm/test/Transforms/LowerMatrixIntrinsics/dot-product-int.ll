@@ -350,3 +350,18 @@ define <1 x i32> @test_builtin_column_major_variable_stride(ptr %src, <4 x i32> 
   %r = call <1 x i32> @llvm.matrix.multiply.v1i32.v4i32.v4i32(<4 x i32> %l, <4 x i32> %a, i32 1, i32 4, i32 1)
   ret <1 x i32> %r
 }
+
+define <1 x i32> @intrinsic_column_major_load_dot_product_i32_v4_store_before_multiply(ptr %lhs_address, <4 x i32> %a) {
+; CHECK-LABEL: @intrinsic_column_major_load_dot_product_i32_v4_store_before_multiply(
+; CHECK-NEXT:    store <4 x i32> zeroinitializer, ptr [[LHS_ADDRESS:%.*]], align 16
+; CHECK-NEXT:    [[TMP1:%.*]] = load <4 x i32>, ptr [[LHS_ADDRESS]], align 1
+; CHECK-NEXT:    [[TMP2:%.*]] = mul <4 x i32> [[TMP1]], [[A:%.*]]
+; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[TMP2]])
+; CHECK-NEXT:    [[TMP4:%.*]] = insertelement <1 x i32> poison, i32 [[TMP3]], i64 0
+; CHECK-NEXT:    ret <1 x i32> [[TMP4]]
+;
+  %lhs = call <4 x i32> @llvm.matrix.column.major.load.v4i32.i64(ptr %lhs_address, i64 1, i1 false, i32 1, i32 4)
+  store <4 x i32> zeroinitializer, ptr %lhs_address
+  %r = call <1 x i32> @llvm.matrix.multiply.v1i32.v4i32.v4i32(<4 x i32> %lhs, <4 x i32> %a, i32 1, i32 4, i32 1)
+  ret <1 x i32> %r
+}
