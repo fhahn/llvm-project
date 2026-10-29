@@ -89,3 +89,21 @@ define void @strided_store_align8_stride12(<6 x i32> %in, ptr %out) {
   call void @llvm.matrix.column.major.store(<6 x i32> %in, ptr align 8 %out, i64 3, i1 false, i32 2, i32 3)
   ret void
 }
+
+define void @strided_store_i1_align4(<4 x i1> %in, i64 %stride, ptr %out) {
+; CHECK-LABEL: @strided_store_i1_align4(
+; CHECK-NEXT:    [[SPLIT:%.*]] = shufflevector <4 x i1> [[IN:%.*]], <4 x i1> poison, <2 x i32> <i32 0, i32 1>
+; CHECK-NEXT:    [[SPLIT1:%.*]] = shufflevector <4 x i1> [[IN]], <4 x i1> poison, <2 x i32> <i32 2, i32 3>
+; CHECK-NEXT:    [[VEC_START:%.*]] = mul i64 0, [[STRIDE:%.*]]
+; CHECK-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds i1, ptr [[OUT:%.*]], i64 [[VEC_START]]
+; CHECK-NEXT:    store <2 x i1> [[SPLIT]], ptr [[VEC_GEP]], align 4
+; CHECK-NEXT:    [[VEC_START2:%.*]] = mul i64 1, [[STRIDE]]
+; CHECK-NEXT:    [[VEC_GEP3:%.*]] = getelementptr inbounds i1, ptr [[OUT]], i64 [[VEC_START2]]
+; CHECK-NEXT:    store <2 x i1> [[SPLIT1]], ptr [[VEC_GEP3]], align 4
+; CHECK-NEXT:    ret void
+;
+  call void @llvm.matrix.column.major.store.v4i1(<4 x i1> %in, ptr align 4 %out, i64 %stride, i1 false, i32 2, i32 2)
+  ret void
+}
+
+declare void @llvm.matrix.column.major.store.v4i1(<4 x i1>, ptr, i64, i1, i32, i32)
