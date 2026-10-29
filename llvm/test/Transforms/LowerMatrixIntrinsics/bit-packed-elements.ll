@@ -78,7 +78,10 @@ define void @multiply_fused_i24(ptr noalias %a, ptr noalias %b, ptr noalias %c) 
 define <1 x i1> @dot_product_load_i1(ptr %a, <2 x i1> %b) {
 ; CHECK-LABEL: define <1 x i1> @dot_product_load_i1(
 ; CHECK-SAME: ptr [[A:%.*]], <2 x i1> [[B:%.*]]) {
-; CHECK-NEXT:    [[TMP1:%.*]] = load <2 x i1>, ptr [[A]], align 1
+; CHECK-NEXT:    [[COL_LOAD:%.*]] = load <1 x i1>, ptr [[A]], align 1
+; CHECK-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds i1, ptr [[A]], i64 1
+; CHECK-NEXT:    [[COL_LOAD1:%.*]] = load <1 x i1>, ptr [[VEC_GEP]], align 1
+; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <1 x i1> [[COL_LOAD]], <1 x i1> [[COL_LOAD1]], <2 x i32> <i32 0, i32 1>
 ; CHECK-NEXT:    [[TMP2:%.*]] = mul <2 x i1> [[TMP1]], [[B]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = call i1 @llvm.vector.reduce.add.v2i1(<2 x i1> [[TMP2]])
 ; CHECK-NEXT:    [[TMP4:%.*]] = insertelement <1 x i1> poison, i1 [[TMP3]], i64 0
