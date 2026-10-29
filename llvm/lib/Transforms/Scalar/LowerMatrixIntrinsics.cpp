@@ -1561,15 +1561,17 @@ public:
     if (!IsIntVec && !FMF.allowReassoc())
       return;
 
-    auto CanBeFlattened = [](Value *Op) {
+    auto CanBeFlattened = [this](Value *Op) {
       if (match(Op, m_BinOp()))
         return true;
-      return match(
-          Op, m_OneUse(m_CombineOr(
-                  m_Load(m_Value()),
-                  m_CombineOr(m_Intrinsic<Intrinsic::matrix_transpose>(),
-                              m_Intrinsic<Intrinsic::matrix_column_major_load>(
-                                  m_Value(), m_One())))));
+      // A flattened load would bit-pack the columns, but the intrinsic loads
+      // them at element GEPs.
+      if (match(Op, m_Intrinsic<Intrinsic::matrix_column_major_load>(m_Value(),
+                                                                     m_One())))
+        return Op->hasOneUse() && !hasBitPackedElements(Op->getType());
+      return match(Op, m_OneUse(m_CombineOr(
+                           m_Load(m_Value()),
+                           m_Intrinsic<Intrinsic::matrix_transpose>())));
     };
     // Returns the cost benefit of using \p Op with the dot product lowering. If
     // the returned cost is < 0, the argument is cheaper to use in the
