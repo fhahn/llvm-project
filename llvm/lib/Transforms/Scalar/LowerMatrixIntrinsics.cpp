@@ -1269,28 +1269,26 @@ public:
   /// non-ConstantInt strides, return the common alignment of the initial
   /// alignment and the element alloc size.
   Align getAlignForIndex(unsigned Idx, Value *Stride, Type *ElementTy,
-                         MaybeAlign A) const {
-    Align InitialAlign = DL.getValueOrABITypeAlignment(A, ElementTy);
+                         Align A) const {
     if (Idx == 0)
-      return InitialAlign;
+      return A;
 
     uint64_t ElementSize = DL.getTypeAllocSize(ElementTy);
     if (auto *ConstStride = dyn_cast<ConstantInt>(Stride)) {
       uint64_t StrideInBytes = ConstStride->getZExtValue() * ElementSize;
-      return commonAlignment(InitialAlign, Idx * StrideInBytes);
+      return commonAlignment(A, Idx * StrideInBytes);
     }
-    return commonAlignment(InitialAlign, ElementSize);
+    return commonAlignment(A, ElementSize);
   }
 
   /// Compute the alignment of a tile starting \p Offset elements after an
   /// address with alignment \p A. Non-ConstantInt offsets are multiples of the
   /// tile size.
-  Align getAlignForTile(Value *Offset, Type *ElementTy, MaybeAlign A) const {
+  Align getAlignForTile(Value *Offset, Type *ElementTy, Align A) const {
     auto *ConstOffset = dyn_cast<ConstantInt>(Offset);
     uint64_t NumElements =
         ConstOffset ? ConstOffset->getZExtValue() : Opts.fuse_matrix_tile_size;
-    return commonAlignment(DL.getValueOrABITypeAlignment(A, ElementTy),
-                           NumElements * DL.getTypeAllocSize(ElementTy));
+    return commonAlignment(A, NumElements * DL.getTypeAllocSize(ElementTy));
   }
 
   IntegerType *getIndexType(Value *Ptr) const {
@@ -1313,7 +1311,7 @@ public:
 
   /// Load a matrix with \p Shape starting at \p Ptr and using \p Stride between
   /// vectors.
-  MatrixTy loadMatrix(Type *Ty, Value *Ptr, MaybeAlign MAlign, Value *Stride,
+  MatrixTy loadMatrix(Type *Ty, Value *Ptr, Align A, Value *Stride,
                       bool IsVolatile, ShapeInfo Shape, IRBuilder<> &Builder) {
     auto *VType = cast<FixedVectorType>(Ty);
     Type *EltTy = VType->getElementType();
@@ -1326,8 +1324,8 @@ public:
           EltPtr, Builder.getIntN(Stride->getType()->getScalarSizeInBits(), I),
           Stride, EltTy, Builder);
       Value *Vector = Builder.CreateAlignedLoad(
-          VecTy, GEP, getAlignForIndex(I, Stride, EltTy, MAlign),
-          IsVolatile, "col.load");
+          VecTy, GEP, getAlignForIndex(I, Stride, EltTy, A), IsVolatile,
+          "col.load");
 
       Result.addVector(Vector);
     }
@@ -1338,7 +1336,7 @@ public:
   /// Loads a sub-matrix with shape \p ResultShape from a \p R x \p C matrix,
   /// starting at \p MatrixPtr[I][J]. \p I and \p J must be multiples of the
   /// tile size.
-  MatrixTy loadMatrix(Value *MatrixPtr, MaybeAlign Align, bool IsVolatile,
+  MatrixTy loadMatrix(Value *MatrixPtr, Align A, bool IsVolatile,
                       ShapeInfo MatrixShape, Value *I, Value *J,
                       ShapeInfo ResultShape, Type *EltTy,
                       IRBuilder<> &Builder) {
@@ -1349,16 +1347,15 @@ public:
     auto *TileTy = FixedVectorType::get(EltTy, ResultShape.NumRows *
                                                    ResultShape.NumColumns);
 
-    return loadMatrix(TileTy, TileStart, getAlignForTile(Offset, EltTy, Align),
+    return loadMatrix(TileTy, TileStart, getAlignForTile(Offset, EltTy, A),
                       getIndex(MatrixPtr, getStride(MatrixShape)), IsVolatile,
                       ResultShape, Builder);
   }
 
   /// Lower a load instruction with shape information.
-  MatrixTy LowerLoad(Instruction *Inst, Value *Ptr, MaybeAlign Align,
-                     Value *Stride, bool IsVolatile, ShapeInfo Shape,
-                     IRBuilder<> &Builder) {
-    return loadMatrix(Inst->getType(), Ptr, Align, Stride, IsVolatile, Shape,
+  MatrixTy LowerLoad(Instruction *Inst, Value *Ptr, Align A, Value *Stride,
+                     bool IsVolatile, ShapeInfo Shape, IRBuilder<> &Builder) {
+    return loadMatrix(Inst->getType(), Ptr, A, Stride, IsVolatile, Shape,
                       Builder);
   }
 
@@ -1377,9 +1374,9 @@ public:
 
   /// Stores a sub-matrix \p StoreVal into the \p R x \p C matrix starting at \p
   /// MatrixPtr[I][J]. \p I and \p J must be multiples of the tile size.
-  void storeMatrix(const MatrixTy &StoreVal, Value *MatrixPtr,
-                   MaybeAlign MAlign, bool IsVolatile, ShapeInfo MatrixShape,
-                   Value *I, Value *J, Type *EltTy, IRBuilder<> &Builder) {
+  void storeMatrix(const MatrixTy &StoreVal, Value *MatrixPtr, Align A,
+                   bool IsVolatile, ShapeInfo MatrixShape, Value *I, Value *J,
+                   Type *EltTy, IRBuilder<> &Builder) {
     Value *Offset = Builder.CreateAdd(
         Builder.CreateMul(J, getIndex(MatrixPtr, getStride(MatrixShape))), I);
 
@@ -1387,16 +1384,15 @@ public:
     auto *TileTy = FixedVectorType::get(EltTy, StoreVal.getNumRows() *
                                                    StoreVal.getNumColumns());
 
-    storeMatrix(
-        TileTy, StoreVal, TileStart, getAlignForTile(Offset, EltTy, MAlign),
-        getIndex(MatrixPtr, getStride(MatrixShape)), IsVolatile, Builder);
+    storeMatrix(TileTy, StoreVal, TileStart, getAlignForTile(Offset, EltTy, A),
+                getIndex(MatrixPtr, getStride(MatrixShape)), IsVolatile,
+                Builder);
   }
 
   /// Store matrix \p StoreVal starting at \p Ptr and using \p Stride between
   /// vectors.
-  MatrixTy storeMatrix(Type *Ty, MatrixTy StoreVal, Value *Ptr,
-                       MaybeAlign MAlign, Value *Stride, bool IsVolatile,
-                       IRBuilder<> &Builder) {
+  MatrixTy storeMatrix(Type *Ty, MatrixTy StoreVal, Value *Ptr, Align A,
+                       Value *Stride, bool IsVolatile, IRBuilder<> &Builder) {
     auto *VType = cast<FixedVectorType>(Ty);
     Value *EltPtr = Ptr;
     Stride = castToIndexType(Ptr, Stride, Builder);
@@ -1406,11 +1402,10 @@ public:
           Builder.getIntN(Stride->getType()->getScalarSizeInBits(),
                           Vec.index()),
           Stride, VType->getElementType(), Builder);
-      Builder.CreateAlignedStore(Vec.value(), GEP,
-                                 getAlignForIndex(Vec.index(), Stride,
-                                                  VType->getElementType(),
-                                                  MAlign),
-                                 IsVolatile);
+      Builder.CreateAlignedStore(
+          Vec.value(), GEP,
+          getAlignForIndex(Vec.index(), Stride, VType->getElementType(), A),
+          IsVolatile);
     }
     return MatrixTy(isColumnMajor())
         .addNumStores(getNumOps(StoreVal.getVectorTy()) *
@@ -1418,9 +1413,9 @@ public:
   }
 
   /// Lower a store instruction with shape information.
-  MatrixTy LowerStore(Instruction *Inst, Value *Matrix, Value *Ptr,
-                      MaybeAlign A, Value *Stride, bool IsVolatile,
-                      ShapeInfo Shape, IRBuilder<> &Builder) {
+  MatrixTy LowerStore(Instruction *Inst, Value *Matrix, Value *Ptr, Align A,
+                      Value *Stride, bool IsVolatile, ShapeInfo Shape,
+                      IRBuilder<> &Builder) {
     auto StoreVal = getMatrix(Matrix, Shape, Builder);
     return storeMatrix(Matrix->getType(), StoreVal, Ptr, A, Stride, IsVolatile,
                        Builder);
