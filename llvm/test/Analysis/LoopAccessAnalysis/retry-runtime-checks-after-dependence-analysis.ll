@@ -955,3 +955,448 @@ loop:
 exit:
   ret void
 }
+
+; The loads from %a[i] and %a[i + 1] have the same unknown dependences, but
+; their step does not exceed the access size, so they are not grouped.
+define void @consecutive_loads_with_unknown_deps(ptr %a, i64 %offset, i64 %n) {
+; CHECK-LABEL: 'consecutive_loads_with_unknown_deps'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.off
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
+; CHECK-NEXT:      Check 1:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.off
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a, i64 1
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: ((4 * %offset) + %a) High: ((4 * %offset) + (4 * %n) + %a))
+; CHECK-NEXT:            Member: {((4 * %offset) + %a),+,4}<%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a))
+; CHECK-NEXT:            Member: {%a,+,4}<nuw><%loop>
+; CHECK-NEXT:        Group GRP2:
+; CHECK-NEXT:          (Low: (4 + %a)<nuw> High: (4 + (4 * %n) + %a))
+; CHECK-NEXT:            Member: {(4 + %a)<nuw>,+,4}<nuw><%loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
+  %l.a = load i32, ptr %gep.a, align 4
+  %gep.a.1 = getelementptr inbounds i32, ptr %gep.a, i64 1
+  %l.a.1 = load i32, ptr %gep.a.1, align 4
+  %add = add i32 %l.a, %l.a.1
+  %iv.off = add i64 %iv, %offset
+  %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.off
+  store i32 %add, ptr %gep.a.off, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The load from %a overlaps only the store to %a[2 * i], so the stores to
+; %a[2 * i] and %a[2 * i + 1] have different unknown dependences and are not
+; grouped.
+define void @interleaved_stores_with_different_unknown_deps(ptr %a, i64 %offset, i64 %n) {
+; CHECK-LABEL: 'interleaved_stores_with_different_unknown_deps'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
+; CHECK-NEXT:      Check 1:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
+; CHECK-NEXT:        Against group GRP3:
+; CHECK-NEXT:        ptr %a
+; CHECK-NEXT:      Check 2:
+; CHECK-NEXT:        Comparing group GRP1:
+; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %a High: (-4 + (8 * %n) + %a))
+; CHECK-NEXT:            Member: {%a,+,8}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: (4 + %a)<nuw> High: ((8 * %n) + %a))
+; CHECK-NEXT:            Member: {(4 + %a)<nuw>,+,8}<nuw><%loop>
+; CHECK-NEXT:        Group GRP2:
+; CHECK-NEXT:          (Low: ((4 * %offset) + %a) High: (-4 + (4 * %offset) + (8 * %n) + %a))
+; CHECK-NEXT:            Member: {((4 * %offset) + %a),+,8}<%loop>
+; CHECK-NEXT:        Group GRP3:
+; CHECK-NEXT:          (Low: %a High: (4 + %a)<nuw>)
+; CHECK-NEXT:            Member: %a
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.2 = shl nuw nsw i64 %iv, 1
+  %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
+  store i32 0, ptr %gep.a.0, align 4
+  %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
+  store i32 1, ptr %gep.a.1, align 4
+  %iv.2.off = add i64 %iv.2, %offset
+  %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
+  %l.a.off = load i32, ptr %gep.a.off, align 4
+  %l.a = load i32, ptr %a, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The step exceeds the size of the byte load, but not the size of the other
+; accesses in the alias set, so the loads are not grouped.
+define void @load_and_byte_load_with_unknown_deps(ptr %a, i64 %offset, i64 %n) {
+; CHECK-LABEL: 'load_and_byte_load_with_unknown_deps'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.off
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
+; CHECK-NEXT:      Check 1:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.off
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i8, ptr %gep.a, i64 1
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: ((4 * %offset) + %a) High: ((4 * %offset) + (4 * %n) + %a))
+; CHECK-NEXT:            Member: {((4 * %offset) + %a),+,4}<%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a))
+; CHECK-NEXT:            Member: {%a,+,4}<nuw><%loop>
+; CHECK-NEXT:        Group GRP2:
+; CHECK-NEXT:          (Low: (1 + %a)<nuw> High: (-2 + (4 * %n) + %a))
+; CHECK-NEXT:            Member: {(1 + %a)<nuw>,+,4}<nuw><%loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
+  %l.a = load i32, ptr %gep.a, align 4
+  %gep.a.1 = getelementptr inbounds i8, ptr %gep.a, i64 1
+  %l.a.1 = load i8, ptr %gep.a.1, align 1
+  %ext = zext i8 %l.a.1 to i32
+  %add = add i32 %l.a, %ext
+  %iv.off = add i64 %iv, %offset
+  %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.off
+  store i32 %add, ptr %gep.a.off, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The loads from %gep.a.j and %gep.a.j.1000 are AddRecs of the outer loop, not
+; of the inner loop, so they are not grouped.
+define void @outer_loop_invariant_loads_with_unknown_deps(ptr %a, i64 %offset, i64 %m, i64 %n) {
+; CHECK-LABEL: 'outer_loop_invariant_loads_with_unknown_deps'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds [1024 x i32], ptr %a, i64 %j, i64 %iv.off
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.a.j = getelementptr inbounds [1024 x i32], ptr %a, i64 %j, i64 0
+; CHECK-NEXT:      Check 1:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds [1024 x i32], ptr %a, i64 %j, i64 %iv.off
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.a.j.1000 = getelementptr inbounds [1024 x i32], ptr %a, i64 %j, i64 1000
+; CHECK-NEXT:      Check 2:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds [1024 x i32], ptr %a, i64 %j, i64 %iv.off
+; CHECK-NEXT:        Against group GRP3:
+; CHECK-NEXT:          %gep.a.iv = getelementptr inbounds [1024 x i32], ptr %a, i64 %j, i64 %iv
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: {((4 * %offset) + %a),+,4096}<nw><%outer> High: {((4 * %offset) + (4 * %n) + %a),+,4096}<nw><%outer>)
+; CHECK-NEXT:            Member: {{\{\{}}((4 * %offset) + %a),+,4096}<nw><%outer>,+,4}<%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: {%a,+,4096}<nuw><%outer> High: {(4 + %a),+,4096}<nw><%outer>)
+; CHECK-NEXT:            Member: {%a,+,4096}<nuw><%outer>
+; CHECK-NEXT:        Group GRP2:
+; CHECK-NEXT:          (Low: {(4000 + %a)<nuw>,+,4096}<nuw><%outer> High: {(4004 + %a),+,4096}<nw><%outer>)
+; CHECK-NEXT:            Member: {(4000 + %a)<nuw>,+,4096}<nuw><%outer>
+; CHECK-NEXT:        Group GRP3:
+; CHECK-NEXT:          (Low: {%a,+,4096}<nuw><%outer> High: {((4 * %n) + %a),+,4096}<nw><%outer>)
+; CHECK-NEXT:            Member: {{\{\{}}%a,+,4096}<nuw><%outer>,+,4}<nuw><%loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+; CHECK-NEXT:    outer:
+; CHECK-NEXT:      Report: loop is not the innermost loop
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %outer
+
+outer:
+  %j = phi i64 [ 0, %entry ], [ %j.next, %outer.latch ]
+  %gep.a.j = getelementptr inbounds [1024 x i32], ptr %a, i64 %j, i64 0
+  %gep.a.j.1000 = getelementptr inbounds [1024 x i32], ptr %a, i64 %j, i64 1000
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %outer ], [ %iv.next, %loop ]
+  %l.a.j = load i32, ptr %gep.a.j, align 4
+  %l.a.j.1000 = load i32, ptr %gep.a.j.1000, align 4
+  %gep.a.iv = getelementptr inbounds [1024 x i32], ptr %a, i64 %j, i64 %iv
+  %l.a.iv = load i32, ptr %gep.a.iv, align 4
+  %add.1 = add i32 %l.a.j, %l.a.j.1000
+  %add = add i32 %add.1, %l.a.iv
+  %iv.off = add i64 %iv, %offset
+  %gep.a.off = getelementptr inbounds [1024 x i32], ptr %a, i64 %j, i64 %iv.off
+  store i32 %add, ptr %gep.a.off, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %outer.latch, label %loop
+
+outer.latch:
+  %j.next = add nuw nsw i64 %j, 1
+  %ec.outer = icmp eq i64 %j.next, %m
+  br i1 %ec.outer, label %exit, label %outer
+
+exit:
+  ret void
+}
+
+; The loads from %a[2 * i] and %a[2 * i + 100] are more than a step apart, so
+; they are not grouped.
+define void @interleaved_loads_more_than_a_step_apart_with_unknown_deps(ptr %a, i64 %offset, i64 %n) {
+; CHECK-LABEL: 'interleaved_loads_more_than_a_step_apart_with_unknown_deps'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
+; CHECK-NEXT:      Check 1:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.a.100 = getelementptr inbounds i32, ptr %gep.a.0, i64 100
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: ((4 * %offset) + %a) High: (-4 + (4 * %offset) + (8 * %n) + %a))
+; CHECK-NEXT:            Member: {((4 * %offset) + %a),+,8}<%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %a High: (-4 + (8 * %n) + %a))
+; CHECK-NEXT:            Member: {%a,+,8}<nuw><%loop>
+; CHECK-NEXT:        Group GRP2:
+; CHECK-NEXT:          (Low: (400 + %a)<nuw> High: (396 + (8 * %n) + %a))
+; CHECK-NEXT:            Member: {(400 + %a)<nuw>,+,8}<nuw><%loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.2 = shl nuw nsw i64 %iv, 1
+  %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
+  %l.a.0 = load i32, ptr %gep.a.0, align 4
+  %gep.a.100 = getelementptr inbounds i32, ptr %gep.a.0, i64 100
+  %l.a.100 = load i32, ptr %gep.a.100, align 4
+  %add = add i32 %l.a.0, %l.a.100
+  %iv.2.off = add i64 %iv.2, %offset
+  %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
+  store i32 %add, ptr %gep.a.off, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The store to %a[2 * i] and the load from %a[2 * i + 1] have the same unknown
+; dependences, but only the store is checked against the load from %b, so they
+; are not grouped.
+define void @interleaved_store_and_load_with_unknown_deps_and_load_from_other_object(ptr %a, ptr %b, i64 %offset, i64 %n) {
+; CHECK-LABEL: 'interleaved_store_and_load_with_unknown_deps_and_load_from_other_object'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
+; CHECK-NEXT:      Check 1:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
+; CHECK-NEXT:      Check 2:
+; CHECK-NEXT:        Comparing group GRP1:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
+; CHECK-NEXT:      Check 3:
+; CHECK-NEXT:        Comparing group GRP1:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
+; CHECK-NEXT:        Against group GRP3:
+; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %a High: (-4 + (8 * %n) + %a))
+; CHECK-NEXT:            Member: {%a,+,8}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: ((4 * %offset) + %a) High: (-4 + (4 * %offset) + (8 * %n) + %a))
+; CHECK-NEXT:            Member: {((4 * %offset) + %a),+,8}<%loop>
+; CHECK-NEXT:        Group GRP2:
+; CHECK-NEXT:          (Low: %b High: ((4 * %n) + %b))
+; CHECK-NEXT:            Member: {%b,+,4}<nuw><%loop>
+; CHECK-NEXT:        Group GRP3:
+; CHECK-NEXT:          (Low: (4 + %a)<nuw> High: ((8 * %n) + %a))
+; CHECK-NEXT:            Member: {(4 + %a)<nuw>,+,8}<nuw><%loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.2 = shl nuw nsw i64 %iv, 1
+  %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
+  %l.b = load i32, ptr %gep.b, align 4
+  store i32 %l.b, ptr %gep.a.0, align 4
+  %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
+  %l.a.1 = load i32, ptr %gep.a.1, align 4
+  %iv.2.off = add i64 %iv.2, %offset
+  %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
+  store i32 %l.a.1, ptr %gep.a.off, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The wider load from %b is in a different alias set, so it does not prevent
+; grouping the stores to %a[2 * i] and %a[2 * i + 1].
+define void @interleaved_stores_with_unknown_deps_and_wider_load_from_noalias_object(ptr %a, ptr noalias %b, i64 %offset, i64 %n) {
+; CHECK-LABEL: 'interleaved_stores_with_unknown_deps_and_wider_load_from_noalias_object'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
+; CHECK-NEXT:      Check 1:
+; CHECK-NEXT:        Comparing group GRP1:
+; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %a High: (-4 + (8 * %n) + %a))
+; CHECK-NEXT:            Member: {%a,+,8}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: (4 + %a)<nuw> High: ((8 * %n) + %a))
+; CHECK-NEXT:            Member: {(4 + %a)<nuw>,+,8}<nuw><%loop>
+; CHECK-NEXT:        Group GRP2:
+; CHECK-NEXT:          (Low: ((4 * %offset) + %a) High: (-4 + (4 * %offset) + (8 * %n) + %a))
+; CHECK-NEXT:            Member: {((4 * %offset) + %a),+,8}<%loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.2 = shl nuw nsw i64 %iv, 1
+  %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
+  store i32 0, ptr %gep.a.0, align 4
+  %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
+  store i32 1, ptr %gep.a.1, align 4
+  %iv.2.off = add i64 %iv.2, %offset
+  %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
+  %l.a.off = load i32, ptr %gep.a.off, align 4
+  %gep.b = getelementptr inbounds double, ptr %b, i64 %iv
+  %l.b = load double, ptr %gep.b, align 8
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
