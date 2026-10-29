@@ -2079,11 +2079,13 @@ public:
     Value *CPtr = Store->getPointerOperand();
 
     // Use loop-based tiling when the number of expected operations exceeds
-    // threshold.
+    // threshold. The loops only process full tiles, so all dimensions must be
+    // multiples of the tile size.
     unsigned NumOps = getNumNativeVectorOps(EltType, R, M, C);
     bool UseLoops = (NumOps > Opts.fuse_matrix_loops_threshold) &&
                     R % Opts.fuse_matrix_tile_size == 0 &&
-                    C % Opts.fuse_matrix_tile_size == 0;
+                    C % Opts.fuse_matrix_tile_size == 0 &&
+                    M % Opts.fuse_matrix_tile_size == 0;
     if (UseLoops)
       createTiledLoops(MatMul, APtr, LShape, BPtr, RShape, Store);
     else {
