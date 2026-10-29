@@ -4,9 +4,9 @@ define void @strided_store_volatile(<6 x i32> %in, ptr %out) {
 ; CHECK-LABEL: @strided_store_volatile(
 ; CHECK-NEXT:    [[SPLIT:%.*]] = shufflevector <6 x i32> [[IN:%.*]], <6 x i32> poison, <3 x i32> <i32 0, i32 1, i32 2>
 ; CHECK-NEXT:    [[SPLIT1:%.*]] = shufflevector <6 x i32> [[IN]], <6 x i32> poison, <3 x i32> <i32 3, i32 4, i32 5>
-; CHECK-NEXT:    store volatile <3 x i32> [[SPLIT]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store volatile <3 x i32> [[SPLIT]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds i32, ptr [[OUT]], i64 5
-; CHECK-NEXT:    store volatile <3 x i32> [[SPLIT1]], ptr [[VEC_GEP]], align 4
+; CHECK-NEXT:    store volatile <3 x i32> [[SPLIT1]], ptr [[VEC_GEP]], align 1
 ; CHECK-NEXT:    ret void
 ;
   call void @llvm.matrix.column.major.store(<6 x i32> %in, ptr %out, i64 5, i1 true, i32 3, i32 2)

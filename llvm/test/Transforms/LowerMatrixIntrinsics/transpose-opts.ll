@@ -923,13 +923,13 @@ entry:
 
 define <6 x double> @transpose_of_transpose_of_non_matrix_op(ptr %a) {
 ; CHECK-LABEL: @transpose_of_transpose_of_non_matrix_op(
-; CHECK-NEXT:    [[COL_LOAD:%.*]] = load <2 x double>, ptr [[A:%.*]], align 8
+; CHECK-NEXT:    [[COL_LOAD:%.*]] = load <2 x double>, ptr [[A:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds double, ptr [[A]], i64 4
-; CHECK-NEXT:    [[COL_LOAD1:%.*]] = load <2 x double>, ptr [[VEC_GEP]], align 8
+; CHECK-NEXT:    [[COL_LOAD1:%.*]] = load <2 x double>, ptr [[VEC_GEP]], align 1
 ; CHECK-NEXT:    [[VEC_GEP2:%.*]] = getelementptr inbounds double, ptr [[A]], i64 8
-; CHECK-NEXT:    [[COL_LOAD3:%.*]] = load <2 x double>, ptr [[VEC_GEP2]], align 8
+; CHECK-NEXT:    [[COL_LOAD3:%.*]] = load <2 x double>, ptr [[VEC_GEP2]], align 1
 ; CHECK-NEXT:    [[VEC_GEP4:%.*]] = getelementptr inbounds double, ptr [[A]], i64 12
-; CHECK-NEXT:    [[COL_LOAD5:%.*]] = load <2 x double>, ptr [[VEC_GEP4]], align 8
+; CHECK-NEXT:    [[COL_LOAD5:%.*]] = load <2 x double>, ptr [[VEC_GEP4]], align 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <2 x double> [[COL_LOAD]], <2 x double> [[COL_LOAD1]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
 ; CHECK-NEXT:    [[TMP2:%.*]] = shufflevector <2 x double> [[COL_LOAD3]], <2 x double> [[COL_LOAD5]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
 ; CHECK-NEXT:    [[TMP3:%.*]] = shufflevector <4 x double> [[TMP1]], <4 x double> [[TMP2]], <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>

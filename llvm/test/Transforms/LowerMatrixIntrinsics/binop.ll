@@ -11,9 +11,9 @@ define void @add_2x2(ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x i32>, ptr [[VEC_GEP3]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = add <2 x i32> [[COL_LOAD]], [[COL_LOAD2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = add <2 x i32> [[COL_LOAD1]], [[COL_LOAD4]]
-; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds i32, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %lhsv = load <4 x i32>, ptr %lhs
@@ -33,9 +33,9 @@ define void @fadd_2x2(ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x float>, ptr [[VEC_GEP3]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = fadd <2 x float> [[COL_LOAD]], [[COL_LOAD2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = fadd <2 x float> [[COL_LOAD1]], [[COL_LOAD4]]
-; CHECK-NEXT:    store <2 x float> [[TMP1]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store <2 x float> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds float, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x float> [[TMP2]], ptr [[VEC_GEP5]], align 4
+; CHECK-NEXT:    store <2 x float> [[TMP2]], ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %lhsv = load <4 x float>, ptr %lhs
@@ -55,9 +55,9 @@ define void @sub_2x2(ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x i32>, ptr [[VEC_GEP3]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub <2 x i32> [[COL_LOAD]], [[COL_LOAD2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub <2 x i32> [[COL_LOAD1]], [[COL_LOAD4]]
-; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds i32, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %lhsv = load <4 x i32>, ptr %lhs
@@ -77,9 +77,9 @@ define void @fsub_2x2(ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x float>, ptr [[VEC_GEP3]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = fsub nnan <2 x float> [[COL_LOAD]], [[COL_LOAD2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = fsub nnan <2 x float> [[COL_LOAD1]], [[COL_LOAD4]]
-; CHECK-NEXT:    store <2 x float> [[TMP1]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store <2 x float> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds float, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x float> [[TMP2]], ptr [[VEC_GEP5]], align 4
+; CHECK-NEXT:    store <2 x float> [[TMP2]], ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %lhsv = load <4 x float>, ptr %lhs
@@ -99,9 +99,9 @@ define void @mul_2x2(ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x i32>, ptr [[VEC_GEP3]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = mul <2 x i32> [[COL_LOAD]], [[COL_LOAD2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = mul <2 x i32> [[COL_LOAD1]], [[COL_LOAD4]]
-; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds i32, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %lhsv = load <4 x i32>, ptr %lhs
@@ -121,9 +121,9 @@ define void @fmul_2x2(ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x float>, ptr [[VEC_GEP3]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = fmul contract <2 x float> [[COL_LOAD]], [[COL_LOAD2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = fmul contract <2 x float> [[COL_LOAD1]], [[COL_LOAD4]]
-; CHECK-NEXT:    store <2 x float> [[TMP1]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store <2 x float> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds float, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x float> [[TMP2]], ptr [[VEC_GEP5]], align 4
+; CHECK-NEXT:    store <2 x float> [[TMP2]], ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %lhsv = load <4 x float>, ptr %lhs
@@ -143,9 +143,9 @@ define void @udiv_2x2(ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x i32>, ptr [[VEC_GEP3]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = udiv <2 x i32> [[COL_LOAD]], [[COL_LOAD2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = udiv <2 x i32> [[COL_LOAD1]], [[COL_LOAD4]]
-; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds i32, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %lhsv = load <4 x i32>, ptr %lhs
@@ -165,9 +165,9 @@ define void @sdiv_2x2(ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x i32>, ptr [[VEC_GEP3]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = sdiv <2 x i32> [[COL_LOAD]], [[COL_LOAD2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = sdiv <2 x i32> [[COL_LOAD1]], [[COL_LOAD4]]
-; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds i32, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %lhsv = load <4 x i32>, ptr %lhs
@@ -187,9 +187,9 @@ define void @fdiv_2x2(ptr %num, ptr %denom, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x double>, ptr [[VEC_GEP3]], align 16
 ; CHECK-NEXT:    [[TMP1:%.*]] = fdiv nnan <2 x double> [[COL_LOAD]], [[COL_LOAD2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = fdiv nnan <2 x double> [[COL_LOAD1]], [[COL_LOAD4]]
-; CHECK-NEXT:    store <2 x double> [[TMP1]], ptr [[OUT:%.*]], align 8
+; CHECK-NEXT:    store <2 x double> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds double, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x double> [[TMP2]], ptr [[VEC_GEP5]], align 8
+; CHECK-NEXT:    store <2 x double> [[TMP2]], ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %numv = load <4 x double>, ptr %num
@@ -209,9 +209,9 @@ define void @urem_2x2(ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x i32>, ptr [[VEC_GEP3]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = urem <2 x i32> [[COL_LOAD]], [[COL_LOAD2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = urem <2 x i32> [[COL_LOAD1]], [[COL_LOAD4]]
-; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds i32, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %lhsv = load <4 x i32>, ptr %lhs
@@ -231,9 +231,9 @@ define void @srem_2x2(ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x i32>, ptr [[VEC_GEP3]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = srem <2 x i32> [[COL_LOAD]], [[COL_LOAD2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = srem <2 x i32> [[COL_LOAD1]], [[COL_LOAD4]]
-; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds i32, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %lhsv = load <4 x i32>, ptr %lhs
@@ -253,9 +253,9 @@ define void @frem_2x2(ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x float>, ptr [[VEC_GEP3]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = frem fast <2 x float> [[COL_LOAD]], [[COL_LOAD2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = frem fast <2 x float> [[COL_LOAD1]], [[COL_LOAD4]]
-; CHECK-NEXT:    store <2 x float> [[TMP1]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store <2 x float> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds float, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x float> [[TMP2]], ptr [[VEC_GEP5]], align 4
+; CHECK-NEXT:    store <2 x float> [[TMP2]], ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %lhsv = load <4 x float>, ptr %lhs
@@ -275,9 +275,9 @@ define void @shl_2x2(ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x i32>, ptr [[VEC_GEP3]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = shl <2 x i32> [[COL_LOAD]], [[COL_LOAD2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = shl <2 x i32> [[COL_LOAD1]], [[COL_LOAD4]]
-; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds i32, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %lhsv = load <4 x i32>, ptr %lhs
@@ -297,9 +297,9 @@ define void @lshr_2x2(ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x i32>, ptr [[VEC_GEP3]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = lshr <2 x i32> [[COL_LOAD]], [[COL_LOAD2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = lshr <2 x i32> [[COL_LOAD1]], [[COL_LOAD4]]
-; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds i32, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %lhsv = load <4 x i32>, ptr %lhs
@@ -319,9 +319,9 @@ define void @ashr_2x2(ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x i32>, ptr [[VEC_GEP3]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = ashr <2 x i32> [[COL_LOAD]], [[COL_LOAD2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = ashr <2 x i32> [[COL_LOAD1]], [[COL_LOAD4]]
-; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds i32, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %lhsv = load <4 x i32>, ptr %lhs
@@ -341,9 +341,9 @@ define void @and_2x2(ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x i32>, ptr [[VEC_GEP3]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = and <2 x i32> [[COL_LOAD]], [[COL_LOAD2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = and <2 x i32> [[COL_LOAD1]], [[COL_LOAD4]]
-; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds i32, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %lhsv = load <4 x i32>, ptr %lhs
@@ -363,9 +363,9 @@ define void @or_2x2(ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x i32>, ptr [[VEC_GEP3]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = or <2 x i32> [[COL_LOAD]], [[COL_LOAD2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = or <2 x i32> [[COL_LOAD1]], [[COL_LOAD4]]
-; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds i32, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %lhsv = load <4 x i32>, ptr %lhs
@@ -385,9 +385,9 @@ define void @xor_2x2(ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x i32>, ptr [[VEC_GEP3]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = xor <2 x i32> [[COL_LOAD]], [[COL_LOAD2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = xor <2 x i32> [[COL_LOAD1]], [[COL_LOAD4]]
-; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds i32, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %lhsv = load <4 x i32>, ptr %lhs
@@ -404,9 +404,9 @@ define void @fabs_2x2f64(ptr %in, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD1:%.*]] = load <2 x double>, ptr [[VEC_GEP]], align 16
 ; CHECK-NEXT:    [[TMP1:%.*]] = call <2 x double> @llvm.fabs.v2f64(<2 x double> [[COL_LOAD]])
 ; CHECK-NEXT:    [[TMP2:%.*]] = call <2 x double> @llvm.fabs.v2f64(<2 x double> [[COL_LOAD1]])
-; CHECK-NEXT:    store <2 x double> [[TMP1]], ptr [[OUT:%.*]], align 8
+; CHECK-NEXT:    store <2 x double> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP2:%.*]] = getelementptr inbounds double, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x double> [[TMP2]], ptr [[VEC_GEP2]], align 8
+; CHECK-NEXT:    store <2 x double> [[TMP2]], ptr [[VEC_GEP2]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %load = load <4 x double>, ptr %in
@@ -422,9 +422,9 @@ define void @abs_2x2i32(ptr %in, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD1:%.*]] = load <2 x i32>, ptr [[VEC_GEP]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = call <2 x i32> @llvm.abs.v2i32(<2 x i32> [[COL_LOAD]], i1 false)
 ; CHECK-NEXT:    [[TMP2:%.*]] = call <2 x i32> @llvm.abs.v2i32(<2 x i32> [[COL_LOAD1]], i1 false)
-; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP2:%.*]] = getelementptr inbounds i32, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP2]], align 4
+; CHECK-NEXT:    store <2 x i32> [[TMP2]], ptr [[VEC_GEP2]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %load = load <4 x i32>, ptr %in

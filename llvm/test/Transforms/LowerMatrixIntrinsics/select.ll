@@ -11,9 +11,9 @@ define void @select_2x2_bot(i1 %cond, ptr %lhs, ptr %rhs, ptr %out) !prof !0 {
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x float>, ptr [[VEC_GEP3]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = select i1 [[COND:%.*]], <2 x float> [[COL_LOAD]], <2 x float> [[COL_LOAD2]], !prof [[PROF1:![0-9]+]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = select i1 [[COND]], <2 x float> [[COL_LOAD1]], <2 x float> [[COL_LOAD4]], !prof [[PROF1]]
-; CHECK-NEXT:    store <2 x float> [[TMP1]], ptr [[OUT:%.*]], align 4
+; CHECK-NEXT:    store <2 x float> [[TMP1]], ptr [[OUT:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds float, ptr [[OUT]], i64 2
-; CHECK-NEXT:    store <2 x float> [[TMP2]], ptr [[VEC_GEP5]], align 4
+; CHECK-NEXT:    store <2 x float> [[TMP2]], ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %lhsv = load <4 x float>, ptr %lhs
@@ -25,9 +25,9 @@ define void @select_2x2_bot(i1 %cond, ptr %lhs, ptr %rhs, ptr %out) !prof !0 {
 
 define void @select_2x2_lhs(i1 %cond, ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-LABEL: @select_2x2_lhs(
-; CHECK-NEXT:    [[COL_LOAD:%.*]] = load <2 x float>, ptr [[LHS:%.*]], align 4
+; CHECK-NEXT:    [[COL_LOAD:%.*]] = load <2 x float>, ptr [[LHS:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds float, ptr [[LHS]], i64 2
-; CHECK-NEXT:    [[COL_LOAD1:%.*]] = load <2 x float>, ptr [[VEC_GEP]], align 4
+; CHECK-NEXT:    [[COL_LOAD1:%.*]] = load <2 x float>, ptr [[VEC_GEP]], align 1
 ; CHECK-NEXT:    [[COL_LOAD2:%.*]] = load <2 x float>, ptr [[RHS:%.*]], align 16
 ; CHECK-NEXT:    [[VEC_GEP3:%.*]] = getelementptr inbounds float, ptr [[RHS]], i64 2
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x float>, ptr [[VEC_GEP3]], align 8
@@ -50,9 +50,9 @@ define void @select_2x2_rhs(i1 %cond, ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD:%.*]] = load <2 x float>, ptr [[RHS:%.*]], align 16
 ; CHECK-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds float, ptr [[RHS]], i64 2
 ; CHECK-NEXT:    [[COL_LOAD1:%.*]] = load <2 x float>, ptr [[VEC_GEP]], align 8
-; CHECK-NEXT:    [[COL_LOAD2:%.*]] = load <2 x float>, ptr [[RHS1:%.*]], align 4
+; CHECK-NEXT:    [[COL_LOAD2:%.*]] = load <2 x float>, ptr [[RHS1:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP3:%.*]] = getelementptr inbounds float, ptr [[RHS1]], i64 2
-; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x float>, ptr [[VEC_GEP3]], align 4
+; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x float>, ptr [[VEC_GEP3]], align 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = select i1 [[COND:%.*]], <2 x float> [[COL_LOAD]], <2 x float> [[COL_LOAD2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = select i1 [[COND]], <2 x float> [[COL_LOAD1]], <2 x float> [[COL_LOAD4]]
 ; CHECK-NEXT:    store <2 x float> [[TMP1]], ptr [[OUT:%.*]], align 16
@@ -73,9 +73,9 @@ define void @select_2x2_vcond_shape1(ptr %cond, ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds float, ptr [[LHS]], i64 2
 ; CHECK-NEXT:    [[COL_LOAD1:%.*]] = load <2 x float>, ptr [[VEC_GEP]], align 8
 ; CHECK-NEXT:    [[CONDV:%.*]] = load <4 x i1>, ptr [[COND:%.*]], align 1
-; CHECK-NEXT:    [[COL_LOAD5:%.*]] = load <2 x float>, ptr [[RHS1:%.*]], align 4
+; CHECK-NEXT:    [[COL_LOAD5:%.*]] = load <2 x float>, ptr [[RHS1:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP6:%.*]] = getelementptr inbounds float, ptr [[RHS1]], i64 2
-; CHECK-NEXT:    [[COL_LOAD7:%.*]] = load <2 x float>, ptr [[VEC_GEP6]], align 4
+; CHECK-NEXT:    [[COL_LOAD7:%.*]] = load <2 x float>, ptr [[VEC_GEP6]], align 1
 ; CHECK-NEXT:    [[COL_LOAD2:%.*]] = shufflevector <4 x i1> [[CONDV]], <4 x i1> poison, <2 x i32> <i32 0, i32 1>
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = shufflevector <4 x i1> [[CONDV]], <4 x i1> poison, <2 x i32> <i32 2, i32 3>
 ; CHECK-NEXT:    [[TMP1:%.*]] = select <2 x i1> [[COL_LOAD2]], <2 x float> [[COL_LOAD]], <2 x float> [[COL_LOAD5]]
@@ -101,9 +101,9 @@ define void @select_2x2_vcond_shape2(ptr %cond, ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD2:%.*]] = load <2 x i1>, ptr [[COND:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP3:%.*]] = getelementptr inbounds i1, ptr [[COND]], i64 2
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x i1>, ptr [[VEC_GEP3]], align 1
-; CHECK-NEXT:    [[COL_LOAD5:%.*]] = load <2 x float>, ptr [[RHS:%.*]], align 4
+; CHECK-NEXT:    [[COL_LOAD5:%.*]] = load <2 x float>, ptr [[RHS:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP6:%.*]] = getelementptr inbounds float, ptr [[RHS]], i64 2
-; CHECK-NEXT:    [[COL_LOAD7:%.*]] = load <2 x float>, ptr [[VEC_GEP6]], align 4
+; CHECK-NEXT:    [[COL_LOAD7:%.*]] = load <2 x float>, ptr [[VEC_GEP6]], align 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = select <2 x i1> [[COL_LOAD2]], <2 x float> [[COL_LOAD]], <2 x float> [[COL_LOAD5]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = select <2 x i1> [[COL_LOAD4]], <2 x float> [[COL_LOAD1]], <2 x float> [[COL_LOAD7]]
 ; CHECK-NEXT:    store <2 x float> [[TMP1]], ptr [[OUT:%.*]], align 16
@@ -125,9 +125,9 @@ define void @select_2x2_vcond_shape3(ptr %cond, ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds float, ptr [[LHS]], i64 2
 ; CHECK-NEXT:    [[COL_LOAD1:%.*]] = load <2 x float>, ptr [[VEC_GEP]], align 8
 ; CHECK-NEXT:    [[COL_LOAD2:%.*]] = load <4 x i1>, ptr [[COND:%.*]], align 1
-; CHECK-NEXT:    [[COL_LOAD3:%.*]] = load <2 x float>, ptr [[RHS:%.*]], align 4
+; CHECK-NEXT:    [[COL_LOAD3:%.*]] = load <2 x float>, ptr [[RHS:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP4:%.*]] = getelementptr inbounds float, ptr [[RHS]], i64 2
-; CHECK-NEXT:    [[COL_LOAD5:%.*]] = load <2 x float>, ptr [[VEC_GEP4]], align 4
+; CHECK-NEXT:    [[COL_LOAD5:%.*]] = load <2 x float>, ptr [[VEC_GEP4]], align 1
 ; CHECK-NEXT:    [[SPLIT:%.*]] = shufflevector <4 x i1> [[COL_LOAD2]], <4 x i1> poison, <2 x i32> <i32 0, i32 1>
 ; CHECK-NEXT:    [[SPLIT6:%.*]] = shufflevector <4 x i1> [[COL_LOAD2]], <4 x i1> poison, <2 x i32> <i32 2, i32 3>
 ; CHECK-NEXT:    [[TMP1:%.*]] = select <2 x i1> [[SPLIT]], <2 x float> [[COL_LOAD]], <2 x float> [[COL_LOAD3]]
@@ -149,7 +149,7 @@ define void @select_2x2_vcond_shape4(ptr %cond, ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-LABEL: @select_2x2_vcond_shape4(
 ; CHECK-NEXT:    [[COL_LOAD:%.*]] = load <4 x float>, ptr [[LHS:%.*]], align 16
 ; CHECK-NEXT:    [[COL_LOAD1:%.*]] = load <4 x i1>, ptr [[COND:%.*]], align 1
-; CHECK-NEXT:    [[COL_LOAD2:%.*]] = load <4 x float>, ptr [[RHS:%.*]], align 4
+; CHECK-NEXT:    [[COL_LOAD2:%.*]] = load <4 x float>, ptr [[RHS:%.*]], align 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = select <4 x i1> [[COL_LOAD1]], <4 x float> [[COL_LOAD]], <4 x float> [[COL_LOAD2]]
 ; CHECK-NEXT:    store <4 x float> [[TMP1]], ptr [[OUT:%.*]], align 16
 ; CHECK-NEXT:    ret void
@@ -178,13 +178,13 @@ define void @select_2x2_vcond_shape5(ptr %cond, ptr %lhs, ptr %rhs, ptr %out) {
 ; CHECK-NEXT:    [[COL_LOAD10:%.*]] = load <1 x i1>, ptr [[VEC_GEP9]], align 1
 ; CHECK-NEXT:    [[VEC_GEP11:%.*]] = getelementptr inbounds i1, ptr [[COND]], i64 3
 ; CHECK-NEXT:    [[COL_LOAD12:%.*]] = load <1 x i1>, ptr [[VEC_GEP11]], align 1
-; CHECK-NEXT:    [[COL_LOAD13:%.*]] = load <1 x float>, ptr [[RHS:%.*]], align 4
+; CHECK-NEXT:    [[COL_LOAD13:%.*]] = load <1 x float>, ptr [[RHS:%.*]], align 1
 ; CHECK-NEXT:    [[VEC_GEP14:%.*]] = getelementptr inbounds float, ptr [[RHS]], i64 1
-; CHECK-NEXT:    [[COL_LOAD15:%.*]] = load <1 x float>, ptr [[VEC_GEP14]], align 4
+; CHECK-NEXT:    [[COL_LOAD15:%.*]] = load <1 x float>, ptr [[VEC_GEP14]], align 1
 ; CHECK-NEXT:    [[VEC_GEP16:%.*]] = getelementptr inbounds float, ptr [[RHS]], i64 2
-; CHECK-NEXT:    [[COL_LOAD17:%.*]] = load <1 x float>, ptr [[VEC_GEP16]], align 4
+; CHECK-NEXT:    [[COL_LOAD17:%.*]] = load <1 x float>, ptr [[VEC_GEP16]], align 1
 ; CHECK-NEXT:    [[VEC_GEP18:%.*]] = getelementptr inbounds float, ptr [[RHS]], i64 3
-; CHECK-NEXT:    [[COL_LOAD19:%.*]] = load <1 x float>, ptr [[VEC_GEP18]], align 4
+; CHECK-NEXT:    [[COL_LOAD19:%.*]] = load <1 x float>, ptr [[VEC_GEP18]], align 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = select <1 x i1> [[COL_LOAD6]], <1 x float> [[COL_LOAD]], <1 x float> [[COL_LOAD13]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = select <1 x i1> [[COL_LOAD8]], <1 x float> [[COL_LOAD1]], <1 x float> [[COL_LOAD15]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = select <1 x i1> [[COL_LOAD10]], <1 x float> [[COL_LOAD3]], <1 x float> [[COL_LOAD17]]
