@@ -653,6 +653,21 @@ class InstExecutor : public InstVisitor<InstExecutor, void>,
         });
   }
 
+  AnyValue visitFMulAddWithResult(Type *RetTy, const FastMathFlags &FMF,
+                                  const AnyValue &Op1, const AnyValue &Op2,
+                                  const AnyValue &Op3) {
+    return visitFPTriOpWithResult(
+        RetTy, FMF, Op1, Op2, Op3,
+        [&](const APFloat &A, const APFloat &B, const APFloat &C) -> APFloat {
+          if (Ctx.fuseMultiplyAdd()) {
+            auto Res = A;
+            Res.fusedMultiplyAdd(B, C, RoundingMode::NearestTiesToEven);
+            return Res;
+          }
+          return A * B + C;
+        });
+  }
+
   void jumpTo(Instruction &Terminator, BasicBlock *DestBB) {
     if (!Handler.onBBJump(Terminator, *DestBB)) {
       setFailed();
@@ -1036,6 +1051,55 @@ class InstExecutor : public InstVisitor<InstExecutor, void>,
     }
 
     return IsStore ? AnyValue() : Data;
+  }
+
+  /// Implements llvm.matrix.multiply. Each result element sums the products
+  /// in increasing order of the inner dimension, starting with the first
+  /// product rather than +0.0 so -0.0 is preserved. With contract, each later
+  /// product is accumulated as by llvm.fmuladd. As for the FP reductions, the
+  /// other fast-math flags only apply to the operands and the result.
+  AnyValue callMatrixMultiplyIntrinsic(CallBase &CB, const AnyValue &LHS,
+                                       const AnyValue &RHS) {
+    const unsigned Rows =
+        cast<ConstantInt>(CB.getArgOperand(2))->getZExtValue();
+    const unsigned Inner =
+        cast<ConstantInt>(CB.getArgOperand(3))->getZExtValue();
+    const unsigned Cols =
+        cast<ConstantInt>(CB.getArgOperand(4))->getZExtValue();
+    Type *ElemTy = CB.getType()->getScalarType();
+    const bool IsFP = ElemTy->isFloatingPointTy();
+    const FastMathFlags FMF = CB.getFastMathFlagsOrNone();
+
+    auto ApplyFMF = [&](const AnyValue &V, bool IsInput) {
+      return IsFP ? handleFMFFlags(V, FMF, IsInput) : V;
+    };
+    auto BinOp = [&](const AnyValue &A, const AnyValue &B, auto Op) {
+      if (IsFP)
+        return visitFPBinOpWithResult(ElemTy, FastMathFlags(), A, B, Op);
+      return visitIntBinOpWithResult(ElemTy, A, B, Op);
+    };
+    auto MulAdd = [&](const AnyValue &A, const AnyValue &B,
+                      const AnyValue &Sum) {
+      if (FMF.allowContract())
+        return visitFMulAddWithResult(ElemTy, FastMathFlags(), A, B, Sum);
+      return BinOp(Sum, BinOp(A, B, std::multiplies<>()), std::plus<>());
+    };
+
+    const AnyValue LHSVal = ApplyFMF(LHS, /*IsInput=*/true);
+    const AnyValue RHSVal = ApplyFMF(RHS, /*IsInput=*/true);
+    const auto &LHSVec = LHSVal.asAggregate();
+    const auto &RHSVec = RHSVal.asAggregate();
+    std::vector<AnyValue> Res;
+    Res.reserve(Rows * Cols);
+    for (unsigned J = 0; J != Cols; ++J) {
+      for (unsigned I = 0; I != Rows; ++I) {
+        AnyValue Sum = BinOp(LHSVec[I], RHSVec[J * Inner], std::multiplies<>());
+        for (unsigned K = 1; K != Inner; ++K)
+          Sum = MulAdd(LHSVec[K * Rows + I], RHSVec[J * Inner + K], Sum);
+        Res.push_back(std::move(Sum));
+      }
+    }
+    return ApplyFMF(std::move(Res), /*IsInput=*/false);
   }
 
 public:
@@ -1818,17 +1882,7 @@ public:
           });
     }
     case Intrinsic::fmuladd: {
-      return visitFPTriOpWithResult(
-          RetTy, FMF, Args[0], Args[1], Args[2],
-          [&](const APFloat &Op1, const APFloat &Op2,
-              const APFloat &Op3) -> APFloat {
-            if (Ctx.fuseMultiplyAdd()) {
-              auto Res = Op1;
-              Res.fusedMultiplyAdd(Op2, Op3, RoundingMode::NearestTiesToEven);
-              return Res;
-            }
-            return Op1 * Op2 + Op3;
-          });
+      return visitFMulAddWithResult(RetTy, FMF, Args[0], Args[1], Args[2]);
     }
     case Intrinsic::is_fpclass: {
       const FPClassTest Mask =
@@ -1933,6 +1987,8 @@ public:
           Res.push_back(Vec[J * Rows + I]);
       return std::move(Res);
     }
+    case Intrinsic::matrix_multiply:
+      return callMatrixMultiplyIntrinsic(CB, Args[0], Args[1]);
     case Intrinsic::experimental_noalias_scope_decl:
       // FIXME: Not implemented yet. Currently it acts as a noop.
       return AnyValue();
