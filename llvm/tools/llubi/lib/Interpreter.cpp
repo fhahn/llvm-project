@@ -1053,19 +1053,23 @@ class InstExecutor : public InstVisitor<InstExecutor, void>,
     return IsStore ? AnyValue() : Data;
   }
 
-  /// Implements llvm.matrix.column.major.store. Column C of \p Data is stored
-  /// as a <Rows x ElemTy> vector at an inbounds nuw GEP of C * \p Stride
-  /// elements from \p Ptr.
-  AnyValue callMatrixColumnMajorStoreIntrinsic(CallBase &CB,
-                                               const AnyValue &Ptr,
-                                               const AnyValue &Stride,
-                                               const AnyValue &Data) {
+  /// Implements llvm.matrix.column.major.load and
+  /// llvm.matrix.column.major.store. Column C is accessed as a <Rows x ElemTy>
+  /// vector at an inbounds nuw GEP of C * \p Stride elements from \p Ptr. For
+  /// loads, \p Data is overwritten with the loaded columns; for stores, it
+  /// holds the values to store.
+  AnyValue callMatrixColumnMajorLoadStoreIntrinsic(CallBase &CB,
+                                                   const AnyValue &Ptr,
+                                                   const AnyValue &Stride,
+                                                   AnyValue Data) {
     // TODO: Handle isvolatile argument.
+    const bool IsStore =
+        CB.getIntrinsicID() == Intrinsic::matrix_column_major_store;
     StringRef IntrinsicName = Intrinsic::getBaseName(CB.getIntrinsicID());
     const unsigned Rows =
-        cast<ConstantInt>(CB.getArgOperand(4))->getZExtValue();
+        cast<ConstantInt>(CB.getArgOperand(IsStore ? 4 : 3))->getZExtValue();
     const unsigned Cols =
-        cast<ConstantInt>(CB.getArgOperand(5))->getZExtValue();
+        cast<ConstantInt>(CB.getArgOperand(IsStore ? 5 : 4))->getZExtValue();
     if (Stride.isPoison()) {
       reportImmediateUB() << IntrinsicName << " with poison stride.";
       return AnyValue();
@@ -1078,23 +1082,29 @@ class InstExecutor : public InstVisitor<InstExecutor, void>,
       return AnyValue();
     }
 
-    Type *ElemTy = CB.getArgOperand(0)->getType()->getScalarType();
+    Type *ElemTy = (IsStore ? CB.getArgOperand(0)->getType() : CB.getType())
+                       ->getScalarType();
     auto *ColTy = FixedVectorType::get(ElemTy, Rows);
     const unsigned IndexBW =
-        DL.getIndexTypeSizeInBits(CB.getArgOperand(1)->getType());
+        DL.getIndexTypeSizeInBits(CB.getArgOperand(IsStore ? 1 : 0)->getType());
     const APInt StrideIdx = StrideInt.zextOrTrunc(IndexBW);
     const APInt ElemSize(IndexBW, Ctx.getEffectiveTypeAllocSize(ElemTy),
                          /*isSigned=*/false, /*implicitTrunc=*/true);
-    ArrayRef<AnyValue> Elems = Data.asAggregate();
+    MutableArrayRef<AnyValue> Elems = Data.asAggregate();
     for (unsigned C = 0; C != Cols; ++C) {
       AnyValue AccumulatedOffset = AnyValue::poison();
       AnyValue ColPtr = Ctx.computeScaledPtrAdd(
           Ptr, StrideIdx * C, ElemSize,
           GEPNoWrapFlags::inBounds() | GEPNoWrapFlags::noUnsignedWrap(),
           AccumulatedOffset);
-      store(ColPtr, Align(1), Elems.slice(C * Rows, Rows).vec(), ColTy);
+      MutableArrayRef<AnyValue> Col = Elems.slice(C * Rows, Rows);
+      if (IsStore)
+        store(ColPtr, Align(1), Col.vec(), ColTy);
+      else
+        copy(load(ColPtr, Align(1), ColTy, /*NoUndef=*/false).asAggregate(),
+             Col.begin());
     }
-    return AnyValue();
+    return IsStore ? AnyValue() : Data;
   }
 
   /// Implements llvm.matrix.multiply. Each result element sums the products
@@ -2033,8 +2043,12 @@ public:
     }
     case Intrinsic::matrix_multiply:
       return callMatrixMultiplyIntrinsic(CB, Args[0], Args[1]);
+    case Intrinsic::matrix_column_major_load:
+      return callMatrixColumnMajorLoadStoreIntrinsic(
+          CB, Args[0], Args[1], AnyValue::getPoisonValue(Ctx, RetTy));
     case Intrinsic::matrix_column_major_store:
-      return callMatrixColumnMajorStoreIntrinsic(CB, Args[1], Args[2], Args[0]);
+      return callMatrixColumnMajorLoadStoreIntrinsic(CB, Args[1], Args[2],
+                                                     Args[0]);
     case Intrinsic::experimental_noalias_scope_decl:
       // FIXME: Not implemented yet. Currently it acts as a noop.
       return AnyValue();
