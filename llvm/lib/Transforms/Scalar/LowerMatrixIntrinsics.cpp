@@ -95,14 +95,9 @@ static auto m_AnyAdd(const LTy &L, const RTy &R) {
 }
 
 // Given an element pointer \p BasePtr to the start of a (sub) matrix, compute
-// the start address of vector \p VecIdx with type (\p EltType x \p NumElements)
-// assuming \p Stride elements between start two consecutive vectors.
-// \p Stride must be >= \p NumElements.
-// For column-major matrixes, the function computes the address of a column
-// vectors and \p NumElements must be set to the number of elements in a column
-// (= number of rows of the matrix). For row-major matrixes, the function
-// computes the address of a row vector and \p NumElements must be set to the
-// number of elements in a column (= number of columns of the matrix).
+// the start address of vector \p VecIdx (a column for column-major, a row for
+// row-major matrixes) with element type \p EltType, assuming \p Stride
+// elements between the starts of two consecutive vectors.
 //
 // Consider a 4x4 matrix in column-mjaor layout like below
 //
@@ -117,11 +112,11 @@ static auto m_AnyAdd(const LTy &L, const RTy &R) {
 // Then we can use computeVectorAddr to compute the addresses for the columns
 // of the sub-matrix.
 //
-// Column 0: computeVectorAddr(Base, 0 (column), 4 (stride), 2 (num rows), ..)
+// Column 0: computeVectorAddr(Base, 0 (column), 4 (stride), ..)
 //           -> just returns Base
-// Column 1: computeVectorAddr(Base, 1 (column), 4 (stride), 2 (num rows), ..)
+// Column 1: computeVectorAddr(Base, 1 (column), 4 (stride), ..)
 //           -> returns Base + (1 * 4)
-// Column 2: computeVectorAddr(Base, 2 (column), 4 (stride), 2 (num rows), ..)
+// Column 2: computeVectorAddr(Base, 2 (column), 4 (stride), ..)
 //           -> returns Base + (2 * 4)
 //
 // The graphic below illustrates the number of elements in a column (marked
@@ -135,13 +130,7 @@ static auto m_AnyAdd(const LTy &L, const RTy &R) {
 //         v_3_0 {v_3_1 {v_3_2  v_3_3
 //
 static Value *computeVectorAddr(Value *BasePtr, Value *VecIdx, Value *Stride,
-                                unsigned NumElements, Type *EltType,
-                                IRBuilder<> &Builder) {
-
-  assert((!isa<ConstantInt>(Stride) ||
-          cast<ConstantInt>(Stride)->getZExtValue() >= NumElements) &&
-         "Stride must be >= the number of elements in the result vector.");
-
+                                Type *EltType, IRBuilder<> &Builder) {
   // Compute the start of the vector with index VecIdx as VecIdx * Stride.
   Value *VecStart = Builder.CreateMul(VecIdx, Stride, "vec.start");
 
@@ -1325,7 +1314,7 @@ public:
     for (unsigned I = 0, E = getNumVectors(Shape); I < E; ++I) {
       Value *GEP = computeVectorAddr(
           EltPtr, Builder.getIntN(Stride->getType()->getScalarSizeInBits(), I),
-          Stride, getStride(Shape), EltTy, Builder);
+          Stride, EltTy, Builder);
       Value *Vector = Builder.CreateAlignedLoad(
           VecTy, GEP, getAlignForIndex(I, Stride, EltTy, MAlign),
           IsVolatile, "col.load");
@@ -1405,7 +1394,7 @@ public:
           EltPtr,
           Builder.getIntN(Stride->getType()->getScalarSizeInBits(),
                           Vec.index()),
-          Stride, StoreVal.getStride(), VType->getElementType(), Builder);
+          Stride, VType->getElementType(), Builder);
       Builder.CreateAlignedStore(Vec.value(), GEP,
                                  getAlignForIndex(Vec.index(), Stride,
                                                   VType->getElementType(),
