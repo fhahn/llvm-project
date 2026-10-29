@@ -694,7 +694,17 @@ public:
       default:
         break;
       }
-    return isShapePreserving(V) || isa<StoreInst>(V) || isa<LoadInst>(V);
+    // Loads and stores are lowered to accesses at element GEPs.
+    if (isa<LoadInst, StoreInst>(Inst))
+      return !hasBitPackedElements(getLoadStoreType(Inst));
+    return isShapePreserving(V);
+  }
+
+  /// Returns true if vector elements of \p Ty's scalar type are not at
+  /// multiples of their alloc size in memory, as vectors are bit-packed.
+  bool hasBitPackedElements(Type *Ty) const {
+    Type *EltTy = Ty->getScalarType();
+    return DL.getTypeSizeInBits(EltTy) != DL.getTypeAllocSizeInBits(EltTy);
   }
 
   /// Propagate the shape information of instructions to their users.
@@ -2203,7 +2213,8 @@ public:
     auto *LoadOp0 = dyn_cast<LoadInst>(A);
     auto *LoadOp1 = dyn_cast<LoadInst>(B);
     auto *Store = dyn_cast<StoreInst>(*MatMul->user_begin());
-    if (LoadOp0 && LoadOp1 && Store) {
+    if (LoadOp0 && LoadOp1 && Store &&
+        !hasBitPackedElements(MatMul->getType())) {
       // The store address must dominate the MatMul instruction, otherwise
       // we create invalid IR.
       SetVector<Value *> WorkList;
