@@ -436,6 +436,80 @@ entry:
 }
 
 declare <4 x i64> @llvm.matrix.multiply.v4i64.v2i64.v2i64(<2 x i64>, <2 x i64>, i32, i32, i32)
+
+; Tiles at non-zero offsets must not keep the alignment of the matrix start
+; and tile loads must use the alignment of the operand loads.
+define void @multiply_noalias_4x2_2x2_align16_align1(ptr noalias %A, ptr noalias %B, ptr noalias %C) {
+; CHECK-LABEL: @multiply_noalias_4x2_2x2_align16_align1(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br label [[COLS_HEADER:%.*]]
+; CHECK:       cols.header:
+; CHECK-NEXT:    [[COLS_IV:%.*]] = phi i64 [ 0, [[ENTRY:%.*]] ], [ [[COLS_STEP:%.*]], [[COLS_LATCH:%.*]] ]
+; CHECK-NEXT:    br label [[COLS_BODY:%.*]]
+; CHECK:       cols.body:
+; CHECK-NEXT:    br label [[ROWS_HEADER:%.*]]
+; CHECK:       rows.header:
+; CHECK-NEXT:    [[ROWS_IV:%.*]] = phi i64 [ 0, [[COLS_BODY]] ], [ [[ROWS_STEP:%.*]], [[ROWS_LATCH:%.*]] ]
+; CHECK-NEXT:    br label [[ROWS_BODY:%.*]]
+; CHECK:       rows.body:
+; CHECK-NEXT:    br label [[INNER_HEADER:%.*]]
+; CHECK:       inner.header:
+; CHECK-NEXT:    [[INNER_IV:%.*]] = phi i64 [ 0, [[ROWS_BODY]] ], [ [[INNER_STEP:%.*]], [[INNER_LATCH:%.*]] ]
+; CHECK-NEXT:    [[RESULT_VEC_0:%.*]] = phi <2 x float> [ splat (float -0.000000e+00), [[ROWS_BODY]] ], [ [[TMP5:%.*]], [[INNER_LATCH]] ]
+; CHECK-NEXT:    [[RESULT_VEC_1:%.*]] = phi <2 x float> [ splat (float -0.000000e+00), [[ROWS_BODY]] ], [ [[TMP7:%.*]], [[INNER_LATCH]] ]
+; CHECK-NEXT:    br label [[INNER_BODY:%.*]]
+; CHECK:       inner.body:
+; CHECK-NEXT:    [[DOTIDX:%.*]] = shl i64 [[INNER_IV]], 4
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr i8, ptr [[A:%.*]], i64 [[DOTIDX]]
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr [4 x i8], ptr [[TMP0]], i64 [[ROWS_IV]]
+; CHECK-NEXT:    [[COL_LOAD:%.*]] = load <2 x float>, ptr [[TMP1]], align 4
+; CHECK-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP1]], i64 16
+; CHECK-NEXT:    [[COL_LOAD1:%.*]] = load <2 x float>, ptr [[VEC_GEP]], align 4
+; CHECK-NEXT:    [[DOTIDX17:%.*]] = shl i64 [[COLS_IV]], 3
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[B:%.*]], i64 [[DOTIDX17]]
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr [4 x i8], ptr [[TMP2]], i64 [[INNER_IV]]
+; CHECK-NEXT:    [[COL_LOAD2:%.*]] = load <2 x float>, ptr [[TMP3]], align 4
+; CHECK-NEXT:    [[VEC_GEP3:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP3]], i64 8
+; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x float>, ptr [[VEC_GEP3]], align 4
+; CHECK-NEXT:    [[SPLAT_SPLAT:%.*]] = shufflevector <2 x float> [[COL_LOAD2]], <2 x float> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP4:%.*]] = call contract <2 x float> @llvm.fmuladd.v2f32(<2 x float> [[COL_LOAD]], <2 x float> [[SPLAT_SPLAT]], <2 x float> [[RESULT_VEC_0]])
+; CHECK-NEXT:    [[SPLAT_SPLAT8:%.*]] = shufflevector <2 x float> [[COL_LOAD2]], <2 x float> poison, <2 x i32> <i32 1, i32 1>
+; CHECK-NEXT:    [[TMP5]] = call contract <2 x float> @llvm.fmuladd.v2f32(<2 x float> [[COL_LOAD1]], <2 x float> [[SPLAT_SPLAT8]], <2 x float> [[TMP4]])
+; CHECK-NEXT:    [[SPLAT_SPLAT12:%.*]] = shufflevector <2 x float> [[COL_LOAD4]], <2 x float> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP6:%.*]] = call contract <2 x float> @llvm.fmuladd.v2f32(<2 x float> [[COL_LOAD]], <2 x float> [[SPLAT_SPLAT12]], <2 x float> [[RESULT_VEC_1]])
+; CHECK-NEXT:    [[SPLAT_SPLAT15:%.*]] = shufflevector <2 x float> [[COL_LOAD4]], <2 x float> poison, <2 x i32> <i32 1, i32 1>
+; CHECK-NEXT:    [[TMP7]] = call contract <2 x float> @llvm.fmuladd.v2f32(<2 x float> [[COL_LOAD1]], <2 x float> [[SPLAT_SPLAT15]], <2 x float> [[TMP6]])
+; CHECK-NEXT:    br label [[INNER_LATCH]]
+; CHECK:       inner.latch:
+; CHECK-NEXT:    [[INNER_STEP]] = add i64 [[INNER_IV]], 2
+; CHECK-NEXT:    [[INNER_COND_NOT:%.*]] = icmp eq i64 [[INNER_IV]], 0
+; CHECK-NEXT:    br i1 [[INNER_COND_NOT]], label [[ROWS_LATCH]], label [[INNER_HEADER]], !prof [[PROF4]], !llvm.loop [[LOOP9:![0-9]+]]
+; CHECK:       rows.latch:
+; CHECK-NEXT:    [[ROWS_STEP]] = add i64 [[ROWS_IV]], 2
+; CHECK-NEXT:    [[ROWS_COND_NOT:%.*]] = icmp eq i64 [[ROWS_STEP]], 4
+; CHECK-NEXT:    [[DOTIDX18:%.*]] = shl i64 [[COLS_IV]], 4
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[C:%.*]], i64 [[DOTIDX18]]
+; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr [4 x i8], ptr [[TMP8]], i64 [[ROWS_IV]]
+; CHECK-NEXT:    store <2 x float> [[TMP5]], ptr [[TMP9]], align 16
+; CHECK-NEXT:    [[VEC_GEP16:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP9]], i64 16
+; CHECK-NEXT:    store <2 x float> [[TMP7]], ptr [[VEC_GEP16]], align 16
+; CHECK-NEXT:    br i1 [[ROWS_COND_NOT]], label [[COLS_LATCH]], label [[ROWS_HEADER]], !prof [[PROF0]]
+; CHECK:       cols.latch:
+; CHECK-NEXT:    [[COLS_STEP]] = add i64 [[COLS_IV]], 2
+; CHECK-NEXT:    [[COLS_COND_NOT:%.*]] = icmp eq i64 [[COLS_IV]], 0
+; CHECK-NEXT:    br i1 [[COLS_COND_NOT]], label [[CONTINUE:%.*]], label [[COLS_HEADER]], !prof [[PROF4]]
+; CHECK:       continue:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %a = load <8 x float>, ptr %A, align 16
+  %b = load <4 x float>, ptr %B, align 1
+  %c = call <8 x float> @llvm.matrix.multiply.v8f32.v8f32.v4f32(<8 x float> %a, <4 x float> %b, i32 4, i32 2, i32 2)
+  store <8 x float> %c, ptr %C, align 16
+  ret void
+}
+
+declare <8 x float> @llvm.matrix.multiply.v8f32.v8f32.v4f32(<8 x float>, <4 x float>, i32, i32, i32)
 ;.
 ; CHECK: [[PROF0]] = !{!"branch_weights", i32 1, i32 2}
 ; CHECK: [[LOOP1]] = distinct !{[[LOOP1]], [[META2:![0-9]+]]}
@@ -446,4 +520,5 @@ declare <4 x i64> @llvm.matrix.multiply.v4i64.v2i64.v2i64(<2 x i64>, <2 x i64>, 
 ; CHECK: [[META6]] = !{!"llvm.loop.unroll.count", i32 1}
 ; CHECK: [[PROF7]] = !{!"branch_weights", i32 1, i32 4}
 ; CHECK: [[LOOP8]] = distinct !{[[LOOP8]], [[META6]]}
+; CHECK: [[LOOP9]] = distinct !{[[LOOP9]], [[META6]]}
 ;.

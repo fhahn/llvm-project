@@ -374,7 +374,58 @@ entry:
   ret void
 }
 
+; Tiles at non-zero offsets must not keep the alignment of the matrix start.
+define void @multiply_noalias_4x2_2x2_align16(ptr noalias %A, ptr noalias %B, ptr noalias %C) {
+; CHECK-LABEL: @multiply_noalias_4x2_2x2_align16(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[COL_LOAD:%.*]] = load <2 x float>, ptr [[A:%.*]], align 16
+; CHECK-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 16
+; CHECK-NEXT:    [[COL_LOAD1:%.*]] = load <2 x float>, ptr [[VEC_GEP]], align 16
+; CHECK-NEXT:    [[COL_LOAD2:%.*]] = load <2 x float>, ptr [[B:%.*]], align 16
+; CHECK-NEXT:    [[VEC_GEP3:%.*]] = getelementptr inbounds nuw i8, ptr [[B]], i64 8
+; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x float>, ptr [[VEC_GEP3]], align 8
+; CHECK-NEXT:    [[SPLAT_SPLAT:%.*]] = shufflevector <2 x float> [[COL_LOAD2]], <2 x float> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP0:%.*]] = fmul contract <2 x float> [[COL_LOAD]], [[SPLAT_SPLAT]]
+; CHECK-NEXT:    [[SPLAT_SPLAT7:%.*]] = shufflevector <2 x float> [[COL_LOAD2]], <2 x float> poison, <2 x i32> <i32 1, i32 1>
+; CHECK-NEXT:    [[TMP1:%.*]] = call contract <2 x float> @llvm.fmuladd.v2f32(<2 x float> [[COL_LOAD1]], <2 x float> [[SPLAT_SPLAT7]], <2 x float> [[TMP0]])
+; CHECK-NEXT:    [[SPLAT_SPLAT10:%.*]] = shufflevector <2 x float> [[COL_LOAD4]], <2 x float> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP2:%.*]] = fmul contract <2 x float> [[COL_LOAD]], [[SPLAT_SPLAT10]]
+; CHECK-NEXT:    [[SPLAT_SPLAT13:%.*]] = shufflevector <2 x float> [[COL_LOAD4]], <2 x float> poison, <2 x i32> <i32 1, i32 1>
+; CHECK-NEXT:    [[TMP3:%.*]] = call contract <2 x float> @llvm.fmuladd.v2f32(<2 x float> [[COL_LOAD1]], <2 x float> [[SPLAT_SPLAT13]], <2 x float> [[TMP2]])
+; CHECK-NEXT:    store <2 x float> [[TMP1]], ptr [[C:%.*]], align 16
+; CHECK-NEXT:    [[VEC_GEP14:%.*]] = getelementptr inbounds nuw i8, ptr [[C]], i64 16
+; CHECK-NEXT:    store <2 x float> [[TMP3]], ptr [[VEC_GEP14]], align 16
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 8
+; CHECK-NEXT:    [[COL_LOAD15:%.*]] = load <2 x float>, ptr [[TMP4]], align 16
+; CHECK-NEXT:    [[VEC_GEP16:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 24
+; CHECK-NEXT:    [[COL_LOAD17:%.*]] = load <2 x float>, ptr [[VEC_GEP16]], align 16
+; CHECK-NEXT:    [[COL_LOAD18:%.*]] = load <2 x float>, ptr [[B]], align 16
+; CHECK-NEXT:    [[VEC_GEP19:%.*]] = getelementptr inbounds nuw i8, ptr [[B]], i64 8
+; CHECK-NEXT:    [[COL_LOAD20:%.*]] = load <2 x float>, ptr [[VEC_GEP19]], align 8
+; CHECK-NEXT:    [[SPLAT_SPLAT23:%.*]] = shufflevector <2 x float> [[COL_LOAD18]], <2 x float> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP5:%.*]] = fmul contract <2 x float> [[COL_LOAD15]], [[SPLAT_SPLAT23]]
+; CHECK-NEXT:    [[SPLAT_SPLAT26:%.*]] = shufflevector <2 x float> [[COL_LOAD18]], <2 x float> poison, <2 x i32> <i32 1, i32 1>
+; CHECK-NEXT:    [[TMP6:%.*]] = call contract <2 x float> @llvm.fmuladd.v2f32(<2 x float> [[COL_LOAD17]], <2 x float> [[SPLAT_SPLAT26]], <2 x float> [[TMP5]])
+; CHECK-NEXT:    [[SPLAT_SPLAT29:%.*]] = shufflevector <2 x float> [[COL_LOAD20]], <2 x float> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP7:%.*]] = fmul contract <2 x float> [[COL_LOAD15]], [[SPLAT_SPLAT29]]
+; CHECK-NEXT:    [[SPLAT_SPLAT32:%.*]] = shufflevector <2 x float> [[COL_LOAD20]], <2 x float> poison, <2 x i32> <i32 1, i32 1>
+; CHECK-NEXT:    [[TMP8:%.*]] = call contract <2 x float> @llvm.fmuladd.v2f32(<2 x float> [[COL_LOAD17]], <2 x float> [[SPLAT_SPLAT32]], <2 x float> [[TMP7]])
+; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds nuw i8, ptr [[C]], i64 8
+; CHECK-NEXT:    store <2 x float> [[TMP6]], ptr [[TMP9]], align 16
+; CHECK-NEXT:    [[VEC_GEP33:%.*]] = getelementptr inbounds nuw i8, ptr [[C]], i64 24
+; CHECK-NEXT:    store <2 x float> [[TMP8]], ptr [[VEC_GEP33]], align 16
+; CHECK-NEXT:    ret void
+;
+entry:
+  %a = load <8 x float>, ptr %A, align 16
+  %b = load <4 x float>, ptr %B, align 16
+  %c = call <8 x float> @llvm.matrix.multiply.v8f32.v8f32.v4f32(<8 x float> %a, <4 x float> %b, i32 4, i32 2, i32 2)
+  store <8 x float> %c, ptr %C, align 16
+  ret void
+}
+
 declare <16 x double> @llvm.matrix.multiply(<16 x double>, <16 x double>, i32, i32, i32)
+declare <8 x float> @llvm.matrix.multiply.v8f32.v8f32.v4f32(<8 x float>, <4 x float>, i32, i32, i32)
 
 !0 = !{!"function_entry_count", i64 1000}
 ;.
