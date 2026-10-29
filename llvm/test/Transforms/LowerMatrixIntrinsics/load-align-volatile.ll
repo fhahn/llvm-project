@@ -112,7 +112,7 @@ define <4 x i1> @strided_load_2x2_i1_align4_stride3(ptr %in) {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[COL_LOAD:%.*]] = load <2 x i1>, ptr [[IN:%.*]], align 4
 ; CHECK-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds i1, ptr [[IN]], i64 3
-; CHECK-NEXT:    [[COL_LOAD1:%.*]] = load <2 x i1>, ptr [[VEC_GEP]], align 4
+; CHECK-NEXT:    [[COL_LOAD1:%.*]] = load <2 x i1>, ptr [[VEC_GEP]], align 1
 ; CHECK-NEXT:    [[TMP0:%.*]] = shufflevector <2 x i1> [[COL_LOAD]], <2 x i1> [[COL_LOAD1]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
 ; CHECK-NEXT:    ret <4 x i1> [[TMP0]]
 ;

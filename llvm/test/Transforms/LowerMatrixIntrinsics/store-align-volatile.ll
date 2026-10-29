@@ -99,7 +99,7 @@ define void @strided_store_i1_align4(<4 x i1> %in, i64 %stride, ptr %out) {
 ; CHECK-NEXT:    store <2 x i1> [[SPLIT]], ptr [[VEC_GEP]], align 4
 ; CHECK-NEXT:    [[VEC_START2:%.*]] = mul i64 1, [[STRIDE]]
 ; CHECK-NEXT:    [[VEC_GEP3:%.*]] = getelementptr inbounds i1, ptr [[OUT]], i64 [[VEC_START2]]
-; CHECK-NEXT:    store <2 x i1> [[SPLIT1]], ptr [[VEC_GEP3]], align 4
+; CHECK-NEXT:    store <2 x i1> [[SPLIT1]], ptr [[VEC_GEP3]], align 1
 ; CHECK-NEXT:    ret void
 ;
   call void @llvm.matrix.column.major.store.v4i1(<4 x i1> %in, ptr align 4 %out, i64 %stride, i1 false, i32 2, i32 2)
