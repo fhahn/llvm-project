@@ -22,3 +22,20 @@ entry:
   %res = call reassoc <1 x float> @llvm.matrix.multiply.v1f32.v4f32.v4f32(<4 x float> %lhs, <4 x float> %rhs, i32 1, i32 4, i32 1)
   ret <1 x float> %res
 }
+
+define <1 x float> @dot_product_flatten_no_align(ptr %a, ptr %b) {
+; CHECK-LABEL: @dot_product_flatten_no_align(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[COL_LOAD:%.*]] = load <4 x float>, ptr [[B:%.*]], align 4
+; CHECK-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 4
+; CHECK-NEXT:    [[TMP1:%.*]] = fmul <4 x float> [[TMP0]], [[COL_LOAD]]
+; CHECK-NEXT:    [[TMP2:%.*]] = call reassoc float @llvm.vector.reduce.fadd.v4f32(float -0.000000e+00, <4 x float> [[TMP1]])
+; CHECK-NEXT:    [[TMP3:%.*]] = insertelement <1 x float> poison, float [[TMP2]], i64 0
+; CHECK-NEXT:    ret <1 x float> [[TMP3]]
+;
+entry:
+  %lhs = call <4 x float> @llvm.matrix.column.major.load.v4f32.i64(ptr %a, i64 1, i1 false, i32 1, i32 4)
+  %rhs = call <4 x float> @llvm.matrix.column.major.load.v4f32.i64(ptr align 4 %b, i64 4, i1 false, i32 4, i32 1)
+  %res = call reassoc <1 x float> @llvm.matrix.multiply.v1f32.v4f32.v4f32(<4 x float> %lhs, <4 x float> %rhs, i32 1, i32 4, i32 1)
+  ret <1 x float> %res
+}
