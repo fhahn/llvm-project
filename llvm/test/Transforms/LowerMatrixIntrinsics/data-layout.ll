@@ -17,13 +17,13 @@ define <9 x double> @strided_load_3x3_i64(ptr %in, i64 %stride) {
 ; PTR64-NEXT:  entry:
 ; PTR64-NEXT:    [[VEC_START:%.*]] = mul i64 0, [[STRIDE:%.*]]
 ; PTR64-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds double, ptr [[IN:%.*]], i64 [[VEC_START]]
-; PTR64-NEXT:    [[COL_LOAD:%.*]] = load <3 x double>, ptr [[VEC_GEP]], align 8
+; PTR64-NEXT:    [[COL_LOAD:%.*]] = load <3 x double>, ptr [[VEC_GEP]], align 1
 ; PTR64-NEXT:    [[VEC_START1:%.*]] = mul i64 1, [[STRIDE]]
 ; PTR64-NEXT:    [[VEC_GEP2:%.*]] = getelementptr inbounds double, ptr [[IN]], i64 [[VEC_START1]]
-; PTR64-NEXT:    [[COL_LOAD3:%.*]] = load <3 x double>, ptr [[VEC_GEP2]], align 8
+; PTR64-NEXT:    [[COL_LOAD3:%.*]] = load <3 x double>, ptr [[VEC_GEP2]], align 1
 ; PTR64-NEXT:    [[VEC_START4:%.*]] = mul i64 2, [[STRIDE]]
 ; PTR64-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds double, ptr [[IN]], i64 [[VEC_START4]]
-; PTR64-NEXT:    [[COL_LOAD6:%.*]] = load <3 x double>, ptr [[VEC_GEP5]], align 8
+; PTR64-NEXT:    [[COL_LOAD6:%.*]] = load <3 x double>, ptr [[VEC_GEP5]], align 1
 ; PTR64-NEXT:    [[TMP0:%.*]] = shufflevector <3 x double> [[COL_LOAD]], <3 x double> [[COL_LOAD3]], <6 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5>
 ; PTR64-NEXT:    [[TMP1:%.*]] = shufflevector <3 x double> [[COL_LOAD6]], <3 x double> poison, <6 x i32> <i32 0, i32 1, i32 2, i32 poison, i32 poison, i32 poison>
 ; PTR64-NEXT:    [[TMP2:%.*]] = shufflevector <6 x double> [[TMP0]], <6 x double> [[TMP1]], <9 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8>
@@ -34,13 +34,13 @@ define <9 x double> @strided_load_3x3_i64(ptr %in, i64 %stride) {
 ; PTR32-NEXT:    [[STRIDE_CAST:%.*]] = trunc i64 [[STRIDE:%.*]] to i32
 ; PTR32-NEXT:    [[VEC_START:%.*]] = mul i32 0, [[STRIDE_CAST]]
 ; PTR32-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds double, ptr [[IN:%.*]], i32 [[VEC_START]]
-; PTR32-NEXT:    [[COL_LOAD:%.*]] = load <3 x double>, ptr [[VEC_GEP]], align 8
+; PTR32-NEXT:    [[COL_LOAD:%.*]] = load <3 x double>, ptr [[VEC_GEP]], align 1
 ; PTR32-NEXT:    [[VEC_START1:%.*]] = mul i32 1, [[STRIDE_CAST]]
 ; PTR32-NEXT:    [[VEC_GEP2:%.*]] = getelementptr inbounds double, ptr [[IN]], i32 [[VEC_START1]]
-; PTR32-NEXT:    [[COL_LOAD3:%.*]] = load <3 x double>, ptr [[VEC_GEP2]], align 8
+; PTR32-NEXT:    [[COL_LOAD3:%.*]] = load <3 x double>, ptr [[VEC_GEP2]], align 1
 ; PTR32-NEXT:    [[VEC_START4:%.*]] = mul i32 2, [[STRIDE_CAST]]
 ; PTR32-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds double, ptr [[IN]], i32 [[VEC_START4]]
-; PTR32-NEXT:    [[COL_LOAD6:%.*]] = load <3 x double>, ptr [[VEC_GEP5]], align 8
+; PTR32-NEXT:    [[COL_LOAD6:%.*]] = load <3 x double>, ptr [[VEC_GEP5]], align 1
 ; PTR32-NEXT:    [[TMP0:%.*]] = shufflevector <3 x double> [[COL_LOAD]], <3 x double> [[COL_LOAD3]], <6 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5>
 ; PTR32-NEXT:    [[TMP1:%.*]] = shufflevector <3 x double> [[COL_LOAD6]], <3 x double> poison, <6 x i32> <i32 0, i32 1, i32 2, i32 poison, i32 poison, i32 poison>
 ; PTR32-NEXT:    [[TMP2:%.*]] = shufflevector <6 x double> [[TMP0]], <6 x double> [[TMP1]], <9 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8>
@@ -54,11 +54,11 @@ entry:
 define <9 x double> @strided_load_3x3_const_stride_i64(ptr %in) {
 ; PTR64-LABEL: @strided_load_3x3_const_stride_i64(
 ; PTR64-NEXT:  entry:
-; PTR64-NEXT:    [[COL_LOAD:%.*]] = load <3 x double>, ptr [[IN:%.*]], align 8
+; PTR64-NEXT:    [[COL_LOAD:%.*]] = load <3 x double>, ptr [[IN:%.*]], align 1
 ; PTR64-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds double, ptr [[IN]], i64 16
-; PTR64-NEXT:    [[COL_LOAD1:%.*]] = load <3 x double>, ptr [[VEC_GEP]], align 8
+; PTR64-NEXT:    [[COL_LOAD1:%.*]] = load <3 x double>, ptr [[VEC_GEP]], align 1
 ; PTR64-NEXT:    [[VEC_GEP2:%.*]] = getelementptr inbounds double, ptr [[IN]], i64 32
-; PTR64-NEXT:    [[COL_LOAD3:%.*]] = load <3 x double>, ptr [[VEC_GEP2]], align 8
+; PTR64-NEXT:    [[COL_LOAD3:%.*]] = load <3 x double>, ptr [[VEC_GEP2]], align 1
 ; PTR64-NEXT:    [[TMP0:%.*]] = shufflevector <3 x double> [[COL_LOAD]], <3 x double> [[COL_LOAD1]], <6 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5>
 ; PTR64-NEXT:    [[TMP1:%.*]] = shufflevector <3 x double> [[COL_LOAD3]], <3 x double> poison, <6 x i32> <i32 0, i32 1, i32 2, i32 poison, i32 poison, i32 poison>
 ; PTR64-NEXT:    [[TMP2:%.*]] = shufflevector <6 x double> [[TMP0]], <6 x double> [[TMP1]], <9 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8>
@@ -66,11 +66,11 @@ define <9 x double> @strided_load_3x3_const_stride_i64(ptr %in) {
 ;
 ; PTR32-LABEL: @strided_load_3x3_const_stride_i64(
 ; PTR32-NEXT:  entry:
-; PTR32-NEXT:    [[COL_LOAD:%.*]] = load <3 x double>, ptr [[IN:%.*]], align 8
+; PTR32-NEXT:    [[COL_LOAD:%.*]] = load <3 x double>, ptr [[IN:%.*]], align 1
 ; PTR32-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds double, ptr [[IN]], i32 16
-; PTR32-NEXT:    [[COL_LOAD1:%.*]] = load <3 x double>, ptr [[VEC_GEP]], align 8
+; PTR32-NEXT:    [[COL_LOAD1:%.*]] = load <3 x double>, ptr [[VEC_GEP]], align 1
 ; PTR32-NEXT:    [[VEC_GEP2:%.*]] = getelementptr inbounds double, ptr [[IN]], i32 32
-; PTR32-NEXT:    [[COL_LOAD3:%.*]] = load <3 x double>, ptr [[VEC_GEP2]], align 8
+; PTR32-NEXT:    [[COL_LOAD3:%.*]] = load <3 x double>, ptr [[VEC_GEP2]], align 1
 ; PTR32-NEXT:    [[TMP0:%.*]] = shufflevector <3 x double> [[COL_LOAD]], <3 x double> [[COL_LOAD1]], <6 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5>
 ; PTR32-NEXT:    [[TMP1:%.*]] = shufflevector <3 x double> [[COL_LOAD3]], <3 x double> poison, <6 x i32> <i32 0, i32 1, i32 2, i32 poison, i32 poison, i32 poison>
 ; PTR32-NEXT:    [[TMP2:%.*]] = shufflevector <6 x double> [[TMP0]], <6 x double> [[TMP1]], <9 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8>
@@ -87,13 +87,13 @@ define <9 x double> @strided_load_3x3_i32(ptr %in, i32 %stride) {
 ; PTR64-NEXT:    [[STRIDE_CAST:%.*]] = zext i32 [[STRIDE:%.*]] to i64
 ; PTR64-NEXT:    [[VEC_START:%.*]] = mul i64 0, [[STRIDE_CAST]]
 ; PTR64-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds double, ptr [[IN:%.*]], i64 [[VEC_START]]
-; PTR64-NEXT:    [[COL_LOAD:%.*]] = load <3 x double>, ptr [[VEC_GEP]], align 8
+; PTR64-NEXT:    [[COL_LOAD:%.*]] = load <3 x double>, ptr [[VEC_GEP]], align 1
 ; PTR64-NEXT:    [[VEC_START1:%.*]] = mul i64 1, [[STRIDE_CAST]]
 ; PTR64-NEXT:    [[VEC_GEP2:%.*]] = getelementptr inbounds double, ptr [[IN]], i64 [[VEC_START1]]
-; PTR64-NEXT:    [[COL_LOAD3:%.*]] = load <3 x double>, ptr [[VEC_GEP2]], align 8
+; PTR64-NEXT:    [[COL_LOAD3:%.*]] = load <3 x double>, ptr [[VEC_GEP2]], align 1
 ; PTR64-NEXT:    [[VEC_START4:%.*]] = mul i64 2, [[STRIDE_CAST]]
 ; PTR64-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds double, ptr [[IN]], i64 [[VEC_START4]]
-; PTR64-NEXT:    [[COL_LOAD6:%.*]] = load <3 x double>, ptr [[VEC_GEP5]], align 8
+; PTR64-NEXT:    [[COL_LOAD6:%.*]] = load <3 x double>, ptr [[VEC_GEP5]], align 1
 ; PTR64-NEXT:    [[TMP0:%.*]] = shufflevector <3 x double> [[COL_LOAD]], <3 x double> [[COL_LOAD3]], <6 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5>
 ; PTR64-NEXT:    [[TMP1:%.*]] = shufflevector <3 x double> [[COL_LOAD6]], <3 x double> poison, <6 x i32> <i32 0, i32 1, i32 2, i32 poison, i32 poison, i32 poison>
 ; PTR64-NEXT:    [[TMP2:%.*]] = shufflevector <6 x double> [[TMP0]], <6 x double> [[TMP1]], <9 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8>
@@ -103,13 +103,13 @@ define <9 x double> @strided_load_3x3_i32(ptr %in, i32 %stride) {
 ; PTR32-NEXT:  entry:
 ; PTR32-NEXT:    [[VEC_START:%.*]] = mul i32 0, [[STRIDE:%.*]]
 ; PTR32-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds double, ptr [[IN:%.*]], i32 [[VEC_START]]
-; PTR32-NEXT:    [[COL_LOAD:%.*]] = load <3 x double>, ptr [[VEC_GEP]], align 8
+; PTR32-NEXT:    [[COL_LOAD:%.*]] = load <3 x double>, ptr [[VEC_GEP]], align 1
 ; PTR32-NEXT:    [[VEC_START1:%.*]] = mul i32 1, [[STRIDE]]
 ; PTR32-NEXT:    [[VEC_GEP2:%.*]] = getelementptr inbounds double, ptr [[IN]], i32 [[VEC_START1]]
-; PTR32-NEXT:    [[COL_LOAD3:%.*]] = load <3 x double>, ptr [[VEC_GEP2]], align 8
+; PTR32-NEXT:    [[COL_LOAD3:%.*]] = load <3 x double>, ptr [[VEC_GEP2]], align 1
 ; PTR32-NEXT:    [[VEC_START4:%.*]] = mul i32 2, [[STRIDE]]
 ; PTR32-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds double, ptr [[IN]], i32 [[VEC_START4]]
-; PTR32-NEXT:    [[COL_LOAD6:%.*]] = load <3 x double>, ptr [[VEC_GEP5]], align 8
+; PTR32-NEXT:    [[COL_LOAD6:%.*]] = load <3 x double>, ptr [[VEC_GEP5]], align 1
 ; PTR32-NEXT:    [[TMP0:%.*]] = shufflevector <3 x double> [[COL_LOAD]], <3 x double> [[COL_LOAD3]], <6 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5>
 ; PTR32-NEXT:    [[TMP1:%.*]] = shufflevector <3 x double> [[COL_LOAD6]], <3 x double> poison, <6 x i32> <i32 0, i32 1, i32 2, i32 poison, i32 poison, i32 poison>
 ; PTR32-NEXT:    [[TMP2:%.*]] = shufflevector <6 x double> [[TMP0]], <6 x double> [[TMP1]], <9 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8>
@@ -123,11 +123,11 @@ entry:
 define <9 x double> @strided_load_3x3_const_stride_i32(ptr %in) {
 ; PTR64-LABEL: @strided_load_3x3_const_stride_i32(
 ; PTR64-NEXT:  entry:
-; PTR64-NEXT:    [[COL_LOAD:%.*]] = load <3 x double>, ptr [[IN:%.*]], align 8
+; PTR64-NEXT:    [[COL_LOAD:%.*]] = load <3 x double>, ptr [[IN:%.*]], align 1
 ; PTR64-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds double, ptr [[IN]], i64 16
-; PTR64-NEXT:    [[COL_LOAD1:%.*]] = load <3 x double>, ptr [[VEC_GEP]], align 8
+; PTR64-NEXT:    [[COL_LOAD1:%.*]] = load <3 x double>, ptr [[VEC_GEP]], align 1
 ; PTR64-NEXT:    [[VEC_GEP2:%.*]] = getelementptr inbounds double, ptr [[IN]], i64 32
-; PTR64-NEXT:    [[COL_LOAD3:%.*]] = load <3 x double>, ptr [[VEC_GEP2]], align 8
+; PTR64-NEXT:    [[COL_LOAD3:%.*]] = load <3 x double>, ptr [[VEC_GEP2]], align 1
 ; PTR64-NEXT:    [[TMP0:%.*]] = shufflevector <3 x double> [[COL_LOAD]], <3 x double> [[COL_LOAD1]], <6 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5>
 ; PTR64-NEXT:    [[TMP1:%.*]] = shufflevector <3 x double> [[COL_LOAD3]], <3 x double> poison, <6 x i32> <i32 0, i32 1, i32 2, i32 poison, i32 poison, i32 poison>
 ; PTR64-NEXT:    [[TMP2:%.*]] = shufflevector <6 x double> [[TMP0]], <6 x double> [[TMP1]], <9 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8>
@@ -135,11 +135,11 @@ define <9 x double> @strided_load_3x3_const_stride_i32(ptr %in) {
 ;
 ; PTR32-LABEL: @strided_load_3x3_const_stride_i32(
 ; PTR32-NEXT:  entry:
-; PTR32-NEXT:    [[COL_LOAD:%.*]] = load <3 x double>, ptr [[IN:%.*]], align 8
+; PTR32-NEXT:    [[COL_LOAD:%.*]] = load <3 x double>, ptr [[IN:%.*]], align 1
 ; PTR32-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds double, ptr [[IN]], i32 16
-; PTR32-NEXT:    [[COL_LOAD1:%.*]] = load <3 x double>, ptr [[VEC_GEP]], align 8
+; PTR32-NEXT:    [[COL_LOAD1:%.*]] = load <3 x double>, ptr [[VEC_GEP]], align 1
 ; PTR32-NEXT:    [[VEC_GEP2:%.*]] = getelementptr inbounds double, ptr [[IN]], i32 32
-; PTR32-NEXT:    [[COL_LOAD3:%.*]] = load <3 x double>, ptr [[VEC_GEP2]], align 8
+; PTR32-NEXT:    [[COL_LOAD3:%.*]] = load <3 x double>, ptr [[VEC_GEP2]], align 1
 ; PTR32-NEXT:    [[TMP0:%.*]] = shufflevector <3 x double> [[COL_LOAD]], <3 x double> [[COL_LOAD1]], <6 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5>
 ; PTR32-NEXT:    [[TMP1:%.*]] = shufflevector <3 x double> [[COL_LOAD3]], <3 x double> poison, <6 x i32> <i32 0, i32 1, i32 2, i32 poison, i32 poison, i32 poison>
 ; PTR32-NEXT:    [[TMP2:%.*]] = shufflevector <6 x double> [[TMP0]], <6 x double> [[TMP1]], <9 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8>
@@ -153,17 +153,17 @@ entry:
 define <4 x double> @strided_load_2x2_const_stride_i64_truncated(ptr %in) {
 ; PTR64-LABEL: @strided_load_2x2_const_stride_i64_truncated(
 ; PTR64-NEXT:  entry:
-; PTR64-NEXT:    [[COL_LOAD:%.*]] = load <2 x double>, ptr [[IN:%.*]], align 8
+; PTR64-NEXT:    [[COL_LOAD:%.*]] = load <2 x double>, ptr [[IN:%.*]], align 1
 ; PTR64-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds double, ptr [[IN]], i64 4294967297
-; PTR64-NEXT:    [[COL_LOAD1:%.*]] = load <2 x double>, ptr [[VEC_GEP]], align 8
+; PTR64-NEXT:    [[COL_LOAD1:%.*]] = load <2 x double>, ptr [[VEC_GEP]], align 1
 ; PTR64-NEXT:    [[TMP0:%.*]] = shufflevector <2 x double> [[COL_LOAD]], <2 x double> [[COL_LOAD1]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
 ; PTR64-NEXT:    ret <4 x double> [[TMP0]]
 ;
 ; PTR32-LABEL: @strided_load_2x2_const_stride_i64_truncated(
 ; PTR32-NEXT:  entry:
-; PTR32-NEXT:    [[COL_LOAD:%.*]] = load <2 x double>, ptr [[IN:%.*]], align 8
+; PTR32-NEXT:    [[COL_LOAD:%.*]] = load <2 x double>, ptr [[IN:%.*]], align 1
 ; PTR32-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds double, ptr [[IN]], i32 1
-; PTR32-NEXT:    [[COL_LOAD1:%.*]] = load <2 x double>, ptr [[VEC_GEP]], align 8
+; PTR32-NEXT:    [[COL_LOAD1:%.*]] = load <2 x double>, ptr [[VEC_GEP]], align 1
 ; PTR32-NEXT:    [[TMP0:%.*]] = shufflevector <2 x double> [[COL_LOAD]], <2 x double> [[COL_LOAD1]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
 ; PTR32-NEXT:    ret <4 x double> [[TMP0]]
 ;
@@ -177,18 +177,18 @@ define void @strided_store_2x2_const_stride_i64_truncated(<4 x double> %in, ptr 
 ; PTR64-NEXT:  entry:
 ; PTR64-NEXT:    [[SPLIT:%.*]] = shufflevector <4 x double> [[IN:%.*]], <4 x double> poison, <2 x i32> <i32 0, i32 1>
 ; PTR64-NEXT:    [[SPLIT1:%.*]] = shufflevector <4 x double> [[IN]], <4 x double> poison, <2 x i32> <i32 2, i32 3>
-; PTR64-NEXT:    store <2 x double> [[SPLIT]], ptr [[OUT:%.*]], align 8
+; PTR64-NEXT:    store <2 x double> [[SPLIT]], ptr [[OUT:%.*]], align 1
 ; PTR64-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds double, ptr [[OUT]], i64 4294967297
-; PTR64-NEXT:    store <2 x double> [[SPLIT1]], ptr [[VEC_GEP]], align 8
+; PTR64-NEXT:    store <2 x double> [[SPLIT1]], ptr [[VEC_GEP]], align 1
 ; PTR64-NEXT:    ret void
 ;
 ; PTR32-LABEL: @strided_store_2x2_const_stride_i64_truncated(
 ; PTR32-NEXT:  entry:
 ; PTR32-NEXT:    [[SPLIT:%.*]] = shufflevector <4 x double> [[IN:%.*]], <4 x double> poison, <2 x i32> <i32 0, i32 1>
 ; PTR32-NEXT:    [[SPLIT1:%.*]] = shufflevector <4 x double> [[IN]], <4 x double> poison, <2 x i32> <i32 2, i32 3>
-; PTR32-NEXT:    store <2 x double> [[SPLIT]], ptr [[OUT:%.*]], align 8
+; PTR32-NEXT:    store <2 x double> [[SPLIT]], ptr [[OUT:%.*]], align 1
 ; PTR32-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds double, ptr [[OUT]], i32 1
-; PTR32-NEXT:    store <2 x double> [[SPLIT1]], ptr [[VEC_GEP]], align 8
+; PTR32-NEXT:    store <2 x double> [[SPLIT1]], ptr [[VEC_GEP]], align 1
 ; PTR32-NEXT:    ret void
 ;
 entry:

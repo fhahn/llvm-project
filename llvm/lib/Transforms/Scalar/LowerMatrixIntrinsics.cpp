@@ -1359,7 +1359,7 @@ public:
            "Intrinsic only supports column-major layout!");
     Value *Ptr = Inst->getArgOperand(0);
     Value *Stride = Inst->getArgOperand(1);
-    return LowerLoad(Inst, Ptr, Inst->getParamAlign(0), Stride,
+    return LowerLoad(Inst, Ptr, Inst->getParamAlign(0).valueOrOne(), Stride,
                      cast<ConstantInt>(Inst->getArgOperand(2))->isOne(),
                      {Inst->getArgOperand(3), Inst->getArgOperand(4)}, Builder);
   }
@@ -1424,10 +1424,10 @@ public:
     Value *Matrix = Inst->getArgOperand(0);
     Value *Ptr = Inst->getArgOperand(1);
     Value *Stride = Inst->getArgOperand(2);
-    return LowerStore(Inst, Matrix, Ptr, Inst->getParamAlign(1), Stride,
-                      cast<ConstantInt>(Inst->getArgOperand(3))->isOne(),
-                      {Inst->getArgOperand(4), Inst->getArgOperand(5)},
-                      Builder);
+    return LowerStore(
+        Inst, Matrix, Ptr, Inst->getParamAlign(1).valueOrOne(), Stride,
+        cast<ConstantInt>(Inst->getArgOperand(3))->isOne(),
+        {Inst->getArgOperand(4), Inst->getArgOperand(5)}, Builder);
   }
 
   // Set elements I..I+NumElts-1 to Block
@@ -1676,10 +1676,7 @@ public:
         auto *MatLoad = cast<IntrinsicInst>(Op);
         bool IsVolatile = cast<ConstantInt>(MatLoad->getArgOperand(2))->isOne();
         // Preserve the volatile flag and alignment of the original load.
-        Align Alignment = getAlignForIndex(
-            0, MatLoad->getArgOperand(1),
-            cast<FixedVectorType>(Op->getType())->getElementType(),
-            MatLoad->getParamAlign(0));
+        Align Alignment = MatLoad->getParamAlign(0).valueOrOne();
         auto *NewLoad = Builder.CreateAlignedLoad(Op->getType(), Arg, Alignment,
                                                   IsVolatile);
         Op->replaceAllUsesWith(NewLoad);

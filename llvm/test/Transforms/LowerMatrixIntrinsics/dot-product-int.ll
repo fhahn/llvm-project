@@ -328,16 +328,16 @@ define <1 x i32> @test_builtin_column_major_variable_stride(ptr %src, <4 x i32> 
 ; CHECK-LABEL: @test_builtin_column_major_variable_stride(
 ; CHECK-NEXT:    [[VEC_START:%.*]] = mul i64 0, [[STRIDE:%.*]]
 ; CHECK-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds i32, ptr [[SRC:%.*]], i64 [[VEC_START]]
-; CHECK-NEXT:    [[COL_LOAD:%.*]] = load <1 x i32>, ptr [[VEC_GEP]], align 4
+; CHECK-NEXT:    [[COL_LOAD:%.*]] = load <1 x i32>, ptr [[VEC_GEP]], align 1
 ; CHECK-NEXT:    [[VEC_START1:%.*]] = mul i64 1, [[STRIDE]]
 ; CHECK-NEXT:    [[VEC_GEP2:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[VEC_START1]]
-; CHECK-NEXT:    [[COL_LOAD3:%.*]] = load <1 x i32>, ptr [[VEC_GEP2]], align 4
+; CHECK-NEXT:    [[COL_LOAD3:%.*]] = load <1 x i32>, ptr [[VEC_GEP2]], align 1
 ; CHECK-NEXT:    [[VEC_START4:%.*]] = mul i64 2, [[STRIDE]]
 ; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[VEC_START4]]
-; CHECK-NEXT:    [[COL_LOAD6:%.*]] = load <1 x i32>, ptr [[VEC_GEP5]], align 4
+; CHECK-NEXT:    [[COL_LOAD6:%.*]] = load <1 x i32>, ptr [[VEC_GEP5]], align 1
 ; CHECK-NEXT:    [[VEC_START7:%.*]] = mul i64 3, [[STRIDE]]
 ; CHECK-NEXT:    [[VEC_GEP8:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[VEC_START7]]
-; CHECK-NEXT:    [[COL_LOAD9:%.*]] = load <1 x i32>, ptr [[VEC_GEP8]], align 4
+; CHECK-NEXT:    [[COL_LOAD9:%.*]] = load <1 x i32>, ptr [[VEC_GEP8]], align 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <1 x i32> [[COL_LOAD]], <1 x i32> [[COL_LOAD3]], <2 x i32> <i32 0, i32 1>
 ; CHECK-NEXT:    [[TMP2:%.*]] = shufflevector <1 x i32> [[COL_LOAD6]], <1 x i32> [[COL_LOAD9]], <2 x i32> <i32 0, i32 1>
 ; CHECK-NEXT:    [[TMP3:%.*]] = shufflevector <2 x i32> [[TMP1]], <2 x i32> [[TMP2]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>

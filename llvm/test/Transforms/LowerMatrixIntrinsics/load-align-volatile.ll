@@ -5,13 +5,13 @@ define <9 x double> @strided_load_3x3_volatile(ptr %in, i64 %stride) {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[VEC_START:%.*]] = mul i64 0, [[STRIDE:%.*]]
 ; CHECK-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds double, ptr %in, i64 [[VEC_START]]
-; CHECK-NEXT:    load volatile <3 x double>, ptr [[VEC_GEP]], align 8
+; CHECK-NEXT:    load volatile <3 x double>, ptr [[VEC_GEP]], align 1
 ; CHECK-NEXT:    [[VEC_START1:%.*]] = mul i64 1, [[STRIDE]]
 ; CHECK-NEXT:    [[VEC_GEP2:%.*]] = getelementptr inbounds double, ptr %in, i64 [[VEC_START1]]
-; CHECK-NEXT:    load volatile <3 x double>, ptr [[VEC_GEP2]], align 8
+; CHECK-NEXT:    load volatile <3 x double>, ptr [[VEC_GEP2]], align 1
 ; CHECK-NEXT:    [[VEC_START5:%.*]] = mul i64 2, [[STRIDE]]
 ; CHECK-NEXT:    [[VEC_GEP6:%.*]] = getelementptr inbounds double, ptr %in, i64 [[VEC_START5]]
-; CHECK-NEXT:    load volatile <3 x double>, ptr [[VEC_GEP6]], align 8
+; CHECK-NEXT:    load volatile <3 x double>, ptr [[VEC_GEP6]], align 1
 ; CHECK-NOT:     = load
 ;
 entry:
