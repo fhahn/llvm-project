@@ -1717,10 +1717,9 @@ public:
     if (IsIntVec)
       Result = Builder.CreateAddReduce(Mul);
     else {
+      // Start at -0.0, the fadd identity, so -0.0 products sum to -0.0.
       Result = Builder.CreateFAddReduce(
-          ConstantFP::get(
-              cast<FixedVectorType>(LHS->getType())->getElementType(), 0.0),
-          Mul);
+          ConstantFP::getNegativeZero(ElementType), Mul);
       cast<Instruction>(Result)->setFastMathFlags(FMF);
     }
 
