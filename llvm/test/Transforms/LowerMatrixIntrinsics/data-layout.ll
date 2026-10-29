@@ -150,5 +150,53 @@ entry:
   ret <9 x double> %load
 }
 
+define <4 x double> @strided_load_2x2_const_stride_i64_truncated(ptr %in) {
+; PTR64-LABEL: @strided_load_2x2_const_stride_i64_truncated(
+; PTR64-NEXT:  entry:
+; PTR64-NEXT:    [[COL_LOAD:%.*]] = load <2 x double>, ptr [[IN:%.*]], align 8
+; PTR64-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds double, ptr [[IN]], i64 4294967297
+; PTR64-NEXT:    [[COL_LOAD1:%.*]] = load <2 x double>, ptr [[VEC_GEP]], align 8
+; PTR64-NEXT:    [[TMP0:%.*]] = shufflevector <2 x double> [[COL_LOAD]], <2 x double> [[COL_LOAD1]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
+; PTR64-NEXT:    ret <4 x double> [[TMP0]]
+;
+; PTR32-LABEL: @strided_load_2x2_const_stride_i64_truncated(
+; PTR32-NEXT:  entry:
+; PTR32-NEXT:    [[COL_LOAD:%.*]] = load <2 x double>, ptr [[IN:%.*]], align 8
+; PTR32-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds double, ptr [[IN]], i32 1
+; PTR32-NEXT:    [[COL_LOAD1:%.*]] = load <2 x double>, ptr [[VEC_GEP]], align 8
+; PTR32-NEXT:    [[TMP0:%.*]] = shufflevector <2 x double> [[COL_LOAD]], <2 x double> [[COL_LOAD1]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
+; PTR32-NEXT:    ret <4 x double> [[TMP0]]
+;
+entry:
+  %load = call <4 x double> @llvm.matrix.column.major.load.v4f64.i64(ptr %in, i64 4294967297, i1 false, i32 2, i32 2)
+  ret <4 x double> %load
+}
+
+define void @strided_store_2x2_const_stride_i64_truncated(<4 x double> %in, ptr %out) {
+; PTR64-LABEL: @strided_store_2x2_const_stride_i64_truncated(
+; PTR64-NEXT:  entry:
+; PTR64-NEXT:    [[SPLIT:%.*]] = shufflevector <4 x double> [[IN:%.*]], <4 x double> poison, <2 x i32> <i32 0, i32 1>
+; PTR64-NEXT:    [[SPLIT1:%.*]] = shufflevector <4 x double> [[IN]], <4 x double> poison, <2 x i32> <i32 2, i32 3>
+; PTR64-NEXT:    store <2 x double> [[SPLIT]], ptr [[OUT:%.*]], align 8
+; PTR64-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds double, ptr [[OUT]], i64 4294967297
+; PTR64-NEXT:    store <2 x double> [[SPLIT1]], ptr [[VEC_GEP]], align 8
+; PTR64-NEXT:    ret void
+;
+; PTR32-LABEL: @strided_store_2x2_const_stride_i64_truncated(
+; PTR32-NEXT:  entry:
+; PTR32-NEXT:    [[SPLIT:%.*]] = shufflevector <4 x double> [[IN:%.*]], <4 x double> poison, <2 x i32> <i32 0, i32 1>
+; PTR32-NEXT:    [[SPLIT1:%.*]] = shufflevector <4 x double> [[IN]], <4 x double> poison, <2 x i32> <i32 2, i32 3>
+; PTR32-NEXT:    store <2 x double> [[SPLIT]], ptr [[OUT:%.*]], align 8
+; PTR32-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds double, ptr [[OUT]], i32 1
+; PTR32-NEXT:    store <2 x double> [[SPLIT1]], ptr [[VEC_GEP]], align 8
+; PTR32-NEXT:    ret void
+;
+entry:
+  call void @llvm.matrix.column.major.store.v4f64.i64(<4 x double> %in, ptr %out, i64 4294967297, i1 false, i32 2, i32 2)
+  ret void
+}
+
 declare <9 x double> @llvm.matrix.column.major.load.v9f64.i64(ptr, i64, i1, i32, i32)
 declare <9 x double> @llvm.matrix.column.major.load.v9f64.i32(ptr, i32, i1, i32, i32)
+declare <4 x double> @llvm.matrix.column.major.load.v4f64.i64(ptr, i64, i1, i32, i32)
+declare void @llvm.matrix.column.major.store.v4f64.i64(<4 x double>, ptr, i64, i1, i32, i32)
