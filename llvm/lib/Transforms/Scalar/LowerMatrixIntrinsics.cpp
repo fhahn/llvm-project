@@ -1267,20 +1267,19 @@ public:
   /// The address at \p Idx == 0 has alignment \p A. If \p Stride is a
   /// ConstantInt, reduce the initial alignment based on the byte offset. For
   /// non-ConstantInt strides, return the common alignment of the initial
-  /// alignment and the element size in bytes.
+  /// alignment and the element alloc size.
   Align getAlignForIndex(unsigned Idx, Value *Stride, Type *ElementTy,
                          MaybeAlign A) const {
     Align InitialAlign = DL.getValueOrABITypeAlignment(A, ElementTy);
     if (Idx == 0)
       return InitialAlign;
 
-    TypeSize ElementSizeInBits = DL.getTypeSizeInBits(ElementTy);
+    uint64_t ElementSize = DL.getTypeAllocSize(ElementTy);
     if (auto *ConstStride = dyn_cast<ConstantInt>(Stride)) {
-      uint64_t StrideInBytes =
-          ConstStride->getZExtValue() * ElementSizeInBits / 8;
+      uint64_t StrideInBytes = ConstStride->getZExtValue() * ElementSize;
       return commonAlignment(InitialAlign, Idx * StrideInBytes);
     }
-    return commonAlignment(InitialAlign, ElementSizeInBits / 8);
+    return commonAlignment(InitialAlign, ElementSize);
   }
 
   IntegerType *getIndexType(Value *Ptr) const {
