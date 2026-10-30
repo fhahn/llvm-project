@@ -1282,6 +1282,17 @@ public:
     return commonAlignment(InitialAlign, ElementSize);
   }
 
+  /// Compute the alignment of a tile starting \p Offset elements after an
+  /// address with alignment \p A. Non-ConstantInt offsets are multiples of the
+  /// tile size.
+  Align getAlignForTile(Value *Offset, Type *ElementTy, MaybeAlign A) const {
+    auto *ConstOffset = dyn_cast<ConstantInt>(Offset);
+    uint64_t NumElements =
+        ConstOffset ? ConstOffset->getZExtValue() : Opts.fuse_matrix_tile_size;
+    return commonAlignment(DL.getValueOrABITypeAlignment(A, ElementTy),
+                           NumElements * DL.getTypeAllocSize(ElementTy));
+  }
+
   IntegerType *getIndexType(Value *Ptr) const {
     return cast<IntegerType>(DL.getIndexType(Ptr->getType()));
   }
@@ -1325,7 +1336,8 @@ public:
   }
 
   /// Loads a sub-matrix with shape \p ResultShape from a \p R x \p C matrix,
-  /// starting at \p MatrixPtr[I][J].
+  /// starting at \p MatrixPtr[I][J]. \p I and \p J must be multiples of the
+  /// tile size.
   MatrixTy loadMatrix(Value *MatrixPtr, MaybeAlign Align, bool IsVolatile,
                       ShapeInfo MatrixShape, Value *I, Value *J,
                       ShapeInfo ResultShape, Type *EltTy,
@@ -1337,7 +1349,7 @@ public:
     auto *TileTy = FixedVectorType::get(EltTy, ResultShape.NumRows *
                                                    ResultShape.NumColumns);
 
-    return loadMatrix(TileTy, TileStart, Align,
+    return loadMatrix(TileTy, TileStart, getAlignForTile(Offset, EltTy, Align),
                       getIndex(MatrixPtr, getStride(MatrixShape)), IsVolatile,
                       ResultShape, Builder);
   }
@@ -1364,7 +1376,7 @@ public:
   }
 
   /// Stores a sub-matrix \p StoreVal into the \p R x \p C matrix starting at \p
-  /// MatrixPtr[I][J].
+  /// MatrixPtr[I][J]. \p I and \p J must be multiples of the tile size.
   void storeMatrix(const MatrixTy &StoreVal, Value *MatrixPtr,
                    MaybeAlign MAlign, bool IsVolatile, ShapeInfo MatrixShape,
                    Value *I, Value *J, Type *EltTy, IRBuilder<> &Builder) {
@@ -1375,9 +1387,9 @@ public:
     auto *TileTy = FixedVectorType::get(EltTy, StoreVal.getNumRows() *
                                                    StoreVal.getNumColumns());
 
-    storeMatrix(TileTy, StoreVal, TileStart, MAlign,
-                getIndex(MatrixPtr, getStride(MatrixShape)), IsVolatile,
-                Builder);
+    storeMatrix(
+        TileTy, StoreVal, TileStart, getAlignForTile(Offset, EltTy, MAlign),
+        getIndex(MatrixPtr, getStride(MatrixShape)), IsVolatile, Builder);
   }
 
   /// Store matrix \p StoreVal starting at \p Ptr and using \p Stride between

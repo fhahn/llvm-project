@@ -490,9 +490,9 @@ define void @multiply_noalias_4x2_2x2_align16_align1(ptr noalias %A, ptr noalias
 ; CHECK-NEXT:    [[DOTIDX18:%.*]] = shl i64 [[COLS_IV]], 4
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[C:%.*]], i64 [[DOTIDX18]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr [4 x i8], ptr [[TMP8]], i64 [[ROWS_IV]]
-; CHECK-NEXT:    store <2 x float> [[TMP5]], ptr [[TMP9]], align 16
+; CHECK-NEXT:    store <2 x float> [[TMP5]], ptr [[TMP9]], align 8
 ; CHECK-NEXT:    [[VEC_GEP16:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP9]], i64 16
-; CHECK-NEXT:    store <2 x float> [[TMP7]], ptr [[VEC_GEP16]], align 16
+; CHECK-NEXT:    store <2 x float> [[TMP7]], ptr [[VEC_GEP16]], align 8
 ; CHECK-NEXT:    br i1 [[ROWS_COND_NOT]], label [[COLS_LATCH]], label [[ROWS_HEADER]], !prof [[PROF0]]
 ; CHECK:       cols.latch:
 ; CHECK-NEXT:    [[COLS_STEP]] = add i64 [[COLS_IV]], 2

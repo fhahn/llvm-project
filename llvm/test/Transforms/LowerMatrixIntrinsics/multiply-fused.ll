@@ -396,9 +396,9 @@ define void @multiply_noalias_4x2_2x2_align16(ptr noalias %A, ptr noalias %B, pt
 ; CHECK-NEXT:    [[VEC_GEP14:%.*]] = getelementptr inbounds nuw i8, ptr [[C]], i64 16
 ; CHECK-NEXT:    store <2 x float> [[TMP3]], ptr [[VEC_GEP14]], align 16
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 8
-; CHECK-NEXT:    [[COL_LOAD15:%.*]] = load <2 x float>, ptr [[TMP4]], align 16
+; CHECK-NEXT:    [[COL_LOAD15:%.*]] = load <2 x float>, ptr [[TMP4]], align 8
 ; CHECK-NEXT:    [[VEC_GEP16:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 24
-; CHECK-NEXT:    [[COL_LOAD17:%.*]] = load <2 x float>, ptr [[VEC_GEP16]], align 16
+; CHECK-NEXT:    [[COL_LOAD17:%.*]] = load <2 x float>, ptr [[VEC_GEP16]], align 8
 ; CHECK-NEXT:    [[COL_LOAD18:%.*]] = load <2 x float>, ptr [[B]], align 16
 ; CHECK-NEXT:    [[VEC_GEP19:%.*]] = getelementptr inbounds nuw i8, ptr [[B]], i64 8
 ; CHECK-NEXT:    [[COL_LOAD20:%.*]] = load <2 x float>, ptr [[VEC_GEP19]], align 8
@@ -411,9 +411,9 @@ define void @multiply_noalias_4x2_2x2_align16(ptr noalias %A, ptr noalias %B, pt
 ; CHECK-NEXT:    [[SPLAT_SPLAT32:%.*]] = shufflevector <2 x float> [[COL_LOAD20]], <2 x float> poison, <2 x i32> <i32 1, i32 1>
 ; CHECK-NEXT:    [[TMP8:%.*]] = call contract <2 x float> @llvm.fmuladd.v2f32(<2 x float> [[COL_LOAD17]], <2 x float> [[SPLAT_SPLAT32]], <2 x float> [[TMP7]])
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds nuw i8, ptr [[C]], i64 8
-; CHECK-NEXT:    store <2 x float> [[TMP6]], ptr [[TMP9]], align 16
+; CHECK-NEXT:    store <2 x float> [[TMP6]], ptr [[TMP9]], align 8
 ; CHECK-NEXT:    [[VEC_GEP33:%.*]] = getelementptr inbounds nuw i8, ptr [[C]], i64 24
-; CHECK-NEXT:    store <2 x float> [[TMP8]], ptr [[VEC_GEP33]], align 16
+; CHECK-NEXT:    store <2 x float> [[TMP8]], ptr [[VEC_GEP33]], align 8
 ; CHECK-NEXT:    ret void
 ;
 entry:
