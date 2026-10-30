@@ -127,6 +127,45 @@ for.body:                                         ; preds = %entry, %for.body
   br i1 %cmp, label %for.body, label %for.cond.cleanup
 }
 
+; The second i32 store starts 6 bytes after the first one and ends 6 bytes
+; before the first store of the next iteration. No dependence, even though the
+; distance is not a multiple of the access size.
+define void @nodep_Write_Write_dist_not_multiple_of_size(ptr %a) {
+; CHECK-LABEL: 'nodep_Write_Write_dist_not_multiple_of_size'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Backward loop carried data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Backward:
+; CHECK-NEXT:            store i32 0, ptr %gep.iv, align 4 ->
+; CHECK-NEXT:            store i32 1, ptr %gep.6.iv, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %gep.6 = getelementptr nuw i8, ptr %a, i64 6
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.iv = getelementptr i8, ptr %a, i64 %iv
+  store i32 0, ptr %gep.iv
+  %gep.6.iv = getelementptr i8, ptr %gep.6, i64 %iv
+  store i32 1, ptr %gep.6.iv
+  %iv.next = add nuw nsw i64 %iv, 16
+  %ec = icmp eq i64 %iv.next, 1024
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
 ; Following cases are unsafe depdences and are not vectorizable.
 
 ; void unsafe_Read_Write(int *A) {
@@ -263,6 +302,44 @@ for.body:                                         ; preds = %entry, %for.body
   store i32 %2, ptr %arrayidx3, align 4
   %cmp = icmp ult i64 %indvars.iv.next, 1024
   br i1 %cmp, label %for.body, label %for.cond.cleanup
+}
+
+; The second i32 store starts 13 bytes after the first one and overlaps the
+; first store of the next iteration.
+define void @unsafe_Write_Write_dist_not_multiple_of_size(ptr %a) {
+; CHECK-LABEL: 'unsafe_Write_Write_dist_not_multiple_of_size'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Backward loop carried data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Backward:
+; CHECK-NEXT:            store i32 0, ptr %gep.iv, align 4 ->
+; CHECK-NEXT:            store i32 1, ptr %gep.13.iv, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %gep.13 = getelementptr nuw i8, ptr %a, i64 13
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.iv = getelementptr i8, ptr %a, i64 %iv
+  store i32 0, ptr %gep.iv
+  %gep.13.iv = getelementptr i8, ptr %gep.13, i64 %iv
+  store i32 1, ptr %gep.13.iv
+  %iv.next = add nuw nsw i64 %iv, 16
+  %ec = icmp eq i64 %iv.next, 1024
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
 }
 
 ; Following cases check that strided accesses can be vectorized.

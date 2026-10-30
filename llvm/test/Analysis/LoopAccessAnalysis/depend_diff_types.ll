@@ -313,6 +313,203 @@ exit:
   ret void
 }
 
+;   i16  i32
+; [ 0 x 1 1 1 . . .] [ 0 x 1 1 1 . . . ]
+;   ^~^ dependence distance = 1
+;   ^ ~~~~~~~~~~~~~~~~ ^ iv.next = iv + 8
+;
+; The i32 store starts 1 byte after the i16 store, and overlaps it.
+define void @different_type_sizes_strided_accesses_overlap_src(ptr %dst) {
+; CHECK-LABEL: 'different_type_sizes_strided_accesses_overlap_src'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            store i16 0, ptr %gep.iv, align 2 ->
+; CHECK-NEXT:            store i32 1, ptr %gep.1.iv, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %gep.1 = getelementptr nuw i8, ptr %dst, i64 1
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.iv = getelementptr i8, ptr %dst, i64 %iv
+  store i16 0, ptr %gep.iv
+  %gep.1.iv = getelementptr i8, ptr %gep.1, i64 %iv
+  store i32 1, ptr %gep.1.iv
+  %iv.next = add nuw nsw i64 %iv, 8
+  %ec = icmp eq i64 %iv.next, 64
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+;   i16       i32
+; [ 0 0 . . . 1 1 1] [ x 0 . . . 1 1 1 ]
+;   ^ ~~~~~~~ ^ dependence distance = 5
+;   ^ ~~~~~~~~~~~~~~~~ ^ iv.next = iv + 8
+;
+; The i32 store starts 5 bytes after the i16 store, and overlaps the i16 store
+; of the next iteration.
+define void @different_type_sizes_strided_accesses_overlap_next_src(ptr %dst) {
+; CHECK-LABEL: 'different_type_sizes_strided_accesses_overlap_next_src'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            store i16 0, ptr %gep.iv, align 2 ->
+; CHECK-NEXT:            store i32 1, ptr %gep.5.iv, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %gep.5 = getelementptr nuw i8, ptr %dst, i64 5
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.iv = getelementptr i8, ptr %dst, i64 %iv
+  store i16 0, ptr %gep.iv
+  %gep.5.iv = getelementptr i8, ptr %gep.5, i64 %iv
+  store i32 1, ptr %gep.5.iv
+  %iv.next = add nuw nsw i64 %iv, 8
+  %ec = icmp eq i64 %iv.next, 64
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The i16 store starts 3 bytes after the i32 store, and overlaps it.
+define void @different_type_sizes_strided_accesses_overlap_neg_dist(ptr %dst) {
+; CHECK-LABEL: 'different_type_sizes_strided_accesses_overlap_neg_dist'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Forward:
+; CHECK-NEXT:            store i16 0, ptr %gep.3.iv, align 2 ->
+; CHECK-NEXT:            store i32 1, ptr %gep.iv, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %gep.3 = getelementptr nuw i8, ptr %dst, i64 3
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.3.iv = getelementptr i8, ptr %gep.3, i64 %iv
+  store i16 0, ptr %gep.3.iv
+  %gep.iv = getelementptr i8, ptr %dst, i64 %iv
+  store i32 1, ptr %gep.iv
+  %iv.next = add nuw nsw i64 %iv, 8
+  %ec = icmp eq i64 %iv.next, 64
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Same as @different_type_sizes_strided_accesses_independent_src_size, but with
+; a negative step and the i32 store first. No dependence.
+define void @different_type_sizes_strided_accesses_independent_neg_step(ptr %dst) {
+; CHECK-LABEL: 'different_type_sizes_strided_accesses_independent_neg_step'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            store i32 1, ptr %gep.10.iv, align 4 ->
+; CHECK-NEXT:            store i16 0, ptr %gep.iv, align 2
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %gep.10 = getelementptr nuw i8, ptr %dst, i64 10
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 56, %entry ], [ %iv.next, %loop ]
+  %gep.10.iv = getelementptr i8, ptr %gep.10, i64 %iv
+  store i32 1, ptr %gep.10.iv
+  %gep.iv = getelementptr i8, ptr %dst, i64 %iv
+  store i16 0, ptr %gep.iv
+  %iv.next = add nsw i64 %iv, -8
+  %ec = icmp eq i64 %iv, 0
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Same as @different_type_sizes_strided_accesses_overlap_next_src, but with a
+; negative step and the i32 store first.
+define void @different_type_sizes_strided_accesses_overlap_neg_step(ptr %dst) {
+; CHECK-LABEL: 'different_type_sizes_strided_accesses_overlap_neg_step'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            store i32 1, ptr %gep.5.iv, align 4 ->
+; CHECK-NEXT:            store i16 0, ptr %gep.iv, align 2
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %gep.5 = getelementptr nuw i8, ptr %dst, i64 5
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 56, %entry ], [ %iv.next, %loop ]
+  %gep.5.iv = getelementptr i8, ptr %gep.5, i64 %iv
+  store i32 1, ptr %gep.5.iv
+  %gep.iv = getelementptr i8, ptr %dst, i64 %iv
+  store i16 0, ptr %gep.iv
+  %iv.next = add nsw i64 %iv, -8
+  %ec = icmp eq i64 %iv, 0
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
 
 ;     i16      i64
 ; [ . 0 0 . 1 1 1 1] [ 1 x x 1 1 1 1 1 ]
@@ -401,13 +598,11 @@ exit:
 }
 
 
-; Source type-size differs from that of the sink, but when
-; determining backward dependence, only the source size
-; is relevant.
-; TODO: Relax the HasSameSize check; this test should report
-; BackwardVectorizable.
-define void @different_type_sizes_source_size_backwardvectorizible(ptr %dst) {
-; CHECK-LABEL: 'different_type_sizes_source_size_backwardvectorizible'
+; Source type-size differs from that of the sink. The i32 store starts directly
+; after the i16 store of the next iteration, so the strided accesses are
+; independent.
+define void @different_type_sizes_strided_accesses_independent_src_size(ptr %dst) {
+; CHECK-LABEL: 'different_type_sizes_strided_accesses_independent_src_size'
 ; CHECK-NEXT:    loop:
 ; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
 ; CHECK-NEXT:  Unknown data dependence.
@@ -442,11 +637,11 @@ exit:
   ret void
 }
 
-; Source type-size differs from that of the sink, and when
-; determining forward dependence, the source size can
-; prevent forwarding.
-define void @different_type_sizes_forward(ptr %dst) {
-; CHECK-LABEL: 'different_type_sizes_forward'
+; Source type-size differs from that of the sink. The i16 store ends where the
+; i32 store of the previous iteration starts, so the strided accesses are
+; independent.
+define void @different_type_sizes_strided_accesses_independent_neg_dist(ptr %dst) {
+; CHECK-LABEL: 'different_type_sizes_strided_accesses_independent_neg_dist'
 ; CHECK-NEXT:    loop:
 ; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
@@ -473,6 +668,79 @@ loop:
   %gep.iv = getelementptr i8, ptr %dst, i64 %iv
   store i16 1, ptr %gep.iv
   %iv.next = add i64 %iv, 8
+  %ec = icmp eq i64 %iv.next, 64
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The i24 and [3 x i8] stores have the same store size, but different alloc
+; sizes. The [3 x i8] store starts directly after the i24 store, so the strided
+; accesses are independent.
+define void @same_store_size_different_alloc_size_strided_accesses_independent(ptr %dst) {
+; CHECK-LABEL: 'same_store_size_different_alloc_size_strided_accesses_independent'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %gep.3 = getelementptr nuw i8, ptr %dst, i64 3
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.iv = getelementptr i8, ptr %dst, i64 %iv
+  store i24 0, ptr %gep.iv
+  %gep.3.iv = getelementptr i8, ptr %gep.3, i64 %iv
+  store [3 x i8] zeroinitializer, ptr %gep.3.iv
+  %iv.next = add nuw nsw i64 %iv, 12
+  %ec = icmp eq i64 %iv.next, 96
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The i32 store starts directly after the 3 bytes stored by the i24 store,
+; whose alloc size is 4, so the strided accesses are independent.
+define void @different_type_sizes_strided_accesses_independent_store_size(ptr %dst) {
+; CHECK-LABEL: 'different_type_sizes_strided_accesses_independent_store_size'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            store i24 0, ptr %gep.1.iv, align 4 ->
+; CHECK-NEXT:            store i32 1, ptr %gep.4.iv, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %gep.1 = getelementptr nuw i8, ptr %dst, i64 1
+  %gep.4 = getelementptr nuw i8, ptr %dst, i64 4
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.1.iv = getelementptr i8, ptr %gep.1, i64 %iv
+  store i24 0, ptr %gep.1.iv
+  %gep.4.iv = getelementptr i8, ptr %gep.4, i64 %iv
+  store i32 1, ptr %gep.4.iv
+  %iv.next = add nuw nsw i64 %iv, 8
   %ec = icmp eq i64 %iv.next, 64
   br i1 %ec, label %exit, label %loop
 

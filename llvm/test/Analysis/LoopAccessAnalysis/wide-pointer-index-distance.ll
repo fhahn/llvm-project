@@ -41,6 +41,44 @@ exit:
   ret void
 }
 
+; Constant distance that needs more than 64 bits. The load and store access
+; different halves of [2 x i32] elements, so they are independent.
+define void @i128_const_dist_strided_independent(ptr %A, i128 %n) {
+; CHECK-LABEL: 'i128_const_dist_strided_independent'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            %v = load i32, ptr %gep.load, align 4 ->
+; CHECK-NEXT:            store i32 %v, ptr %gep.store, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i128 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.load = getelementptr inbounds [2 x i32], ptr %A, i128 %iv
+  %v = load i32, ptr %gep.load, align 4
+  %idx.store = add i128 %iv, 36893488147419103232
+  %gep.store = getelementptr inbounds [2 x i32], ptr %A, i128 %idx.store, i128 1
+  store i32 %v, ptr %gep.store, align 4
+  %iv.next = add i128 %iv, 1
+  %ec = icmp eq i128 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
 ; Non-constant distance with a 128-bit type.
 define void @i128_nonconst_dist(ptr %A, i128 %n, i128 %offset) {
 ; CHECK-LABEL: 'i128_nonconst_dist'
