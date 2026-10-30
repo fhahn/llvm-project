@@ -61,8 +61,8 @@ bb4:
   %phi5 = phi ptr [ %getelementptr15, %bb4 ], [ %phi, %bb2 ]
   %phi6 = phi ptr [ %getelementptr14, %bb4 ], [ %phi3, %bb2 ]
   %load = load i64, ptr %phi5, align 8
-  store i64 %load, ptr %phi, align 8
-  store i64 0, ptr %phi3, align 8
+  store i64 %load, ptr %arg, align 8
+  store i64 0, ptr %arg1, align 8
   %load7 = load ptr, ptr %phi6, align 8
   %load8 = load ptr, ptr %phi5, align 8
   store ptr %load8, ptr %phi6, align 8
