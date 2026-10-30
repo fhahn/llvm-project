@@ -217,20 +217,20 @@ define void @test(ptr %A, ptr %B, ptr %C, i1 %cond) {
 ; CHECK-NEXT:    ret void
 ;
 entry:
-  %a = load <6 x double>, ptr %A, align 8
-  %b = load <6 x double>, ptr %B, align 8
-  %c = call <9 x double> @llvm.matrix.multiply(<6 x double> %a, <6 x double> %b, i32 3, i32 2, i32 3)
+  %a.load = load <6 x double>, ptr %A, align 8
+  %b.load = load <6 x double>, ptr %B, align 8
+  %c = call <9 x double> @llvm.matrix.multiply(<6 x double> %a.load, <6 x double> %b.load, i32 3, i32 2, i32 3)
   store <9 x double> %c, ptr %C, align 8
 
   br i1 %cond, label %true, label %false
 
 true:
-  %a.add = fadd <6 x double> %a, %a
+  %a.add = fadd <6 x double> %a.load, %a.load
   store <6 x double> %a.add, ptr %A, align 8
   br label %end
 
 false:
-  %b.add = fadd <6 x double> %b, %b
+  %b.add = fadd <6 x double> %b.load, %b.load
   store <6 x double> %b.add, ptr %B, align 8
   br label %end
 
