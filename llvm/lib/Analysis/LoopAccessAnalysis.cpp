@@ -310,16 +310,17 @@ static bool isKnownNonDecreasingInLoop(const SCEV *S, const Loop *L,
            ScalarEvolution::MonotonicPredicateType::MonotonicallyIncreasing;
   }
   case scAddExpr:
-  case scMulExpr: {
-    const auto *NAry = cast<SCEVNAryExpr>(S);
-    if (!NAry->hasNoUnsignedWrap())
+  case scMulExpr:
+    if (!cast<SCEVNAryExpr>(S)->hasNoUnsignedWrap())
       return false;
     // With NUW, the exact sum or product fits in the type, so it is
-    // non-decreasing if every operandis.
-    return all_of(NAry->operands(), [&](const SCEV *Op) {
+    // non-decreasing if every operand is.
+    [[fallthrough]];
+  case scUMaxExpr:
+  case scUMinExpr:
+    return all_of(S->operands(), [&](const SCEV *Op) {
       return isKnownNonDecreasingInLoop(Op, L, SE);
     });
-  }
   default:
     return false;
   }
