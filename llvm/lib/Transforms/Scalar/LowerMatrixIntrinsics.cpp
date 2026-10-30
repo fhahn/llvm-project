@@ -1989,8 +1989,9 @@ public:
     return Res;
   }
 
-  void createTiledLoops(CallInst *MatMul, Value *LPtr, ShapeInfo LShape,
-                        Value *RPtr, ShapeInfo RShape, StoreInst *Store) {
+  void createTiledLoops(CallInst *MatMul, Value *LPtr, Align LAlign,
+                        ShapeInfo LShape, Value *RPtr, Align RAlign,
+                        ShapeInfo RShape, StoreInst *Store) {
     auto *EltType = cast<FixedVectorType>(MatMul->getType())->getElementType();
 
     // Create the main tiling loop nest.
@@ -2026,14 +2027,14 @@ public:
     //   Res += Load(CurrentRow, K) * Load(K, CurrentColumn)
     Builder.SetInsertPoint(InnerBody->getTerminator());
     // Load tiles of the operands.
-    MatrixTy A =
-        loadMatrix(LPtr, {}, false, LShape, TI.RowLoop.Index, TI.KLoop.Index,
-                   {Opts.fuse_matrix_tile_size, Opts.fuse_matrix_tile_size},
-                   EltType, Builder);
-    MatrixTy B =
-        loadMatrix(RPtr, {}, false, RShape, TI.KLoop.Index, TI.ColumnLoop.Index,
-                   {Opts.fuse_matrix_tile_size, Opts.fuse_matrix_tile_size},
-                   EltType, Builder);
+    MatrixTy A = loadMatrix(
+        LPtr, LAlign, false, LShape, TI.RowLoop.Index, TI.KLoop.Index,
+        {Opts.fuse_matrix_tile_size, Opts.fuse_matrix_tile_size}, EltType,
+        Builder);
+    MatrixTy B = loadMatrix(
+        RPtr, RAlign, false, RShape, TI.KLoop.Index, TI.ColumnLoop.Index,
+        {Opts.fuse_matrix_tile_size, Opts.fuse_matrix_tile_size}, EltType,
+        Builder);
     emitMatrixMultiply(TileResult, A, B, Builder, true, false,
                        getFastMathFlags(MatMul));
     // Store result after the inner loop is done.
@@ -2084,7 +2085,8 @@ public:
                     C % Opts.fuse_matrix_tile_size == 0 &&
                     M % Opts.fuse_matrix_tile_size == 0;
     if (UseLoops)
-      createTiledLoops(MatMul, APtr, LShape, BPtr, RShape, Store);
+      createTiledLoops(MatMul, APtr, LoadOp0->getAlign(), LShape, BPtr,
+                       LoadOp1->getAlign(), RShape, Store);
     else {
       IRBuilder<> Builder(Store);
       for (unsigned J = 0; J < C; J += Opts.fuse_matrix_tile_size)
