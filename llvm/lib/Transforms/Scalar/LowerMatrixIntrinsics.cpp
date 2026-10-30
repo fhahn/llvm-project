@@ -998,13 +998,8 @@ public:
     }
 
     bool Changed = false;
-    if (PassOpts.TransposeOpts) {
+    if (PassOpts.TransposeOpts)
       Changed |= optimizeTransposes();
-      if (Opts.matrix_print_after_transpose_opt) {
-        dbgs() << "Dump after matrix transpose optimization:\n";
-        Func.print(dbgs());
-      }
-    }
 
     if (!PassOpts.Lower)
       return Changed;

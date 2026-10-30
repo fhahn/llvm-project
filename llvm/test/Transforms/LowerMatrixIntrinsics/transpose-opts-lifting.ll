@@ -1,6 +1,4 @@
-; RUN: opt -p lower-matrix-intrinsics -matrix-print-after-transpose-opt -disable-output -S %s 2>&1 | FileCheck %s
-
-; REQUIRES: asserts
+; RUN: opt -p 'lower-matrix-intrinsics<no-fuse;no-lower>' -S %s | FileCheck %s
 
 target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128"
 

@@ -461,7 +461,6 @@ defm : EnumField<"matrix-default-layout", "MatrixLayoutTy", "MatrixLayoutTy::Col
   "column-major,row-major",
   ["MatrixLayoutTy::ColumnMajor", "MatrixLayoutTy::RowMajor"],
   "Sets the default matrix layout">;
-defm : BoolField<"matrix-print-after-transpose-opt", "false", "">;
 defm : ValueField<"matrix-split-matmul-remainder-over-threshold", "unsigned", "0",
   "Illegal remainder vectors over this size in bits should be split in the inner loop of matmul">;
 defm : BoolField<"verify-matrix-shapes", "false",
