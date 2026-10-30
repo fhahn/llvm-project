@@ -1737,8 +1737,6 @@ public:
                       SmallPtrSetImpl<Instruction *> &FusedInsts) {
     assert(Opts.matrix_default_layout == MatrixLayoutTy::ColumnMajor &&
            "Tiling only supported for column-major matrixes at the moment!");
-    if (!isFusionProfitable(MatMul))
-      return;
 
     ShapeInfo LShape(MatMul->getArgOperand(2), MatMul->getArgOperand(3));
     ShapeInfo RShape(MatMul->getArgOperand(3), MatMul->getArgOperand(4));
@@ -1879,7 +1877,7 @@ public:
     auto *LoadOp0 = dyn_cast<LoadInst>(A);
     auto *LoadOp1 = dyn_cast<LoadInst>(B);
     auto *Store = dyn_cast<StoreInst>(*MatMul->user_begin());
-    if (LoadOp0 && LoadOp1 && Store) {
+    if (LoadOp0 && LoadOp1 && Store && isFusionProfitable(MatMul)) {
       // The store address must dominate the MatMul instruction, otherwise
       // we create invalid IR.
       SetVector<Value *> WorkList;

@@ -21,6 +21,7 @@ define void @lifetime_for_first_arg_before_multiply(ptr %B, ptr %C) {
 ; CHECK-NEXT:    [[COL_LOAD2:%.*]] = load <2 x double>, ptr [[B]], align 8
 ; CHECK-NEXT:    [[VEC_GEP3:%.*]] = getelementptr inbounds double, ptr [[B]], i64 2
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x double>, ptr [[VEC_GEP3]], align 8
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[A]])
 ; CHECK-NEXT:    [[BLOCK:%.*]] = shufflevector <2 x double> [[COL_LOAD]], <2 x double> poison, <2 x i32> <i32 0, i32 1>
 ; CHECK-NEXT:    [[TMP0:%.*]] = extractelement <2 x double> [[COL_LOAD2]], i64 0
 ; CHECK-NEXT:    [[SPLAT_SPLATINSERT:%.*]] = insertelement <2 x double> poison, double [[TMP0]], i64 0
@@ -50,7 +51,6 @@ define void @lifetime_for_first_arg_before_multiply(ptr %B, ptr %C) {
 ; CHECK-NEXT:    store <2 x double> [[TMP6]], ptr [[C]], align 8
 ; CHECK-NEXT:    [[VEC_GEP14:%.*]] = getelementptr inbounds double, ptr [[C]], i64 2
 ; CHECK-NEXT:    store <2 x double> [[TMP13]], ptr [[VEC_GEP14]], align 8
-; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[A]])
 ; CHECK-NEXT:    ret void
 ;
 entry:
@@ -74,8 +74,6 @@ define void @multiply_udiv_in_store_address(ptr %A, ptr %B, ptr %C, i64 %x, i64 
 ; CHECK-NEXT:    [[COL_LOAD2:%.*]] = load <2 x double>, ptr [[B]], align 8
 ; CHECK-NEXT:    [[VEC_GEP3:%.*]] = getelementptr inbounds double, ptr [[B]], i64 2
 ; CHECK-NEXT:    [[COL_LOAD4:%.*]] = load <2 x double>, ptr [[VEC_GEP3]], align 8
-; CHECK-NEXT:    [[IDX:%.*]] = udiv i64 [[X]], [[Y]]
-; CHECK-NEXT:    [[GEP:%.*]] = getelementptr <4 x double>, ptr [[C]], i64 [[IDX]]
 ; CHECK-NEXT:    [[BLOCK:%.*]] = shufflevector <2 x double> [[COL_LOAD]], <2 x double> poison, <2 x i32> <i32 0, i32 1>
 ; CHECK-NEXT:    [[TMP0:%.*]] = extractelement <2 x double> [[COL_LOAD2]], i64 0
 ; CHECK-NEXT:    [[SPLAT_SPLATINSERT:%.*]] = insertelement <2 x double> poison, double [[TMP0]], i64 0
@@ -105,6 +103,8 @@ define void @multiply_udiv_in_store_address(ptr %A, ptr %B, ptr %C, i64 %x, i64 
 ; CHECK-NEXT:    [[Y_NZ:%.*]] = icmp ne i64 [[Y]], 0
 ; CHECK-NEXT:    br i1 [[Y_NZ]], label %[[THEN:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[THEN]]:
+; CHECK-NEXT:    [[IDX:%.*]] = udiv i64 [[X]], [[Y]]
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr <4 x double>, ptr [[C]], i64 [[IDX]]
 ; CHECK-NEXT:    store <2 x double> [[TMP6]], ptr [[GEP]], align 8
 ; CHECK-NEXT:    [[VEC_GEP14:%.*]] = getelementptr inbounds double, ptr [[GEP]], i64 2
 ; CHECK-NEXT:    store <2 x double> [[TMP13]], ptr [[VEC_GEP14]], align 8
