@@ -1364,3 +1364,803 @@ loop:
 exit:
   ret void
 }
+
+; The load from the invariant %a[%k] has an unknown dependence with the store
+; to %a[i], which can be checked at runtime.
+define void @retry_invariant_and_strided_access(ptr %a, i64 %k, i64 %n) {
+; CHECK-LABEL: 'retry_invariant_and_strided_access'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            %l = load i32, ptr %gep.a.k, align 4 ->
+; CHECK-NEXT:            store i32 %l, ptr %gep.a.iv, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.a.k = getelementptr inbounds i32, ptr %a, i64 %k
+  %l = load i32, ptr %gep.a.k, align 4
+  %gep.a.iv = getelementptr inbounds i32, ptr %a, i64 %iv
+  store i32 %l, ptr %gep.a.iv, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; %a[%n - 1] is the last element accessed via %a[i], so runtime checks would
+; always fail.
+define void @invariant_and_strided_access_same_end_rt_checks_always_fail(ptr %a, i64 %n) {
+; CHECK-LABEL: 'invariant_and_strided_access_same_end_rt_checks_always_fail'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            %l = load i32, ptr %gep.a.last, align 4 ->
+; CHECK-NEXT:            store i32 %l, ptr %gep.a.iv, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %n.sub.1 = add i64 %n, -1
+  %gep.a.last = getelementptr inbounds i32, ptr %a, i64 %n.sub.1
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %l = load i32, ptr %gep.a.last, align 4
+  %gep.a.iv = getelementptr inbounds i32, ptr %a, i64 %iv
+  store i32 %l, ptr %gep.a.iv, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The stores to %a[2 * i] and %a[2 * i + 1] are grouped, as both have unknown
+; dependences with the loads from %a[1] and %a[2 * i + %offset]. %a[2 * i + 1]
+; starts at %a[1], so runtime checks would always fail.
+define void @grouped_stores_and_invariant_access_same_start_rt_checks_always_fail(ptr %a, i64 %offset, i64 %n) {
+; CHECK-LABEL: 'grouped_stores_and_invariant_access_same_start_rt_checks_always_fail'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
+; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
+; CHECK-NEXT:      Check 1:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
+; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.a.inv = getelementptr inbounds i32, ptr %a, i64 1
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %a High: ((8 * %n) + %a))
+; CHECK-NEXT:            Member: {%a,+,8}<nuw><%loop>
+; CHECK-NEXT:            Member: {(4 + %a)<nuw>,+,8}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: ((4 * %offset) + %a) High: (-4 + (4 * %offset) + (8 * %n) + %a))
+; CHECK-NEXT:            Member: {((4 * %offset) + %a),+,8}<%loop>
+; CHECK-NEXT:        Group GRP2:
+; CHECK-NEXT:          (Low: (4 + %a)<nuw> High: (8 + %a))
+; CHECK-NEXT:            Member: (4 + %a)<nuw>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %gep.a.inv = getelementptr inbounds i32, ptr %a, i64 1
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.2 = shl nuw nsw i64 %iv, 1
+  %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
+  store i32 0, ptr %gep.a.0, align 4
+  %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
+  store i32 1, ptr %gep.a.1, align 4
+  %iv.2.off = add i64 %iv.2, %offset
+  %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
+  %l.a.off = load i32, ptr %gep.a.off, align 4
+  %l.a.inv = load i32, ptr %gep.a.inv, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The load from the invariant %a[%k] has an unknown dependence with the store
+; to the invariant %a[%j], which can be checked at runtime.
+define void @retry_invariant_accesses(ptr %a, i64 %k, i64 %j, i64 %n) {
+; CHECK-LABEL: 'retry_invariant_accesses'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            %l = load i32, ptr %gep.a.k, align 4 ->
+; CHECK-NEXT:            store i32 %add, ptr %gep.a.j, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %gep.a.k = getelementptr inbounds i32, ptr %a, i64 %k
+  %gep.a.j = getelementptr inbounds i32, ptr %a, i64 %j
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %l = load i32, ptr %gep.a.k, align 4
+  %iv.trunc = trunc i64 %iv to i32
+  %add = add i32 %l, %iv.trunc
+  store i32 %add, ptr %gep.a.j, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; In-place reversal: %a[i] and %a[%n - 1 - i] are accessed in different
+; directions with a symbolic distance, so retry with runtime checks.
+define void @retry_strides_in_different_directions(ptr %a, i64 %n) {
+; CHECK-LABEL: 'retry_strides_in_different_directions'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Forward:
+; CHECK-NEXT:            %l.1 = load i32, ptr %gep.a.rev, align 4 ->
+; CHECK-NEXT:            store i32 %l.0, ptr %gep.a.rev, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            %l.1 = load i32, ptr %gep.a.rev, align 4 ->
+; CHECK-NEXT:            store i32 %l.1, ptr %gep.a.iv, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            %l.0 = load i32, ptr %gep.a.iv, align 4 ->
+; CHECK-NEXT:            store i32 %l.0, ptr %gep.a.rev, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            store i32 %l.1, ptr %gep.a.iv, align 4 ->
+; CHECK-NEXT:            store i32 %l.0, ptr %gep.a.rev, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:        Forward:
+; CHECK-NEXT:            %l.0 = load i32, ptr %gep.a.iv, align 4 ->
+; CHECK-NEXT:            store i32 %l.1, ptr %gep.a.iv, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %half = lshr i64 %n, 1
+  %n.sub.1 = add i64 %n, -1
+  %pre = icmp ugt i64 %half, 0
+  br i1 %pre, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.a.iv = getelementptr inbounds i32, ptr %a, i64 %iv
+  %l.0 = load i32, ptr %gep.a.iv, align 4
+  %rev = sub i64 %n.sub.1, %iv
+  %gep.a.rev = getelementptr inbounds i32, ptr %a, i64 %rev
+  %l.1 = load i32, ptr %gep.a.rev, align 4
+  store i32 %l.1, ptr %gep.a.iv, align 4
+  store i32 %l.0, ptr %gep.a.rev, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %half
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Accesses in different directions with a constant distance in the first
+; iteration; runtime checks could only pass for small trip counts.
+define void @no_retry_strides_in_different_directions_constant_offset(ptr %a, i64 %n) {
+; CHECK-LABEL: 'no_retry_strides_in_different_directions_constant_offset'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            %l = load i32, ptr %gep.a.rev, align 4 ->
+; CHECK-NEXT:            store i32 %l, ptr %gep.a.iv, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %rev = sub i64 100, %iv
+  %gep.a.rev = getelementptr inbounds i32, ptr %a, i64 %rev
+  %l = load i32, ptr %gep.a.rev, align 4
+  %gep.a.iv = getelementptr inbounds i32, ptr %a, i64 %iv
+  store i32 %l, ptr %gep.a.iv, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Accesses with different strides and a symbolic distance in the first
+; iteration.
+define void @retry_different_strides(ptr %a, i64 %offset, i64 %n) {
+; CHECK-LABEL: 'retry_different_strides'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            %l = load i32, ptr %gep.a.off, align 4 ->
+; CHECK-NEXT:            store i32 %l, ptr %gep.a.iv.2, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.offset = add i64 %iv, %offset
+  %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.offset
+  %l = load i32, ptr %gep.a.off, align 4
+  %iv.2 = shl nuw nsw i64 %iv, 1
+  %gep.a.iv.2 = getelementptr inbounds i32, ptr %a, i64 %iv.2
+  store i32 %l, ptr %gep.a.iv.2, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Accesses with different strides, where %src is either %a or %a + 2. The
+; distance in the first iteration is constant for both, so runtime checks could
+; only pass for small trip counts.
+define void @no_retry_different_strides_constant_offsets_via_phi(ptr %a, i64 %n, i1 %c) {
+; CHECK-LABEL: 'no_retry_different_strides_constant_offsets_via_phi'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            %l = load i8, ptr %gep.src.iv.2, align 1 ->
+; CHECK-NEXT:            store i8 %l, ptr %gep.a.iv, align 1
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br i1 %c, label %skip, label %ph
+
+skip:
+  %a.2 = getelementptr inbounds i8, ptr %a, i64 2
+  br label %ph
+
+ph:
+  %src = phi ptr [ %a.2, %skip ], [ %a, %entry ]
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %ph ], [ %iv.next, %loop ]
+  %iv.2 = shl nuw nsw i64 %iv, 1
+  %gep.src.iv.2 = getelementptr inbounds i8, ptr %src, i64 %iv.2
+  %l = load i8, ptr %gep.src.iv.2, align 1
+  %gep.a.iv = getelementptr inbounds i8, ptr %a, i64 %iv
+  store i8 %l, ptr %gep.a.iv, align 1
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Same as above, but with the store via %dst, which is either %a or %a + 2.
+define void @no_retry_different_strides_constant_offsets_via_phi_store(ptr %a, i64 %n, i1 %c) {
+; CHECK-LABEL: 'no_retry_different_strides_constant_offsets_via_phi_store'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            %l = load i8, ptr %gep.a.iv, align 1 ->
+; CHECK-NEXT:            store i8 %l, ptr %gep.dst.iv.2, align 1
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br i1 %c, label %skip, label %ph
+
+skip:
+  %a.2 = getelementptr inbounds i8, ptr %a, i64 2
+  br label %ph
+
+ph:
+  %dst = phi ptr [ %a.2, %skip ], [ %a, %entry ]
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %ph ], [ %iv.next, %loop ]
+  %gep.a.iv = getelementptr inbounds i8, ptr %a, i64 %iv
+  %l = load i8, ptr %gep.a.iv, align 1
+  %iv.2 = shl nuw nsw i64 %iv, 1
+  %gep.dst.iv.2 = getelementptr inbounds i8, ptr %dst, i64 %iv.2
+  store i8 %l, ptr %gep.dst.iv.2, align 1
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Accesses with different strides, where %src is either %a or %a + %k, so the
+; distance in the first iteration is not constant.
+define void @retry_different_strides_non_constant_offsets_via_phi(ptr %a, i64 %n, i64 %k, i1 %c) {
+; CHECK-LABEL: 'retry_different_strides_non_constant_offsets_via_phi'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            %l = load i8, ptr %gep.src.iv.2, align 1 ->
+; CHECK-NEXT:            store i8 %l, ptr %gep.a.iv, align 1
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br i1 %c, label %skip, label %ph
+
+skip:
+  %a.k = getelementptr inbounds i8, ptr %a, i64 %k
+  br label %ph
+
+ph:
+  %src = phi ptr [ %a.k, %skip ], [ %a, %entry ]
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %ph ], [ %iv.next, %loop ]
+  %iv.2 = shl nuw nsw i64 %iv, 1
+  %gep.src.iv.2 = getelementptr inbounds i8, ptr %src, i64 %iv.2
+  %l = load i8, ptr %gep.src.iv.2, align 1
+  %gep.a.iv = getelementptr inbounds i8, ptr %a, i64 %iv
+  store i8 %l, ptr %gep.a.iv, align 1
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Accesses with different strides, where %src is either %a + 2 or the exit
+; value of the conditionally executed %loop.1, which is not available on entry
+; to %loop, so retry with runtime checks.
+define void @retry_different_strides_offset_via_phi_with_exit_value_of_sibling_loop(ptr %a, i64 %n, i1 %c) {
+; CHECK-LABEL: 'retry_different_strides_offset_via_phi_with_exit_value_of_sibling_loop'
+; CHECK-NEXT:    loop.1:
+; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            %l = load i8, ptr %gep.src.iv.2, align 1 ->
+; CHECK-NEXT:            store i8 %l, ptr %gep.a.iv, align 1
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %a.2 = getelementptr inbounds i8, ptr %a, i64 2
+  br i1 %c, label %loop.1, label %ph
+
+loop.1:
+  %p = phi ptr [ %a, %entry ], [ %p.next, %loop.1 ]
+  %iv.1 = phi i64 [ 0, %entry ], [ %iv.1.next, %loop.1 ]
+  %p.next = getelementptr inbounds i8, ptr %p, i64 1
+  %iv.1.next = add nuw nsw i64 %iv.1, 1
+  %ec.1 = icmp eq i64 %iv.1.next, %n
+  br i1 %ec.1, label %ph, label %loop.1
+
+ph:
+  %src = phi ptr [ %a.2, %entry ], [ %p.next, %loop.1 ]
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %ph ], [ %iv.next, %loop ]
+  %iv.2 = shl nuw nsw i64 %iv, 1
+  %gep.src.iv.2 = getelementptr inbounds i8, ptr %src, i64 %iv.2
+  %l = load i8, ptr %gep.src.iv.2, align 1
+  %gep.a.iv = getelementptr inbounds i8, ptr %a, i64 %iv
+  store i8 %l, ptr %gep.a.iv, align 1
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The i8 load from %a[i] and the i32 store to (%a + 4000)[i] have equal strides
+; in elements and a constant distance in the first iteration, but their ranges
+; are disjoint for %n <= 4000, so retry with runtime checks.
+define void @retry_constant_start_distance_different_sizes(ptr %a, i64 %n) {
+; CHECK-LABEL: 'retry_constant_start_distance_different_sizes'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.4000.iv = getelementptr inbounds i32, ptr %a.4000, i64 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.a.iv = getelementptr inbounds i8, ptr %a, i64 %iv
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: (4000 + %a)<nuw> High: (4000 + (4 * %n) + %a))
+; CHECK-NEXT:            Member: {(4000 + %a)<nuw>,+,4}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %a High: (%n + %a))
+; CHECK-NEXT:            Member: {%a,+,1}<nuw><%loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %a.4000 = getelementptr inbounds i8, ptr %a, i64 4000
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.a.iv = getelementptr inbounds i8, ptr %a, i64 %iv
+  %l = load i8, ptr %gep.a.iv, align 1
+  %ext = zext i8 %l to i32
+  %gep.a.4000.iv = getelementptr inbounds i32, ptr %a.4000, i64 %iv
+  store i32 %ext, ptr %gep.a.4000.iv, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The i8 load and the i32 store both start at %a. They have equal strides in
+; elements but different strides in bytes, so runtime checks always fail.
+define void @same_start_different_sizes_rt_checks_always_fail(ptr %a, i64 %n) {
+; CHECK-LABEL: 'same_start_different_sizes_rt_checks_always_fail'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.iv.i32 = getelementptr inbounds i32, ptr %a, i64 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.a.iv.i8 = getelementptr inbounds i8, ptr %a, i64 %iv
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a))
+; CHECK-NEXT:            Member: {%a,+,4}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %a High: (%n + %a))
+; CHECK-NEXT:            Member: {%a,+,1}<nuw><%loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.a.iv.i8 = getelementptr inbounds i8, ptr %a, i64 %iv
+  %l = load i8, ptr %gep.a.iv.i8, align 1
+  %ext = zext i8 %l to i32
+  %gep.a.iv.i32 = getelementptr inbounds i32, ptr %a, i64 %iv
+  store i32 %ext, ptr %gep.a.iv.i32, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The i8 load from (%a + 3 * %n)[i] and the i32 store to %a[i] both end at
+; %a + 4 * %n, so runtime checks always fail.
+define void @same_end_different_sizes_rt_checks_always_fail(ptr %a, i64 %n) {
+; CHECK-LABEL: 'same_end_different_sizes_rt_checks_always_fail'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.iv = getelementptr inbounds i32, ptr %a, i64 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.a.3n.iv = getelementptr inbounds i8, ptr %a.3n, i64 %iv
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a))
+; CHECK-NEXT:            Member: {%a,+,4}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: ((3 * %n) + %a) High: ((4 * %n) + %a))
+; CHECK-NEXT:            Member: {((3 * %n) + %a),+,1}<nw><%loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %n.3 = mul i64 %n, 3
+  %a.3n = getelementptr inbounds i8, ptr %a, i64 %n.3
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.a.3n.iv = getelementptr inbounds i8, ptr %a.3n, i64 %iv
+  %l = load i8, ptr %gep.a.3n.iv, align 1
+  %ext = zext i8 %l to i32
+  %gep.a.iv = getelementptr inbounds i32, ptr %a, i64 %iv
+  store i32 %ext, ptr %gep.a.iv, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The i8 load from %a[i] and the i32 store to (%a + 1)[i] overlap for %n > 1.
+; With the loop guard %n == 25, each range ends a constant past the start of
+; the other, so runtime checks always fail.
+define void @different_sizes_overlap_via_loop_guard_rt_checks_always_fail(ptr %a, i64 %n) {
+; CHECK-LABEL: 'different_sizes_overlap_via_loop_guard_rt_checks_always_fail'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.1.iv = getelementptr inbounds i32, ptr %a.1, i64 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.a.iv = getelementptr inbounds i8, ptr %a, i64 %iv
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: (1 + %a) High: (1 + (4 * %n) + %a))
+; CHECK-NEXT:            Member: {(1 + %a),+,4}<nw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %a High: (%n + %a))
+; CHECK-NEXT:            Member: {%a,+,1}<nuw><%loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %a.1 = getelementptr inbounds i8, ptr %a, i64 1
+  %pre = icmp eq i64 %n, 25
+  br i1 %pre, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.a.iv = getelementptr inbounds i8, ptr %a, i64 %iv
+  %l = load i8, ptr %gep.a.iv, align 1
+  %ext = zext i8 %l to i32
+  %gep.a.1.iv = getelementptr inbounds i32, ptr %a.1, i64 %iv
+  store i32 %ext, ptr %gep.a.1.iv, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The i16 and i32 accesses have different strides in elements but the same
+; stride in bytes. The early exit makes both ranges end at the maximum address,
+; but the accesses can still be checked via their symbolic distance.
+define void @retry_same_byte_stride_different_types_early_exit(ptr %a, i64 %offset, i64 %n, ptr noalias %c) {
+; CHECK-LABEL: 'retry_same_byte_stride_different_types_early_exit'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            %l = load i16, ptr %gep.a.off, align 2 ->
+; CHECK-NEXT:            store i32 %ext, ptr %gep.a.iv, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  %iv.2 = shl nuw nsw i64 %iv, 1
+  %iv.2.offset = add i64 %iv.2, %offset
+  %gep.a.off = getelementptr inbounds i16, ptr %a, i64 %iv.2.offset
+  %l = load i16, ptr %gep.a.off, align 2
+  %ext = sext i16 %l to i32
+  %gep.a.iv = getelementptr inbounds i32, ptr %a, i64 %iv
+  store i32 %ext, ptr %gep.a.iv, align 4
+  %l.c = load i8, ptr %c, align 1
+  %cmp = icmp eq i8 %l.c, 0
+  br i1 %cmp, label %exit, label %latch
+
+latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The i32 load from %a[2 * i] and the i64 store to %a[i + %outer.iv] have
+; different strides in elements but the same stride in bytes. Their distance
+; only varies with the outer loop, so retry with runtime checks.
+define void @retry_same_byte_stride_different_types_outer_loop_distance(ptr %a, i64 %n, i64 %m) {
+; CHECK-LABEL: 'retry_same_byte_stride_different_types_outer_loop_distance'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            %l = load i32, ptr %gep.a.iv.2, align 4 ->
+; CHECK-NEXT:            store i64 %ext, ptr %gep.a.iv.outer, align 8
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+; CHECK-NEXT:    outer.header:
+; CHECK-NEXT:      Report: loop is not the innermost loop
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %outer.header
+
+outer.header:
+  %outer.iv = phi i64 [ 0, %entry ], [ %outer.iv.next, %outer.latch ]
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %outer.header ], [ %iv.next, %loop ]
+  %iv.2 = shl nuw nsw i64 %iv, 1
+  %gep.a.iv.2 = getelementptr inbounds i32, ptr %a, i64 %iv.2
+  %l = load i32, ptr %gep.a.iv.2, align 4
+  %ext = sext i32 %l to i64
+  %iv.outer = add nuw nsw i64 %iv, %outer.iv
+  %gep.a.iv.outer = getelementptr inbounds i64, ptr %a, i64 %iv.outer
+  store i64 %ext, ptr %gep.a.iv.outer, align 8
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %outer.latch, label %loop
+
+outer.latch:
+  %outer.iv.next = add nuw nsw i64 %outer.iv, 1
+  %outer.ec = icmp eq i64 %outer.iv.next, %m
+  br i1 %outer.ec, label %exit, label %outer.header
+
+exit:
+  ret void
+}
