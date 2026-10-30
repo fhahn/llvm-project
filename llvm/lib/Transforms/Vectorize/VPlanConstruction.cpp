@@ -1303,7 +1303,7 @@ void VPlanTransforms::handleCountableEarlyExits(VPlan &Plan) {
 }
 
 void VPlanTransforms::addMiddleCheck(VPlan &Plan) {
-  auto *MiddleVPBB = VPBlockUtils::getPlainCFGMiddleBlock(Plan);
+  VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
   // If MiddleVPBB has a single successor then the original loop does not exit
   // via the latch and the single successor must be the scalar preheader.
   // There's no need to add a runtime check to MiddleVPBB.
@@ -1312,6 +1312,10 @@ void VPlanTransforms::addMiddleCheck(VPlan &Plan) {
            "must have ScalarPH as single successor");
     return;
   }
+  // Uncountable early exits with side-effects already branch on their own
+  // check.
+  if (!MiddleVPBB->empty() && match(&MiddleVPBB->back(), m_BranchOnCond()))
+    return;
 
   assert(MiddleVPBB->getNumSuccessors() == 2 && "must have 2 successors");
 
@@ -1330,7 +1334,8 @@ void VPlanTransforms::addMiddleCheck(VPlan &Plan) {
   // the corresponding compare because they may have ended up with different
   // line numbers and we want to avoid awkward line stepping while debugging.
   // E.g., if the compare has got a line number inside the loop.
-  auto *LatchVPBB = cast<VPBasicBlock>(MiddleVPBB->getSinglePredecessor());
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  auto *LatchVPBB = LoopRegion->getExitingBasicBlock();
   DebugLoc LatchDL = LatchVPBB->getTerminator()->getDebugLoc();
   VPBuilder Builder(MiddleVPBB);
   VPValue *Cmp =
