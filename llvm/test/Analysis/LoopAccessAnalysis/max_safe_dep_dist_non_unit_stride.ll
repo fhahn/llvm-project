@@ -51,3 +51,257 @@ loop:
   %cmp = icmp ult i64 %iv.next, %len
   br i1 %cmp, label %loop, label %loop.exit
 }
+
+; Each dependence should limit the safe vector width by its own distance and
+; stride, independent of the order the dependences are visited in:
+; a[i] -> a[i+2] allows VF 2 and b[2i] -> b[2i+50] allows VF 25.
+define void @strided_dep_not_rejected_by_smaller_distance(ptr noalias %a, ptr noalias %b, i64 %n) {
+; CHECK-LABEL: 'strided_dep_not_rejected_by_smaller_distance'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Backward loop carried data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        BackwardVectorizable:
+; CHECK-NEXT:            store i32 0, ptr %gep.a, align 4 ->
+; CHECK-NEXT:            store i32 1, ptr %gep.a.2, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:        Backward:
+; CHECK-NEXT:            store i32 0, ptr %gep.b, align 4 ->
+; CHECK-NEXT:            store i32 1, ptr %gep.b.50, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
+  store i32 0, ptr %gep.a, align 4
+  %iv.2 = add nuw nsw i64 %iv, 2
+  %gep.a.2 = getelementptr inbounds i32, ptr %a, i64 %iv.2
+  store i32 1, ptr %gep.a.2, align 4
+  %iv.mul.2 = shl nuw nsw i64 %iv, 1
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv.mul.2
+  store i32 0, ptr %gep.b, align 4
+  %iv.mul.2.50 = add nuw nsw i64 %iv.mul.2, 50
+  %gep.b.50 = getelementptr inbounds i32, ptr %b, i64 %iv.mul.2.50
+  store i32 1, ptr %gep.b.50, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Same as @strided_dep_not_rejected_by_smaller_distance, with the dependences
+; in reverse order.
+define void @strided_dep_not_rejected_by_smaller_distance_reversed(ptr noalias %a, ptr noalias %b, i64 %n) {
+; CHECK-LABEL: 'strided_dep_not_rejected_by_smaller_distance_reversed'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with a maximum safe vector width of 64 bits
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        BackwardVectorizable:
+; CHECK-NEXT:            store i32 0, ptr %gep.b, align 4 ->
+; CHECK-NEXT:            store i32 1, ptr %gep.b.50, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:        BackwardVectorizable:
+; CHECK-NEXT:            store i32 0, ptr %gep.a, align 4 ->
+; CHECK-NEXT:            store i32 1, ptr %gep.a.2, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.mul.2 = shl nuw nsw i64 %iv, 1
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv.mul.2
+  store i32 0, ptr %gep.b, align 4
+  %iv.mul.2.50 = add nuw nsw i64 %iv.mul.2, 50
+  %gep.b.50 = getelementptr inbounds i32, ptr %b, i64 %iv.mul.2.50
+  store i32 1, ptr %gep.b.50, align 4
+  %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
+  store i32 0, ptr %gep.a, align 4
+  %iv.2 = add nuw nsw i64 %iv, 2
+  %gep.a.2 = getelementptr inbounds i32, ptr %a, i64 %iv.2
+  store i32 1, ptr %gep.a.2, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; a[i] -> a[i+4] allows VF 4 (128 bits) and b[3i] -> b[3i+30] allows VF 10
+; (320 bits). The distance of the first dependence should not limit the second.
+define void @strided_dep_not_limited_by_smaller_distance(ptr noalias %a, ptr noalias %b, i64 %n) {
+; CHECK-LABEL: 'strided_dep_not_limited_by_smaller_distance'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with a maximum safe vector width of 32 bits
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        BackwardVectorizable:
+; CHECK-NEXT:            store i32 0, ptr %gep.a, align 4 ->
+; CHECK-NEXT:            store i32 1, ptr %gep.a.4, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:        BackwardVectorizable:
+; CHECK-NEXT:            store i32 0, ptr %gep.b, align 4 ->
+; CHECK-NEXT:            store i32 1, ptr %gep.b.30, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
+  store i32 0, ptr %gep.a, align 4
+  %iv.4 = add nuw nsw i64 %iv, 4
+  %gep.a.4 = getelementptr inbounds i32, ptr %a, i64 %iv.4
+  store i32 1, ptr %gep.a.4, align 4
+  %iv.mul.3 = mul nuw nsw i64 %iv, 3
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv.mul.3
+  store i32 0, ptr %gep.b, align 4
+  %iv.mul.3.30 = add nuw nsw i64 %iv.mul.3, 30
+  %gep.b.30 = getelementptr inbounds i32, ptr %b, i64 %iv.mul.3.30
+  store i32 1, ptr %gep.b.30, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; a[i] -> a[i+4] (i8) allows VF 4 (32 bits). The non-constant distance of
+; b[4i] -> b[4i+k] (i8) is at least 32 bytes and should not make the loop
+; unsafe. It is checked at runtime, as 4 bytes allow only 8 bits with its
+; stride.
+define void @strided_non_constant_distance_not_rejected_by_smaller_distance(ptr noalias %a, ptr noalias %b, i64 %n, i64 %k) {
+; CHECK-LABEL: 'strided_non_constant_distance_not_rejected_by_smaller_distance'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Backward loop carried data dependence.
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        BackwardVectorizable:
+; CHECK-NEXT:            store i8 0, ptr %gep.a, align 1 ->
+; CHECK-NEXT:            store i8 1, ptr %gep.a.4, align 1
+; CHECK-EMPTY:
+; CHECK-NEXT:        Backward:
+; CHECK-NEXT:            store i8 0, ptr %gep.b, align 1 ->
+; CHECK-NEXT:            store i8 1, ptr %gep.b.k, align 1
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %c = icmp sgt i64 %k, 31
+  br i1 %c, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.a = getelementptr inbounds i8, ptr %a, i64 %iv
+  store i8 0, ptr %gep.a, align 1
+  %iv.4 = add nuw nsw i64 %iv, 4
+  %gep.a.4 = getelementptr inbounds i8, ptr %a, i64 %iv.4
+  store i8 1, ptr %gep.a.4, align 1
+  %iv.mul.4 = shl nuw nsw i64 %iv, 2
+  %gep.b = getelementptr inbounds i8, ptr %b, i64 %iv.mul.4
+  store i8 0, ptr %gep.b, align 1
+  %iv.mul.4.k = add nuw nsw i64 %iv.mul.4, %k
+  %gep.b.k = getelementptr inbounds i8, ptr %b, i64 %iv.mul.4.k
+  store i8 1, ptr %gep.b.k, align 1
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; a[i] -> a[i+4] (i32) allows VF 4 (128 bits). The non-constant distance of
+; b[4i] -> b[4i+k] (i8) is at least 32 bytes, allowing 64 bits on its own, but
+; it is checked at runtime, as 16 bytes allow only 32 bits with its stride.
+define void @strided_non_constant_distance_after_constant_distance(ptr noalias %a, ptr noalias %b, i64 %n, i64 %k) {
+; CHECK-LABEL: 'strided_non_constant_distance_after_constant_distance'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with a maximum safe vector width of 128 bits with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        BackwardVectorizable:
+; CHECK-NEXT:            store i32 0, ptr %gep.a, align 4 ->
+; CHECK-NEXT:            store i32 1, ptr %gep.a.4, align 4
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP1:
+; CHECK-NEXT:          %gep.b = getelementptr inbounds i8, ptr %b, i64 %iv.mul.4
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.b.k = getelementptr inbounds i8, ptr %b, i64 %iv.mul.4.k
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %a High: (16 + (4 * %n) + %a))
+; CHECK-NEXT:            Member: {(16 + %a),+,4}<nuw><%loop>
+; CHECK-NEXT:            Member: {%a,+,4}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %b High: (-3 + (4 * %n) + %b))
+; CHECK-NEXT:            Member: {%b,+,4}<nuw><%loop>
+; CHECK-NEXT:        Group GRP2:
+; CHECK-NEXT:          (Low: (%k + %b) High: (-3 + (4 * %n) + %k + %b))
+; CHECK-NEXT:            Member: {(%k + %b),+,4}<nw><%loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %c = icmp sgt i64 %k, 31
+  br i1 %c, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
+  store i32 0, ptr %gep.a, align 4
+  %iv.4 = add nuw nsw i64 %iv, 4
+  %gep.a.4 = getelementptr inbounds i32, ptr %a, i64 %iv.4
+  store i32 1, ptr %gep.a.4, align 4
+  %iv.mul.4 = shl nuw nsw i64 %iv, 2
+  %gep.b = getelementptr inbounds i8, ptr %b, i64 %iv.mul.4
+  store i8 0, ptr %gep.b, align 1
+  %iv.mul.4.k = add nuw nsw i64 %iv.mul.4, %k
+  %gep.b.k = getelementptr inbounds i8, ptr %b, i64 %iv.mul.4.k
+  store i8 1, ptr %gep.b.k, align 1
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}

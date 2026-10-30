@@ -431,3 +431,67 @@ outer.latch:
 exit:
   ret void
 }
+
+; The non-constant distances of a[i] -> a[i+k] and b[i] -> b[i+j] are at least
+; 2 and 8 bytes. Both are checked at runtime, instead of limiting the width by
+; the second one.
+define void @non_constant_distance_after_smaller_non_constant_distance(ptr noalias %a, ptr noalias %b, i64 %n, i64 %k, i64 %j) {
+; COMMON-LABEL: 'non_constant_distance_after_smaller_non_constant_distance'
+; COMMON-NEXT:    loop:
+; COMMON-NEXT:      Memory dependences are safe with run-time checks
+; COMMON-NEXT:      Dependences:
+; COMMON-NEXT:      Run-time memory checks:
+; COMMON-NEXT:      Check 0:
+; COMMON-NEXT:        Comparing group GRP0:
+; COMMON-NEXT:          %gep.a = getelementptr inbounds i8, ptr %a, i64 %iv
+; COMMON-NEXT:        Against group GRP1:
+; COMMON-NEXT:          %gep.a.k = getelementptr inbounds i8, ptr %a, i64 %iv.k
+; COMMON-NEXT:      Check 1:
+; COMMON-NEXT:        Comparing group GRP2:
+; COMMON-NEXT:          %gep.b = getelementptr inbounds i8, ptr %b, i64 %iv
+; COMMON-NEXT:        Against group GRP3:
+; COMMON-NEXT:          %gep.b.j = getelementptr inbounds i8, ptr %b, i64 %iv.j
+; COMMON-NEXT:      Grouped accesses:
+; COMMON-NEXT:        Group GRP0:
+; COMMON-NEXT:          (Low: %a High: (%n + %a))
+; COMMON-NEXT:            Member: {%a,+,1}<nuw><%loop>
+; COMMON-NEXT:        Group GRP1:
+; COMMON-NEXT:          (Low: (%k + %a) High: (%n + %k + %a))
+; COMMON-NEXT:            Member: {(%k + %a),+,1}<nw><%loop>
+; COMMON-NEXT:        Group GRP2:
+; COMMON-NEXT:          (Low: %b High: (%n + %b))
+; COMMON-NEXT:            Member: {%b,+,1}<nuw><%loop>
+; COMMON-NEXT:        Group GRP3:
+; COMMON-NEXT:          (Low: (%j + %b) High: (%n + %j + %b))
+; COMMON-NEXT:            Member: {(%j + %b),+,1}<nw><%loop>
+; COMMON-EMPTY:
+; COMMON-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; COMMON-NEXT:      SCEV assumptions:
+; COMMON-EMPTY:
+; COMMON-NEXT:      Expressions re-written:
+;
+entry:
+  %c.k = icmp sgt i64 %k, 1
+  %c.j = icmp sgt i64 %j, 7
+  %c = and i1 %c.k, %c.j
+  br i1 %c, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.a = getelementptr inbounds i8, ptr %a, i64 %iv
+  store i8 0, ptr %gep.a, align 1
+  %iv.k = add nuw nsw i64 %iv, %k
+  %gep.a.k = getelementptr inbounds i8, ptr %a, i64 %iv.k
+  store i8 1, ptr %gep.a.k, align 1
+  %gep.b = getelementptr inbounds i8, ptr %b, i64 %iv
+  store i8 0, ptr %gep.b, align 1
+  %iv.j = add nuw nsw i64 %iv, %j
+  %gep.b.j = getelementptr inbounds i8, ptr %b, i64 %iv.j
+  store i8 1, ptr %gep.b.j, align 1
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
