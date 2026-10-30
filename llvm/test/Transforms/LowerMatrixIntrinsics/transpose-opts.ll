@@ -10,35 +10,10 @@ target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "aarch64-apple-ios"
 
 define void @double_transpose(ptr %A, ptr %B) {
-; REMARK:      Pass:            lower-matrix-intrinsics
-; REMARK-NEXT: Name:            matrix-lowered
-; REMARK-NEXT: Function:        double_transpose
-; REMARK-NEXT: Args:
-; REMARK-NEXT:   - String:          'Lowered with '
-; REMARK-NEXT:   - NumStores:       '6'
-; REMARK-NEXT:   - String:          ' stores, '
-; REMARK-NEXT:   - NumLoads:        '6'
-; REMARK-NEXT:   - String:          ' loads, '
-; REMARK-NEXT:   - NumComputeOps:   '0'
-; REMARK-NEXT:   - String:          ' compute ops, '
-; REMARK-NEXT:   - NumExposedTransposes: '0'
-; REMARK-NEXT:   - String:          ' exposed transposes'
-; REMARK-NEXT:   - String:           |
-; REMARK:            store(
-; REMARK-NEXT:        load(addr %A),
-; REMARK-NEXT:        addr %B)
 ; CHECK-LABEL: @double_transpose(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[COL_LOAD:%.*]] = load <3 x double>, ptr [[A:%.*]], align 16
-; CHECK-NEXT:    [[VEC_GEP:%.*]] = getelementptr inbounds double, ptr [[A]], i64 3
-; CHECK-NEXT:    [[COL_LOAD1:%.*]] = load <3 x double>, ptr [[VEC_GEP]], align 8
-; CHECK-NEXT:    [[VEC_GEP2:%.*]] = getelementptr inbounds double, ptr [[A]], i64 6
-; CHECK-NEXT:    [[COL_LOAD3:%.*]] = load <3 x double>, ptr [[VEC_GEP2]], align 16
-; CHECK-NEXT:    store <3 x double> [[COL_LOAD]], ptr [[B:%.*]], align 16
-; CHECK-NEXT:    [[VEC_GEP4:%.*]] = getelementptr inbounds double, ptr [[B]], i64 3
-; CHECK-NEXT:    store <3 x double> [[COL_LOAD1]], ptr [[VEC_GEP4]], align 8
-; CHECK-NEXT:    [[VEC_GEP5:%.*]] = getelementptr inbounds double, ptr [[B]], i64 6
-; CHECK-NEXT:    store <3 x double> [[COL_LOAD3]], ptr [[VEC_GEP5]], align 16
+; CHECK-NEXT:    [[A_LOAD:%.*]] = load <9 x double>, ptr [[A:%.*]], align 16
+; CHECK-NEXT:    store <9 x double> [[A_LOAD]], ptr [[B:%.*]], align 16
 ; CHECK-NEXT:    ret void
 ;
 entry:

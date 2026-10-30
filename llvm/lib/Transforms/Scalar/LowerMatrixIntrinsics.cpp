@@ -37,6 +37,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
@@ -78,6 +79,23 @@ static bool isSplat(Value *V) {
   if (auto *SV = dyn_cast<ShuffleVectorInst>(V))
     return SV->isZeroEltSplat();
   return false;
+}
+
+/// Return true if \p I is a matrix intrinsic, which carries its shape as
+/// arguments.
+static bool isMatrixIntrinsic(const Instruction &I) {
+  const auto *II = dyn_cast<IntrinsicInst>(&I);
+  if (!II)
+    return false;
+  switch (II->getIntrinsicID()) {
+  case Intrinsic::matrix_multiply:
+  case Intrinsic::matrix_transpose:
+  case Intrinsic::matrix_column_major_load:
+  case Intrinsic::matrix_column_major_store:
+    return true;
+  default:
+    return false;
+  }
 }
 
 /// Match any mul operation (fp or integer).
@@ -420,14 +438,11 @@ class LowerMatrixIntrinsics {
   /// instructions and the matrix_column_major_store intrinsics. For those, the
   /// shape information indicates that those instructions should be lowered
   /// using shape information as well. Note that extra care is needed when
-  /// erasing or RAUW'ing a value that is present in ShapeMap. If the
-  /// replacement is also a matrix operation, use
-  /// updateShapeAndReplaceAllUsesWith to make sure the replacement is added to
-  /// ShapeMap.  We don't use ValueMap, as there are also cases where we do not
-  /// want to add shape information for a replacement instruction. When directly
-  /// erasing a value with an entry in ShapeMap, use
-  /// eraseFromParentAndRemoveFromShapeMap to make sure ShapeMap is also updated
-  /// accordingly.
+  /// erasing or RAUW'ing a value that is present in ShapeMap. We don't use
+  /// ValueMap, as there are also cases where we do not want to add shape
+  /// information for a replacement instruction. When directly erasing a value
+  /// with an entry in ShapeMap, use eraseFromParentAndRemoveFromShapeMap to
+  /// make sure ShapeMap is also updated accordingly.
   DenseMap<Value *, ShapeInfo> ShapeMap;
 
   /// List of instructions to remove. While lowering, we are not replacing all
@@ -595,19 +610,8 @@ public:
     Instruction *Inst = dyn_cast<Instruction>(V);
     if (!Inst)
       return false;
-
-    IntrinsicInst *II = dyn_cast<IntrinsicInst>(Inst);
-    if (II)
-      switch (II->getIntrinsicID()) {
-      case Intrinsic::matrix_multiply:
-      case Intrinsic::matrix_transpose:
-      case Intrinsic::matrix_column_major_load:
-      case Intrinsic::matrix_column_major_store:
-        return true;
-      default:
-        break;
-      }
-    return isShapePreserving(V) || isa<StoreInst>(V) || isa<LoadInst>(V);
+    return isMatrixIntrinsic(*Inst) || isShapePreserving(V) ||
+           isa<StoreInst>(V) || isa<LoadInst>(V);
   }
 
   /// Propagate the shape information of instructions to their users.
@@ -724,12 +728,8 @@ public:
           Operation) {
     Value *T0 = Builder.CreateMatrixTranspose(
         Op0, Shape0.NumRows, Shape0.NumColumns, Op0->getName() + "_t");
-    // We are being run after shape prop, add shape for newly created
-    // instructions so that we lower them later.
-    setShapeInfo(T0, Shape0.t());
     Value *T1 = Builder.CreateMatrixTranspose(
         Op1, Shape1.NumRows, Shape1.NumColumns, Op1->getName() + "_t");
-    setShapeInfo(T1, Shape1.t());
     return Operation(T0, Shape0.t(), T1, Shape1.t());
   }
 
@@ -750,23 +750,7 @@ public:
       return;
     if (II != BB.rend() && Inst == &*II)
       ++II;
-    eraseFromParentAndRemoveFromShapeMap(Inst);
-  }
-
-  /// Add a new entry to ShapeMap for \p New with \p Old's shape info, erase the
-  /// entry for \p Old and replace all uses of \p Old with \p New.
-  void updateShapeAndReplaceAllUsesWith(Instruction &Old, Value *New) {
-    // We need to remove Old from the ShapeMap otherwise RAUW will replace it
-    // with New. We should only add New it it supportsShapeInfo so we insert
-    // it conditionally instead.
-    auto S = ShapeMap.find(&Old);
-    if (S != ShapeMap.end()) {
-      ShapeInfo Shape = S->second;
-      ShapeMap.erase(S);
-      if (supportsShapeInfo(New))
-        ShapeMap.insert({New, Shape});
-    }
-    Old.replaceAllUsesWith(New);
+    Inst->eraseFromParent();
   }
 
   /// Sink a top-level transpose inside matmuls and adds.
@@ -789,7 +773,7 @@ public:
     Value *TATA;
     if (match(TA, m_Intrinsic<Intrinsic::matrix_transpose>(
                       m_Value(TATA), m_Specific(C), m_Specific(R)))) {
-      updateShapeAndReplaceAllUsesWith(I, TATA);
+      I.replaceAllUsesWith(TATA);
       eraseFromParentAndMove(&I, II, BB);
       eraseFromParentAndMove(TA, II, BB);
       Changed = true;
@@ -798,7 +782,7 @@ public:
 
     // k^T -> k
     if (isSplat(TA)) {
-      updateShapeAndReplaceAllUsesWith(I, TA);
+      I.replaceAllUsesWith(TA);
       eraseFromParentAndMove(&I, II, BB);
       Changed = true;
       return nullptr;
@@ -816,7 +800,7 @@ public:
                                                 Shape0.NumColumns,
                                                 Shape1.NumColumns, "mmul");
           });
-      updateShapeAndReplaceAllUsesWith(I, NewInst);
+      I.replaceAllUsesWith(NewInst);
       eraseFromParentAndMove(&I, II, BB);
       eraseFromParentAndMove(TA, II, BB);
       Changed = true;
@@ -838,11 +822,9 @@ public:
             bool IsFP = I.getType()->isFPOrFPVectorTy();
             auto *Mul = IsFP ? LocalBuilder.CreateFMul(T0, T1, "mmul")
                              : LocalBuilder.CreateMul(T0, T1, "mmul");
-            auto *Result = cast<Instruction>(Mul);
-            setShapeInfo(Result, Shape0);
-            return Result;
+            return cast<Instruction>(Mul);
           });
-      updateShapeAndReplaceAllUsesWith(I, NewInst);
+      I.replaceAllUsesWith(NewInst);
       eraseFromParentAndMove(&I, II, BB);
       eraseFromParentAndMove(TA, II, BB);
       Changed = true;
@@ -859,12 +841,9 @@ public:
             bool IsFP = I.getType()->isFPOrFPVectorTy();
             auto *Add = IsFP ? LocalBuilder.CreateFAdd(T0, T1, "madd")
                              : LocalBuilder.CreateAdd(T0, T1, "madd");
-
-            auto *Result = cast<Instruction>(Add);
-            setShapeInfo(Result, Shape0);
-            return Result;
+            return cast<Instruction>(Add);
           });
-      updateShapeAndReplaceAllUsesWith(I, NewInst);
+      I.replaceAllUsesWith(NewInst);
       eraseFromParentAndMove(&I, II, BB);
       eraseFromParentAndMove(TA, II, BB);
       Changed = true;
@@ -876,13 +855,13 @@ public:
 
   bool liftTranspose(Instruction &I) {
     // Erase dead Instructions after lifting transposes from binops.
-    auto CleanupBinOp = [this](Instruction &T, Value *A, Value *B) {
+    auto CleanupBinOp = [](Instruction &T, Value *A, Value *B) {
       if (T.use_empty())
-        eraseFromParentAndRemoveFromShapeMap(&T);
+        T.eraseFromParent();
       if (A->use_empty())
-        eraseFromParentAndRemoveFromShapeMap(cast<Instruction>(A));
+        cast<Instruction>(A)->eraseFromParent();
       if (A != B && B->use_empty())
-        eraseFromParentAndRemoveFromShapeMap(cast<Instruction>(B));
+        cast<Instruction>(B)->eraseFromParent();
     };
 
     Value *A, *B, *AT, *BT;
@@ -897,10 +876,9 @@ public:
       MatrixBuilder Builder(IB);
       Value *M = Builder.CreateMatrixMultiply(
           BT, AT, C->getZExtValue(), K->getZExtValue(), R->getZExtValue());
-      setShapeInfo(M, {C, R});
       Instruction *NewInst = Builder.CreateMatrixTranspose(M, C->getZExtValue(),
                                                            R->getZExtValue());
-      updateShapeAndReplaceAllUsesWith(I, NewInst);
+      I.replaceAllUsesWith(NewInst);
       CleanupBinOp(I, A, B);
       return true;
     }
@@ -917,18 +895,8 @@ public:
       MatrixBuilder MBuilder(Builder);
       Instruction *NewInst = MBuilder.CreateMatrixTranspose(
           Add, R->getZExtValue(), C->getZExtValue(), "mfadd_t");
-      updateShapeAndReplaceAllUsesWith(I, NewInst);
-      assert(computeShapeInfoForInst(NewInst, ShapeMap) ==
-                 computeShapeInfoForInst(&I, ShapeMap) &&
-             "Shape of new instruction doesn't match original shape.");
+      I.replaceAllUsesWith(NewInst);
       CleanupBinOp(I, A, B);
-      if (auto *AddI = dyn_cast<Instruction>(Add)) {
-        setShapeInfo(AddI, {R, C});
-        assert(
-            computeShapeInfoForInst(AddI, ShapeMap).value_or(ShapeMap[AddI]) ==
-                ShapeMap[AddI] &&
-            "Shape of updated addition doesn't match cached shape.");
-      }
       return true;
     }
     return false;
@@ -960,30 +928,8 @@ public:
   }
 
   bool Visit() {
-    SmallVector<Instruction *, 32> WorkList;
-
-    // Initially only the shape of matrix intrinsics is known.
-    // Initialize the work list with ops carrying shape information.
-    for (BasicBlock &BB : Func)
-      for (Instruction &Inst : BB) {
-        IntrinsicInst *II = dyn_cast<IntrinsicInst>(&Inst);
-        if (!II)
-          continue;
-
-        switch (II->getIntrinsicID()) {
-        case Intrinsic::matrix_multiply:
-        case Intrinsic::matrix_transpose:
-        case Intrinsic::matrix_column_major_load:
-        case Intrinsic::matrix_column_major_store:
-          WorkList.push_back(&Inst);
-          break;
-        default:
-          break;
-        }
-      }
-
     // Avoid unnecessary work if there are no matrix intrinsics in the function.
-    if (WorkList.empty())
+    if (none_of(instructions(Func), isMatrixIntrinsic))
       return false;
 
     auto &ORE = AM.getResult<OptimizationRemarkEmitterAnalysis>(Func);
@@ -991,18 +937,25 @@ public:
     DT = &AM.getResult<DominatorTreeAnalysis>(Func);
     LI = &AM.getResult<LoopAnalysis>(Func);
 
-    // Propagate shapes until nothing changes any longer.
-    while (!WorkList.empty()) {
-      WorkList = propagateShapeForward(WorkList);
-      WorkList = propagateShapeBackward(WorkList);
-    }
-
     bool Changed = false;
     if (PassOpts.TransposeOpts)
       Changed |= optimizeTransposes();
 
     if (!PassOpts.Lower)
       return Changed;
+
+    // Initially only the shape of matrix intrinsics is known. Collect them
+    // after the transpose optimizations, which may erase or create some.
+    SmallVector<Instruction *, 32> WorkList;
+    for (Instruction &Inst : instructions(Func))
+      if (isMatrixIntrinsic(Inst))
+        WorkList.push_back(&Inst);
+
+    // Propagate shapes until nothing changes any longer.
+    while (!WorkList.empty()) {
+      WorkList = propagateShapeForward(WorkList);
+      WorkList = propagateShapeBackward(WorkList);
+    }
 
     SmallVector<CallInst *, 16> MaybeFusableInsts;
     SmallVector<Instruction *, 16> MatrixInsts;

@@ -7,9 +7,9 @@ define void @reshape(ptr %in, ptr %out) {
 ; CHECK-LABEL: define void @reshape(
 ; CHECK-SAME: ptr [[IN:%.*]], ptr [[OUT:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[COL_LOAD:%.*]] = load <4 x double>, ptr [[IN]], align 8
-; CHECK-NEXT:    [[SPLIT:%.*]] = shufflevector <4 x double> [[COL_LOAD]], <4 x double> poison, <2 x i32> <i32 0, i32 1>
-; CHECK-NEXT:    [[SPLIT1:%.*]] = shufflevector <4 x double> [[COL_LOAD]], <4 x double> poison, <2 x i32> <i32 2, i32 3>
+; CHECK-NEXT:    [[SPLIT:%.*]] = load <2 x double>, ptr [[IN]], align 8
+; CHECK-NEXT:    [[VEC_GEP1:%.*]] = getelementptr inbounds double, ptr [[IN]], i64 2
+; CHECK-NEXT:    [[SPLIT1:%.*]] = load <2 x double>, ptr [[VEC_GEP1]], align 8
 ; CHECK-NEXT:    [[TMP0:%.*]] = extractelement <2 x double> [[SPLIT]], i64 0
 ; CHECK-NEXT:    [[TMP1:%.*]] = insertelement <2 x double> poison, double [[TMP0]], i64 0
 ; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <2 x double> [[SPLIT1]], i64 0

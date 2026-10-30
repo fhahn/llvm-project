@@ -18,11 +18,7 @@ define <8 x float> @transpose_constant_fold_fmul_A_k() {
 ; CHECK-LABEL: define <8 x float> @transpose_constant_fold_fmul_A_k() {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[SPLAT:%.*]] = shufflevector <8 x float> splat (float 3.000000e+00), <8 x float> poison, <8 x i32> zeroinitializer
-; CHECK-NEXT:    [[SPLIT:%.*]] = shufflevector <8 x float> [[SPLAT]], <8 x float> poison, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-; CHECK-NEXT:    [[SPLIT1:%.*]] = shufflevector <8 x float> [[SPLAT]], <8 x float> poison, <4 x i32> <i32 4, i32 5, i32 6, i32 7>
-; CHECK-NEXT:    [[TMP0:%.*]] = fmul <4 x float> splat (float 1.000000e+00), [[SPLIT]]
-; CHECK-NEXT:    [[TMP1:%.*]] = fmul <4 x float> splat (float 1.000000e+00), [[SPLIT1]]
-; CHECK-NEXT:    [[TMP2:%.*]] = shufflevector <4 x float> [[TMP0]], <4 x float> [[TMP1]], <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
+; CHECK-NEXT:    [[TMP2:%.*]] = fmul <8 x float> splat (float 1.000000e+00), [[SPLAT]]
 ; CHECK-NEXT:    ret <8 x float> [[TMP2]]
 ;
 entry:
