@@ -721,21 +721,10 @@ for.body:                                         ; preds = %entry, %for.body
 define void @nodep_symbolic_distance_negative_const(ptr %A, i64 %k, i64 %n) {
 ; CHECK-LABEL: 'nodep_symbolic_distance_negative_const'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.st = getelementptr inbounds i32, ptr %A, i64 %iv.k.2
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.ld = getelementptr inbounds i32, ptr %A, i64 %iv.2.1
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: ((8 * %k) + %A) High: (-4 + (8 * %k) + (8 * %n) + %A))
-; CHECK-NEXT:            Member: {((8 * %k) + %A),+,8}<%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: (4 + %A)<nuw> High: ((8 * %n) + %A))
-; CHECK-NEXT:            Member: {(4 + %A)<nuw>,+,8}<nuw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -767,21 +756,10 @@ exit:
 define void @nodep_symbolic_distance_positive_const(ptr %A, i64 %k, i64 %n) {
 ; CHECK-LABEL: 'nodep_symbolic_distance_positive_const'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.st = getelementptr inbounds i32, ptr %A, i64 %iv.k.2.1
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.ld = getelementptr inbounds i32, ptr %A, i64 %iv.2
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: (4 + (8 * %k) + %A) High: ((8 * %k) + (8 * %n) + %A))
-; CHECK-NEXT:            Member: {(4 + (8 * %k) + %A),+,8}<%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: (-4 + (8 * %n) + %A))
-; CHECK-NEXT:            Member: {%A,+,8}<nuw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -813,21 +791,10 @@ exit:
 define void @nodep_symbolic_distance_negative_stride(ptr %A, i64 %k, i64 %n) {
 ; CHECK-LABEL: 'nodep_symbolic_distance_negative_stride'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.st = getelementptr inbounds i32, ptr %A, i64 %iv.k.2
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.ld = getelementptr inbounds i32, ptr %A, i64 %iv.2.3
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: (8 + (8 * %k) + %A) High: (4 + (8 * (%k + %n)) + %A))
-; CHECK-NEXT:            Member: {((8 * (%k + %n)) + %A),+,-8}<%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: (20 + %A) High: (16 + (8 * %n) + %A))
-; CHECK-NEXT:            Member: {(12 + (8 * %n) + %A),+,-8}<%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -859,21 +826,10 @@ exit:
 define void @nodep_symbolic_distance_multiple_terms(ptr %A, i64 %k, i64 %m, i64 %n) {
 ; CHECK-LABEL: 'nodep_symbolic_distance_multiple_terms'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.st = getelementptr inbounds i32, ptr %A, i64 %iv.k.m
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.ld = getelementptr inbounds i32, ptr %A, i64 %iv.2.1
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: ((8 * %k) + (16 * %m) + %A) High: (-4 + (8 * %k) + (8 * %n) + (16 * %m) + %A))
-; CHECK-NEXT:            Member: {((8 * %k) + (16 * %m) + %A),+,8}<%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: (4 + %A)<nuw> High: ((8 * %n) + %A))
-; CHECK-NEXT:            Member: {(4 + %A)<nuw>,+,8}<nuw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -1088,13 +1044,8 @@ exit:
 define void @nodep_symbolic_distance_different_sizes(ptr %A, i64 %k, i64 %n) {
 ; CHECK-LABEL: 'nodep_symbolic_distance_different_sizes'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            %l = load i32, ptr %gep.ld, align 4 ->
-; CHECK-NEXT:            store i64 %l.ext, ptr %gep.st, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:

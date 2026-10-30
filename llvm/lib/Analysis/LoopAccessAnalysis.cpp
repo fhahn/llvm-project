@@ -3066,21 +3066,29 @@ MemoryDepChecker::getDependenceDistanceStrideAndSize(
     CommonStride = StrideAScaled;
   }
 
-  // If the distance and the common stride are known constants, check whether
-  // the accessed bytes (given by the store sizes) interlace each other.
   const APInt *APDist;
   bool IsConstDist = match(Dist, m_scev_APInt(APDist));
-  if (CommonStride && IsConstDist &&
+  // TODO: Historically, we didn't retry with runtime checks when (unscaled)
+  // strides were different but there is no inherent reason to.
+  if (!IsConstDist)
+    ShouldRetryWithRuntimeChecks |= StrideAPtrInt == StrideBPtrInt;
+
+  // If the distance modulo the common stride is a known constant, check
+  // whether the accessed bytes (given by the store sizes) interlace each other.
+  // If Dist = C + R, where R is a multiple of the power-of-2 common stride,
+  // Dist and C are equal modulo the stride, even if Dist wraps.
+  auto *AddDist = dyn_cast<SCEVAddExpr>(Dist);
+  if (CommonStride &&
+      (IsConstDist ||
+       (isPowerOf2_64(*CommonStride) && AddDist &&
+        match(AddDist->getOperand(0), m_scev_APInt(APDist)) &&
+        SE.getMinTrailingZeros(SE.getMinusSCEV(Dist, AddDist->getOperand(0))) >=
+            Log2_64(*CommonStride))) &&
       areStridedAccessesIndependent(*APDist, *CommonStride, AStoreSz,
                                     BStoreSz)) {
     LLVM_DEBUG(dbgs() << "LAA: Strided accesses are independent\n");
     return Dependence::NoDep;
   }
-
-  // TODO: Historically, we didn't retry with runtime checks when (unscaled)
-  // strides were different but there is no inherent reason to.
-  if (!IsConstDist)
-    ShouldRetryWithRuntimeChecks |= StrideAPtrInt == StrideBPtrInt;
 
   // If distance is a SCEVCouldNotCompute, return Unknown immediately.
   if (isa<SCEVCouldNotCompute>(Dist)) {
