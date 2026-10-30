@@ -6,11 +6,10 @@
 define void @cse_trip_count_expression(ptr %a, ptr %p) {
 ; CHECK-LABEL: VPlan for loop in 'cse_trip_count_expression'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %n = load i64, ptr %p, align 4
-; CHECK-NEXT:    EMIT vp<[[VP2]]> = EXPAND SCEV %n
+; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = EXPAND SCEV %n
 ; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<2>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.main.loop.iter.check
@@ -68,12 +67,11 @@ exit:
 define void @hoisted_stride_check_and_trip_count_expand_same_scev(ptr %dst, ptr %src, ptr %n.ptr, i64 %m) {
 ; CHECK-LABEL: VPlan for loop in 'hoisted_stride_check_and_trip_count_expand_same_scev'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  vp<[[VP1:%[0-9]+]]> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<outer.header>:
 ; CHECK-NEXT:    IR   %outer.iv = phi i64 [ 0, %entry ], [ %outer.iv.next, %outer.latch ]
 ; CHECK-NEXT:    IR   %row = mul i64 %outer.iv, %n
-; CHECK-NEXT:    EMIT vp<[[VP1]]> = EXPAND SCEV %n (in IR)
+; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = EXPAND SCEV %n (in IR)
 ; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = EXPAND SCEV (4 * %n) (in IR)
 ; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEV ((%m * %n) + %src) (in IR)
 ; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = EXPAND SCEV ((4 * %m * %n) + %dst) (in IR)

@@ -394,10 +394,17 @@ public:
 /// This class augments VPValue with operands which provide the inverse def-use
 /// edges from VPValue's users to their defs.
 class LLVM_ABI_FOR_TEST VPUser {
+public:
+  /// Subclass identifier: recipes, or the parameters of a vector loop.
+  enum class VPUserID : unsigned char { Recipe, LoopParams };
+
+private:
   /// Grant access to removeOperand for VPPhiAccessors, the only supported user.
   friend class VPPhiAccessors;
   /// Grant access to addOperand for VPWidenMemoryRecipe.
   friend class VPWidenMemoryRecipe;
+
+  const VPUserID ID;
 
   SmallVector<VPValue *, 2> Operands;
 
@@ -414,7 +421,8 @@ protected:
   void printOperands(raw_ostream &O, VPSlotTracker &SlotTracker) const;
 #endif
 
-  VPUser(ArrayRef<VPValue *> Operands) {
+  VPUser(ArrayRef<VPValue *> Operands, VPUserID ID = VPUserID::Recipe)
+      : ID(ID) {
     for (VPValue *Operand : Operands)
       addOperand(Operand);
   }
@@ -432,6 +440,8 @@ public:
     for (VPValue *Op : operands())
       Op->removeUser(*this);
   }
+
+  VPUserID getVPUserID() const { return ID; }
 
   unsigned getNumOperands() const { return Operands.size(); }
   inline VPValue *getOperand(unsigned N) const {

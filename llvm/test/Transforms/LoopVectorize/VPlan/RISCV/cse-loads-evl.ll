@@ -10,7 +10,6 @@
 define void @cse_duplicate_load(ptr noalias %a, ptr noalias %b, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'cse_duplicate_load'
 ; CHECK:  VPlan 'Final VPlan for VF={vscale x 4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): vector.ph
@@ -57,7 +56,6 @@ exit:
 define void @no_cse_across_store(ptr %a, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'no_cse_across_store'
 ; CHECK:  VPlan 'Final VPlan for VF={vscale x 4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): vector.ph
@@ -107,7 +105,6 @@ exit:
 define void @two_masked_same_mask(ptr noalias %a, ptr noalias %b, ptr noalias %cond, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'two_masked_same_mask'
 ; CHECK:  VPlan 'Final VPlan for VF={vscale x 4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): vector.ph
@@ -168,7 +165,6 @@ exit:
 define void @two_masked_diff_mask(ptr noalias %a, ptr noalias %b, ptr noalias %c1, ptr noalias %c2, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'two_masked_diff_mask'
 ; CHECK:  VPlan 'Final VPlan for VF={vscale x 4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): vector.ph
@@ -244,7 +240,6 @@ exit:
 define void @cse_three_duplicate_loads(ptr noalias %a, ptr noalias %b, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'cse_three_duplicate_loads'
 ; CHECK:  VPlan 'Final VPlan for VF={vscale x 4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): vector.ph
@@ -294,7 +289,6 @@ exit:
 define void @two_dup_groups(ptr noalias %a, ptr noalias %b, ptr noalias %out, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'two_dup_groups'
 ; CHECK:  VPlan 'Final VPlan for VF={vscale x 4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): vector.ph
@@ -350,7 +344,6 @@ exit:
 define void @cse_stronger_align_first(ptr noalias %a, ptr noalias %b, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'cse_stronger_align_first'
 ; CHECK:  VPlan 'Final VPlan for VF={vscale x 4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): vector.ph
@@ -397,7 +390,6 @@ exit:
 define void @no_cse_weaker_align_first(ptr noalias %a, ptr noalias %b, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'no_cse_weaker_align_first'
 ; CHECK:  VPlan 'Final VPlan for VF={vscale x 4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): vector.ph
@@ -445,7 +437,6 @@ exit:
 define void @no_cse_across_noalias_store(ptr noalias %a, ptr noalias %b, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'no_cse_across_noalias_store'
 ; CHECK:  VPlan 'Final VPlan for VF={vscale x 4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): vector.ph
@@ -495,7 +486,6 @@ exit:
 define void @dup_gather(ptr noalias %a, ptr noalias %idx, ptr noalias %out, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'dup_gather'
 ; CHECK:  VPlan 'Final VPlan for VF={vscale x 4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): vector.ph

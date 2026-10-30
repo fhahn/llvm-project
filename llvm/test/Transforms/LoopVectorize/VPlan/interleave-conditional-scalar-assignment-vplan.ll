@@ -17,7 +17,6 @@
 define i32 @find_last_int_select(i64 %N, ptr %data, i32 %a) {
 ; IC2-LABEL: VPlan for loop in 'find_last_int_select'
 ; IC2:  VPlan 'Final VPlan for VF={4},UF={2}' {
-; IC2-NEXT:  Live-in ir<%N> = original trip-count
 ; IC2-EMPTY:
 ; IC2-NEXT:  ir-bb<entry>:
 ; IC2-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%N>, ir<8>
@@ -83,7 +82,6 @@ define i32 @find_last_int_select(i64 %N, ptr %data, i32 %a) {
 ;
 ; IC2-TF-LABEL: VPlan for loop in 'find_last_int_select'
 ; IC2-TF:  VPlan 'Final VPlan for VF={4},UF={2}' {
-; IC2-TF-NEXT:  Live-in ir<%N> = original trip-count
 ; IC2-TF-EMPTY:
 ; IC2-TF-NEXT:  ir-bb<entry>:
 ; IC2-TF-NEXT:  Successor(s): vector.ph

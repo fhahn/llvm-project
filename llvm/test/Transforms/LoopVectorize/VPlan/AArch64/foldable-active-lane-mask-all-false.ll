@@ -4,7 +4,6 @@
 define void @all_false(ptr %p) vscale_range(1, 16) {
 ; CHECK-LABEL: VPlan for loop in 'all_false'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF={2}' {
-; CHECK-NEXT:  Live-in ir<7> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): vector.ph

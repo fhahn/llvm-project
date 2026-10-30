@@ -19,7 +19,6 @@ define void @may_alias_load(ptr %A, ptr %B, i64 %N, i64 %M) {
 ;
 ; FINAL-LABEL: VPlan for loop in 'may_alias_load'
 ; FINAL:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; FINAL-NEXT:  Live-in ir<%N> = original trip-count
 ; FINAL-EMPTY:
 ; FINAL-NEXT:  ir-bb<entry>:
 ; FINAL-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%N>, ir<4>

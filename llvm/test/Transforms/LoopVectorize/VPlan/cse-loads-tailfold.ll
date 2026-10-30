@@ -9,7 +9,6 @@
 define void @cse_duplicate_masked_load(ptr noalias %a, ptr noalias %b, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'cse_duplicate_masked_load'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): vector.ph

@@ -155,7 +155,6 @@ define void @predicated_block(ptr noalias %a, ptr noalias %idx) {
 ;
 ; DISSOLVE-LABEL: VPlan for loop in 'predicated_block'
 ; DISSOLVE:  VPlan 'Initial VPlan for VF={2},UF={1}' {
-; DISSOLVE-NEXT:  Live-in ir<1024> = original trip-count
 ; DISSOLVE-EMPTY:
 ; DISSOLVE-NEXT:  ir-bb<entry>:
 ; DISSOLVE-NEXT:  Successor(s): vector.ph
@@ -344,7 +343,6 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ;
 ; DISSOLVE-LABEL: VPlan for loop in 'selects'
 ; DISSOLVE:  VPlan 'Initial VPlan for VF={2},UF={1}' {
-; DISSOLVE-NEXT:  Live-in ir<%n> = original trip-count
 ; DISSOLVE-EMPTY:
 ; DISSOLVE-NEXT:  ir-bb<entry>:
 ; DISSOLVE-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%n>, ir<2>

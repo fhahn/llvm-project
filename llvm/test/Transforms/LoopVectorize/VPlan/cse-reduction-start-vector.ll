@@ -7,7 +7,6 @@
 define i32 @cse_reduction_start_vector_multiple_users(ptr %a, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'cse_reduction_start_vector_multiple_users'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%n>, ir<2>
