@@ -133,13 +133,8 @@ for.body:                                         ; preds = %entry, %for.body
 define void @nodep_Write_Write_dist_not_multiple_of_size(ptr %a) {
 ; CHECK-LABEL: 'nodep_Write_Write_dist_not_multiple_of_size'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Backward loop carried data dependence.
+; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Backward:
-; CHECK-NEXT:            store i32 0, ptr %gep.iv, align 4 ->
-; CHECK-NEXT:            store i32 1, ptr %gep.6.iv, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:

@@ -272,19 +272,13 @@ exit:
 ;
 ; Measurements are in bytes.
 ;
-; TODO: Relax the HasSameSize check; the strided accesses are
-; independent, as determined by both the source size and the sink size.
-; This test should report no dependencies.
+; The strided accesses are independent, as determined by both the source size
+; and the sink size.
 define void @different_type_sizes_strided_accesses_independent(ptr %dst) {
 ; CHECK-LABEL: 'different_type_sizes_strided_accesses_independent'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            store i16 0, ptr %gep.2.iv, align 2 ->
-; CHECK-NEXT:            store i32 1, ptr %gep.6.iv, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -439,13 +433,8 @@ exit:
 define void @different_type_sizes_strided_accesses_independent_neg_step(ptr %dst) {
 ; CHECK-LABEL: 'different_type_sizes_strided_accesses_independent_neg_step'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            store i32 1, ptr %gep.10.iv, align 4 ->
-; CHECK-NEXT:            store i16 0, ptr %gep.iv, align 2
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -604,13 +593,8 @@ exit:
 define void @different_type_sizes_strided_accesses_independent_src_size(ptr %dst) {
 ; CHECK-LABEL: 'different_type_sizes_strided_accesses_independent_src_size'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            store i16 0, ptr %gep.iv, align 2 ->
-; CHECK-NEXT:            store i32 1, ptr %gep.10.iv, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -645,10 +629,6 @@ define void @different_type_sizes_strided_accesses_independent_neg_dist(ptr %dst
 ; CHECK-NEXT:    loop:
 ; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Forward:
-; CHECK-NEXT:            store i32 0, ptr %gep.10.iv, align 4 ->
-; CHECK-NEXT:            store i16 1, ptr %gep.iv, align 2
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -714,13 +694,8 @@ exit:
 define void @different_type_sizes_strided_accesses_independent_store_size(ptr %dst) {
 ; CHECK-LABEL: 'different_type_sizes_strided_accesses_independent_store_size'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            store i24 0, ptr %gep.1.iv, align 4 ->
-; CHECK-NEXT:            store i32 1, ptr %gep.4.iv, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:

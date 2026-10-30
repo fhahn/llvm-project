@@ -2895,22 +2895,19 @@ static bool isSafeDependenceDistance(ScalarEvolution &SE, const SCEV &MaxBTC,
   return SE.isKnownPositive(Minus);
 }
 
-/// Check the dependence for two accesses with the same stride \p Stride.
-/// \p Distance is the positive distance in bytes, and \p TypeByteSize is type
-/// size in bytes.
+/// Check the dependence for two accesses with the same stride \p Stride, where
+/// the sink starts \p Distance bytes after the source. \p SrcSize and
+/// \p SinkSize are the access sizes in bytes, and \p Stride covers both. Only
+/// \p Distance modulo \p Stride is used, so any congruent value can be passed.
 ///
 /// \returns true if they are independent.
-static bool areStridedAccessesIndependent(uint64_t Distance, uint64_t Stride,
-                                          uint64_t TypeByteSize) {
-  assert(Stride > 1 && "The stride must be greater than 1");
-  assert(TypeByteSize > 0 && "The type size in byte must be non-zero");
-  assert(Distance > 0 && "The distance must be non-zero");
-
-  // Skip if the distance is not multiple of type byte size.
-  if (Distance % TypeByteSize)
-    return false;
-
-  // No dependence if the distance is not multiple of the stride.
+static bool areStridedAccessesIndependent(const APInt &Distance,
+                                          uint64_t Stride, uint64_t SrcSize,
+                                          uint64_t SinkSize) {
+  // The sink of iteration J starts Distance + (J - I) * Stride bytes after the
+  // source of iteration I. No dependence if none of these offsets is in
+  // (-SinkSize, SrcSize), i.e. if Distance mod Stride is in
+  // [SrcSize, Stride - SinkSize].
   // E.g.
   //      for (i = 0; i < 1024 ; i += 4)
   //        A[i+2] = A[i] + 1;
@@ -2926,7 +2923,10 @@ static bool areStridedAccessesIndependent(uint64_t Distance, uint64_t Stride,
   // Two accesses in memory (distance is 4, stride is 3):
   //     | A[0] |      |      | A[3] |      |      | A[6] |      |      |
   //     |      |      |      |      | A[4] |      |      | A[7] |      |
-  return Distance % Stride;
+  uint64_t Rem = Distance.abs().urem(Stride);
+  if (Distance.isNegative() && Rem)
+    Rem = Stride - Rem;
+  return SrcSize <= Rem && Rem <= Stride - SinkSize;
 }
 
 bool MemoryDepChecker::areAccessesCompletelyBeforeOrAfter(const SCEV *Src,
@@ -3060,12 +3060,26 @@ MemoryDepChecker::getDependenceDistanceStrideAndSize(
   uint64_t MaxStride = std::max(StrideAScaled, StrideBScaled);
 
   std::optional<uint64_t> CommonStride;
-  if (StrideAScaled == StrideBScaled)
+  if (StrideAScaled == StrideBScaled) {
+    assert(StrideAScaled >= std::max(ASz, BSz) &&
+           "The stride must cover both accesses");
     CommonStride = StrideAScaled;
+  }
+
+  // If the distance and the common stride are known constants, check whether
+  // the accessed bytes (given by the store sizes) interlace each other.
+  const APInt *APDist;
+  bool IsConstDist = match(Dist, m_scev_APInt(APDist));
+  if (CommonStride && IsConstDist &&
+      areStridedAccessesIndependent(*APDist, *CommonStride, AStoreSz,
+                                    BStoreSz)) {
+    LLVM_DEBUG(dbgs() << "LAA: Strided accesses are independent\n");
+    return Dependence::NoDep;
+  }
 
   // TODO: Historically, we didn't retry with runtime checks when (unscaled)
   // strides were different but there is no inherent reason to.
-  if (!isa<SCEVConstant>(Dist))
+  if (!IsConstDist)
     ShouldRetryWithRuntimeChecks |= StrideAPtrInt == StrideBPtrInt;
 
   // If distance is a SCEVCouldNotCompute, return Unknown immediately.
@@ -3112,7 +3126,6 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
   bool HasSameSize = TypeByteSize > 0;
 
   ScalarEvolution &SE = *PSE.getSE();
-  auto &DL = InnermostLoop->getHeader()->getDataLayout();
 
   // If the distance between the acecsses is larger than their maximum absolute
   // stride multiplied by the symbolic maximum backedge taken count (which is an
@@ -3133,17 +3146,6 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
       return Dependence::Unknown;
     }
     ConstDist = *Val;
-  }
-
-  // Attempt to prove strided accesses independent.
-  if (APDist) {
-    // If the distance between accesses and their strides are known constants,
-    // check whether the accesses interlace each other.
-    if (ConstDist > 0 && CommonStride && CommonStride > 1 && HasSameSize &&
-        areStridedAccessesIndependent(ConstDist, *CommonStride, TypeByteSize)) {
-      LLVM_DEBUG(dbgs() << "LAA: Strided accesses are independent\n");
-      return Dependence::NoDep;
-    }
   } else {
     Dist = SE.applyLoopGuards(Dist, LoopGuards);
   }
@@ -3155,18 +3157,11 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
       if (HasSameSize)
         return Dependence::Forward;
 
-      if (CommonStride) {
-        // For mixed sizes, CommonStride is asserted to cover both accesses when
-        // computed in getDependenceDistanceStrideAndSize, so different
-        // iterations cannot overlap.
-        [[maybe_unused]] uint64_t ASz =
-            DL.getTypeAllocSize(getLoadStoreType(InstMap[AIdx]));
-        [[maybe_unused]] uint64_t BSz =
-            DL.getTypeAllocSize(getLoadStoreType(InstMap[BIdx]));
-        assert(*CommonStride >= std::max(ASz, BSz) &&
-               "Invariant from getDependenceDistanceStrideAndSize broken!");
+      // For mixed sizes, CommonStride is asserted to cover both accesses when
+      // computed in getDependenceDistanceStrideAndSize, so different
+      // iterations cannot overlap.
+      if (CommonStride)
         return Dependence::Forward;
-      }
       LLVM_DEBUG(dbgs() << "LAA: possibly zero dependence difference but "
                            "different type sizes\n");
       return Dependence::Unknown;

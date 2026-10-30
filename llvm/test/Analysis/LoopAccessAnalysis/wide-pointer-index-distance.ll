@@ -46,13 +46,8 @@ exit:
 define void @i128_const_dist_strided_independent(ptr %A, i128 %n) {
 ; CHECK-LABEL: 'i128_const_dist_strided_independent'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            %v = load i32, ptr %gep.load, align 4 ->
-; CHECK-NEXT:            store i32 %v, ptr %gep.store, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:

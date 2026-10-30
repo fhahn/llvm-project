@@ -651,10 +651,6 @@ define void @unknown_dep_with_one_of_stores_within_step(ptr %a, i64 %offset, i64
 ; CHECK-NEXT:    loop:
 ; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Forward:
-; CHECK-NEXT:            store i16 2, ptr %gep.a.10, align 1 ->
-; CHECK-NEXT:            store i32 3, ptr %gep.a.4, align 1
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Check 0:
 ; CHECK-NEXT:        Comparing group GRP0:
