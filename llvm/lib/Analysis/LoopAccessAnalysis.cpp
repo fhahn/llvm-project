@@ -3544,6 +3544,40 @@ bool LoopAccessInfo::canAnalyzeLoop() {
   return true;
 }
 
+/// Return true if the checks LV uses for \p RtCheck always fail, i.e. there
+/// are no diff checks and a range check compares groups with members whose
+/// ranges always overlap. With diff checks, range-check clients (e.g.
+/// LoopVersioning) may still get such range checks.
+static bool runtimeChecksAlwaysFail(const RuntimePointerChecking &RtCheck,
+                                    ScalarEvolution &SE,
+                                    ScalarEvolution::LoopGuards &LoopGuards) {
+  if (RtCheck.getDiffChecks())
+    return false;
+  auto IsPositiveConstDiff = [&SE](const SCEV *X, const SCEV *Y) {
+    std::optional<APInt> Diff = SE.computeConstantDifference(X, Y);
+    return Diff && Diff->isStrictlyPositive();
+  };
+  auto AlwaysOverlap = [&](unsigned I, unsigned J) {
+    const auto &A = RtCheck.getPointerInfo(I);
+    const auto &B = RtCheck.getPointerInfo(J);
+    const SCEV *LowA = SE.applyLoopGuards(A.Start, LoopGuards);
+    const SCEV *HighA = SE.applyLoopGuards(A.End, LoopGuards);
+    const SCEV *LowB = SE.applyLoopGuards(B.Start, LoopGuards);
+    const SCEV *HighB = SE.applyLoopGuards(B.End, LoopGuards);
+    return LowA == LowB || HighA == HighB ||
+           (IsPositiveConstDiff(HighA, LowB) &&
+            IsPositiveConstDiff(HighB, LowA));
+  };
+  // The range of a group includes the ranges of its members, so a check always
+  // fails if any pair of their members always overlaps.
+  for (const auto &[GroupA, GroupB] : RtCheck.getChecks())
+    for (unsigned I : GroupA->Members)
+      for (unsigned J : GroupB->Members)
+        if (AlwaysOverlap(I, J))
+          return true;
+  return false;
+}
+
 bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
                                  const TargetLibraryInfo *TLI,
                                  DominatorTree *DT) {
@@ -3829,7 +3863,9 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
     if (!DepsAreSafe && DepChecker->shouldRetryWithRuntimeChecks()) {
       LLVM_DEBUG(dbgs() << "LAA: Retrying with memory checks\n");
 
-      PtrRtChecking->reset();
+      auto PreRetryRtChecking = std::move(PtrRtChecking);
+      PtrRtChecking = std::make_unique<RuntimePointerChecking>(
+          *DepChecker, PSE->getSE(), LoopGuards);
       PtrRtChecking->Need = true;
 
       UncomputablePtr = nullptr;
@@ -3846,11 +3882,18 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
         return false;
       }
 
-      // The runtime checks cover the unknown dependences, so drop those. Keep
-      // the known ones, as they still constrain reordering.
-      Accesses.resetDepChecks(*DepChecker);
-
-      DepsAreSafe = true;
+      if (runtimeChecksAlwaysFail(*PtrRtChecking, *PSE->getSE(), LoopGuards)) {
+        // Keep the unknown dependences and the checks from before the retry.
+        // TODO: Without recorded dependences, all pairs are checked, and
+        // checks between pairs without unknown dependences may always fail.
+        LLVM_DEBUG(dbgs() << "LAA: Runtime checks always fail\n");
+        PtrRtChecking = std::move(PreRetryRtChecking);
+      } else {
+        // The runtime checks cover the unknown dependences, so drop those.
+        // Keep the known ones, as they still constrain reordering.
+        Accesses.resetDepChecks(*DepChecker);
+        DepsAreSafe = true;
+      }
     }
   }
 
