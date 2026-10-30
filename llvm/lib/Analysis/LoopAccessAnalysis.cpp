@@ -1718,19 +1718,30 @@ private:
     return Loc;
   }
 
-  /// Drop alias scopes that are only valid within a single loop iteration.
+  /// Drop alias scopes that are only valid within a single loop iteration,
+  /// together with all other scopes of their domains: dropping only some
+  /// scopes of a domain from !alias.scope can turn MayAlias into NoAlias.
+  /// !noalias lists are handled the same way for simplicity.
   MDNode *adjustAliasScopeList(MDNode *ScopeList) const {
     if (!ScopeList)
       return nullptr;
 
-    // For the sake of simplicity, drop the whole scope list if any scope is
-    // iteration-local.
-    if (any_of(ScopeList->operands(), [&](Metadata *Scope) {
-          return LoopAliasScopes.contains(cast<MDNode>(Scope));
-        }))
-      return nullptr;
+    SmallPtrSet<const MDNode *, 4> LocalDomains;
+    for (Metadata *Op : ScopeList->operands()) {
+      auto *Scope = cast<MDNode>(Op);
+      if (LoopAliasScopes.contains(Scope))
+        LocalDomains.insert(AliasScopeNode(Scope).getDomain());
+    }
+    if (LocalDomains.empty())
+      return ScopeList;
 
-    return ScopeList;
+    SmallVector<Metadata *> Scopes;
+    for (Metadata *Op : ScopeList->operands())
+      if (!LocalDomains.contains(AliasScopeNode(cast<MDNode>(Op)).getDomain()))
+        Scopes.push_back(Op);
+    if (Scopes.empty())
+      return nullptr;
+    return MDNode::get(ScopeList->getContext(), Scopes);
   }
 
   const AnalysisOptions &Opts;
