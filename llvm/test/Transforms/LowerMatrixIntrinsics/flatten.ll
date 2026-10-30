@@ -12,19 +12,15 @@ define void @diag_3x3(ptr %in, ptr %out) {
 ; CHECK-NEXT: because we do not have a shape-aware lowering for its user:
 ; CHECK-NEXT: %{{.*}} = shufflevector <9 x float> %{{.*}}, <9 x float> poison, <3 x i32> <i32 0, i32 4, i32 8>
 
-define void @reshape(ptr %in, ptr %out) {
+define void @reshape_conflicting_users(ptr %in, ptr %out) {
 entry:
-  %0 = load <4 x double>, ptr %in, align 8
-  %1 = tail call <4 x double> @llvm.matrix.transpose.v4f64(<4 x double> %0, i32 4, i32 1)
-  %2 = tail call <4 x double> @llvm.matrix.transpose.v4f64(<4 x double> %1, i32 1, i32 4)
-  %3 = tail call <4 x double> @llvm.matrix.transpose.v4f64(<4 x double> %2, i32 2, i32 2)
-  %4 = tail call <4 x double> @llvm.matrix.transpose.v4f64(<4 x double> %3, i32 2, i32 2)
-  %5 = tail call <4 x double> @llvm.matrix.transpose.v4f64(<4 x double> %4, i32 2, i32 2)
-  store <4 x double> %5, ptr %out, align 8
+  %l = load <6 x double>, ptr %in, align 8
+  call void @llvm.matrix.column.major.store.v6f64.i64(<6 x double> %l, ptr %out, i64 6, i1 false, i32 6, i32 1)
+  call void @llvm.matrix.column.major.store.v6f64.i64(<6 x double> %l, ptr %out, i64 3, i1 false, i32 3, i32 2)
   ret void
 }
-; CHECK-LABEL: matrix reshape from 4x1 to 2x2 using at least 2 shuffles on behalf of:
-; CHECK-NEXT: %{{.*}} = load <4 x double>, ptr %{{.*}}, align 8
+; CHECK-LABEL: matrix reshape from 6x1 to 3x2 using at least 2 shuffles on behalf of:
+; CHECK-NEXT: %{{.*}} = load <6 x double>, ptr %{{.*}}, align 8
 
 define void @multiply_ntt(ptr %A, ptr %B, ptr %C, ptr %R) {
 entry:
@@ -49,13 +45,12 @@ entry:
 ; CHECK-NEXT: %{{.*}} = shufflevector <12 x double> %{{.*}}, <12 x double> poison, <4 x i32> <i32 8, i32 9, i32 10, i32 11>
 
 
-define void @redundant_transpose_of_shuffle(<4 x float> %m, ptr %dst) {
+define void @split_shuffle(<4 x float> %a, <4 x float> %b, ptr %out) {
 entry:
-  %shuffle = shufflevector <4 x float> %m, <4 x float> zeroinitializer, <4 x i32> zeroinitializer
-  %t = tail call <4 x float> @llvm.matrix.transpose.v3f32(<4 x float> %shuffle, i32 1, i32 4)
-  store <4 x float> %t, ptr %dst, align 4
+  %shuffle = shufflevector <4 x float> %a, <4 x float> %b, <4 x i32> <i32 0, i32 5, i32 2, i32 7>
+  call void @llvm.matrix.column.major.store.v4f32.i64(<4 x float> %shuffle, ptr %out, i64 2, i1 false, i32 2, i32 2)
   ret void
 }
 
-; CHECK-LABEL: splitting a 4x1 matrix with 1 shuffles beacuse we do not have a shape-aware lowering for its def:
-; CHECK-NEXT: %{{.*}} = shufflevector <4 x float> %{{.*}}, <4 x float> zeroinitializer, <4 x i32> zeroinitializer
+; CHECK-LABEL: splitting a 2x2 matrix with 2 shuffles beacuse we do not have a shape-aware lowering for its def:
+; CHECK-NEXT: %{{.*}} = shufflevector <4 x float> %{{.*}}, <4 x float> %{{.*}}, <4 x i32> <i32 0, i32 5, i32 2, i32 7>

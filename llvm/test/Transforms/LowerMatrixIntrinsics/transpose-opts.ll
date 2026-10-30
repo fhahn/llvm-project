@@ -42,8 +42,8 @@ define void @double_transpose(ptr %A, ptr %B) {
 ; CHECK-NEXT:    ret void
 ;
 entry:
-  %a = load <9 x double>, ptr %A, align 16
-  %at = call <9 x double> @llvm.matrix.transpose.v9f64.v9f64(<9 x double> %a, i32 3, i32 3)
+  %a.load = load <9 x double>, ptr %A, align 16
+  %at = call <9 x double> @llvm.matrix.transpose.v9f64.v9f64(<9 x double> %a.load, i32 3, i32 3)
   %att = call <9 x double> @llvm.matrix.transpose.v9f64.v9f64(<9 x double> %at, i32 3, i32 3)
   store <9 x double> %att, ptr %B, align 16
   ret void
