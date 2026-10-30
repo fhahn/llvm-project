@@ -941,11 +941,18 @@ public:
     if (PassOpts.TransposeOpts)
       Changed |= optimizeTransposes();
 
+    // Tiling load/multiply/store chains only uses the multiply's dimensions.
+    // Do it before propagating shapes, so the instructions it erases do not
+    // contribute any.
+    if (PassOpts.Fuse)
+      Changed |= fuseLoadMultiplyStoreChains();
+
     if (!PassOpts.Lower)
       return Changed;
 
     // Initially only the shape of matrix intrinsics is known. Collect them
-    // after the transpose optimizations, which may erase or create some.
+    // after the transpose optimizations and tiling, which may erase or create
+    // some.
     SmallVector<Instruction *, 32> WorkList;
     for (Instruction &Inst : instructions(Func))
       if (isMatrixIntrinsic(Inst))
@@ -959,15 +966,12 @@ public:
 
     SmallVector<CallInst *, 16> MaybeFusableInsts;
     SmallVector<Instruction *, 16> MatrixInsts;
-    SmallVector<IntrinsicInst *, 16> LifetimeEnds;
 
     // First, collect all instructions with shape information and candidates for
     // fusion (currently only matrix multiplies).
     ReversePostOrderTraversal<Function *> RPOT(&Func);
     for (auto *BB : RPOT)
       for (Instruction &I : *BB) {
-        if (match(&I, m_Intrinsic<Intrinsic::lifetime_end>()))
-          LifetimeEnds.push_back(cast<IntrinsicInst>(&I));
         if (!ShapeMap.contains(&I))
           continue;
         if (match(&I, m_Intrinsic<Intrinsic::matrix_multiply>()))
@@ -980,10 +984,10 @@ public:
     for (CallInst *CI : MaybeFusableInsts)
       lowerDotProduct(CI, FusedInsts, getFastMathFlags(CI));
 
-    // Third, try to fuse candidates.
+    // Third, try to fold transposed operands into multiplies.
     for (CallInst *CI : MaybeFusableInsts)
       if (!FusedInsts.contains(CI))
-        LowerMatrixMultiplyFused(CI, FusedInsts, LifetimeEnds);
+        LowerMatrixMultiplyFused(CI, FusedInsts);
 
     Changed |= !FusedInsts.empty();
 
@@ -1686,8 +1690,7 @@ public:
   }
 
   void emitSIMDTiling(CallInst *MatMul, LoadInst *LoadOp0, LoadInst *LoadOp1,
-                      StoreInst *Store,
-                      SmallPtrSetImpl<Instruction *> &FusedInsts) {
+                      StoreInst *Store) {
     assert(Opts.matrix_default_layout == MatrixLayoutTy::ColumnMajor &&
            "Tiling only supported for column-major matrixes at the moment!");
 
@@ -1746,29 +1749,20 @@ public:
         Builder.CreateLifetimeEnd(BAlloca);
     }
 
-    // Mark eliminated instructions as fused and remove them.
-    FusedInsts.insert(Store);
-    FusedInsts.insert(MatMul);
-    eraseFromParentAndRemoveFromShapeMap(Store);
-    eraseFromParentAndRemoveFromShapeMap(MatMul);
-    if (LoadOp0->use_empty()) {
-      FusedInsts.insert(LoadOp0);
-      eraseFromParentAndRemoveFromShapeMap(LoadOp0);
-    }
-    if (LoadOp1 != LoadOp0 && LoadOp1->use_empty()) {
-      FusedInsts.insert(LoadOp1);
-      eraseFromParentAndRemoveFromShapeMap(LoadOp1);
-    }
+    Store->eraseFromParent();
+    MatMul->eraseFromParent();
+    if (LoadOp0->use_empty())
+      LoadOp0->eraseFromParent();
+    if (LoadOp1 != LoadOp0 && LoadOp1->use_empty())
+      LoadOp1->eraseFromParent();
   }
 
-  /// Try to lower matrix multiply chains by fusing operations.
+  /// Try to lower \p MatMul by folding a transposed operand into the multiply.
   ///
   /// Call finalizeLowering on lowered instructions.  Instructions that are
   /// completely eliminated by fusion are added to \p FusedInsts.
-  void
-  LowerMatrixMultiplyFused(CallInst *MatMul,
-                           SmallPtrSetImpl<Instruction *> &FusedInsts,
-                           SmallVector<IntrinsicInst *, 16> &LifetimeEnds) {
+  void LowerMatrixMultiplyFused(CallInst *MatMul,
+                                SmallPtrSetImpl<Instruction *> &FusedInsts) {
     if (!PassOpts.Fuse || Opts.fuse_matrix_tile_size == 0)
       return;
 
@@ -1818,17 +1812,19 @@ public:
         Inst2ColumnMatrix[Transpose] = MatrixTy(isColumnMajor(), M, C, EltType);
       }
       finalizeLowering(MatMul, Result, Builder);
-      return;
     }
+  }
 
-    if (!MatMul->hasOneUse() ||
-        Opts.matrix_default_layout != MatrixLayoutTy::ColumnMajor)
-      return;
+  /// Try to replace a {ld, ld} -> \p MatMul -> st chain by a tiled multiply
+  /// that loads its operands and stores its result directly. Returns true if
+  /// the IR changed.
+  bool fuseLoadMultiplyStore(CallInst *MatMul,
+                             SmallVectorImpl<IntrinsicInst *> &LifetimeEnds) {
+    if (!MatMul->hasOneUse())
+      return false;
 
-    // Lower {ld, ld} -> matmul -> st chains.  No need to call finalizeLowering
-    // since the single store user will be lowered as part of this.
-    auto *LoadOp0 = dyn_cast<LoadInst>(A);
-    auto *LoadOp1 = dyn_cast<LoadInst>(B);
+    auto *LoadOp0 = dyn_cast<LoadInst>(MatMul->getArgOperand(0));
+    auto *LoadOp1 = dyn_cast<LoadInst>(MatMul->getArgOperand(1));
     auto *Store = dyn_cast<StoreInst>(*MatMul->user_begin());
     if (LoadOp0 && LoadOp1 && Store && isFusionProfitable(MatMul)) {
       // The store address must dominate the MatMul instruction, otherwise
@@ -1842,11 +1838,11 @@ public:
         if (!CurrI)
           continue;
         if (isa<PHINode>(CurrI))
-          return;
+          return false;
         if (DT->dominates(CurrI, MatMul))
           continue;
         if (CurrI->mayHaveSideEffects() || CurrI->mayReadFromMemory())
-          return;
+          return false;
         ToHoist.push_back(CurrI);
         WorkList.insert_range(CurrI->operands());
       }
@@ -1900,15 +1896,40 @@ public:
         }
 
         // Otherwise remove the conflicting lifetime.end marker.
-        ToRemove.push_back(End);
+        End->eraseFromParent();
         std::swap(LifetimeEnds[Idx], LifetimeEnds.back());
         LifetimeEnds.pop_back();
         Inc.release();
       }
 
-      emitSIMDTiling(MatMul, LoadOp0, LoadOp1, Store, FusedInsts);
-      return;
+      emitSIMDTiling(MatMul, LoadOp0, LoadOp1, Store);
+      return true;
     }
+    return false;
+  }
+
+  /// Try to fuse {ld, ld} -> matmul -> st chains in the function. Returns true
+  /// if the IR changed.
+  bool fuseLoadMultiplyStoreChains() {
+    if (Opts.fuse_matrix_tile_size == 0 ||
+        Opts.matrix_default_layout != MatrixLayoutTy::ColumnMajor)
+      return false;
+
+    SmallVector<CallInst *> MatMuls;
+    SmallVector<IntrinsicInst *> LifetimeEnds;
+    ReversePostOrderTraversal<Function *> RPOT(&Func);
+    for (auto *BB : RPOT)
+      for (Instruction &I : *BB) {
+        if (match(&I, m_Intrinsic<Intrinsic::lifetime_end>()))
+          LifetimeEnds.push_back(cast<IntrinsicInst>(&I));
+        if (match(&I, m_Intrinsic<Intrinsic::matrix_multiply>()))
+          MatMuls.push_back(cast<CallInst>(&I));
+      }
+
+    bool Changed = false;
+    for (CallInst *MatMul : MatMuls)
+      Changed |= fuseLoadMultiplyStore(MatMul, LifetimeEnds);
+    return Changed;
   }
 
   /// Lowers llvm.matrix.multiply.
