@@ -152,8 +152,7 @@ public:
       ForwardButPreventsForwarding,
       // Lexically backward.
       Backward,
-      // Backward, but the distance allows a vectorization factor of dependent
-      // on MinDepDistBytes.
+      // Backward, but the distance allows a limited vectorization factor.
       BackwardVectorizable,
       // Same, but may prevent store-to-load forwarding.
       BackwardVectorizableButPreventsForwarding
@@ -377,9 +376,9 @@ private:
   /// The program order index to be used for the next instruction.
   unsigned AccessIdx = 0;
 
-  /// The smallest dependence distance in bytes in the loop. This may not be
-  /// the same as the maximum number of bytes that are safe to operate on
-  /// simultaneously.
+  /// The smallest dependence distance in bytes seen so far. Only used to decide
+  /// whether to retry non-constant distances with runtime checks, if the target
+  /// vector width is fixed.
   uint64_t MinDepDistBytes = 0;
 
   /// Number of elements (from consecutive iterations) that are safe to
@@ -432,12 +431,10 @@ private:
   /// Access \p A must happen before \p B in program order. The two indices
   /// identify the index into the program order map.
   ///
-  /// This function checks  whether there is a plausible dependence (or the
-  /// absence of such can't be proved) between the two accesses. If there is a
-  /// plausible dependence but the dependence distance is bigger than one
-  /// element access it records this distance in \p MinDepDistBytes (if this
-  /// distance is smaller than any other distance encountered so far).
-  /// Otherwise, this function returns true signaling a possible dependence.
+  /// This function checks whether there is a plausible dependence (or the
+  /// absence of such can't be proved) between the two accesses and returns its
+  /// type. For BackwardVectorizable dependences, it also limits
+  /// MaxSafeVectorWidthInBits by the dependence's max safe width.
   Dependence::DepType isDependent(const MemAccessInfo &A, unsigned AIdx,
                                   const MemAccessInfo &B, unsigned BIdx);
 
@@ -445,7 +442,7 @@ private:
   /// forwarding.
   ///
   /// \return false if we shouldn't vectorize at all or avoid larger
-  /// vectorization factors by limiting MinDepDistBytes.
+  /// vectorization factors by limiting MaxStoreLoadForwardSafeDistanceInBits.
   bool couldPreventStoreLoadForward(uint64_t Distance, uint64_t TypeByteSize,
                                     unsigned CommonStride = 0);
 

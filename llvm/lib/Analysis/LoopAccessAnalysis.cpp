@@ -3178,8 +3178,8 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
     // factor and relatively small.
     //
     // NOTE: There is no need to update MaxSafeVectorWidthInBits after call to
-    // couldPreventStoreLoadForward, even if it changed MinDepDistBytes, since a
-    // forward dependency will allow vectorization using any width.
+    // couldPreventStoreLoadForward, since a forward dependency will allow
+    // vectorization using any width.
 
     if (IsTrueDataDependence &&
         Opts.store_to_load_forwarding_conflict_detection) {
@@ -3275,14 +3275,6 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
     return Dependence::Backward;
   }
 
-  // Unsafe if the minimum distance needed is greater than smallest dependence
-  // distance distance.
-  if (MinDistanceNeeded > MinDepDistBytes) {
-    LLVM_DEBUG(dbgs() << "LAA: Failure because it needs at least "
-                      << MinDistanceNeeded << " size in bytes\n");
-    return Dependence::Backward;
-  }
-
   MinDepDistBytes =
       std::min(static_cast<uint64_t>(MinDistance), MinDepDistBytes);
 
@@ -3292,26 +3284,34 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
       couldPreventStoreLoadForward(MinDistance, TypeByteSize, *CommonStride))
     return Dependence::BackwardVectorizableButPreventsForwarding;
 
-  uint64_t MaxVF = MinDepDistBytes / MaxStride;
-  LLVM_DEBUG(dbgs() << "LAA: Positive min distance " << MinDistance
-                    << " with max VF = " << MaxVF << '\n');
-
   // Use the type size, which may be smaller than the alloc size.
-  uint64_t MaxVFInBits =
-      MaxVF * DL.getTypeSizeInBits(getLoadStoreType(InstMap[BIdx]));
-  if (!ConstDist && MaxVFInBits < MaxTargetVectorWidthInBits) {
+  uint64_t TypeSizeInBits =
+      DL.getTypeSizeInBits(getLoadStoreType(InstMap[BIdx]));
+  uint64_t MinDepDistMaxVF = MinDepDistBytes / MaxStride;
+  if (!ConstDist &&
+      MinDepDistMaxVF * TypeSizeInBits < MaxTargetVectorWidthInBits) {
     // For non-constant distances, we checked the lower bound of the dependence
     // distance and the distance may be larger at runtime (and safe for
     // vectorization). Classify it as Unknown, so we re-try with runtime checks,
-    // unless we can prove both accesses cannot overlap.
+    // unless we can prove both accesses cannot overlap. Use the smallest
+    // distance seen so far, which keeps the retry decisions from when it
+    // limited the max VF of all dependences, so results never get narrower.
+    // As before, this depends on the order the dependences are visited in.
+    // TODO: Decide per dependence and demote non-constant BackwardVectorizable
+    // dependences to Unknown when retrying with runtime checks anyway.
     return CheckCompletelyBeforeOrAfter() ? Dependence::NoDep
                                           : Dependence::Unknown;
   }
 
+  uint64_t MaxVF = MinDistance / MaxStride;
+  LLVM_DEBUG(dbgs() << "LAA: Positive min distance " << MinDistance
+                    << " with max VF = " << MaxVF << '\n');
+
   if (CheckCompletelyBeforeOrAfter())
     return Dependence::NoDep;
 
-  MaxSafeVectorWidthInBits = std::min(MaxSafeVectorWidthInBits, MaxVFInBits);
+  MaxSafeVectorWidthInBits =
+      std::min(MaxSafeVectorWidthInBits, MaxVF * TypeSizeInBits);
   return Dependence::BackwardVectorizable;
 }
 

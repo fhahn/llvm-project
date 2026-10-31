@@ -58,14 +58,13 @@ loop:
 define void @strided_dep_not_rejected_by_smaller_distance(ptr noalias %a, ptr noalias %b, i64 %n) {
 ; CHECK-LABEL: 'strided_dep_not_rejected_by_smaller_distance'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Backward loop carried data dependence.
+; CHECK-NEXT:      Memory dependences are safe with a maximum safe vector width of 64 bits
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:        BackwardVectorizable:
 ; CHECK-NEXT:            store i32 0, ptr %gep.a, align 4 ->
 ; CHECK-NEXT:            store i32 1, ptr %gep.a.2, align 4
 ; CHECK-EMPTY:
-; CHECK-NEXT:        Backward:
+; CHECK-NEXT:        BackwardVectorizable:
 ; CHECK-NEXT:            store i32 0, ptr %gep.b, align 4 ->
 ; CHECK-NEXT:            store i32 1, ptr %gep.b.50, align 4
 ; CHECK-EMPTY:
@@ -153,7 +152,7 @@ exit:
 define void @strided_dep_not_limited_by_smaller_distance(ptr noalias %a, ptr noalias %b, i64 %n) {
 ; CHECK-LABEL: 'strided_dep_not_limited_by_smaller_distance'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with a maximum safe vector width of 32 bits
+; CHECK-NEXT:      Memory dependences are safe with a maximum safe vector width of 128 bits
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:        BackwardVectorizable:
 ; CHECK-NEXT:            store i32 0, ptr %gep.a, align 4 ->
@@ -202,19 +201,29 @@ exit:
 define void @strided_non_constant_distance_not_rejected_by_smaller_distance(ptr noalias %a, ptr noalias %b, i64 %n, i64 %k) {
 ; CHECK-LABEL: 'strided_non_constant_distance_not_rejected_by_smaller_distance'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Backward loop carried data dependence.
+; CHECK-NEXT:      Memory dependences are safe with a maximum safe vector width of 32 bits with run-time checks
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:        BackwardVectorizable:
 ; CHECK-NEXT:            store i8 0, ptr %gep.a, align 1 ->
 ; CHECK-NEXT:            store i8 1, ptr %gep.a.4, align 1
 ; CHECK-EMPTY:
-; CHECK-NEXT:        Backward:
-; CHECK-NEXT:            store i8 0, ptr %gep.b, align 1 ->
-; CHECK-NEXT:            store i8 1, ptr %gep.b.k, align 1
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP1:
+; CHECK-NEXT:          %gep.b = getelementptr inbounds i8, ptr %b, i64 %iv.mul.4
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.b.k = getelementptr inbounds i8, ptr %b, i64 %iv.mul.4.k
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %a High: (4 + %n + %a))
+; CHECK-NEXT:            Member: {(4 + %a),+,1}<nuw><%loop>
+; CHECK-NEXT:            Member: {%a,+,1}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %b High: (-3 + (4 * %n) + %b))
+; CHECK-NEXT:            Member: {%b,+,4}<nuw><%loop>
+; CHECK-NEXT:        Group GRP2:
+; CHECK-NEXT:          (Low: (%k + %b) High: (-3 + (4 * %n) + %k + %b))
+; CHECK-NEXT:            Member: {(%k + %b),+,4}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
