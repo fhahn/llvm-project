@@ -678,11 +678,16 @@ getRuntimeCheckBounds(const RuntimeCheckingPtrGroup *CG, const Loop *TheLoop,
 
 /// Add code that checks at runtime if the accessed arrays in \p PointerChecks
 /// overlap. Returns the final comparator value or NULL if no check is needed.
+/// Enables safe UDiv mode on \p Expander, see
+/// SCEVExpander::enableSafeUDivMode.
 LLVM_ABI Value *
 addRuntimeChecks(Instruction *Loc, Loop *TheLoop,
                  const SmallVectorImpl<RuntimePointerCheck> &PointerChecks,
                  SCEVExpander &Expander, bool HoistRuntimeChecks = false);
 
+/// Add code that checks at runtime if any pointer difference in \p Checks is
+/// too small for \p VF x \p IC iterations. Enables safe UDiv mode on
+/// \p Expander, see SCEVExpander::enableSafeUDivMode.
 LLVM_ABI Value *addDiffRuntimeChecks(Instruction *Loc,
                                      ArrayRef<PointerDiffInfo> Checks,
                                      SCEVExpander &Expander, ElementCount VF,

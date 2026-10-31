@@ -1686,6 +1686,7 @@ void VPlanTransforms::attachMemoryChecks(
   auto *MemCheckVPBB = Plan.createVPBasicBlock("vector.memcheck");
   VPBuilder Builder(MemCheckVPBB);
   VPSCEVExpander Expander(Builder, SE, DL, TheLoop->getParentLoop());
+  Expander.enableSafeUDivMode();
   auto DiffChecks = RtPtrChecking.getDiffChecks();
   VPValue *Cond =
       DiffChecks

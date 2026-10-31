@@ -193,7 +193,9 @@ define void @bound_is_addrec_of_sibling_loop(ptr %a, ptr %b, i64 %n, i64 %d, i1 
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.memcheck
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.memcheck:
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = udiv ir<%n>, ir<%d>
+; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = freeze ir<%d>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = call i64 @llvm.umax(vp<[[VP2]]>, ir<1>)
+; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = udiv ir<%n>, vp<[[VP3]]>
 ; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = shl vp<[[VP4]]>, ir<2>
 ; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = shl ir<%iv.1.lcssa>, ir<2>
 ; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = add vp<[[VP5]]>, vp<[[VP6]]>

@@ -2224,6 +2224,7 @@ Value *llvm::addRuntimeChecks(
     SCEVExpander &Exp, bool HoistRuntimeChecks) {
   // TODO: Move noalias annotation code from LoopVersioning here and share with LV if possible.
   // TODO: Pass  RtPtrChecking instead of PointerChecks and SE separately, if possible
+  Exp.enableSafeUDivMode();
   auto ExpandedChecks =
       expandBounds(PointerChecks, TheLoop, Loc, Exp, HoistRuntimeChecks);
 
@@ -2281,6 +2282,7 @@ Value *llvm::addDiffRuntimeChecks(Instruction *Loc,
                                   ArrayRef<PointerDiffInfo> Checks,
                                   SCEVExpander &Expander, ElementCount VF,
                                   unsigned IC) {
+  Expander.enableSafeUDivMode();
 
   IRBuilder ChkBuilder(Loc->getIterator(),
                        InstSimplifyFolder(Loc->getDataLayout()));

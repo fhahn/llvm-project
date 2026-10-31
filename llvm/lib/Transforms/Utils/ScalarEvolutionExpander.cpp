@@ -524,6 +524,23 @@ public:
 
 }
 
+/// Clamp \p RHS, the expansion of divisor \p RHSExpr, to be non-zero and not
+/// poison.
+static Value *clampDivisor(IRBuilderBase &Builder, ScalarEvolution &SE,
+                           Value *RHS, const SCEV *RHSExpr) {
+  bool GuaranteedNotPoison =
+      ScalarEvolution::isGuaranteedNotToBePoison(RHSExpr);
+  if (!GuaranteedNotPoison)
+    RHS = Builder.CreateFreeze(RHS);
+
+  // Clamp with umax if RHSExpr may be zero, or may be poison, since frozen
+  // poison may be 0.
+  if (!SE.isKnownNonZero(RHSExpr) || !GuaranteedNotPoison)
+    RHS = Builder.CreateIntrinsic(RHS->getType(), Intrinsic::umax,
+                                  {RHS, ConstantInt::get(RHS->getType(), 1)});
+  return RHS;
+}
+
 Value *SCEVExpander::visitAddExpr(SCEVUseT<const SCEVAddExpr *> S) {
   // Recognize the canonical representation of an unsimplifed urem.
   const SCEV *URemLHS = nullptr;
@@ -531,6 +548,8 @@ Value *SCEVExpander::visitAddExpr(SCEVUseT<const SCEVAddExpr *> S) {
   if (match(S, m_scev_URem(m_SCEV(URemLHS), m_SCEV(URemRHS), SE))) {
     Value *LHS = expand(URemLHS);
     Value *RHS = expand(URemRHS);
+    if (SafeUDivMode)
+      RHS = clampDivisor(Builder, SE, RHS, URemRHS);
     return InsertBinop(Instruction::URem, LHS, RHS, SCEV::FlagNone,
                        /*IsSafeToHoist*/ false);
   }
@@ -728,21 +747,10 @@ Value *SCEVExpander::visitUDivExpr(SCEVUseT<const SCEVUDivExpr *> S) {
 
   const SCEV *RHSExpr = S->getRHS();
   Value *RHS = expand(RHSExpr);
-  if (SafeUDivMode) {
-    bool GuaranteedNotPoison =
-        ScalarEvolution::isGuaranteedNotToBePoison(RHSExpr);
-    if (!GuaranteedNotPoison)
-      RHS = Builder.CreateFreeze(RHS);
-
-    // We need an umax if either RHSExpr is not known to be zero, or if it is
-    // not guaranteed to be non-poison. In the later case, the frozen poison may
-    // be 0.
-    if (!SE.isKnownNonZero(RHSExpr) || !GuaranteedNotPoison)
-      RHS = Builder.CreateIntrinsic(RHS->getType(), Intrinsic::umax,
-                                    {RHS, ConstantInt::get(RHS->getType(), 1)});
-  }
+  if (SafeUDivMode)
+    RHS = clampDivisor(Builder, SE, RHS, RHSExpr);
   return InsertBinop(Instruction::UDiv, LHS, RHS, SCEV::FlagNone,
-                     /*IsSafeToHoist*/ SE.isKnownNonZero(S->getRHS()));
+                     /*IsSafeToHoist*/ SE.isKnownNonZero(RHSExpr));
 }
 
 /// Determine if this is a well-behaved chain of instructions leading back to
@@ -2225,6 +2233,7 @@ bool SCEVExpander::isHighCostExpansionHelper(
 Value *SCEVExpander::expandCodeForPredicate(const SCEVPredicate *Pred,
                                             Instruction *IP) {
   assert(IP);
+  enableSafeUDivMode();
   switch (Pred->getKind()) {
   case SCEVPredicate::P_Union:
     return expandUnionPredicate(cast<SCEVUnionPredicate>(Pred), IP);

@@ -987,7 +987,9 @@ VPValue *VPSCEVExpander::expandImpl(const SCEV *S) {
   if (VPValue *V = tryToReuseIRValue(S))
     return V;
 
-  if (HoistOutOf && !SafeUDivMode && SE.isLoopInvariant(S, HoistOutOf) &&
+  // Expressions that cannot cause UB contain no UDivs SafeUDivMode would
+  // change.
+  if (HoistOutOf && SE.isLoopInvariant(S, HoistOutOf) &&
       SE.isGuaranteedNotToCauseUB(S))
     return vputils::getOrCreateVPValueForSCEVExpr(Builder.getPlan(), S,
                                                   /*ExpandInIR=*/true);
@@ -1217,6 +1219,7 @@ VPValue *VPSCEVExpander::expandImpl(const SCEV *S) {
     const Loop *L = AR->getLoop();
     auto m_scev_CanonicalIV = // NOLINT
         m_scev_AffineAddRec(m_scev_Zero(), m_scev_One(), m_SpecificLoop(L));
+    // TODO: getOrCreateVPValueForSCEVExpr ignores SafeUDivMode.
     if (!AR->isAffine() || match(AR, m_scev_CanonicalIV))
       return vputils::getOrCreateVPValueForSCEVExpr(Plan, AR);
 

@@ -539,7 +539,9 @@ define void @udiv_in_cond_block(ptr %a, ptr %b, i32 %x, i32 %y, i64 %n) {
 ; LV-NEXT:  loop.lver.check:
 ; LV-NEXT:    [[TMP0:%.*]] = shl i64 [[N:%.*]], 2
 ; LV-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B:%.*]], i64 [[TMP0]]
-; LV-NEXT:    [[TMP1:%.*]] = udiv i32 [[X:%.*]], [[Y:%.*]]
+; LV-NEXT:    [[TMP12:%.*]] = freeze i32 [[Y:%.*]]
+; LV-NEXT:    [[TMP13:%.*]] = call i32 @llvm.umax.i32(i32 [[TMP12]], i32 1)
+; LV-NEXT:    [[TMP1:%.*]] = udiv i32 [[X:%.*]], [[TMP13]]
 ; LV-NEXT:    [[TMP2:%.*]] = sext i32 [[TMP1]] to i64
 ; LV-NEXT:    [[TMP3:%.*]] = shl nsw i64 [[TMP2]], 2
 ; LV-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[A:%.*]], i64 [[TMP3]]
@@ -549,7 +551,9 @@ define void @udiv_in_cond_block(ptr %a, ptr %b, i32 %x, i32 %y, i64 %n) {
 ; LV-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP1]], [[SCEVGEP]]
 ; LV-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; LV-NEXT:    [[TMP5:%.*]] = add i64 [[N]], -1
-; LV-NEXT:    [[TMP6:%.*]] = udiv i32 [[X]], [[Y]]
+; LV-NEXT:    [[TMP14:%.*]] = freeze i32 [[Y]]
+; LV-NEXT:    [[TMP15:%.*]] = call i32 @llvm.umax.i32(i32 [[TMP14]], i32 1)
+; LV-NEXT:    [[TMP6:%.*]] = udiv i32 [[X]], [[TMP15]]
 ; LV-NEXT:    [[TMP7:%.*]] = trunc i64 [[TMP5]] to i32
 ; LV-NEXT:    [[TMP8:%.*]] = add i32 [[TMP6]], [[TMP7]]
 ; LV-NEXT:    [[TMP9:%.*]] = icmp slt i32 [[TMP8]], [[TMP6]]
@@ -637,10 +641,14 @@ exit:
 define void @urem_in_cond_block(ptr %a, ptr %b, i64 %x, i64 %y, i64 %n) {
 ; LV-LABEL: @urem_in_cond_block(
 ; LV-NEXT:  loop.lver.check:
-; LV-NEXT:    [[TMP0:%.*]] = urem i64 [[X:%.*]], [[Y:%.*]]
+; LV-NEXT:    [[TMP5:%.*]] = freeze i64 [[Y:%.*]]
+; LV-NEXT:    [[TMP6:%.*]] = call i64 @llvm.umax.i64(i64 [[TMP5]], i64 1)
+; LV-NEXT:    [[TMP0:%.*]] = urem i64 [[X:%.*]], [[TMP6]]
 ; LV-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[A:%.*]], i64 [[TMP0]]
 ; LV-NEXT:    [[TMP1:%.*]] = add i64 [[N:%.*]], [[X]]
-; LV-NEXT:    [[TMP2:%.*]] = udiv i64 [[X]], [[Y]]
+; LV-NEXT:    [[TMP7:%.*]] = freeze i64 [[Y]]
+; LV-NEXT:    [[TMP8:%.*]] = call i64 @llvm.umax.i64(i64 [[TMP7]], i64 1)
+; LV-NEXT:    [[TMP2:%.*]] = udiv i64 [[X]], [[TMP8]]
 ; LV-NEXT:    [[TMP3:%.*]] = mul nuw i64 [[Y]], [[TMP2]]
 ; LV-NEXT:    [[TMP4:%.*]] = sub i64 [[TMP1]], [[TMP3]]
 ; LV-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP4]]

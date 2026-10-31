@@ -1138,7 +1138,9 @@ define void @udiv_in_cond_block(ptr %a, ptr %b, i32 %x, i32 %y, i64 %n) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N]], -1
-; CHECK-NEXT:    [[TMP1:%.*]] = udiv i32 [[X]], [[Y]]
+; CHECK-NEXT:    [[TMP13:%.*]] = freeze i32 [[Y]]
+; CHECK-NEXT:    [[TMP14:%.*]] = call i32 @llvm.umax.i32(i32 [[TMP13]], i32 1)
+; CHECK-NEXT:    [[TMP1:%.*]] = udiv i32 [[X]], [[TMP14]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = trunc i64 [[TMP0]] to i32
 ; CHECK-NEXT:    [[TMP3:%.*]] = add i32 [[TMP1]], [[TMP2]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp slt i32 [[TMP3]], [[TMP1]]
@@ -1146,7 +1148,9 @@ define void @udiv_in_cond_block(ptr %a, ptr %b, i32 %x, i32 %y, i64 %n) {
 ; CHECK-NEXT:    [[TMP6:%.*]] = or i1 [[TMP4]], [[TMP5]]
 ; CHECK-NEXT:    br i1 [[TMP6]], [[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP7:%.*]] = udiv i32 [[X]], [[Y]]
+; CHECK-NEXT:    [[TMP15:%.*]] = freeze i32 [[Y]]
+; CHECK-NEXT:    [[TMP16:%.*]] = call i32 @llvm.umax.i32(i32 [[TMP15]], i32 1)
+; CHECK-NEXT:    [[TMP7:%.*]] = udiv i32 [[X]], [[TMP16]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = sext i32 [[TMP7]] to i64
 ; CHECK-NEXT:    [[TMP9:%.*]] = shl nsw i64 [[TMP8]], 2
 ; CHECK-NEXT:    [[TMP10:%.*]] = add i64 [[A3]], [[TMP9]]
@@ -1255,7 +1259,9 @@ define void @udiv_in_cond_block_inner_loop(ptr %a, ptr %b, i64 %x, i64 %y, i64 %
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = udiv i64 [[X]], [[Y]]
+; CHECK-NEXT:    [[TMP5:%.*]] = freeze i64 [[Y]]
+; CHECK-NEXT:    [[TMP6:%.*]] = call i64 @llvm.umax.i64(i64 [[TMP5]], i64 1)
+; CHECK-NEXT:    [[TMP0:%.*]] = udiv i64 [[X]], [[TMP6]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[A1]], [[TMP1]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], [[B2]]

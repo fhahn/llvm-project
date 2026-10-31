@@ -278,8 +278,8 @@ class VPSCEVExpander {
   ScalarEvolution &SE;
   DebugLoc DL;
 
-  /// When true, nested SCEVUDivExprs are expanded so that they cannot divide by
-  /// zero, matching SCEVExpander's SafeUDivMode.
+  /// When true, SCEVUDivExprs are expanded so that they cannot divide by zero,
+  /// matching SCEVExpander's SafeUDivMode.
   bool SafeUDivMode = false;
 
   /// If set, expressions invariant in this loop are expanded in IR via
@@ -312,6 +312,10 @@ public:
   VPValue *expand(VPExpandSCEVRecipe &R) {
     return R.expandInIR() ? &R : expand(R.getSCEV());
   }
+
+  /// Expand UDivs such that they cannot divide by zero or poison, matching
+  /// SCEVExpander::enableSafeUDivMode.
+  void enableSafeUDivMode() { SafeUDivMode = true; }
 };
 //===----------------------------------------------------------------------===//
 // Utilities for modifying predecessors and successors of VPlan blocks.

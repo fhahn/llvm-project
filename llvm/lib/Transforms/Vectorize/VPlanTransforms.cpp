@@ -2439,6 +2439,20 @@ void VPlanTransforms::cse(VPlan &Plan, const VPDominatorTree &VPDT) {
       auto *Def = dyn_cast<VPSingleDefRecipe>(&R);
       if (!Def || !VPCSEDenseMapInfo::canHandle(Def))
         continue;
+      // A UDiv by Y dominating umax(freeze(Y), 1) or umax(Y, 1), the divisor
+      // clamps of safe UDiv expansion, has executed. Y is then neither zero
+      // nor poison, so the clamp is Y.
+      VPValue *Y;
+      if (match(Def, m_Intrinsic<Intrinsic::umax>(
+                         m_CombineOr(m_Freeze(m_VPValue(Y)), m_VPValue(Y)),
+                         m_One())) &&
+          any_of(Y->users(), [&](VPUser *U) {
+            return match(U, m_UDiv(m_VPValue(), m_Specific(Y))) &&
+                   VPDT.properlyDominates(cast<VPRecipeBase>(U), Def);
+          })) {
+        Def->replaceAllUsesWith(Y);
+        continue;
+      }
       bool IsLoad = vputils::getOpcode(Def) == Instruction::Load;
       auto [It, Inserted] =
           (IsLoad ? LoadCSEMap : CSEMap).try_emplace(Def, Def);

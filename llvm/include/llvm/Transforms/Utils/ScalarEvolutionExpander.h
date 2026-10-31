@@ -356,6 +356,7 @@ public:
   /// Generates a code sequence that evaluates this predicate.  The inserted
   /// instructions will be at position \p Loc.  The result will be of type i1
   /// and will have a value of 0 when the predicate is false and 1 otherwise.
+  /// Enables safe UDiv mode, see enableSafeUDivMode.
   LLVM_ABI Value *expandCodeForPredicate(const SCEVPredicate *Pred,
                                          Instruction *Loc);
 
@@ -409,6 +410,12 @@ public:
   void disableCanonicalMode() { CanonicalMode = false; }
 
   void enableLSRMode() { LSRMode = true; }
+
+  /// Expand UDivs such that they cannot divide by zero or poison. Used for
+  /// runtime checks, which may evaluate UDivs the original program only
+  /// executes conditionally. The expander must not hold earlier non-safe
+  /// expansions, as they would be reused.
+  void enableSafeUDivMode() { SafeUDivMode = true; }
 
   /// Set the current insertion point. This is useful if multiple calls to
   /// expandCodeFor() are going to be made with the same insert point and the
