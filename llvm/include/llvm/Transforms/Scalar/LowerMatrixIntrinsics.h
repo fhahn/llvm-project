@@ -22,8 +22,7 @@ class LLVMContext;
 struct LowerMatrixIntrinsicsOptions {
   /// Sink and lift transposes to fold them away or into multiplies.
   bool TransposeOpts = true;
-  /// Fuse multiplies with transposed operands or with loads and stores, like
-  /// -fuse-matrix.
+  /// Fuse multiplies with transposed operands or with loads and stores.
   bool Fuse = true;
   /// Lower the matrix intrinsics to vector operations.
   bool Lower = true;

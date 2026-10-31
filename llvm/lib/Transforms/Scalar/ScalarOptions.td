@@ -448,8 +448,6 @@ defm : ValueField<"unlikely-branch-weight", "uint32_t", "1",
 // LowerMatrixIntrinsics.cpp
 defm : BoolField<"force-fuse-matrix", "false",
   "Force matrix instruction fusion even if not profitable">;
-defm : BoolField<"fuse-matrix", "true",
-  "Enable/disable fusing matrix instructions">;
 defm : ValueField<"fuse-matrix-loops-threshold", "unsigned", "200",
   "Generate loop nests for tiling when expected number of operations exceeds threshold">;
 // TODO: Allow and use non-square tiles.

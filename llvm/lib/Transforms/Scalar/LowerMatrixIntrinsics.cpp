@@ -1818,7 +1818,7 @@ public:
   LowerMatrixMultiplyFused(CallInst *MatMul,
                            SmallPtrSetImpl<Instruction *> &FusedInsts,
                            SmallVector<IntrinsicInst *, 16> &LifetimeEnds) {
-    if (!Opts.fuse_matrix || !PassOpts.Fuse || Opts.fuse_matrix_tile_size == 0)
+    if (!PassOpts.Fuse || Opts.fuse_matrix_tile_size == 0)
       return;
 
     Value *A = MatMul->getArgOperand(0);
