@@ -505,13 +505,16 @@ struct VPlanTransforms {
   /// of the loop to use the alias mask. Returns the clamped VF.
   static VPValue *materializeAliasMask(VPlan &Plan,
                                        VPBasicBlock *AliasCheckVPBB,
-                                       ArrayRef<PointerDiffInfo> DiffChecks);
+                                       ArrayRef<PointerDiffInfo> DiffChecks,
+                                       ScalarEvolution &SE);
 
   /// Materializes the alias mask within a check block before the loop. The
   /// vector loop will only be entered if the clamped VF from the alias mask
   /// is not scalar.
-  static void materializeAliasMaskCheckBlock(
-      VPlan &Plan, ArrayRef<PointerDiffInfo> DiffChecks, bool HasBranchWeights);
+  static void
+  materializeAliasMaskCheckBlock(VPlan &Plan,
+                                 ArrayRef<PointerDiffInfo> DiffChecks,
+                                 ScalarEvolution &SE, bool HasBranchWeights);
 
   /// Expand VPExpandSCEVRecipes in \p Plan's entry block to VPInstructions.
   /// Recipes wrapping a SCEVAddRecExpr are kept for later IR-level expansion.
