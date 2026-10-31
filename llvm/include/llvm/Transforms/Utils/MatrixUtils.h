@@ -6,23 +6,31 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Utilities for generating tiled loops for matrix operations.
+// Utilities for lowering matrix operations: emitting code for matrices split
+// into vectors of the same type (columns for column-major, rows for row-major
+// layout) and generating tiled loops.
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_TRANSFORMS_UTILS_MATRIXUTILS_H
 #define LLVM_TRANSFORMS_UTILS_MATRIXUTILS_H
 
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Alignment.h"
 
 namespace llvm {
 class DomTreeUpdater;
 class BasicBlock;
 class ConstantInt;
+class FixedVectorType;
 class Value;
 class Loop;
 class LoopInfo;
 class IRBuilderBase;
+class TargetTransformInfo;
+class Type;
 
 /// A helper struct to create IR loop nests for tiling in IR of the following
 /// form:
@@ -85,6 +93,55 @@ private:
                                 StringRef Name, IRBuilderBase &B,
                                 DomTreeUpdater &DTU, Loop *L, LoopInfo &LI);
 };
+
+/// Return the estimated number of native vector operations for an operation on
+/// \p NumElts elements of type \p EltTy.
+LLVM_ABI unsigned estimateNumVectorOps(const TargetTransformInfo &TTI,
+                                       Type *EltTy, unsigned NumElts);
+
+/// Split the flat vector \p Matrix into vectors of \p NumElts elements.
+LLVM_ABI SmallVector<Value *> splitMatrix(IRBuilderBase &Builder, Value *Matrix,
+                                          unsigned NumElts);
+
+/// Concatenate \p Vectors into a flat vector.
+LLVM_ABI Value *flattenMatrix(IRBuilderBase &Builder,
+                              ArrayRef<Value *> Vectors);
+
+/// Load \p NumVecs vectors of type \p VecTy starting at \p Ptr, with \p Stride
+/// elements between the starts of consecutive vectors.
+LLVM_ABI SmallVector<Value *>
+emitMatrixLoad(IRBuilderBase &Builder, FixedVectorType *VecTy, unsigned NumVecs,
+               Value *Ptr, Value *Stride, MaybeAlign Alignment,
+               bool IsVolatile);
+
+/// Store \p Vectors starting at \p Ptr, with \p Stride elements between the
+/// starts of consecutive vectors.
+LLVM_ABI void emitMatrixStore(IRBuilderBase &Builder, ArrayRef<Value *> Vectors,
+                              Value *Ptr, Value *Stride, MaybeAlign Alignment,
+                              bool IsVolatile);
+
+/// Transpose the matrix given by \p Vectors. The result uses the same layout.
+LLVM_ABI SmallVector<Value *> emitMatrixTranspose(IRBuilderBase &Builder,
+                                                  ArrayRef<Value *> Vectors);
+
+/// Compute \p A * \p B into \p Result with left-associating addition, using
+/// the fast-math flags of \p Builder. \p Result must hold vectors of the result
+/// type. If \p Accumulate (column-major only), accumulate onto them. Returns
+/// the estimated number of compute operations.
+///
+/// We can fold a transpose into the operand that is used to extract scalars.
+/// This is the first operand with row-major and the second with column-major.
+/// If \p IsScalarMatrixTransposed we assume the appropriate operand is
+/// transposed. Illegal remainder vectors over \p SplitRemainderThreshold bits
+/// are split.
+LLVM_ABI unsigned emitMatrixMultiply(IRBuilderBase &Builder,
+                                     MutableArrayRef<Value *> Result,
+                                     ArrayRef<Value *> A, ArrayRef<Value *> B,
+                                     const TargetTransformInfo &TTI,
+                                     bool IsColumnMajor = true,
+                                     bool Accumulate = false,
+                                     bool IsScalarMatrixTransposed = false,
+                                     unsigned SplitRemainderThreshold = 0);
 } // namespace llvm
 
 #endif

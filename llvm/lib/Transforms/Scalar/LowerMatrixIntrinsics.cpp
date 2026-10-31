@@ -30,7 +30,6 @@
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
-#include "llvm/Analysis/VectorUtils.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DebugInfoMetadata.h"
@@ -50,8 +49,6 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
 #include "llvm/Transforms/Utils/MatrixUtils.h"
-
-#include <cmath>
 
 using namespace llvm;
 using namespace PatternMatch;
@@ -92,67 +89,6 @@ static auto m_AnyMul(const LTy &L, const RTy &R) {
 template <typename LTy, typename RTy>
 static auto m_AnyAdd(const LTy &L, const RTy &R) {
   return m_CombineOr(m_Add(L, R), m_FAdd(L, R));
-}
-
-// Given an element pointer \p BasePtr to the start of a (sub) matrix, compute
-// the start address of vector \p VecIdx with type (\p EltType x \p NumElements)
-// assuming \p Stride elements between start two consecutive vectors.
-// \p Stride must be >= \p NumElements.
-// For column-major matrixes, the function computes the address of a column
-// vectors and \p NumElements must be set to the number of elements in a column
-// (= number of rows of the matrix). For row-major matrixes, the function
-// computes the address of a row vector and \p NumElements must be set to the
-// number of elements in a column (= number of columns of the matrix).
-//
-// Consider a 4x4 matrix in column-mjaor layout like below
-//
-//      0       1      2      3
-// 0   v_0_0  v_0_1  v_0_2  v_0_3
-// 1   v_1_0  v_1_1  v_1_2  v_1_3
-// 2   v_2_0  v_2_1  v_2_2  v_2_3
-// 3   v_3_0  v_3_1  v_3_2  v_3_3
-
-// To compute the column addresses for a 2x3 sub-matrix at row 1 and column 1,
-// we need a pointer to the first element of the submatrix as base pointer.
-// Then we can use computeVectorAddr to compute the addresses for the columns
-// of the sub-matrix.
-//
-// Column 0: computeVectorAddr(Base, 0 (column), 4 (stride), 2 (num rows), ..)
-//           -> just returns Base
-// Column 1: computeVectorAddr(Base, 1 (column), 4 (stride), 2 (num rows), ..)
-//           -> returns Base + (1 * 4)
-// Column 2: computeVectorAddr(Base, 2 (column), 4 (stride), 2 (num rows), ..)
-//           -> returns Base + (2 * 4)
-//
-// The graphic below illustrates the number of elements in a column (marked
-// with |) and the number of skipped elements (marked with }).
-//
-//         v_0_0  v_0_1 {v_0_2 {v_0_3
-//                Base   Col 1  Col 2
-//                  |     |      |
-//         v_1_0 |v_1_1 |v_1_2 |v_1_3
-//         v_2_0 |v_2_1 |v_2_2 |v_2_3
-//         v_3_0 {v_3_1 {v_3_2  v_3_3
-//
-static Value *computeVectorAddr(Value *BasePtr, Value *VecIdx, Value *Stride,
-                                unsigned NumElements, Type *EltType,
-                                IRBuilder<> &Builder) {
-
-  assert((!isa<ConstantInt>(Stride) ||
-          cast<ConstantInt>(Stride)->getZExtValue() >= NumElements) &&
-         "Stride must be >= the number of elements in the result vector.");
-
-  // Compute the start of the vector with index VecIdx as VecIdx * Stride.
-  Value *VecStart = Builder.CreateMul(VecIdx, Stride, "vec.start");
-
-  // Get pointer to the start of the selected vector. Skip GEP creation,
-  // if we select vector 0.
-  if (isa<ConstantInt>(VecStart) && cast<ConstantInt>(VecStart)->isZero())
-    VecStart = BasePtr;
-  else
-    VecStart = Builder.CreateInBoundsGEP(EltType, BasePtr, VecStart, "vec.gep");
-
-  return VecStart;
 }
 
 namespace {
@@ -386,14 +322,6 @@ class LowerMatrixIntrinsics {
     }
 
     Value *getVector(unsigned i) const { return Vectors[i]; }
-    Value *getColumn(unsigned i) const {
-      assert(isColumnMajor() && "only supported for column-major matrixes");
-      return Vectors[i];
-    }
-    Value *getRow(unsigned i) const {
-      assert(!isColumnMajor() && "only supported for row-major matrixes");
-      return Vectors[i];
-    }
 
     void setVector(unsigned i, Value *V) { Vectors[i] = V; }
 
@@ -437,15 +365,13 @@ class LowerMatrixIntrinsics {
       return make_range(Vectors.begin(), Vectors.end());
     }
 
-    iterator_range<SmallVector<Value *, 8>::iterator> vectors() {
-      return make_range(Vectors.begin(), Vectors.end());
-    }
+    MutableArrayRef<Value *> vectors() { return Vectors; }
+    ArrayRef<Value *> vectors() const { return Vectors; }
 
     /// Embed the vectors of the matrix into a flat vector by concatenating
     /// them.
     Value *embedInVector(IRBuilder<> &Builder) const {
-      return Vectors.size() == 1 ? Vectors[0]
-                                 : concatenateVectors(Builder, Vectors);
+      return flattenMatrix(Builder, Vectors);
     }
 
     MatrixTy &addNumLoads(unsigned N) {
@@ -485,20 +411,6 @@ class LowerMatrixIntrinsics {
     }
 
     ShapeInfo shape() const { return {getNumRows(), getNumColumns()}; }
-
-    /// Extract a vector of \p NumElts starting at index (\p I, \p J). If the
-    /// matrix is column-major, the result vector is extracted from a column
-    /// vector, otherwise from a row vector.
-    Value *extractVector(unsigned I, unsigned J, unsigned NumElts,
-                         IRBuilder<> &Builder) const {
-      Value *Vec = isColumnMajor() ? getColumn(J) : getRow(I);
-      assert(cast<FixedVectorType>(Vec->getType())->getNumElements() >=
-                 NumElts &&
-             "Extracted vector will contain poison values");
-      return Builder.CreateShuffleVector(
-          Vec, createSequentialMask(isColumnMajor() ? I : J, NumElts, 0),
-          "block");
-    }
   };
 
   /// Maps instructions to their shape information. The shape information
@@ -568,10 +480,7 @@ public:
   /// Return the estimated number of vector ops required for an operation on
   /// \p VT * N.
   unsigned getNumOps(Type *ST, unsigned N) {
-    return std::ceil((ST->getPrimitiveSizeInBits() * N).getFixedValue() /
-                     double(TTI.getRegisterBitWidth(
-                                   TargetTransformInfo::RGK_FixedWidthVector)
-                                .getFixedValue()));
+    return estimateNumVectorOps(TTI, ST, N);
   }
 
   /// Estimate the number of native vector operations for a multiply of matrices
@@ -599,8 +508,8 @@ public:
   /// into vectors.
   MatrixTy getMatrix(Value *MatrixVal, const ShapeInfo &SI,
                      IRBuilder<> &Builder) {
-    FixedVectorType *VType = cast<FixedVectorType>(MatrixVal->getType());
-    assert(VType->getNumElements() == SI.NumRows * SI.NumColumns &&
+    assert(cast<FixedVectorType>(MatrixVal->getType())->getNumElements() ==
+               SI.NumRows * SI.NumColumns &&
            "The vector size must match the number of matrix elements");
 
     // Check if we lowered MatrixVal using shape information. In that case,
@@ -619,14 +528,8 @@ public:
     }
 
     // Otherwise split MatrixVal.
-    SmallVector<Value *, 16> SplitVecs;
-    for (unsigned MaskStart = 0; MaskStart < VType->getNumElements();
-         MaskStart += getStride(SI)) {
-      Value *V = Builder.CreateShuffleVector(
-          MatrixVal, createSequentialMask(MaskStart, getStride(SI), 0),
-          "split");
-      SplitVecs.push_back(V);
-    }
+    SmallVector<Value *> SplitVecs =
+        splitMatrix(Builder, MatrixVal, getStride(SI));
 
     if (Instruction *Inst = dyn_cast<Instruction>(MatrixVal)) {
       if (Found != Inst2ColumnMatrix.end()) {
@@ -1274,64 +1177,18 @@ public:
         "only intrinsics supporting shape info should be seen here");
   }
 
-  /// Compute the alignment for a column/row \p Idx with \p Stride between them.
-  /// The address at \p Idx == 0 has alignment \p A. If \p Stride is a
-  /// ConstantInt, reduce the initial alignment based on the byte offset. For
-  /// non-ConstantInt strides, return the common alignment of the initial
-  /// alignment and the element size in bytes.
-  Align getAlignForIndex(unsigned Idx, Value *Stride, Type *ElementTy,
-                         MaybeAlign A) const {
-    Align InitialAlign = DL.getValueOrABITypeAlignment(A, ElementTy);
-    if (Idx == 0)
-      return InitialAlign;
-
-    TypeSize ElementSizeInBits = DL.getTypeSizeInBits(ElementTy);
-    if (auto *ConstStride = dyn_cast<ConstantInt>(Stride)) {
-      uint64_t StrideInBytes =
-          ConstStride->getZExtValue() * ElementSizeInBits / 8;
-      return commonAlignment(InitialAlign, Idx * StrideInBytes);
-    }
-    return commonAlignment(InitialAlign, ElementSizeInBits / 8);
-  }
-
-  IntegerType *getIndexType(Value *Ptr) const {
-    return cast<IntegerType>(DL.getIndexType(Ptr->getType()));
-  }
-
   Value *getIndex(Value *Ptr, uint64_t V) const {
-    return ConstantInt::get(getIndexType(Ptr), V);
-  }
-
-  Value *castToIndexType(Value *Ptr, Value *V, IRBuilder<> &Builder) const {
-    assert(isa<IntegerType>(V->getType()) &&
-           "Attempted to cast non-integral type to integer index");
-    // In case the data layout's index type differs in width from the type of
-    // the value we're given, truncate or zero extend to the appropriate width.
-    // We zero extend here as indices are unsigned.
-    return Builder.CreateZExtOrTrunc(V, getIndexType(Ptr),
-                                     V->getName() + ".cast");
+    return ConstantInt::get(DL.getIndexType(Ptr->getType()), V);
   }
 
   /// Load a matrix with \p Shape starting at \p Ptr and using \p Stride between
   /// vectors.
-  MatrixTy loadMatrix(Type *Ty, Value *Ptr, MaybeAlign MAlign, Value *Stride,
+  MatrixTy loadMatrix(Type *EltTy, Value *Ptr, MaybeAlign MAlign, Value *Stride,
                       bool IsVolatile, ShapeInfo Shape, IRBuilder<> &Builder) {
-    auto *VType = cast<FixedVectorType>(Ty);
-    Type *EltTy = VType->getElementType();
-    Type *VecTy = FixedVectorType::get(EltTy, getStride(Shape));
-    Value *EltPtr = Ptr;
-    MatrixTy Result(isColumnMajor());
-    Stride = castToIndexType(Ptr, Stride, Builder);
-    for (unsigned I = 0, E = getNumVectors(Shape); I < E; ++I) {
-      Value *GEP = computeVectorAddr(
-          EltPtr, Builder.getIntN(Stride->getType()->getScalarSizeInBits(), I),
-          Stride, getStride(Shape), EltTy, Builder);
-      Value *Vector = Builder.CreateAlignedLoad(
-          VecTy, GEP, getAlignForIndex(I, Stride, EltTy, MAlign),
-          IsVolatile, "col.load");
-
-      Result.addVector(Vector);
-    }
+    auto *VecTy = FixedVectorType::get(EltTy, getStride(Shape));
+    SmallVector<Value *> Vectors = emitMatrixLoad(
+        Builder, VecTy, getNumVectors(Shape), Ptr, Stride, MAlign, IsVolatile);
+    MatrixTy Result(isColumnMajor(), Vectors);
     return Result.addNumLoads(getNumOps(Result.getVectorTy()) *
                               Result.getNumVectors());
   }
@@ -1346,10 +1203,7 @@ public:
         Builder.CreateMul(J, getIndex(MatrixPtr, getStride(MatrixShape))), I);
 
     Value *TileStart = Builder.CreateInBoundsGEP(EltTy, MatrixPtr, Offset);
-    auto *TileTy = FixedVectorType::get(EltTy, ResultShape.NumRows *
-                                                   ResultShape.NumColumns);
-
-    return loadMatrix(TileTy, TileStart, Align,
+    return loadMatrix(EltTy, TileStart, Align,
                       getIndex(MatrixPtr, getStride(MatrixShape)), IsVolatile,
                       ResultShape, Builder);
   }
@@ -1358,8 +1212,8 @@ public:
   MatrixTy LowerLoad(Instruction *Inst, Value *Ptr, MaybeAlign Align,
                      Value *Stride, bool IsVolatile, ShapeInfo Shape,
                      IRBuilder<> &Builder) {
-    return loadMatrix(Inst->getType(), Ptr, Align, Stride, IsVolatile, Shape,
-                      Builder);
+    return loadMatrix(Inst->getType()->getScalarType(), Ptr, Align, Stride,
+                      IsVolatile, Shape, Builder);
   }
 
   /// Lowers llvm.matrix.column.major.load.
@@ -1384,34 +1238,17 @@ public:
         Builder.CreateMul(J, getIndex(MatrixPtr, getStride(MatrixShape))), I);
 
     Value *TileStart = Builder.CreateInBoundsGEP(EltTy, MatrixPtr, Offset);
-    auto *TileTy = FixedVectorType::get(EltTy, StoreVal.getNumRows() *
-                                                   StoreVal.getNumColumns());
-
-    storeMatrix(TileTy, StoreVal, TileStart, MAlign,
+    storeMatrix(StoreVal, TileStart, MAlign,
                 getIndex(MatrixPtr, getStride(MatrixShape)), IsVolatile,
                 Builder);
   }
 
   /// Store matrix \p StoreVal starting at \p Ptr and using \p Stride between
   /// vectors.
-  MatrixTy storeMatrix(Type *Ty, MatrixTy StoreVal, Value *Ptr,
-                       MaybeAlign MAlign, Value *Stride, bool IsVolatile,
-                       IRBuilder<> &Builder) {
-    auto *VType = cast<FixedVectorType>(Ty);
-    Value *EltPtr = Ptr;
-    Stride = castToIndexType(Ptr, Stride, Builder);
-    for (auto Vec : enumerate(StoreVal.vectors())) {
-      Value *GEP = computeVectorAddr(
-          EltPtr,
-          Builder.getIntN(Stride->getType()->getScalarSizeInBits(),
-                          Vec.index()),
-          Stride, StoreVal.getStride(), VType->getElementType(), Builder);
-      Builder.CreateAlignedStore(Vec.value(), GEP,
-                                 getAlignForIndex(Vec.index(), Stride,
-                                                  VType->getElementType(),
-                                                  MAlign),
-                                 IsVolatile);
-    }
+  MatrixTy storeMatrix(const MatrixTy &StoreVal, Value *Ptr, MaybeAlign MAlign,
+                       Value *Stride, bool IsVolatile, IRBuilder<> &Builder) {
+    emitMatrixStore(Builder, StoreVal.vectors(), Ptr, Stride, MAlign,
+                    IsVolatile);
     return MatrixTy(isColumnMajor())
         .addNumStores(getNumOps(StoreVal.getVectorTy()) *
                       StoreVal.getNumVectors());
@@ -1422,8 +1259,7 @@ public:
                       MaybeAlign A, Value *Stride, bool IsVolatile,
                       ShapeInfo Shape, IRBuilder<> &Builder) {
     auto StoreVal = getMatrix(Matrix, Shape, Builder);
-    return storeMatrix(Matrix->getType(), StoreVal, Ptr, A, Stride, IsVolatile,
-                       Builder);
+    return storeMatrix(StoreVal, Ptr, A, Stride, IsVolatile, Builder);
   }
 
   /// Lowers llvm.matrix.column.major.store.
@@ -1439,61 +1275,6 @@ public:
                       cast<ConstantInt>(Inst->getArgOperand(3))->isOne(),
                       {Inst->getArgOperand(4), Inst->getArgOperand(5)},
                       Builder);
-  }
-
-  // Set elements I..I+NumElts-1 to Block
-  Value *insertVector(Value *Col, unsigned I, Value *Block,
-                      IRBuilder<> &Builder) {
-
-    // First, bring Block to the same size as Col
-    unsigned BlockNumElts =
-        cast<FixedVectorType>(Block->getType())->getNumElements();
-    unsigned NumElts = cast<FixedVectorType>(Col->getType())->getNumElements();
-    assert(NumElts >= BlockNumElts && "Too few elements for current block");
-
-    Block = Builder.CreateShuffleVector(
-        Block, createSequentialMask(0, BlockNumElts, NumElts - BlockNumElts));
-
-    // If Col is 7 long and I is 2 and BlockNumElts is 2 the mask is: 0, 1, 7,
-    // 8, 4, 5, 6
-    SmallVector<int, 16> Mask;
-    unsigned i;
-    for (i = 0; i < I; i++)
-      Mask.push_back(i);
-
-    unsigned VecNumElts =
-        cast<FixedVectorType>(Col->getType())->getNumElements();
-    for (; i < I + BlockNumElts; i++)
-      Mask.push_back(i - I + VecNumElts);
-
-    for (; i < VecNumElts; i++)
-      Mask.push_back(i);
-
-    return Builder.CreateShuffleVector(Col, Block, Mask);
-  }
-
-  Value *createMulAdd(Value *Sum, Value *A, Value *B, bool UseFPOp,
-                      IRBuilder<> &Builder, bool AllowContraction,
-                      unsigned &NumComputeOps) {
-    NumComputeOps += getNumOps(A->getType());
-    if (!Sum)
-      return UseFPOp ? Builder.CreateFMul(A, B) : Builder.CreateMul(A, B);
-
-    if (UseFPOp) {
-      if (AllowContraction) {
-        // Use fmuladd for floating point operations and let the backend decide
-        // if that's profitable.
-        return Builder.CreateIntrinsic(Intrinsic::fmuladd, A->getType(),
-                                       {A, B, Sum});
-      }
-      NumComputeOps += getNumOps(A->getType());
-      Value *Mul = Builder.CreateFMul(A, B);
-      return Builder.CreateFAdd(Sum, Mul);
-    }
-
-    NumComputeOps += getNumOps(A->getType());
-    Value *Mul = Builder.CreateMul(A, B);
-    return Builder.CreateAdd(Sum, Mul);
   }
 
   /// Cache \p Matrix as result of \p Inst and update the uses of \p Inst. For
@@ -1687,10 +1468,8 @@ public:
         auto *MatLoad = cast<IntrinsicInst>(Op);
         bool IsVolatile = cast<ConstantInt>(MatLoad->getArgOperand(2))->isOne();
         // Preserve the volatile flag and alignment of the original load.
-        Align Alignment = getAlignForIndex(
-            0, MatLoad->getArgOperand(1),
-            cast<FixedVectorType>(Op->getType())->getElementType(),
-            MatLoad->getParamAlign(0));
+        Align Alignment = DL.getValueOrABITypeAlignment(
+            MatLoad->getParamAlign(0), Op->getType()->getScalarType());
         auto *NewLoad = Builder.CreateAlignedLoad(Op->getType(), Arg, Alignment,
                                                   IsVolatile);
         Op->replaceAllUsesWith(NewLoad);
@@ -1732,114 +1511,18 @@ public:
     ToRemove.push_back(MatMul);
   }
 
-  /// Given \p Remainder iterations of the the matmul inner loop,
-  /// potentially lower \p Blocksize that is used for the underlying
-  /// vector.
-  unsigned capBlockSize(unsigned BlockSize, unsigned Remainder, Type *EltType) {
-    if (BlockSize <= Remainder)
-      return BlockSize;
-
-    // If the remainder is also a legal type just use it.
-    auto *VecTy = FixedVectorType::get(EltType, Remainder);
-    if (TTI.isTypeLegal(VecTy))
-      return Remainder;
-
-    // Similarly, if the vector is small enough that we don't want
-    // to split further.
-    if (VecTy->getPrimitiveSizeInBits() <=
-        Opts.matrix_split_matmul_remainder_over_threshold)
-      return Remainder;
-
-    // Gradually lower the vectorization factor to cover the
-    // remainder.
-    do {
-      BlockSize /= 2;
-    } while (BlockSize > Remainder);
-    return BlockSize;
-  }
-
-  /// Compute \p Result += \p A * \p B for input matrices with left-associating
-  /// addition.
-  ///
-  /// We can fold a transpose into the operand that is used to extract scalars.
-  /// This is the first operands with row-major and the second with
-  /// column-major.  If \p IsScalarMatrixTransposed we assume the appropriate
-  /// operand is transposed.
+  /// Compute \p A * \p B into \p Result, see llvm::emitMatrixMultiply.
   void emitMatrixMultiply(MatrixTy &Result, const MatrixTy &A,
                           const MatrixTy &B, IRBuilder<> &Builder, bool IsTiled,
                           bool IsScalarMatrixTransposed, FastMathFlags FMF) {
-    const unsigned VF = std::max<unsigned>(
-        TTI.getRegisterBitWidth(TargetTransformInfo::RGK_FixedWidthVector)
-                .getFixedValue() /
-            Result.getElementType()->getPrimitiveSizeInBits().getFixedValue(),
-        1U);
-    unsigned R = Result.getNumRows();
-    unsigned C = Result.getNumColumns();
-    unsigned M = A.getNumColumns();
-
-    bool IsFP = Result.getElementType()->isFloatingPointTy();
     assert(A.isColumnMajor() == B.isColumnMajor() &&
            Result.isColumnMajor() == A.isColumnMajor() &&
            "operands must agree on matrix layout");
-    unsigned NumComputeOps = 0;
-
     Builder.setFastMathFlags(FMF);
-
-    if (A.isColumnMajor()) {
-      // Multiply columns from the first operand with scalars from the second
-      // operand. Then move along the K axes and accumulate the columns.  With
-      // this the adds can be vectorized without reassociation.
-      for (unsigned J = 0; J < C; ++J) {
-        unsigned BlockSize = VF;
-        // If Result is zero, we don't need to accumulate in the K==0 iteration.
-        bool isSumZero = isa<ConstantAggregateZero>(Result.getColumn(J));
-
-        for (unsigned I = 0; I < R; I += BlockSize) {
-          // Lower block size to make sure we stay within bounds.
-          BlockSize = capBlockSize(BlockSize, R - I, Result.getElementType());
-          Value *Sum = IsTiled ? Result.extractVector(I, J, BlockSize, Builder)
-                               : nullptr;
-          for (unsigned K = 0; K < M; ++K) {
-            Value *L = A.extractVector(I, K, BlockSize, Builder);
-            Value *RH = Builder.CreateExtractElement(
-                B.getColumn(IsScalarMatrixTransposed ? K : J),
-                IsScalarMatrixTransposed ? J : K);
-            Value *Splat = Builder.CreateVectorSplat(BlockSize, RH, "splat");
-            Sum =
-                createMulAdd(isSumZero && K == 0 ? nullptr : Sum, L, Splat,
-                             IsFP, Builder, FMF.allowContract(), NumComputeOps);
-          }
-          Result.setVector(J,
-                           insertVector(Result.getVector(J), I, Sum, Builder));
-        }
-      }
-    } else {
-      // Multiply rows from the second operand with scalars from the first
-      // operand. Then move along the K axes and accumulate the rows.  With this
-      // the adds can be vectorized without reassociation.
-      for (unsigned I = 0; I < R; ++I) {
-        unsigned BlockSize = VF;
-        bool isSumZero = isa<ConstantAggregateZero>(Result.getRow(I));
-        for (unsigned J = 0; J < C; J += BlockSize) {
-          // Lower the vectorization factor to cover the remainder.
-          BlockSize = capBlockSize(BlockSize, C - J, Result.getElementType());
-
-          Value *Sum = nullptr;
-          for (unsigned K = 0; K < M; ++K) {
-            Value *R = B.extractVector(K, J, BlockSize, Builder);
-            Value *LH = Builder.CreateExtractElement(
-                A.getVector(IsScalarMatrixTransposed ? K : I),
-                IsScalarMatrixTransposed ? I : K);
-            Value *Splat = Builder.CreateVectorSplat(BlockSize, LH, "splat");
-            Sum =
-                createMulAdd(isSumZero && K == 0 ? nullptr : Sum, Splat, R,
-                             IsFP, Builder, FMF.allowContract(), NumComputeOps);
-          }
-          Result.setVector(I,
-                           insertVector(Result.getVector(I), J, Sum, Builder));
-        }
-      }
-    }
+    unsigned NumComputeOps = llvm::emitMatrixMultiply(
+        Builder, Result.vectors(), A.vectors(), B.vectors(), TTI,
+        Result.isColumnMajor(), IsTiled, IsScalarMatrixTransposed,
+        Opts.matrix_split_matmul_remainder_over_threshold);
     Result.addNumComputeOps(NumComputeOps);
   }
 
@@ -2313,30 +1996,11 @@ public:
 
   /// Lowers llvm.matrix.transpose.
   MatrixTy LowerTranspose(CallInst *Inst, IRBuilder<> &Builder) {
-    MatrixTy Result(isColumnMajor());
-    Value *InputVal = Inst->getArgOperand(0);
-    FixedVectorType *VectorTy = cast<FixedVectorType>(InputVal->getType());
     ShapeInfo ArgShape(Inst->getArgOperand(1), Inst->getArgOperand(2));
-    MatrixTy InputMatrix = getMatrix(InputVal, ArgShape, Builder);
-
-    const unsigned NewNumVecs =
-        InputMatrix.isColumnMajor() ? ArgShape.NumRows : ArgShape.NumColumns;
-    const unsigned NewNumElts =
-        InputMatrix.isColumnMajor() ? ArgShape.NumColumns : ArgShape.NumRows;
-
-    for (unsigned I = 0; I < NewNumVecs; ++I) {
-      // Build a single result vector. First initialize it.
-      Value *ResultVector = PoisonValue::get(
-          FixedVectorType::get(VectorTy->getElementType(), NewNumElts));
-      // Go through the old elements and insert it into the resulting vector.
-      for (auto J : enumerate(InputMatrix.vectors())) {
-        Value *Elt = Builder.CreateExtractElement(J.value(), I);
-        // Row and column indices are transposed.
-        ResultVector =
-            Builder.CreateInsertElement(ResultVector, Elt, J.index());
-      }
-      Result.addVector(ResultVector);
-    }
+    MatrixTy InputMatrix = getMatrix(Inst->getArgOperand(0), ArgShape, Builder);
+    SmallVector<Value *> Vectors =
+        emitMatrixTranspose(Builder, InputMatrix.vectors());
+    MatrixTy Result(isColumnMajor(), Vectors);
 
     // TODO: Improve estimate of operations needed for transposes. Currently we
     // just count the insertelement/extractelement instructions, but do not
