@@ -1125,3 +1125,222 @@ loop:
 exit:
   ret void
 }
+
+; The start of %gep.a contains %x /u %y, which is only executed if %l.b == 0.
+; It is needed by both the SCEV and the memory checks.
+define void @udiv_in_cond_block(ptr %a, ptr %b, i32 %x, i32 %y, i64 %n) {
+; CHECK-LABEL: define void @udiv_in_cond_block(
+; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i32 [[X:%.*]], i32 [[Y:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[B4:%.*]] = ptrtoaddr ptr [[B]] to i64
+; CHECK-NEXT:    [[A3:%.*]] = ptrtoaddr ptr [[A]] to i64
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_SCEVCHECK:.*]]
+; CHECK:       [[VECTOR_SCEVCHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N]], -1
+; CHECK-NEXT:    [[TMP1:%.*]] = udiv i32 [[X]], [[Y]]
+; CHECK-NEXT:    [[TMP2:%.*]] = trunc i64 [[TMP0]] to i32
+; CHECK-NEXT:    [[TMP3:%.*]] = add i32 [[TMP1]], [[TMP2]]
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp slt i32 [[TMP3]], [[TMP1]]
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp ugt i64 [[TMP0]], 4294967295
+; CHECK-NEXT:    [[TMP6:%.*]] = or i1 [[TMP4]], [[TMP5]]
+; CHECK-NEXT:    br i1 [[TMP6]], [[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP7:%.*]] = udiv i32 [[X]], [[Y]]
+; CHECK-NEXT:    [[TMP8:%.*]] = sext i32 [[TMP7]] to i64
+; CHECK-NEXT:    [[TMP9:%.*]] = shl nsw i64 [[TMP8]], 2
+; CHECK-NEXT:    [[TMP10:%.*]] = add i64 [[A3]], [[TMP9]]
+; CHECK-NEXT:    [[TMP11:%.*]] = sub i64 [[TMP10]], [[B4]]
+; CHECK-NEXT:    [[TMP12:%.*]] = sub i64 [[TMP11]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP12]], 15
+; CHECK-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
+  %l.b = load i32, ptr %gep.b, align 4
+  %c = icmp eq i32 %l.b, 0
+  br i1 %c, label %then, label %latch
+
+then:
+  %div = udiv i32 %x, %y
+  %iv.trunc = trunc i64 %iv to i32
+  %add = add i32 %iv.trunc, %div
+  %idx = sext i32 %add to i64
+  %gep.a = getelementptr inbounds i32, ptr %a, i64 %idx
+  store i32 %l.b, ptr %gep.a, align 4
+  br label %latch
+
+latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Same as @udiv_in_cond_block, but the divisor is known non-zero and not poison.
+define void @udiv_non_zero_divisor_in_cond_block(ptr %a, ptr %b, i32 %x, i32 noundef %y, i64 %n) {
+; CHECK-LABEL: define void @udiv_non_zero_divisor_in_cond_block(
+; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i32 [[X:%.*]], i32 noundef [[Y:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[B4:%.*]] = ptrtoaddr ptr [[B]] to i64
+; CHECK-NEXT:    [[A3:%.*]] = ptrtoaddr ptr [[A]] to i64
+; CHECK-NEXT:    [[Y_NZ:%.*]] = or i32 [[Y]], 1
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_SCEVCHECK:.*]]
+; CHECK:       [[VECTOR_SCEVCHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N]], -1
+; CHECK-NEXT:    [[TMP1:%.*]] = udiv i32 [[X]], [[Y_NZ]]
+; CHECK-NEXT:    [[TMP2:%.*]] = trunc i64 [[TMP0]] to i32
+; CHECK-NEXT:    [[TMP3:%.*]] = add i32 [[TMP1]], [[TMP2]]
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp slt i32 [[TMP3]], [[TMP1]]
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp ugt i64 [[TMP0]], 4294967295
+; CHECK-NEXT:    [[TMP6:%.*]] = or i1 [[TMP4]], [[TMP5]]
+; CHECK-NEXT:    br i1 [[TMP6]], [[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP7:%.*]] = udiv i32 [[X]], [[Y_NZ]]
+; CHECK-NEXT:    [[TMP8:%.*]] = sext i32 [[TMP7]] to i64
+; CHECK-NEXT:    [[TMP9:%.*]] = shl nsw i64 [[TMP8]], 2
+; CHECK-NEXT:    [[TMP10:%.*]] = add i64 [[A3]], [[TMP9]]
+; CHECK-NEXT:    [[TMP11:%.*]] = sub i64 [[TMP10]], [[B4]]
+; CHECK-NEXT:    [[TMP12:%.*]] = sub i64 [[TMP11]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP12]], 15
+; CHECK-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
+;
+entry:
+  %y.nz = or i32 %y, 1
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
+  %l.b = load i32, ptr %gep.b, align 4
+  %c = icmp eq i32 %l.b, 0
+  br i1 %c, label %then, label %latch
+
+then:
+  %div = udiv i32 %x, %y.nz
+  %iv.trunc = trunc i64 %iv to i32
+  %add = add i32 %iv.trunc, %div
+  %idx = sext i32 %add to i64
+  %gep.a = getelementptr inbounds i32, ptr %a, i64 %idx
+  store i32 %l.b, ptr %gep.a, align 4
+  br label %latch
+
+latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The start of %gep.a contains %x /u %y, which is only executed if %l.b == 0.
+; The memory checks for the inner loop are generated in the outer loop.
+define void @udiv_in_cond_block_inner_loop(ptr %a, ptr %b, i64 %x, i64 %y, i64 %n, i64 %m) {
+; CHECK-LABEL: define void @udiv_in_cond_block_inner_loop(
+; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[X:%.*]], i64 [[Y:%.*]], i64 [[N:%.*]], i64 [[M:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[A1:%.*]] = ptrtoaddr ptr [[A]] to i64
+; CHECK-NEXT:    [[B2:%.*]] = ptrtoaddr ptr [[B]] to i64
+; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
+; CHECK:       [[OUTER_HEADER]]:
+; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], [[OUTER_LATCH:%.*]] ]
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = udiv i64 [[X]], [[Y]]
+; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[TMP0]], 2
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[A1]], [[TMP1]]
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], [[B2]]
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[TMP3]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP4]], 15
+; CHECK-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
+;
+entry:
+  br label %outer.header
+
+outer.header:
+  %outer.iv = phi i64 [ 0, %entry ], [ %outer.iv.next, %outer.latch ]
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %outer.header ], [ %iv.next, %latch ]
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
+  %l.b = load i32, ptr %gep.b, align 4
+  %c = icmp eq i32 %l.b, 0
+  br i1 %c, label %then, label %latch
+
+then:
+  %div = udiv i64 %x, %y
+  %idx = add i64 %iv, %div
+  %gep.a = getelementptr inbounds i32, ptr %a, i64 %idx
+  store i32 %l.b, ptr %gep.a, align 4
+  br label %latch
+
+latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %outer.latch, label %loop
+
+outer.latch:
+  %outer.iv.next = add nuw nsw i64 %outer.iv, 1
+  %outer.ec = icmp eq i64 %outer.iv.next, %m
+  br i1 %outer.ec, label %exit, label %outer.header
+
+exit:
+  ret void
+}
+
+; The memory checks need (%n - 1) /u %s, which is also computed for the trip
+; count before the checks, so they reuse it.
+define void @udiv_in_trip_count(ptr %a, ptr %b, i64 %n, i64 %s) mustprogress {
+; CHECK-LABEL: define void @udiv_in_trip_count(
+; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]], i64 [[S:%.*]]) #[[ATTR0:[0-9]+]] {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[PRE:%.*]] = icmp sgt i64 [[N]], 0
+; CHECK-NEXT:    br i1 [[PRE]], label %[[LOOP_PREHEADER:.*]], [[EXIT:label %.*]]
+; CHECK:       [[LOOP_PREHEADER]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N]], -1
+; CHECK-NEXT:    [[TMP1:%.*]] = udiv i64 [[TMP0]], [[S]]
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP1]], 1
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP2]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP1]], 2
+; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[TMP3]], 4
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP4]]
+; CHECK-NEXT:    [[TMP6:%.*]] = shl i64 [[TMP1]], 3
+; CHECK-NEXT:    [[TMP7:%.*]] = add nuw nsw i64 [[TMP6]], 4
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP7]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[TMP8]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[TMP5]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
+;
+entry:
+  %pre = icmp sgt i64 %n, 0
+  br i1 %pre, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %count = phi i64 [ 0, %entry ], [ %count.next, %loop ]
+  %iv.2 = shl nuw nsw i64 %iv, 1
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv.2
+  %l.b = load i32, ptr %gep.b, align 4
+  %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
+  store i32 %l.b, ptr %gep.a, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %count.next = add nuw nsw i64 %count, %s
+  %ec = icmp slt i64 %count.next, %n
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  ret void
+}

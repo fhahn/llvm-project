@@ -531,3 +531,189 @@ for.body:                                         ; preds = %for.body, %entry
 for.end:                                          ; preds = %for.body
   ret void
 }
+
+; The start of %gep.a contains %x /u %y, which is only executed if %l.b == 0.
+; It is needed by both the SCEV and the memory checks.
+define void @udiv_in_cond_block(ptr %a, ptr %b, i32 %x, i32 %y, i64 %n) {
+; LV-LABEL: @udiv_in_cond_block(
+; LV-NEXT:  loop.lver.check:
+; LV-NEXT:    [[TMP0:%.*]] = shl i64 [[N:%.*]], 2
+; LV-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B:%.*]], i64 [[TMP0]]
+; LV-NEXT:    [[TMP1:%.*]] = udiv i32 [[X:%.*]], [[Y:%.*]]
+; LV-NEXT:    [[TMP2:%.*]] = sext i32 [[TMP1]] to i64
+; LV-NEXT:    [[TMP3:%.*]] = shl nsw i64 [[TMP2]], 2
+; LV-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[A:%.*]], i64 [[TMP3]]
+; LV-NEXT:    [[TMP4:%.*]] = add i64 [[TMP0]], [[TMP3]]
+; LV-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP4]]
+; LV-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[SCEVGEP2]]
+; LV-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP1]], [[SCEVGEP]]
+; LV-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; LV-NEXT:    [[TMP5:%.*]] = add i64 [[N]], -1
+; LV-NEXT:    [[TMP6:%.*]] = udiv i32 [[X]], [[Y]]
+; LV-NEXT:    [[TMP7:%.*]] = trunc i64 [[TMP5]] to i32
+; LV-NEXT:    [[TMP8:%.*]] = add i32 [[TMP6]], [[TMP7]]
+; LV-NEXT:    [[TMP9:%.*]] = icmp slt i32 [[TMP8]], [[TMP6]]
+; LV-NEXT:    [[TMP10:%.*]] = icmp ugt i64 [[TMP5]], 4294967295
+; LV-NEXT:    [[TMP11:%.*]] = or i1 [[TMP9]], [[TMP10]]
+; LV-NEXT:    [[LVER_SAFE:%.*]] = or i1 [[FOUND_CONFLICT]], [[TMP11]]
+; LV-NEXT:    br i1 [[LVER_SAFE]], label [[LOOP_PH_LVER_ORIG:%.*]], label [[LOOP_PH:%.*]]
+; LV:       loop.ph.lver.orig:
+; LV-NEXT:    br label [[LOOP_LVER_ORIG:%.*]]
+; LV:       loop.lver.orig:
+; LV-NEXT:    [[IV_LVER_ORIG:%.*]] = phi i64 [ 0, [[LOOP_PH_LVER_ORIG]] ], [ [[IV_NEXT_LVER_ORIG:%.*]], [[LATCH_LVER_ORIG:%.*]] ]
+; LV-NEXT:    [[GEP_B_LVER_ORIG:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[IV_LVER_ORIG]]
+; LV-NEXT:    [[L_B_LVER_ORIG:%.*]] = load i32, ptr [[GEP_B_LVER_ORIG]], align 4
+; LV-NEXT:    [[C_LVER_ORIG:%.*]] = icmp eq i32 [[L_B_LVER_ORIG]], 0
+; LV-NEXT:    br i1 [[C_LVER_ORIG]], label [[THEN_LVER_ORIG:%.*]], label [[LATCH_LVER_ORIG]]
+; LV:       then.lver.orig:
+; LV-NEXT:    [[DIV_LVER_ORIG:%.*]] = udiv i32 [[X]], [[Y]]
+; LV-NEXT:    [[IV_TRUNC_LVER_ORIG:%.*]] = trunc i64 [[IV_LVER_ORIG]] to i32
+; LV-NEXT:    [[ADD_LVER_ORIG:%.*]] = add i32 [[IV_TRUNC_LVER_ORIG]], [[DIV_LVER_ORIG]]
+; LV-NEXT:    [[IDX_LVER_ORIG:%.*]] = sext i32 [[ADD_LVER_ORIG]] to i64
+; LV-NEXT:    [[GEP_A_LVER_ORIG:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IDX_LVER_ORIG]]
+; LV-NEXT:    store i32 [[L_B_LVER_ORIG]], ptr [[GEP_A_LVER_ORIG]], align 4
+; LV-NEXT:    br label [[LATCH_LVER_ORIG]]
+; LV:       latch.lver.orig:
+; LV-NEXT:    [[IV_NEXT_LVER_ORIG]] = add nuw nsw i64 [[IV_LVER_ORIG]], 1
+; LV-NEXT:    [[EC_LVER_ORIG:%.*]] = icmp eq i64 [[IV_NEXT_LVER_ORIG]], [[N]]
+; LV-NEXT:    br i1 [[EC_LVER_ORIG]], label [[EXIT_LOOPEXIT:%.*]], label [[LOOP_LVER_ORIG]]
+; LV:       loop.ph:
+; LV-NEXT:    br label [[LOOP:%.*]]
+; LV:       loop:
+; LV-NEXT:    [[IV:%.*]] = phi i64 [ 0, [[LOOP_PH]] ], [ [[IV_NEXT:%.*]], [[LATCH:%.*]] ]
+; LV-NEXT:    [[GEP_B:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[IV]]
+; LV-NEXT:    [[L_B:%.*]] = load i32, ptr [[GEP_B]], align 4, !alias.scope [[META0:![0-9]+]], !noalias [[META3:![0-9]+]]
+; LV-NEXT:    [[C:%.*]] = icmp eq i32 [[L_B]], 0
+; LV-NEXT:    br i1 [[C]], label [[THEN:%.*]], label [[LATCH]]
+; LV:       then:
+; LV-NEXT:    [[DIV:%.*]] = udiv i32 [[X]], [[Y]]
+; LV-NEXT:    [[IV_TRUNC:%.*]] = trunc i64 [[IV]] to i32
+; LV-NEXT:    [[ADD:%.*]] = add i32 [[IV_TRUNC]], [[DIV]]
+; LV-NEXT:    [[IDX:%.*]] = sext i32 [[ADD]] to i64
+; LV-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IDX]]
+; LV-NEXT:    store i32 [[L_B]], ptr [[GEP_A]], align 4, !alias.scope [[META3]]
+; LV-NEXT:    br label [[LATCH]]
+; LV:       latch:
+; LV-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; LV-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
+; LV-NEXT:    br i1 [[EC]], label [[EXIT_LOOPEXIT3:%.*]], label [[LOOP]]
+; LV:       exit.loopexit:
+; LV-NEXT:    br label [[EXIT:%.*]]
+; LV:       exit.loopexit3:
+; LV-NEXT:    br label [[EXIT]]
+; LV:       exit:
+; LV-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
+  %l.b = load i32, ptr %gep.b, align 4
+  %c = icmp eq i32 %l.b, 0
+  br i1 %c, label %then, label %latch
+
+then:
+  %div = udiv i32 %x, %y
+  %iv.trunc = trunc i64 %iv to i32
+  %add = add i32 %iv.trunc, %div
+  %idx = sext i32 %add to i64
+  %gep.a = getelementptr inbounds i32, ptr %a, i64 %idx
+  store i32 %l.b, ptr %gep.a, align 4
+  br label %latch
+
+latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The start of %gep.a contains %x urem %y, which is only executed if
+; %l.b == 0.
+define void @urem_in_cond_block(ptr %a, ptr %b, i64 %x, i64 %y, i64 %n) {
+; LV-LABEL: @urem_in_cond_block(
+; LV-NEXT:  loop.lver.check:
+; LV-NEXT:    [[TMP0:%.*]] = urem i64 [[X:%.*]], [[Y:%.*]]
+; LV-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[A:%.*]], i64 [[TMP0]]
+; LV-NEXT:    [[TMP1:%.*]] = add i64 [[N:%.*]], [[X]]
+; LV-NEXT:    [[TMP2:%.*]] = udiv i64 [[X]], [[Y]]
+; LV-NEXT:    [[TMP3:%.*]] = mul nuw i64 [[Y]], [[TMP2]]
+; LV-NEXT:    [[TMP4:%.*]] = sub i64 [[TMP1]], [[TMP3]]
+; LV-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP4]]
+; LV-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[B:%.*]], i64 [[N]]
+; LV-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP]], [[SCEVGEP2]]
+; LV-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[SCEVGEP1]]
+; LV-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; LV-NEXT:    br i1 [[FOUND_CONFLICT]], label [[LOOP_PH_LVER_ORIG:%.*]], label [[LOOP_PH:%.*]]
+; LV:       loop.ph.lver.orig:
+; LV-NEXT:    br label [[LOOP_LVER_ORIG:%.*]]
+; LV:       loop.lver.orig:
+; LV-NEXT:    [[IV_LVER_ORIG:%.*]] = phi i64 [ 0, [[LOOP_PH_LVER_ORIG]] ], [ [[IV_NEXT_LVER_ORIG:%.*]], [[LATCH_LVER_ORIG:%.*]] ]
+; LV-NEXT:    [[GEP_B_LVER_ORIG:%.*]] = getelementptr inbounds i8, ptr [[B]], i64 [[IV_LVER_ORIG]]
+; LV-NEXT:    [[L_B_LVER_ORIG:%.*]] = load i8, ptr [[GEP_B_LVER_ORIG]], align 1
+; LV-NEXT:    [[C_LVER_ORIG:%.*]] = icmp eq i8 [[L_B_LVER_ORIG]], 0
+; LV-NEXT:    br i1 [[C_LVER_ORIG]], label [[THEN_LVER_ORIG:%.*]], label [[LATCH_LVER_ORIG]]
+; LV:       then.lver.orig:
+; LV-NEXT:    [[REM_LVER_ORIG:%.*]] = urem i64 [[X]], [[Y]]
+; LV-NEXT:    [[IDX_LVER_ORIG:%.*]] = add i64 [[IV_LVER_ORIG]], [[REM_LVER_ORIG]]
+; LV-NEXT:    [[GEP_A_LVER_ORIG:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 [[IDX_LVER_ORIG]]
+; LV-NEXT:    store i8 [[L_B_LVER_ORIG]], ptr [[GEP_A_LVER_ORIG]], align 1
+; LV-NEXT:    br label [[LATCH_LVER_ORIG]]
+; LV:       latch.lver.orig:
+; LV-NEXT:    [[IV_NEXT_LVER_ORIG]] = add nuw nsw i64 [[IV_LVER_ORIG]], 1
+; LV-NEXT:    [[EC_LVER_ORIG:%.*]] = icmp eq i64 [[IV_NEXT_LVER_ORIG]], [[N]]
+; LV-NEXT:    br i1 [[EC_LVER_ORIG]], label [[EXIT_LOOPEXIT:%.*]], label [[LOOP_LVER_ORIG]]
+; LV:       loop.ph:
+; LV-NEXT:    br label [[LOOP:%.*]]
+; LV:       loop:
+; LV-NEXT:    [[IV:%.*]] = phi i64 [ 0, [[LOOP_PH]] ], [ [[IV_NEXT:%.*]], [[LATCH:%.*]] ]
+; LV-NEXT:    [[GEP_B:%.*]] = getelementptr inbounds i8, ptr [[B]], i64 [[IV]]
+; LV-NEXT:    [[L_B:%.*]] = load i8, ptr [[GEP_B]], align 1, !alias.scope [[META5:![0-9]+]]
+; LV-NEXT:    [[C:%.*]] = icmp eq i8 [[L_B]], 0
+; LV-NEXT:    br i1 [[C]], label [[THEN:%.*]], label [[LATCH]]
+; LV:       then:
+; LV-NEXT:    [[REM:%.*]] = urem i64 [[X]], [[Y]]
+; LV-NEXT:    [[IDX:%.*]] = add i64 [[IV]], [[REM]]
+; LV-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 [[IDX]]
+; LV-NEXT:    store i8 [[L_B]], ptr [[GEP_A]], align 1, !alias.scope [[META8:![0-9]+]], !noalias [[META5]]
+; LV-NEXT:    br label [[LATCH]]
+; LV:       latch:
+; LV-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; LV-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
+; LV-NEXT:    br i1 [[EC]], label [[EXIT_LOOPEXIT3:%.*]], label [[LOOP]]
+; LV:       exit.loopexit:
+; LV-NEXT:    br label [[EXIT:%.*]]
+; LV:       exit.loopexit3:
+; LV-NEXT:    br label [[EXIT]]
+; LV:       exit:
+; LV-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  %gep.b = getelementptr inbounds i8, ptr %b, i64 %iv
+  %l.b = load i8, ptr %gep.b, align 1
+  %c = icmp eq i8 %l.b, 0
+  br i1 %c, label %then, label %latch
+
+then:
+  %rem = urem i64 %x, %y
+  %idx = add i64 %iv, %rem
+  %gep.a = getelementptr inbounds i8, ptr %a, i64 %idx
+  store i8 %l.b, ptr %gep.a, align 1
+  br label %latch
+
+latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
