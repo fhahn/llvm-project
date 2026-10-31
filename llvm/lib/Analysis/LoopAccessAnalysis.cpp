@@ -289,6 +289,24 @@ static bool evaluatePtrAddRecAtMaxBTCWillNotWrap(
 }
 
 /// Return true if \p S is known to be monotonically non-decreasing
+/// (in the signed sense, without signed wrap) across iterations of \p L.
+static bool isKnownSignedNonDecreasingInLoop(const SCEV *S, const Loop *L,
+                                             ScalarEvolution &SE) {
+  if (SE.isLoopInvariant(S, L))
+    return true;
+  if (const auto *AR = dyn_cast<SCEVAddRecExpr>(S)) {
+    assert(AR->getLoop() == L &&
+           "trying to check for AddRec in different loop");
+    return SE.getMonotonicPredicateType(AR, ICmpInst::ICMP_SGE) ==
+           ScalarEvolution::MonotonicPredicateType::MonotonicallyIncreasing;
+  }
+  return isa<SCEVSMaxExpr, SCEVSMinExpr>(S) &&
+         all_of(S->operands(), [&](const SCEV *Op) {
+           return isKnownSignedNonDecreasingInLoop(Op, L, SE);
+         });
+}
+
+/// Return true if \p S is known to be monotonically non-decreasing
 /// (in the unsigned sense, without unsigned wrap) across iterations of \p L.
 static bool isKnownNonDecreasingInLoop(const SCEV *S, const Loop *L,
                                        ScalarEvolution &SE) {
@@ -318,9 +336,15 @@ static bool isKnownNonDecreasingInLoop(const SCEV *S, const Loop *L,
     [[fallthrough]];
   case scUMaxExpr:
   case scUMinExpr:
+  case scZeroExtend:
     return all_of(S->operands(), [&](const SCEV *Op) {
       return isKnownNonDecreasingInLoop(Op, L, SE);
     });
+  case scSMaxExpr:
+  case scSMinExpr:
+    // Signed and unsigned order agree on non-negative values.
+    return SE.isKnownNonNegative(S) &&
+           isKnownSignedNonDecreasingInLoop(S, L, SE);
   default:
     return false;
   }
