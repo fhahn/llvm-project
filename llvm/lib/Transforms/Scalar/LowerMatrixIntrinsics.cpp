@@ -24,6 +24,7 @@
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/DomTreeUpdater.h"
 #include "llvm/Analysis/LoopInfo.h"
@@ -268,6 +269,7 @@ class LowerMatrixIntrinsics {
   Function &Func;
   const DataLayout &DL;
   const TargetTransformInfo &TTI;
+  const LowerMatrixIntrinsicsOptions &PassOpts;
   FunctionAnalysisManager &AM;
   AliasAnalysis *AA = nullptr;
   DominatorTree *DT = nullptr;
@@ -462,8 +464,11 @@ private:
 
 public:
   LowerMatrixIntrinsics(const ScalarOptions &Opts, Function &F,
-                        TargetTransformInfo &TTI, FunctionAnalysisManager &AM)
-      : Opts(Opts), Func(F), DL(F.getDataLayout()), TTI(TTI), AM(AM) {}
+                        TargetTransformInfo &TTI,
+                        const LowerMatrixIntrinsicsOptions &PassOpts,
+                        FunctionAnalysisManager &AM)
+      : Opts(Opts), Func(F), DL(F.getDataLayout()), TTI(TTI),
+        PassOpts(PassOpts), AM(AM) {}
 
   unsigned getNumOps(Type *VT) {
     assert(isa<FixedVectorType>(VT) && "Expected vector type");
@@ -992,11 +997,17 @@ public:
       WorkList = propagateShapeBackward(WorkList);
     }
 
-    bool Changed = optimizeTransposes();
-    if (Opts.matrix_print_after_transpose_opt) {
-      dbgs() << "Dump after matrix transpose optimization:\n";
-      Func.print(dbgs());
+    bool Changed = false;
+    if (PassOpts.TransposeOpts) {
+      Changed |= optimizeTransposes();
+      if (Opts.matrix_print_after_transpose_opt) {
+        dbgs() << "Dump after matrix transpose optimization:\n";
+        Func.print(dbgs());
+      }
     }
+
+    if (!PassOpts.Lower)
+      return Changed;
 
     SmallVector<CallInst *, 16> MaybeFusableInsts;
     SmallVector<Instruction *, 16> MatrixInsts;
@@ -1812,7 +1823,7 @@ public:
   LowerMatrixMultiplyFused(CallInst *MatMul,
                            SmallPtrSetImpl<Instruction *> &FusedInsts,
                            SmallVector<IntrinsicInst *, 16> &LifetimeEnds) {
-    if (!Opts.fuse_matrix || Opts.fuse_matrix_tile_size == 0)
+    if (!Opts.fuse_matrix || !PassOpts.Fuse || Opts.fuse_matrix_tile_size == 0)
       return;
 
     Value *A = MatMul->getArgOperand(0);
@@ -2583,7 +2594,7 @@ PreservedAnalyses LowerMatrixIntrinsicsPass::run(Function &F,
   auto &TTI = AM.getResult<TargetIRAnalysis>(F);
 
   const ScalarOptions &Opts = getScalarOptions(F);
-  LowerMatrixIntrinsics LMT(Opts, F, TTI, AM);
+  LowerMatrixIntrinsics LMT(Opts, F, TTI, Options, AM);
   if (LMT.Visit()) {
     PreservedAnalyses PA;
     PA.preserve<LoopAnalysis>();
@@ -2591,6 +2602,22 @@ PreservedAnalyses LowerMatrixIntrinsicsPass::run(Function &F,
     return PA;
   }
   return PreservedAnalyses::all();
+}
+
+void LowerMatrixIntrinsicsPass::printPipeline(
+    raw_ostream &OS, function_ref<StringRef(StringRef)> MapClassName2PassName) {
+  static_cast<PassInfoMixin<LowerMatrixIntrinsicsPass> *>(this)->printPipeline(
+      OS, MapClassName2PassName);
+  // Only print options that differ from the defaults.
+  SmallVector<StringRef> Params;
+  if (!Options.TransposeOpts)
+    Params.push_back("no-transpose-opts");
+  if (!Options.Fuse)
+    Params.push_back("no-fuse");
+  if (!Options.Lower)
+    Params.push_back("no-lower");
+  if (!Params.empty())
+    OS << '<' << join(Params, ";") << '>';
 }
 
 bool llvm::isMatrixLayoutColumnMajor(const LLVMContext &Ctx) {

@@ -969,6 +969,31 @@ Expected<bool> parseDropUnnecessaryAssumesPassOptions(StringRef Params) {
                                             "DropUnnecessaryAssumes");
 }
 
+Expected<LowerMatrixIntrinsicsOptions>
+parseLowerMatrixIntrinsicsPassOptions(StringRef Params) {
+  LowerMatrixIntrinsicsOptions Result;
+  while (!Params.empty()) {
+    StringRef ParamName;
+    std::tie(ParamName, Params) = Params.split(';');
+
+    bool Enable = !ParamName.consume_front("no-");
+    if (ParamName == "transpose-opts")
+      Result.TransposeOpts = Enable;
+    else if (ParamName == "fuse")
+      Result.Fuse = Enable;
+    else if (ParamName == "lower")
+      Result.Lower = Enable;
+    else {
+      return make_error<StringError>(
+          formatv("invalid LowerMatrixIntrinsics pass parameter '{}'",
+                  ParamName)
+              .str(),
+          inconvertibleErrorCode());
+    }
+  }
+  return Result;
+}
+
 Expected<IRNormalizerOptions> parseIRNormalizerPassOptions(StringRef Params) {
   IRNormalizerOptions Result;
   while (!Params.empty()) {
