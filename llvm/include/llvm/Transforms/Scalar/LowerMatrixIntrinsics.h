@@ -29,7 +29,7 @@ struct LowerMatrixIntrinsicsOptions {
 };
 
 class LowerMatrixIntrinsicsPass
-    : public RequiredPassInfoMixin<LowerMatrixIntrinsicsPass> {
+    : public OptionalPassInfoMixin<LowerMatrixIntrinsicsPass> {
   LowerMatrixIntrinsicsOptions Options;
 
 public:
