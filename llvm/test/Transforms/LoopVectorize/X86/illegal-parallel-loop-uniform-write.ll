@@ -129,14 +129,19 @@ for.end15:
 
 ; Same test as above, but without the invalid parallel_loop_access metadata.
 
-; Here we can see the vectorizer does the mem dep checks and decides it is
-; unsafe to vectorize.
+; Here we can see the vectorizer does the mem dep checks and only vectorizes
+; with runtime checks.
 define void @no-par-mem-metadata(ptr nocapture %a, ptr nocapture %b, i32 %k, i32 %m) #0 {
 ; CHECK-LABEL: @no-par-mem-metadata(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[CMP27:%.*]] = icmp sgt i32 [[M:%.*]], 0
 ; CHECK-NEXT:    br i1 [[CMP27]], label [[FOR_BODY3_LR_PH_US_PREHEADER:%.*]], label [[FOR_END15:%.*]]
 ; CHECK:       for.body3.lr.ph.us.preheader:
+; CHECK-NEXT:    [[TMP5:%.*]] = add i32 [[M]], -1
+; CHECK-NEXT:    [[TMP6:%.*]] = zext i32 [[TMP5]] to i64
+; CHECK-NEXT:    [[TMP7:%.*]] = shl nuw nsw i64 [[TMP6]], 2
+; CHECK-NEXT:    [[TMP12:%.*]] = add nuw nsw i64 [[TMP7]], 4
+; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[A:%.*]], i64 [[TMP12]]
 ; CHECK-NEXT:    br label [[FOR_BODY3_LR_PH_US:%.*]]
 ; CHECK:       for.end.us:
 ; CHECK-NEXT:    [[ARRAYIDX9_US:%.*]] = getelementptr inbounds i32, ptr [[B:%.*]], i64 [[INDVARS_IV33:%.*]]
@@ -148,24 +153,64 @@ define void @no-par-mem-metadata(ptr nocapture %a, ptr nocapture %b, i32 %k, i32
 ; CHECK-NEXT:    [[EXITCOND36:%.*]] = icmp eq i32 [[LFTR_WIDEIV35]], [[M]]
 ; CHECK-NEXT:    br i1 [[EXITCOND36]], label [[FOR_END15_LOOPEXIT:%.*]], label [[FOR_BODY3_LR_PH_US]], !llvm.loop [[LOOP2]]
 ; CHECK:       for.body3.us:
-; CHECK-NEXT:    [[INDVARS_IV29:%.*]] = phi i64 [ 0, [[FOR_BODY3_LR_PH_US]] ], [ [[INDVARS_IV_NEXT30:%.*]], [[FOR_BODY3_US:%.*]] ]
+; CHECK-NEXT:    [[INDVARS_IV29:%.*]] = phi i64 [ [[BC_RESUME_VAL:%.*]], [[SCALAR_PH:%.*]] ], [ [[INDVARS_IV_NEXT30:%.*]], [[FOR_BODY3_US1:%.*]] ]
 ; CHECK-NEXT:    [[TMP1:%.*]] = trunc i64 [[INDVARS_IV29]] to i32
 ; CHECK-NEXT:    [[ADD4_US:%.*]] = add i32 [[ADD_US:%.*]], [[TMP1]]
 ; CHECK-NEXT:    [[IDXPROM_US:%.*]] = sext i32 [[ADD4_US]] to i64
-; CHECK-NEXT:    [[ARRAYIDX_US:%.*]] = getelementptr inbounds i32, ptr [[A:%.*]], i64 [[IDXPROM_US]]
+; CHECK-NEXT:    [[ARRAYIDX_US:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IDXPROM_US]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[ARRAYIDX_US]], align 4
 ; CHECK-NEXT:    [[ADD5_US:%.*]] = add nsw i32 [[TMP2]], 1
 ; CHECK-NEXT:    store i32 [[ADD5_US]], ptr [[ARRAYIDX7_US:%.*]], align 4
 ; CHECK-NEXT:    [[INDVARS_IV_NEXT30]] = add i64 [[INDVARS_IV29]], 1
 ; CHECK-NEXT:    [[LFTR_WIDEIV31:%.*]] = trunc i64 [[INDVARS_IV_NEXT30]] to i32
 ; CHECK-NEXT:    [[EXITCOND32:%.*]] = icmp eq i32 [[LFTR_WIDEIV31]], [[M]]
-; CHECK-NEXT:    br i1 [[EXITCOND32]], label [[FOR_END_US:%.*]], label [[FOR_BODY3_US]], !llvm.loop [[LOOP1:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EXITCOND32]], label [[FOR_END_US:%.*]], label [[FOR_BODY3_US1]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:       for.body3.lr.ph.us:
 ; CHECK-NEXT:    [[INDVARS_IV33]] = phi i64 [ [[INDVARS_IV_NEXT34]], [[FOR_END_US]] ], [ 0, [[FOR_BODY3_LR_PH_US_PREHEADER]] ]
 ; CHECK-NEXT:    [[TMP3:%.*]] = trunc i64 [[INDVARS_IV33]] to i32
 ; CHECK-NEXT:    [[ADD_US]] = add i32 [[TMP3]], [[K:%.*]]
 ; CHECK-NEXT:    [[ARRAYIDX7_US]] = getelementptr inbounds i32, ptr [[A]], i64 [[INDVARS_IV33]]
-; CHECK-NEXT:    br label [[FOR_BODY3_US]]
+; CHECK-NEXT:    [[TMP13:%.*]] = zext i32 [[M]] to i64
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP13]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH]], label [[VECTOR_SCEVCHECK:%.*]]
+; CHECK:       vector.scevcheck:
+; CHECK-NEXT:    [[TMP14:%.*]] = add i32 [[ADD_US]], [[TMP5]]
+; CHECK-NEXT:    [[TMP15:%.*]] = icmp slt i32 [[TMP14]], [[ADD_US]]
+; CHECK-NEXT:    br i1 [[TMP15]], label [[SCALAR_PH]], label [[VECTOR_MEMCHECK:%.*]]
+; CHECK:       vector.memcheck:
+; CHECK-NEXT:    [[TMP11:%.*]] = sext i32 [[ADD_US]] to i64
+; CHECK-NEXT:    [[TMP24:%.*]] = shl nsw i64 [[TMP11]], 2
+; CHECK-NEXT:    [[TMP25:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP24]]
+; CHECK-NEXT:    [[TMP26:%.*]] = add i64 [[TMP24]], [[TMP7]]
+; CHECK-NEXT:    [[TMP27:%.*]] = add i64 [[TMP26]], 4
+; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP27]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[SCEVGEP3]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[TMP25]], [[SCEVGEP2]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
+; CHECK:       vector.ph:
+; CHECK-NEXT:    [[TMP16:%.*]] = and i64 [[TMP13]], 3
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP13]], [[TMP16]]
+; CHECK-NEXT:    br label [[FOR_BODY3_US:%.*]]
+; CHECK:       vector.body:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[FOR_BODY3_US]] ]
+; CHECK-NEXT:    [[TMP17:%.*]] = trunc i64 [[INDEX]] to i32
+; CHECK-NEXT:    [[TMP18:%.*]] = add i32 [[ADD_US]], [[TMP17]]
+; CHECK-NEXT:    [[TMP19:%.*]] = sext i32 [[TMP18]] to i64
+; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP19]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP20]], align 4, !alias.scope [[META8:![0-9]+]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP21:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP21]], label [[MIDDLE_BLOCK:%.*]], label [[FOR_BODY3_US]], !llvm.loop [[LOOP11:![0-9]+]]
+; CHECK:       middle.block:
+; CHECK-NEXT:    [[TMP22:%.*]] = add nsw <4 x i32> [[WIDE_LOAD]], splat (i32 1)
+; CHECK-NEXT:    [[TMP23:%.*]] = extractelement <4 x i32> [[TMP22]], i64 3
+; CHECK-NEXT:    store i32 [[TMP23]], ptr [[ARRAYIDX7_US]], align 4, !alias.scope [[META12:![0-9]+]], !noalias [[META8]]
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP13]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label [[FOR_END_US]], label [[SCALAR_PH]]
+; CHECK:       scalar.ph:
+; CHECK-NEXT:    [[BC_RESUME_VAL]] = phi i64 [ [[N_VEC]], [[MIDDLE_BLOCK]] ], [ 0, [[FOR_BODY3_LR_PH_US]] ], [ 0, [[VECTOR_SCEVCHECK]] ], [ 0, [[VECTOR_MEMCHECK]] ]
+; CHECK-NEXT:    br label [[FOR_BODY3_US1]]
 ; CHECK:       for.end15.loopexit:
 ; CHECK-NEXT:    br label [[FOR_END15]]
 ; CHECK:       for.end15:

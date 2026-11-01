@@ -159,15 +159,21 @@ exit:                                             ; preds = %loop.latch
 define i32 @load_with_pointer_phi_outside_loop(ptr %A, ptr %B, ptr %C, i1 %c.0, i1 %c.1) {
 ; CHECK-LABEL: 'load_with_pointer_phi_outside_loop'
 ; CHECK-NEXT:    loop.header:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            %v8 = load double, ptr %ptr, align 8 ->
-; CHECK-NEXT:            store double %mul16, ptr %arrayidx, align 8
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %arrayidx = getelementptr inbounds double, ptr %A, i64 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %ptr = phi ptr [ %A, %if.then ], [ %ptr.select, %if.else ]
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %A High: (256000 + %A))
+; CHECK-NEXT:            Member: {%A,+,8}<nuw><%loop.header>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %ptr High: (8 + %ptr))
+; CHECK-NEXT:            Member: %ptr
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -205,15 +211,21 @@ exit:                                             ; preds = %loop.latch
 define i32 @store_with_pointer_phi_outside_loop(ptr %A, ptr %B, ptr %C, i1 %c.0, i1 %c.1) {
 ; CHECK-LABEL: 'store_with_pointer_phi_outside_loop'
 ; CHECK-NEXT:    loop.header:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            %v8 = load double, ptr %arrayidx, align 8 ->
-; CHECK-NEXT:            store double %mul16, ptr %ptr, align 8
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %ptr = phi ptr [ %A, %if.then ], [ %ptr.select, %if.else ]
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %arrayidx = getelementptr inbounds double, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %ptr High: (8 + %ptr))
+; CHECK-NEXT:            Member: %ptr
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %A High: (256000 + %A))
+; CHECK-NEXT:            Member: {%A,+,8}<nuw><%loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -412,15 +424,21 @@ exit:                                             ; preds = %loop.latch
 define i32 @store_with_pointer_phi_outside_loop_select(ptr %A, ptr %B, ptr %C, i1 %c.0, i1 %c.1) {
 ; CHECK-LABEL: 'store_with_pointer_phi_outside_loop_select'
 ; CHECK-NEXT:    loop.header:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            %v8 = load double, ptr %arrayidx, align 8 ->
-; CHECK-NEXT:            store double %mul16, ptr %ptr, align 8
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %ptr = phi ptr [ %A, %if.then ], [ %ptr.select, %if.else ]
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %arrayidx = getelementptr inbounds double, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %ptr High: (8 + %ptr))
+; CHECK-NEXT:            Member: %ptr
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %A High: (256000 + %A))
+; CHECK-NEXT:            Member: {%A,+,8}<nuw><%loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:

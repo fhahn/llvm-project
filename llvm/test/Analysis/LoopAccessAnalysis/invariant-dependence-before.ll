@@ -458,15 +458,21 @@ exit:
 define void @test_invar_dependence_before_via_loop_guard_positive_strided_access_1(ptr %a, i32 %off) {
 ; CHECK-LABEL: 'test_invar_dependence_before_via_loop_guard_positive_strided_access_1'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            %l = load i32, ptr %a, align 4 ->
-; CHECK-NEXT:            store i32 %l, ptr %gep, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep = getelementptr i32, ptr %gep.off, i32 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:        ptr %a
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: ((sext i32 %off to i64) + %a) High: (400 + (sext i32 %off to i64) + %a))
+; CHECK-NEXT:            Member: {((sext i32 %off to i64) + %a),+,4}<nw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %a High: (4 + %a))
+; CHECK-NEXT:            Member: %a
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -494,15 +500,21 @@ exit:
 define void @test_invar_dependence_before_via_loop_guard_positive_strided_access_2(ptr %a, i32 %off) {
 ; CHECK-LABEL: 'test_invar_dependence_before_via_loop_guard_positive_strided_access_2'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            %l = load i32, ptr %gep, align 4 ->
-; CHECK-NEXT:            store i32 %l, ptr %a, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:        ptr %a
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep = getelementptr i32, ptr %gep.off, i32 %iv
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %a High: (4 + %a))
+; CHECK-NEXT:            Member: %a
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: ((sext i32 %off to i64) + %a) High: (400 + (sext i32 %off to i64) + %a))
+; CHECK-NEXT:            Member: {((sext i32 %off to i64) + %a),+,4}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -529,15 +541,21 @@ exit:
 define void @test_invar_dependence_not_before_via_loop_guard_positive_strided_access_1(ptr %a, i32 %off) {
 ; CHECK-LABEL: 'test_invar_dependence_not_before_via_loop_guard_positive_strided_access_1'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            %l = load i32, ptr %a, align 4 ->
-; CHECK-NEXT:            store i32 %l, ptr %gep, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep = getelementptr i32, ptr %gep.off, i32 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:        ptr %a
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: ((sext i32 %off to i64) + %a) High: (400 + (sext i32 %off to i64) + %a))
+; CHECK-NEXT:            Member: {((sext i32 %off to i64) + %a),+,4}<nw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %a High: (4 + %a))
+; CHECK-NEXT:            Member: %a
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -565,15 +583,21 @@ exit:
 define void @test_invar_dependence_not_before_via_loop_guard_positive_strided_access_2(ptr %a, i32 %off) {
 ; CHECK-LABEL: 'test_invar_dependence_not_before_via_loop_guard_positive_strided_access_2'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            %l = load i32, ptr %gep, align 4 ->
-; CHECK-NEXT:            store i32 %l, ptr %a, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:        ptr %a
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep = getelementptr i32, ptr %gep.off, i32 %iv
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %a High: (4 + %a))
+; CHECK-NEXT:            Member: %a
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: ((sext i32 %off to i64) + %a) High: (400 + (sext i32 %off to i64) + %a))
+; CHECK-NEXT:            Member: {((sext i32 %off to i64) + %a),+,4}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:

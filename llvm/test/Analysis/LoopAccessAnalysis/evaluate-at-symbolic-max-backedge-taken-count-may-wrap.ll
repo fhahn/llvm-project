@@ -87,19 +87,25 @@ exit:
 define i32 @check_no_dep_via_bounds_compare_symbolic_max_btc_neg_1(ptr %P, i32 %x, i32 %y) {
 ; CHECK-LABEL: 'check_no_dep_via_bounds_compare_symbolic_max_btc_neg_1'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            store i64 0, ptr %gep.iv, align 4 ->
-; CHECK-NEXT:            %l.2 = load i32, ptr %gep.P.4, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:        Forward:
 ; CHECK-NEXT:            %l = load i32, ptr %gep.iv, align 4 ->
 ; CHECK-NEXT:            store i64 0, ptr %gep.iv, align 4
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.iv = getelementptr inbounds i64, ptr %gep.P.8, i32 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.P.4 = getelementptr inbounds nuw i8, ptr %P, i32 4
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: (8 + (8 * %y) + %P) High: inttoptr (i32 -1 to ptr))
+; CHECK-NEXT:            Member: {(8 + (8 * %y) + %P),+,8}<%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: (4 + %P) High: (8 + %P)<nuw>)
+; CHECK-NEXT:            Member: (4 + %P)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:

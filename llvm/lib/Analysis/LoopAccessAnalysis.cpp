@@ -3045,6 +3045,38 @@ bool MemoryDepChecker::areAccessesCompletelyBeforeOrAfter(const SCEV *Src,
   return SE.isKnownPredicate(CmpInst::ICMP_ULE, SinkEnd, SrcStart);
 }
 
+/// Return true if the distance \p Dist from \p Src to \p Sink in the first
+/// iteration of \p L is constant. Otherwise, if \p Src (or else \p Sink) is
+/// based on a phi, return true if the distance is constant for each incoming
+/// value of that phi, e.g. a phi of pointers with constant offsets from the
+/// same base.
+static bool isStartDistanceConstant(const SCEV *Dist, const SCEV *Src,
+                                    const SCEV *Sink, const Loop *L,
+                                    ScalarEvolution &SE) {
+  auto IsConstant = [L](const SCEV *D) {
+    return match(D, m_scev_AffineAddRec(m_SCEVConstant(), m_SCEV(),
+                                        m_SpecificLoop(L)));
+  };
+  if (IsConstant(Dist))
+    return true;
+
+  for (auto [Ptr, Other] : {std::pair(Src, Sink), std::pair(Sink, Src)}) {
+    auto *U = dyn_cast<SCEVUnknown>(SE.getPointerBase(Ptr));
+    auto *PN = U ? dyn_cast<PHINode>(U->getValue()) : nullptr;
+    if (!PN)
+      continue;
+    const SCEV *Offset = SE.removePointerBase(Ptr);
+    return all_of(PN->incoming_values(), [&](Value *V) {
+      // Values not available at loop entry, e.g. the exit value of a sibling
+      // loop, cannot be combined with AddRecs of L.
+      const SCEV *Start = SE.getSCEV(V);
+      return SE.isAvailableAtLoopEntry(Start, L) &&
+             IsConstant(SE.getMinusSCEV(Other, SE.getAddExpr(Offset, Start)));
+    });
+  }
+  return false;
+}
+
 std::variant<MemoryDepChecker::Dependence::DepType,
              MemoryDepChecker::DepDistanceStrideAndSizeInfo>
 MemoryDepChecker::getDependenceDistanceStrideAndSize(
@@ -3112,6 +3144,17 @@ MemoryDepChecker::getDependenceDistanceStrideAndSize(
   int64_t StrideBPtrInt = *StrideBPtr;
   LLVM_DEBUG(dbgs() << "LAA:  Src induction step: " << StrideAPtrInt
                     << " Sink induction step: " << StrideBPtrInt << "\n");
+
+  // Retry with runtime checks if the distance is not constant, unless the
+  // (unscaled) strides differ and the distance in the first iteration is
+  // constant: then the checks could only pass for small trip counts. Equal
+  // unscaled strides with different access sizes still retry, as before.
+  bool ConstStartDiffStrides =
+      StrideAPtrInt != StrideBPtrInt &&
+      isStartDistanceConstant(Dist, Src, Sink, InnermostLoop, SE);
+  ShouldRetryWithRuntimeChecks |=
+      !isa<SCEVConstant>(Dist) && !ConstStartDiffStrides;
+
   // At least Src or Sink are loop invariant and the other is strided or
   // invariant.
   if (!StrideAPtrInt || !StrideBPtrInt) {
@@ -3148,11 +3191,6 @@ MemoryDepChecker::getDependenceDistanceStrideAndSize(
   std::optional<uint64_t> CommonStride;
   if (StrideAScaled == StrideBScaled)
     CommonStride = StrideAScaled;
-
-  // TODO: Historically, we didn't retry with runtime checks when (unscaled)
-  // strides were different but there is no inherent reason to.
-  if (!isa<SCEVConstant>(Dist))
-    ShouldRetryWithRuntimeChecks |= StrideAPtrInt == StrideBPtrInt;
 
   // If distance is a SCEVCouldNotCompute, return Unknown immediately.
   if (isa<SCEVCouldNotCompute>(Dist)) {

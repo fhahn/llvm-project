@@ -41,15 +41,21 @@ exit:
 define void @access_after_via_loop_guard_sge(ptr %a, i64 %off) {
 ; CHECK-LABEL: 'access_after_via_loop_guard_sge'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            %l = load i32, ptr %gep.after, align 4 ->
-; CHECK-NEXT:            store i32 %add, ptr %gep, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep = getelementptr inbounds i32, ptr %a, i64 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.after = getelementptr inbounds nuw i32, ptr %a, i64 %off
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %a High: (400 + %a))
+; CHECK-NEXT:            Member: {%a,+,4}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: ((4 * %off) + %a) High: (4 + (4 * %off) + %a))
+; CHECK-NEXT:            Member: ((4 * %off) + %a)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -121,15 +127,21 @@ exit:
 define void @access_after_via_loop_guard_sge_99(ptr %a, i64 %off) {
 ; CHECK-LABEL: 'access_after_via_loop_guard_sge_99'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            %l = load i32, ptr %gep.after, align 4 ->
-; CHECK-NEXT:            store i32 %add, ptr %gep, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep = getelementptr inbounds i32, ptr %a, i64 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.after = getelementptr inbounds nuw i32, ptr %a, i64 %off
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %a High: (400 + %a))
+; CHECK-NEXT:            Member: {%a,+,4}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: ((4 * %off) + %a) High: (4 + (4 * %off) + %a))
+; CHECK-NEXT:            Member: ((4 * %off) + %a)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -160,15 +172,21 @@ exit:
 define void @access_after_via_loop_guard_uge(ptr %a, i64 %off) {
 ; CHECK-LABEL: 'access_after_via_loop_guard_uge'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            %l = load i32, ptr %gep.after, align 4 ->
-; CHECK-NEXT:            store i32 %add, ptr %gep, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep = getelementptr inbounds i32, ptr %a, i64 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.after = getelementptr inbounds nuw i32, ptr %a, i64 %off
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %a High: (400 + %a))
+; CHECK-NEXT:            Member: {%a,+,4}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: ((4 * %off) + %a) High: (4 + (4 * %off) + %a))
+; CHECK-NEXT:            Member: ((4 * %off) + %a)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -354,15 +372,21 @@ exit:
 define void @nodep_via_logical_and_1(ptr %A, i32 %index, i32 %n) {
 ; CHECK-LABEL: 'nodep_via_logical_and_1'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            %0 = load double, ptr %gep.load, align 8 ->
-; CHECK-NEXT:            store double %0, ptr %gep.store, align 8
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.store = getelementptr double, ptr %A, i64 %index.ext
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.load = getelementptr double, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: ((8 * (zext i32 %index to i64))<nuw><nsw> + %A) High: (8 + (8 * (zext i32 %index to i64))<nuw><nsw> + %A))
+; CHECK-NEXT:            Member: ((8 * (zext i32 %index to i64))<nuw><nsw> + %A)
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: ((8 * (zext i32 (1 + %index) to i64))<nuw><nsw> + %A) High: (8 + (8 * (zext i32 (1 + %index) to i64))<nuw><nsw> + (8 * (zext i32 (-1 + (-1 * %index) + (1 smax (1 + %index))) to i64))<nuw><nsw> + %A))
+; CHECK-NEXT:            Member: {((8 * (zext i32 (1 + %index) to i64))<nuw><nsw> + %A),+,8}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:

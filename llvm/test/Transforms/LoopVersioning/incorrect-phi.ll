@@ -29,7 +29,7 @@ define void @phi_with_poison() {
 ; CHECK-NEXT:    [[_TMP126:%.*]] = getelementptr [3 x [5 x i16]], ptr [[_TMP123]], i16 0, i64 [[_TMP1423]]
 ; CHECK-NEXT:    [[_TMP129:%.*]] = getelementptr [5 x i16], ptr [[_TMP126]], i16 0, i64 poison
 ; CHECK-NEXT:    [[_TMP130:%.*]] = load i16, ptr [[_TMP129]], align 2, !alias.scope [[META0:![0-9]+]]
-; CHECK-NEXT:    store i16 poison, ptr @x, align 2, !alias.scope [[META3:![0-9]+]]
+; CHECK-NEXT:    store i16 poison, ptr @x, align 2, !alias.scope [[META3:![0-9]+]], !noalias [[META0]]
 ; CHECK-NEXT:    [[_TMP142]] = add i64 [[_TMP1423]], 1
 ; CHECK-NEXT:    br i1 false, label %[[BB6]], label %[[LOOP_EXIT_LOOPEXIT1:.*]]
 ; CHECK:       [[LOOP_EXIT_LOOPEXIT]]:
@@ -93,7 +93,7 @@ define void @phi_with_non_loop_defined_value() {
 ; CHECK-NEXT:    [[_TMP126:%.*]] = getelementptr [3 x [5 x i16]], ptr [[_TMP123]], i16 0, i64 [[_TMP1423]]
 ; CHECK-NEXT:    [[_TMP129:%.*]] = getelementptr [5 x i16], ptr [[_TMP126]], i16 0, i64 poison
 ; CHECK-NEXT:    [[_TMP130:%.*]] = load i16, ptr [[_TMP129]], align 2, !alias.scope [[META5:![0-9]+]]
-; CHECK-NEXT:    store i16 poison, ptr @x, align 2, !alias.scope [[META8:![0-9]+]]
+; CHECK-NEXT:    store i16 poison, ptr @x, align 2, !alias.scope [[META8:![0-9]+]], !noalias [[META5]]
 ; CHECK-NEXT:    [[_TMP142]] = add i64 [[_TMP1423]], 1
 ; CHECK-NEXT:    br i1 false, label %[[BB6]], label %[[LOOP_EXIT_LOOPEXIT1:.*]]
 ; CHECK:       [[LOOP_EXIT_LOOPEXIT]]:
