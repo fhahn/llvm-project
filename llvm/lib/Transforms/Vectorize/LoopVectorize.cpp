@@ -6994,6 +6994,25 @@ static bool isOutsideLoopWorkProfitable(GeneratedRTChecks &Checks,
       return false;
     }
   }
+
+  // Also skip vectorization if the trip count, refined by loop guards, is known
+  // to be less than the minimum required trip count (or equal to it, if a
+  // scalar epilogue is required). The minimum iteration check would always
+  // branch to the scalar loop in that case.
+  ScalarEvolution &SE = *PSE.getSE();
+  const SCEV *TC = vputils::getSCEVExprForVPValue(Plan.getTripCount(), PSE);
+  Type *TCTy = TC->getType();
+  CmpInst::Predicate Pred =
+      Plan.requiresScalarEpilogue() ? ICmpInst::ICMP_ULE : ICmpInst::ICMP_ULT;
+  if (isUIntN(TCTy->getScalarSizeInBits(), MinTC) &&
+      SE.isKnownPredicate(Pred, SE.applyLoopGuards(TC, L),
+                          SE.getConstant(TCTy, MinTC))) {
+    LLVM_DEBUG(dbgs() << "LV: Vectorization is not beneficial: trip count is "
+                         "known to be less than the minimum profitable trip "
+                         "count ("
+                      << VF.MinProfitableTripCount << ")\n");
+    return false;
+  }
   return true;
 }
 

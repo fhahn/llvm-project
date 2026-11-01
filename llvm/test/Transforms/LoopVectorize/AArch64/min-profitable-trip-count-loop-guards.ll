@@ -6,9 +6,10 @@
 
 target triple = "arm64-apple-macosx"
 
+; CHECK-NOT: Created vector loop never executes
+
 ; The trip count is at most 9, and the minimum profitable trip count is 10.
-; CHECK: remark: <unknown>:0:0: vectorized loop (vectorization width: 2, interleaved count: 4)
-; CHECK-NEXT: remark: <unknown>:0:0: Created vector loop never executes due to insufficient trip count.
+; CHECK: remark: <unknown>:0:0: loop not vectorized: cannot prove it is safe to reorder memory operations
 define void @tc_below_min_profitable_tc(ptr %dst, ptr %a, ptr %b, ptr %c, i64 %n) {
 entry:
   %g = icmp ult i64 %n, 10
@@ -63,8 +64,7 @@ exit:
 
 ; A scalar epilogue is required by the interleave group for the strided load of
 ; %a. The trip count is at most 12, and the minimum profitable trip count is 12.
-; CHECK: remark: <unknown>:0:0: vectorized loop (vectorization width: 2, interleaved count: 4)
-; CHECK-NEXT: remark: <unknown>:0:0: Created vector loop never executes due to insufficient trip count.
+; CHECK: remark: <unknown>:0:0: loop not vectorized: cannot prove it is safe to reorder memory operations
 define void @tc_equal_min_profitable_tc_requires_scalar_epilogue(ptr %dst, ptr %a, ptr %b, ptr %c, i64 %n) {
 entry:
   %g = icmp ult i64 %n, 13
