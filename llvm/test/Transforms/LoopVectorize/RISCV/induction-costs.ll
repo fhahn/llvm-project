@@ -26,22 +26,16 @@ define void @skip_free_iv_truncate(i16 %x, ptr %A) #0 {
 ; CHECK-NEXT:    [[TMP39:%.*]] = add i64 [[TMP38]], 2
 ; CHECK-NEXT:    [[SCEVGEP12:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP39]]
 ; CHECK-NEXT:    [[TMP40:%.*]] = shl nsw i64 [[X_I64]], 3
-; CHECK-NEXT:    [[SCEVGEP13:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP40]]
+; CHECK-NEXT:    [[TMP12:%.*]] = add nsw i64 [[TMP40]], -8
+; CHECK-NEXT:    [[SCEVGEP15:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP12]]
 ; CHECK-NEXT:    [[TMP41:%.*]] = mul i64 [[TMP3]], 24
 ; CHECK-NEXT:    [[TMP42:%.*]] = add i64 [[TMP41]], [[TMP40]]
 ; CHECK-NEXT:    [[TMP43:%.*]] = add i64 [[TMP42]], 8
-; CHECK-NEXT:    [[SCEVGEP14:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP43]]
-; CHECK-NEXT:    [[TMP44:%.*]] = add nsw i64 [[TMP40]], -8
-; CHECK-NEXT:    [[SCEVGEP15:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP44]]
-; CHECK-NEXT:    [[SCEVGEP16:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP42]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP9]], [[SCEVGEP14]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP13]], [[SCEVGEP12]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[SCEVGEP16:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP43]]
 ; CHECK-NEXT:    [[BOUND017:%.*]] = icmp ult ptr [[SCEVGEP9]], [[SCEVGEP16]]
 ; CHECK-NEXT:    [[BOUND118:%.*]] = icmp ult ptr [[SCEVGEP15]], [[SCEVGEP12]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT19:%.*]] = and i1 [[BOUND017]], [[BOUND118]]
-; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT19]]
-; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT19]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
@@ -233,9 +227,8 @@ attributes #1 = { "target-cpu"="sifive-p670" vscale_range(2, 1024) }
 ; CHECK: [[META0]] = !{[[META1:![0-9]+]]}
 ; CHECK: [[META1]] = distinct !{[[META1]], [[META2:![0-9]+]]}
 ; CHECK: [[META2]] = distinct !{[[META2]], i1 false, !"LVerDomain"}
-; CHECK: [[META3]] = !{[[META4:![0-9]+]], [[META5:![0-9]+]]}
+; CHECK: [[META3]] = !{[[META4:![0-9]+]]}
 ; CHECK: [[META4]] = distinct !{[[META4]], [[META2]]}
-; CHECK: [[META5]] = distinct !{[[META5]], [[META2]]}
 ; CHECK: [[LOOP6]] = distinct !{[[LOOP6]], [[META7:![0-9]+]], [[META8:![0-9]+]]}
 ; CHECK: [[META7]] = !{!"llvm.loop.isvectorized", i32 1}
 ; CHECK: [[META8]] = !{!"llvm.loop.unroll.runtime.disable"}

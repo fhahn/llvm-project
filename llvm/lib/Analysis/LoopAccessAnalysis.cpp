@@ -1689,7 +1689,8 @@ public:
   /// loop, but if \p AllowPartial is set then we will have checks for those
   /// pointers we could analyze. \p DepChecker is used to erase the classes
   /// with unknown dependences from DepCands and to record those dependences in
-  /// \p RtCheck.
+  /// \p RtCheck. Accesses of erased classes that need the same checks are put
+  /// back into a class.
   bool canCheckPtrAtRT(RuntimePointerChecking &RtCheck, Loop *TheLoop,
                        const SymbolicStrideMap &Strides,
                        Value *&UncomputablePtr, bool AllowPartial,
@@ -1744,6 +1745,16 @@ private:
 
     return ScopeList;
   }
+
+  /// Put accesses of a class erased on retry back into a class if they have
+  /// the same unknown dependences and none between them. Then they need the
+  /// same checks, as computeStencilMergeCost assumes, and groupChecks can group
+  /// them. Only do so for AddRecs at most a step apart, so the union of their
+  /// ranges has no gaps with more than one iteration. Their step must exceed
+  /// every access size in the alias set of \p AccessInfos, so none of their
+  /// checks can be diff checks.
+  void groupErasedClassAccesses(const RuntimePointerChecking &RtCheck,
+                                ArrayRef<MemAccessInfo> AccessInfos);
 
   const AnalysisOptions &Opts;
 
@@ -2209,6 +2220,58 @@ bool AccessAnalysis::createCheckForAccess(RuntimePointerChecking &RtCheck,
   return true;
 }
 
+void AccessAnalysis::groupErasedClassAccesses(
+    const RuntimePointerChecking &RtCheck,
+    ArrayRef<MemAccessInfo> AccessInfos) {
+  if (RtCheck.ErasedDepClasses.empty())
+    return;
+
+  const DataLayout &DL = TheLoop->getHeader()->getDataLayout();
+  uint64_t MaxAccessSizeInBytes = 0;
+  for (MemAccessInfo Access : AccessInfos) {
+    for (bool IsWrite : {false, true}) {
+      auto It = Accesses.find(MemAccessInfo(Access.getPointer(), IsWrite));
+      if (It == Accesses.end())
+        continue;
+      for (Type *Ty : It->second)
+        MaxAccessSizeInBytes = std::max(
+            MaxAccessSizeInBytes, DL.getTypeAllocSize(Ty).getKnownMinValue());
+    }
+  }
+
+  const SmallPtrSet<Value *, 4> NoDeps;
+  auto GetUnknownDeps = [&](Value *Ptr) -> const SmallPtrSet<Value *, 4> & {
+    auto It = RtCheck.UnknownDeps.find(Ptr);
+    return It == RtCheck.UnknownDeps.end() ? NoDeps : It->second;
+  };
+
+  for (auto [Idx, A] : enumerate(AccessInfos)) {
+    Value *PtrA = A.getPointer();
+    if (!RtCheck.ErasedDepClasses.contains(PtrA))
+      continue;
+    const SCEV *ScevA = PSE.getSCEV(PtrA);
+    const APInt *Step;
+    if (!match(ScevA, m_scev_AffineAddRec(m_SCEV(), m_scev_APInt(Step),
+                                          m_SpecificLoop(TheLoop))) ||
+        Step->abs().ule(MaxAccessSizeInBytes))
+      continue;
+    const SmallPtrSet<Value *, 4> &DepsA = GetUnknownDeps(PtrA);
+    for (MemAccessInfo B : AccessInfos.take_front(Idx)) {
+      // Unlike a read, a write is also checked against reads of other classes.
+      if (A.getInt() != B.getInt())
+        continue;
+      Value *PtrB = B.getPointer();
+      if (!RtCheck.ErasedDepClasses.isEquivalent(PtrA, PtrB) ||
+          DepsA.contains(PtrB) || DepsA != GetUnknownDeps(PtrB))
+        continue;
+      std::optional<APInt> Diff =
+          PSE.getSE()->computeConstantDifference(ScevA, PSE.getSCEV(PtrB));
+      if (Diff && Diff->abs().ule(Step->abs()))
+        DepCands.unionSets(B, A);
+    }
+  }
+}
+
 bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
                                      Loop *TheLoop,
                                      const SymbolicStrideMap &StridesMap,
@@ -2296,6 +2359,8 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
              "are reads or there is at most 1 entry");
       continue;
     }
+
+    groupErasedClassAccesses(RtCheck, AccessInfos);
 
     const DataLayout &DL = TheLoop->getHeader()->getDataLayout();
     auto StoreSize = [&DL](Type *Ty) { return DL.getTypeStoreSize(Ty); };
