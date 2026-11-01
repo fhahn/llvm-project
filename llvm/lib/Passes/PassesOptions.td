@@ -58,7 +58,7 @@ defm : BoolField<"enable-loop-versioning-licm", "false",
 defm : BoolField<"enable-loopinterchange", "true",
   "Enable the LoopInterchange Pass">;
 defm : BoolField<"enable-matrix", "false",
-  "Enable lowering of the matrix intrinsics">;
+  "Enable LowerMatrixIntrinsics pass in the optimization pipeline">;
 defm : BoolField<"enable-merge-functions", "false",
   "Enable function merging as part of the optimization pipeline">;
 defm : BoolField<"enable-mergeicmps", "true",

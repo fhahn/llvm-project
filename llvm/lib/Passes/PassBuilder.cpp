@@ -969,11 +969,6 @@ Expected<bool> parseDropUnnecessaryAssumesPassOptions(StringRef Params) {
                                             "DropUnnecessaryAssumes");
 }
 
-Expected<bool> parseLowerMatrixIntrinsicsPassOptions(StringRef Params) {
-  return PassBuilder::parseSinglePassOption(Params, "minimal",
-                                            "LowerMatrixIntrinsics");
-}
-
 Expected<IRNormalizerOptions> parseIRNormalizerPassOptions(StringRef Params) {
   IRNormalizerOptions Result;
   while (!Params.empty()) {

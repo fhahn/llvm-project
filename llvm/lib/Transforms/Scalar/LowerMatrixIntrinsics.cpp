@@ -268,11 +268,10 @@ class LowerMatrixIntrinsics {
   Function &Func;
   const DataLayout &DL;
   const TargetTransformInfo &TTI;
-  FunctionAnalysisManager *AM;
+  FunctionAnalysisManager &AM;
   AliasAnalysis *AA = nullptr;
   DominatorTree *DT = nullptr;
   LoopInfo *LI = nullptr;
-  OptimizationRemarkEmitter *ORE = nullptr;
 
   /// Contains estimates of the number of operations (loads, stores, compute)
   /// required to lower a matrix operation.
@@ -463,18 +462,13 @@ private:
 
 public:
   LowerMatrixIntrinsics(const ScalarOptions &Opts, Function &F,
-                        TargetTransformInfo &TTI, FunctionAnalysisManager *AM)
+                        TargetTransformInfo &TTI, FunctionAnalysisManager &AM)
       : Opts(Opts), Func(F), DL(F.getDataLayout()), TTI(TTI), AM(AM) {}
 
   unsigned getNumOps(Type *VT) {
     assert(isa<FixedVectorType>(VT) && "Expected vector type");
     return getNumOps(VT->getScalarType(),
                      cast<FixedVectorType>(VT)->getNumElements());
-  }
-
-  /// Is this the minimal version executed in the backend pipelines.
-  bool isMinimal() const {
-    return !DT;
   }
 
   /// Return the estimated number of vector ops required for an operation on
@@ -987,12 +981,10 @@ public:
     if (WorkList.empty())
       return false;
 
-    if (AM) {
-      ORE = &AM->getResult<OptimizationRemarkEmitterAnalysis>(Func);
-      AA = &AM->getResult<AAManager>(Func);
-      DT = &AM->getResult<DominatorTreeAnalysis>(Func);
-      LI = &AM->getResult<LoopAnalysis>(Func);
-    }
+    auto &ORE = AM.getResult<OptimizationRemarkEmitterAnalysis>(Func);
+    AA = &AM.getResult<AAManager>(Func);
+    DT = &AM.getResult<DominatorTreeAnalysis>(Func);
+    LI = &AM.getResult<LoopAnalysis>(Func);
 
     // Propagate shapes until nothing changes any longer.
     while (!WorkList.empty()) {
@@ -1000,13 +992,10 @@ public:
       WorkList = propagateShapeBackward(WorkList);
     }
 
-    bool Changed = false;
-    if (!isMinimal()) {
-      Changed |= optimizeTransposes();
-      if (Opts.matrix_print_after_transpose_opt) {
-        dbgs() << "Dump after matrix transpose optimization:\n";
-        Func.print(dbgs());
-      }
+    bool Changed = optimizeTransposes();
+    if (Opts.matrix_print_after_transpose_opt) {
+      dbgs() << "Dump after matrix transpose optimization:\n";
+      Func.print(dbgs());
     }
 
     SmallVector<CallInst *, 16> MaybeFusableInsts;
@@ -1096,10 +1085,8 @@ public:
       Changed = true;
     }
 
-    if (ORE) {
-      RemarkGenerator RemarkGen(Inst2ColumnMatrix, *ORE, Func);
-      RemarkGen.emitRemarks();
-    }
+    RemarkGenerator RemarkGen(Inst2ColumnMatrix, ORE, Func);
+    RemarkGen.emitRemarks();
 
     // Delete the instructions backwards, as it has a reduced likelihood of
     // having to update as many def-use and use-def chains.
@@ -1825,10 +1812,8 @@ public:
   LowerMatrixMultiplyFused(CallInst *MatMul,
                            SmallPtrSetImpl<Instruction *> &FusedInsts,
                            SmallVector<IntrinsicInst *, 16> &LifetimeEnds) {
-    if (!Opts.fuse_matrix || !DT || Opts.fuse_matrix_tile_size == 0)
+    if (!Opts.fuse_matrix || Opts.fuse_matrix_tile_size == 0)
       return;
-
-    assert(AA && LI && "Analyses should be available");
 
     Value *A = MatMul->getArgOperand(0);
     Value *B = MatMul->getArgOperand(1);
@@ -2598,26 +2583,14 @@ PreservedAnalyses LowerMatrixIntrinsicsPass::run(Function &F,
   auto &TTI = AM.getResult<TargetIRAnalysis>(F);
 
   const ScalarOptions &Opts = getScalarOptions(F);
-  LowerMatrixIntrinsics LMT(Opts, F, TTI, Minimal ? nullptr : &AM);
+  LowerMatrixIntrinsics LMT(Opts, F, TTI, AM);
   if (LMT.Visit()) {
     PreservedAnalyses PA;
-    if (!Minimal) {
-      PA.preserve<LoopAnalysis>();
-      PA.preserve<DominatorTreeAnalysis>();
-    }
+    PA.preserve<LoopAnalysis>();
+    PA.preserve<DominatorTreeAnalysis>();
     return PA;
   }
   return PreservedAnalyses::all();
-}
-
-void LowerMatrixIntrinsicsPass::printPipeline(
-    raw_ostream &OS, function_ref<StringRef(StringRef)> MapClassName2PassName) {
-  static_cast<PassInfoMixin<LowerMatrixIntrinsicsPass> *>(this)->printPipeline(
-      OS, MapClassName2PassName);
-  OS << '<';
-  if (Minimal)
-    OS << "minimal";
-  OS << '>';
 }
 
 bool llvm::isMatrixLayoutColumnMajor(const LLVMContext &Ctx) {

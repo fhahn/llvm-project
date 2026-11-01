@@ -10,9 +10,6 @@
 ; RUN: opt -disable-verify -verify-analysis-invalidation=0 -debug-pass-manager \
 ; RUN:     -passes='default<O0>' -S %s 2>&1 \
 ; RUN:     | FileCheck %s --check-prefixes=CHECK,CHECK-DEFAULT,CHECK-CORO,CHECK-ALLOCTOKEN
-; RUN: opt -disable-verify -verify-analysis-invalidation=0 -debug-pass-manager -enable-matrix \
-; RUN:     -passes='default<O0>' -S %s 2>&1 \
-; RUN:     | FileCheck %s --check-prefixes=CHECK,CHECK-DEFAULT,CHECK-MATRIX,CHECK-CORO,CHECK-ALLOCTOKEN
 ; RUN: opt -disable-verify -verify-analysis-invalidation=0 -debug-pass-manager -debug-info-for-profiling \
 ; RUN:     -passes='default<O0>' -S %s 2>&1 \
 ; RUN:     | FileCheck %s --check-prefixes=CHECK,CHECK-DIS,CHECK-CORO,CHECK-ALLOCTOKEN
@@ -38,8 +35,6 @@
 ; CHECK-DEFAULT-NEXT: Running pass: EntryExitInstrumenterPass
 ; CHECK-DEFAULT-NEXT: Running pass: AlwaysInlinerPass
 ; CHECK-DEFAULT-NEXT: Running analysis: ProfileSummaryAnalysis
-; CHECK-MATRIX: Running pass: LowerMatrixIntrinsicsPass
-; CHECK-MATRIX-NEXT: Running analysis: TargetIRAnalysis
 ; CHECK-CORO-NEXT: Running pass: CoroConditionalWrapper
 ; CHECK-ALLOCTOKEN-NEXT: Running pass: AllocTokenPass
 ; CHECK-CORO-NEXT: Running pass: LowerCommentStringPass

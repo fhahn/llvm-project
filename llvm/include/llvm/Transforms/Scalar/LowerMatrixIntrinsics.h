@@ -20,14 +20,8 @@ class LLVMContext;
 
 class LowerMatrixIntrinsicsPass
     : public RequiredPassInfoMixin<LowerMatrixIntrinsicsPass> {
-  bool Minimal;
-
 public:
-  LowerMatrixIntrinsicsPass(bool Minimal = false) : Minimal(Minimal) {}
   LLVM_ABI PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
-  LLVM_ABI void
-  printPipeline(raw_ostream &OS,
-                function_ref<StringRef(StringRef)> MapClassName2PassName);
 };
 
 /// Returns true if matrices in \p Ctx use column-major layout, as selected by

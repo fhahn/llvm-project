@@ -484,6 +484,7 @@ FUNCTION_PASS("lower-constant-intrinsics", LowerConstantIntrinsicsPass())
 FUNCTION_PASS("lower-expect", LowerExpectIntrinsicPass())
 FUNCTION_PASS("lower-guard-intrinsic", LowerGuardIntrinsicPass())
 FUNCTION_PASS("lower-invoke", LowerInvokePass())
+FUNCTION_PASS("lower-matrix-intrinsics", LowerMatrixIntrinsicsPass())
 FUNCTION_PASS("lower-switch", LowerSwitchPass())
 FUNCTION_PASS("lower-widenable-condition", LowerWidenableConditionPass())
 FUNCTION_PASS("make-guards-explicit", MakeGuardsExplicitPass())
@@ -653,10 +654,6 @@ FUNCTION_PASS_WITH_PARAMS(
     "lower-allow-check", "LowerAllowCheckPass",
     [](LowerAllowCheckPass::Options Opts) { return LowerAllowCheckPass(Opts); },
     parseLowerAllowCheckPassOptions, "cutoffs[indices]=N")
-FUNCTION_PASS_WITH_PARAMS(
-    "lower-matrix-intrinsics", "LowerMatrixIntrinsicsPass",
-    [](bool Minimal) { return LowerMatrixIntrinsicsPass(Minimal); },
-    parseLowerMatrixIntrinsicsPassOptions, "minimal")
 FUNCTION_PASS_WITH_PARAMS(
     "normalize", "IRNormalizerPass",
     [](IRNormalizerOptions Options) { return IRNormalizerPass(Options); },

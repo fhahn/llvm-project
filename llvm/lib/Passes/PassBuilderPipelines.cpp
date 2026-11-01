@@ -2366,10 +2366,6 @@ PassBuilder::buildO0DefaultPipeline(OptimizationLevel Level,
   if (PTO.MergeFunctions)
     MPM.addPass(MergeFunctionsPass());
 
-  if (Opts.enable_matrix)
-    MPM.addPass(
-        createModuleToFunctionPassAdaptor(LowerMatrixIntrinsicsPass(true)));
-
   if (!CGSCCOptimizerLateEPCallbacks.empty()) {
     CGSCCPassManager CGPM;
     invokeCGSCCOptimizerLateEPCallbacks(CGPM, Level);

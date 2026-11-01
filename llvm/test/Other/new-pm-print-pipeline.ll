@@ -25,9 +25,6 @@
 ; RUN: opt -disable-output -disable-verify -print-pipeline-passes -passes='function(mldst-motion<split-footer-bb>,mldst-motion<no-split-footer-bb>)' < %s | FileCheck %s --match-full-lines --check-prefixes=CHECK-8
 ; CHECK-8: function(mldst-motion<split-footer-bb>,mldst-motion<no-split-footer-bb>)
 
-; RUN: opt -disable-output -disable-verify -print-pipeline-passes -passes='function(lower-matrix-intrinsics<>,lower-matrix-intrinsics<minimal>)' < %s | FileCheck %s --match-full-lines --check-prefixes=CHECK-9
-; CHECK-9: function(lower-matrix-intrinsics<>,lower-matrix-intrinsics<minimal>)
-
 ; RUN: opt -disable-output -disable-verify -print-pipeline-passes -passes='function(loop-unroll<>,loop-unroll<partial;peeling;runtime;upperbound;profile-peeling;full-unroll-max=5;O1>,loop-unroll<no-partial;no-peeling;no-runtime;no-upperbound;no-profile-peeling;full-unroll-max=7;O1>,loop-unroll<prepare-for-lto>)' < %s | FileCheck %s --match-full-lines --check-prefixes=CHECK-10
 ; CHECK-10: function(loop-unroll<O2>,loop-unroll<partial;peeling;runtime;upperbound;profile-peeling;full-unroll-max=5;O1>,loop-unroll<no-partial;no-peeling;no-runtime;no-upperbound;no-profile-peeling;full-unroll-max=7;O1>,loop-unroll<prepare-for-lto;O2>)
 
