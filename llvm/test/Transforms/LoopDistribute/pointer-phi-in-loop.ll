@@ -10,12 +10,16 @@ define void @phi_load_store_distribute(i1 %cond, ptr %A, ptr %B, ptr %C) {
 ; CHECK:       for.body.lver.check:
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[A:%.*]], i64 2
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[C:%.*]], i64 2
+; CHECK-NEXT:    [[C_FR:%.*]] = freeze ptr [[C]]
+; CHECK-NEXT:    [[SCEVGEP1_FR:%.*]] = freeze ptr [[SCEVGEP1]]
 ; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[B:%.*]], i64 2
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[SCEVGEP1]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[C]], [[SCEVGEP]]
+; CHECK-NEXT:    [[B_FR:%.*]] = freeze ptr [[B]]
+; CHECK-NEXT:    [[SCEVGEP2_FR:%.*]] = freeze ptr [[SCEVGEP2]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[SCEVGEP1_FR]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[C_FR]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    [[BOUND03:%.*]] = icmp ult ptr [[A]], [[SCEVGEP2]]
-; CHECK-NEXT:    [[BOUND14:%.*]] = icmp ult ptr [[B]], [[SCEVGEP]]
+; CHECK-NEXT:    [[BOUND03:%.*]] = icmp ult ptr [[A]], [[SCEVGEP2_FR]]
+; CHECK-NEXT:    [[BOUND14:%.*]] = icmp ult ptr [[B_FR]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT5:%.*]] = and i1 [[BOUND03]], [[BOUND14]]
 ; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT5]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label [[ENTRY:%.*]], label [[FOR_BODY_PH_LDIST1:%.*]]

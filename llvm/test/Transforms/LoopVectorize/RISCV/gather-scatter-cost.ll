@@ -23,8 +23,10 @@ define void @predicated_uniform_load(ptr %src, i32 %n, ptr %dst, i1 %cond) {
 ; CHECK:       vector.memcheck:
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[NBRBOXES:%.*]], i64 4
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[BOXES:%.*]], i64 4
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[NBRBOXES]], [[SCEVGEP1]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[BOXES]], [[SCEVGEP]]
+; CHECK-NEXT:    [[TMP15:%.*]] = freeze ptr [[BOXES]]
+; CHECK-NEXT:    [[TMP14:%.*]] = freeze ptr [[SCEVGEP1]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[NBRBOXES]], [[TMP14]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[TMP15]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:

@@ -472,15 +472,21 @@ define void @multi_exit(ptr %dst, ptr %src.1, ptr %src.2, i64 %A, i64 %B) #0 {
 ; CHECK-NEXT:    br i1 [[TMP14]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 1
+; CHECK-NEXT:    [[TMP32:%.*]] = freeze ptr [[DST]]
+; CHECK-NEXT:    [[TMP33:%.*]] = freeze ptr [[SCEVGEP]]
 ; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[SRC_2]], i64 8
+; CHECK-NEXT:    [[TMP34:%.*]] = freeze ptr [[SRC_2]]
+; CHECK-NEXT:    [[TMP35:%.*]] = freeze ptr [[SCEVGEP2]]
 ; CHECK-NEXT:    [[TMP17:%.*]] = shl i64 [[UMIN10]], 3
 ; CHECK-NEXT:    [[TMP18:%.*]] = add i64 [[TMP17]], 8
 ; CHECK-NEXT:    [[SCEVGEP5:%.*]] = getelementptr i8, ptr [[SRC_1]], i64 [[TMP18]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP2]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC_2]], [[SCEVGEP]]
+; CHECK-NEXT:    [[TMP36:%.*]] = freeze ptr [[SRC_1]]
+; CHECK-NEXT:    [[TMP37:%.*]] = freeze ptr [[SCEVGEP5]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP32]], [[TMP35]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[TMP34]], [[TMP33]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    [[BOUND06:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP5]]
-; CHECK-NEXT:    [[BOUND17:%.*]] = icmp ult ptr [[SRC_1]], [[SCEVGEP]]
+; CHECK-NEXT:    [[BOUND06:%.*]] = icmp ult ptr [[TMP32]], [[TMP37]]
+; CHECK-NEXT:    [[BOUND17:%.*]] = icmp ult ptr [[TMP36]], [[TMP33]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT8:%.*]] = and i1 [[BOUND06]], [[BOUND17]]
 ; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT8]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]

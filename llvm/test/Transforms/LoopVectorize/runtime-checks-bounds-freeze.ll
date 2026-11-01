@@ -15,9 +15,11 @@ define void @cond_store_offset_may_be_poison(ptr noundef %a, ptr noundef %b, i64
 ; CHECK-NEXT:    [[TMP2:%.*]] = shl i64 [[N]], 2
 ; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[TMP2]], [[TMP0]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP3]]
+; CHECK-NEXT:    [[TMP7:%.*]] = freeze ptr [[TMP1]]
+; CHECK-NEXT:    [[TMP6:%.*]] = freeze ptr [[TMP4]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP2]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP1]], [[TMP5]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[TMP4]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP7]], [[TMP5]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[TMP6]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
@@ -231,10 +233,12 @@ define void @header_exiting_store_offset_may_be_poison(ptr noundef %a, ptr nound
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[TMP3]], [[TMP1]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[TMP4]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP5]]
+; CHECK-NEXT:    [[TMP9:%.*]] = freeze ptr [[TMP2]]
+; CHECK-NEXT:    [[TMP10:%.*]] = freeze ptr [[TMP6]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = add i64 [[TMP3]], 4
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP7]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP2]], [[TMP8]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[TMP6]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP9]], [[TMP8]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[TMP10]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
@@ -285,11 +289,13 @@ define void @cond_store_outer_offset_may_be_poison(ptr noundef %a, ptr noundef %
 ; CHECK-NEXT:    [[TMP12:%.*]] = mul i64 [[OUTER_IV]], [[TMP2]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[TMP4]], [[TMP12]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP6]]
+; CHECK-NEXT:    [[TMP14:%.*]] = freeze ptr [[P]]
+; CHECK-NEXT:    [[TMP13:%.*]] = freeze ptr [[TMP7]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = mul i64 [[OUTER_IV]], [[TMP11]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = add i64 [[TMP3]], [[TMP8]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP9]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[P]], [[TMP10]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[Q]], [[TMP7]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP14]], [[TMP10]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[Q]], [[TMP13]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
@@ -418,8 +424,10 @@ define void @cond_store_outer_exit_count_may_be_poison(ptr %a, ptr noundef %b, i
 ; CHECK-NEXT:    [[TMP2:%.*]] = mul i64 [[OUTER_IV]], [[TMP1]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[TMP3]], [[TMP2]]
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP4]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[P]], [[SCEVGEP1]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[SCEVGEP]]
+; CHECK-NEXT:    [[TMP7:%.*]] = freeze ptr [[P]]
+; CHECK-NEXT:    [[TMP6:%.*]] = freeze ptr [[SCEVGEP]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP7]], [[SCEVGEP1]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[TMP6]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:

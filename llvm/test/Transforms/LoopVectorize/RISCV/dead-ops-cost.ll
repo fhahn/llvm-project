@@ -141,12 +141,16 @@ define i32 @cost_of_exit_branch_and_cond_insts(ptr %a, ptr %b, i1 %c, i16 %x) vs
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[A]], i64 1
+; CHECK-NEXT:    [[TMP10:%.*]] = freeze ptr [[A]]
+; CHECK-NEXT:    [[TMP14:%.*]] = freeze ptr [[SCEVGEP]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = zext nneg i32 [[SMAX4]] to i64
 ; CHECK-NEXT:    [[TMP6:%.*]] = shl nuw nsw i64 [[TMP5]], 2
 ; CHECK-NEXT:    [[TMP7:%.*]] = add nuw nsw i64 [[TMP6]], 4
 ; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP7]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[SCEVGEP2]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[SCEVGEP]]
+; CHECK-NEXT:    [[TMP12:%.*]] = freeze ptr [[B]]
+; CHECK-NEXT:    [[TMP13:%.*]] = freeze ptr [[SCEVGEP2]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP10]], [[TMP13]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[TMP12]], [[TMP14]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:

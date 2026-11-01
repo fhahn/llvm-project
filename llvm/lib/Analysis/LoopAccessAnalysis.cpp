@@ -2093,6 +2093,35 @@ static void findForkedSCEVs(
   }
 }
 
+/// Returns true if the runtime check bounds of \p Ptr with SCEV \p PtrExpr may
+/// be poison without UB and can be frozen.
+static bool boundsNeedFreeze(Value *Ptr, const SCEV *PtrExpr, const Loop *L,
+                             const DominatorTree &DT) {
+  auto MayBeUndefOrPoison = [](const SCEV *Expr) {
+    return SCEVExprContains(Expr, [](const SCEV *S) {
+      auto *U = dyn_cast<SCEVUnknown>(S);
+      return U && !isGuaranteedNotToBeUndefOrPoison(U->getValue());
+    });
+  };
+  // Freezing would make the bounds wrong for a poison step, which may be
+  // multiplied by 0 while Ptr is accessed.
+  auto StepMayBeUndefOrPoison = [&](const SCEV *S) {
+    auto *AR = dyn_cast<SCEVAddRecExpr>(S);
+    return AR && any_of(drop_begin(AR->operands()), MayBeUndefOrPoison);
+  };
+  if (!MayBeUndefOrPoison(PtrExpr) ||
+      SCEVExprContains(PtrExpr, StepMayBeUndefOrPoison))
+    return false;
+  // Other poison operands make Ptr poison in all iterations, which is UB if
+  // an access in L dominates the only exiting block.
+  BasicBlock *Exiting = L->getExitingBlock();
+  return !Exiting || none_of(Ptr->users(), [&](User *U) {
+    auto *I = dyn_cast<Instruction>(U);
+    return I && L->contains(I) && getLoadStorePointerOperand(I) == Ptr &&
+           DT.dominates(I->getParent(), Exiting);
+  });
+}
+
 bool AccessAnalysis::createCheckForAccess(RuntimePointerChecking &RtCheck,
                                           MemAccessInfo Access, Type *AccessTy,
                                           const SymbolicStrideMap &StridesMap,
@@ -2121,8 +2150,10 @@ bool AccessAnalysis::createCheckForAccess(RuntimePointerChecking &RtCheck,
                for (const auto &[Idx, Q] : enumerate(RTCheckPtrs)) dbgs()
                << "\t(" << Idx << ") " << *Q.getPointer() << "\n");
   } else {
-    RTCheckPtrs = {
-        {replaceSymbolicStrideSCEV(PSE, TheLoop, StridesMap, Ptr), false}};
+    const SCEV *PtrExpr =
+        replaceSymbolicStrideSCEV(PSE, TheLoop, StridesMap, Ptr);
+    bool NeedsFreeze = boundsNeedFreeze(Ptr, PtrExpr, TheLoop, DT);
+    RTCheckPtrs = {{PtrExpr, NeedsFreeze}};
   }
 
   /// Check whether all pointers can participate in a runtime bounds check. They

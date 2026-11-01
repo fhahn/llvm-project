@@ -202,11 +202,15 @@ define void @bound_is_addrec_of_sibling_loop(ptr %a, ptr %b, i64 %n, i64 %d, i1 
 ; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = add vp<[[VP9]]>, vp<[[VP5]]>
 ; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = add vp<[[VP10]]>, vp<[[VP6]]>
 ; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = ptradd ir<%b>, vp<[[VP11]]>
+; CHECK-NEXT:    EMIT vp<[[VP0:%[0-9]+]]> = freeze vp<[[VP8]]>
+; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = freeze vp<[[VP12]]>
 ; CHECK-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = shl ir<%n>, ir<3>
 ; CHECK-NEXT:    EMIT vp<[[VP14:%[0-9]+]]> = add vp<[[VP13]]>, ir<-4>
 ; CHECK-NEXT:    EMIT vp<[[VP15:%[0-9]+]]> = ptradd ir<%a>, vp<[[VP14]]>
-; CHECK-NEXT:    EMIT vp<%bound0> = icmp ult vp<[[VP8]]>, vp<[[VP15]]>
-; CHECK-NEXT:    EMIT vp<%bound1> = icmp ult ir<%a>, vp<[[VP12]]>
+; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = freeze ir<%a>
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = freeze vp<[[VP15]]>
+; CHECK-NEXT:    EMIT vp<%bound0> = icmp ult vp<[[VP0]]>, vp<[[VP3]]>
+; CHECK-NEXT:    EMIT vp<%bound1> = icmp ult vp<[[VP2]]>, vp<[[VP1]]>
 ; CHECK-NEXT:    EMIT vp<%found.conflict> = and vp<%bound0>, vp<%bound1>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%found.conflict>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph

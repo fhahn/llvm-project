@@ -460,9 +460,11 @@ define i32 @multi_user_cmp_branch_use(ptr readonly %a, ptr %b, i64 noundef %n) {
 ; CHECK-VF4-IC1:       vector.memcheck:
 ; CHECK-VF4-IC1-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
 ; CHECK-VF4-IC1-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP0]]
+; CHECK-VF4-IC1-NEXT:    [[TMP12:%.*]] = freeze ptr [[B]]
+; CHECK-VF4-IC1-NEXT:    [[TMP3:%.*]] = freeze ptr [[SCEVGEP]]
 ; CHECK-VF4-IC1-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP0]]
-; CHECK-VF4-IC1-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[SCEVGEP1]]
-; CHECK-VF4-IC1-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[SCEVGEP]]
+; CHECK-VF4-IC1-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP12]], [[SCEVGEP1]]
+; CHECK-VF4-IC1-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[TMP3]]
 ; CHECK-VF4-IC1-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-VF4-IC1-NEXT:    br i1 [[FOUND_CONFLICT]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; CHECK-VF4-IC1:       vector.ph:
@@ -569,9 +571,11 @@ define i32 @multi_user_cmp_branch_use(ptr readonly %a, ptr %b, i64 noundef %n) {
 ; CHECK-VF4-IC2:       vector.memcheck:
 ; CHECK-VF4-IC2-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
 ; CHECK-VF4-IC2-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP0]]
+; CHECK-VF4-IC2-NEXT:    [[TMP5:%.*]] = freeze ptr [[B]]
+; CHECK-VF4-IC2-NEXT:    [[TMP6:%.*]] = freeze ptr [[SCEVGEP]]
 ; CHECK-VF4-IC2-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP0]]
-; CHECK-VF4-IC2-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[SCEVGEP1]]
-; CHECK-VF4-IC2-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[SCEVGEP]]
+; CHECK-VF4-IC2-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP5]], [[SCEVGEP1]]
+; CHECK-VF4-IC2-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[TMP6]]
 ; CHECK-VF4-IC2-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-VF4-IC2-NEXT:    br i1 [[FOUND_CONFLICT]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; CHECK-VF4-IC2:       vector.ph:
@@ -728,9 +732,11 @@ define i32 @multi_user_cmp_branch_use(ptr readonly %a, ptr %b, i64 noundef %n) {
 ; CHECK-VF1-IC2:       vector.memcheck:
 ; CHECK-VF1-IC2-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
 ; CHECK-VF1-IC2-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP0]]
+; CHECK-VF1-IC2-NEXT:    [[TMP18:%.*]] = freeze ptr [[B]]
+; CHECK-VF1-IC2-NEXT:    [[TMP22:%.*]] = freeze ptr [[SCEVGEP]]
 ; CHECK-VF1-IC2-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP0]]
-; CHECK-VF1-IC2-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[SCEVGEP1]]
-; CHECK-VF1-IC2-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[SCEVGEP]]
+; CHECK-VF1-IC2-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP18]], [[SCEVGEP1]]
+; CHECK-VF1-IC2-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[TMP22]]
 ; CHECK-VF1-IC2-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-VF1-IC2-NEXT:    br i1 [[FOUND_CONFLICT]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; CHECK-VF1-IC2:       vector.ph:

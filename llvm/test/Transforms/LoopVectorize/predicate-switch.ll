@@ -529,9 +529,11 @@ define void @switch_unconditional_duplicate_target(ptr %start, ptr %dest) {
 ; IC1-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; IC1:       [[VECTOR_MEMCHECK]]:
 ; IC1-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DEST]], i64 4
+; IC1-NEXT:    [[TMP6:%.*]] = freeze ptr [[DEST]]
+; IC1-NEXT:    [[TMP7:%.*]] = freeze ptr [[SCEVGEP]]
 ; IC1-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[START]], i64 400
-; IC1-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DEST]], [[SCEVGEP1]]
-; IC1-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[START]], [[SCEVGEP]]
+; IC1-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP6]], [[SCEVGEP1]]
+; IC1-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[START]], [[TMP7]]
 ; IC1-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; IC1-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; IC1:       [[VECTOR_PH]]:
@@ -583,9 +585,11 @@ define void @switch_unconditional_duplicate_target(ptr %start, ptr %dest) {
 ; IC2-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; IC2:       [[VECTOR_MEMCHECK]]:
 ; IC2-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DEST]], i64 4
+; IC2-NEXT:    [[TMP11:%.*]] = freeze ptr [[DEST]]
+; IC2-NEXT:    [[TMP12:%.*]] = freeze ptr [[SCEVGEP]]
 ; IC2-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[START]], i64 400
-; IC2-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DEST]], [[SCEVGEP1]]
-; IC2-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[START]], [[SCEVGEP]]
+; IC2-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP11]], [[SCEVGEP1]]
+; IC2-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[START]], [[TMP12]]
 ; IC2-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; IC2-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; IC2:       [[VECTOR_PH]]:
