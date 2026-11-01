@@ -672,16 +672,17 @@ struct RuntimeCheckBounds {
 /// Return the bounds of \p CG in \p TheLoop. If \p HoistRuntimeChecks is true,
 /// bounds varying in the parent loop of \p TheLoop may be widened to cover the
 /// whole parent loop, so that checks using them can be hoisted out of it.
-LLVM_ABI RuntimeCheckBounds
-getRuntimeCheckBounds(const RuntimeCheckingPtrGroup *CG, const Loop *TheLoop,
-                      ScalarEvolution &SE, bool HoistRuntimeChecks);
+LLVM_ABI RuntimeCheckBounds getRuntimeCheckBounds(
+    const RuntimeCheckingPtrGroup *CG, const Loop *TheLoop, ScalarEvolution &SE,
+    const DominatorTree &DT, bool HoistRuntimeChecks);
 
 /// Add code that checks at runtime if the accessed arrays in \p PointerChecks
 /// overlap. Returns the final comparator value or NULL if no check is needed.
 LLVM_ABI Value *
 addRuntimeChecks(Instruction *Loc, Loop *TheLoop,
                  const SmallVectorImpl<RuntimePointerCheck> &PointerChecks,
-                 SCEVExpander &Expander, bool HoistRuntimeChecks = false);
+                 SCEVExpander &Expander, const DominatorTree &DT,
+                 bool HoistRuntimeChecks = false);
 
 LLVM_ABI Value *addDiffRuntimeChecks(Instruction *Loc,
                                      ArrayRef<PointerDiffInfo> Checks,

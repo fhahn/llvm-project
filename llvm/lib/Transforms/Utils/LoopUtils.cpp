@@ -2123,7 +2123,7 @@ struct PointerBounds {
 RuntimeCheckBounds
 llvm::getRuntimeCheckBounds(const RuntimeCheckingPtrGroup *CG,
                             const Loop *TheLoop, ScalarEvolution &SE,
-                            bool HoistRuntimeChecks) {
+                            const DominatorTree &DT, bool HoistRuntimeChecks) {
   const SCEV *Low = CG->Low, *High = CG->High, *Stride = nullptr;
 
   // If the Low and High values are themselves loop-variant, then we may want
@@ -2144,9 +2144,23 @@ llvm::getRuntimeCheckBounds(const RuntimeCheckingPtrGroup *CG,
     const SCEV *Recur = LowAR->getStepRecurrence(SE);
     if (Recur == HighAR->getStepRecurrence(SE) &&
         HighAR->getLoop() == OuterLoop && LowAR->getLoop() == OuterLoop) {
-      BasicBlock *OuterLoopLatch = OuterLoop->getLoopLatch();
-      const SCEV *OuterExitCount = SE.getExitCount(OuterLoop, OuterLoopLatch);
-      if (!isa<SCEVCouldNotCompute>(OuterExitCount) &&
+      // The widened bounds must only cover addresses accessed in each outer
+      // iteration up to the backedge-taken count. The outer loop must not exit
+      // before reaching it, e.g. via a call that does not return or another
+      // subloop that may be infinite, and each outer iteration must execute
+      // all blocks of TheLoop.
+      SmallVector<BasicBlock *> OuterExitingBlocks;
+      OuterLoop->getExitingBlocks(OuterExitingBlocks);
+      const SCEV *OuterExitCount = SE.getBackedgeTakenCount(OuterLoop);
+      if (SE.loopHasNoAbnormalExits(OuterLoop) &&
+          OuterLoop->getSubLoops().size() == 1 &&
+          all_of(TheLoop->blocks(),
+                 [&](BasicBlock *BB) {
+                   return all_of(OuterExitingBlocks, [&](BasicBlock *Exiting) {
+                     return DT.dominates(BB, Exiting);
+                   });
+                 }) &&
+          !isa<SCEVCouldNotCompute>(OuterExitCount) &&
           OuterExitCount->getType()->isIntegerTy()) {
         const SCEV *NewHigh =
             cast<SCEVAddRecExpr>(High)->evaluateAtIteration(OuterExitCount, SE);
@@ -2175,14 +2189,15 @@ llvm::getRuntimeCheckBounds(const RuntimeCheckingPtrGroup *CG,
 /// in \p TheLoop.  \return the values for the bounds.
 static PointerBounds expandBounds(const RuntimeCheckingPtrGroup *CG,
                                   Loop *TheLoop, Instruction *Loc,
-                                  SCEVExpander &Exp, bool HoistRuntimeChecks) {
+                                  SCEVExpander &Exp, const DominatorTree &DT,
+                                  bool HoistRuntimeChecks) {
   LLVMContext &Ctx = Loc->getContext();
   Type *PtrArithTy = PointerType::get(Ctx, CG->AddressSpace);
 
   Value *Start = nullptr, *End = nullptr;
   LLVM_DEBUG(dbgs() << "LAA: Adding RT check for range:\n");
   auto [Low, High, Stride] =
-      getRuntimeCheckBounds(CG, TheLoop, *Exp.getSE(), HoistRuntimeChecks);
+      getRuntimeCheckBounds(CG, TheLoop, *Exp.getSE(), DT, HoistRuntimeChecks);
 
   Start = Exp.expandCodeFor(Low, PtrArithTy, Loc);
   End = Exp.expandCodeFor(High, PtrArithTy, Loc);
@@ -2201,16 +2216,17 @@ static PointerBounds expandBounds(const RuntimeCheckingPtrGroup *CG,
 /// lower bounds for both pointers in the check.
 static SmallVector<std::pair<PointerBounds, PointerBounds>, 4>
 expandBounds(const SmallVectorImpl<RuntimePointerCheck> &PointerChecks, Loop *L,
-             Instruction *Loc, SCEVExpander &Exp, bool HoistRuntimeChecks) {
+             Instruction *Loc, SCEVExpander &Exp, const DominatorTree &DT,
+             bool HoistRuntimeChecks) {
   SmallVector<std::pair<PointerBounds, PointerBounds>, 4> ChecksWithBounds;
 
   // Here we're relying on the SCEV Expander's cache to only emit code for the
   // same bounds once.
   transform(PointerChecks, std::back_inserter(ChecksWithBounds),
             [&](const RuntimePointerCheck &Check) {
-              PointerBounds First = expandBounds(Check.first, L, Loc, Exp,
+              PointerBounds First = expandBounds(Check.first, L, Loc, Exp, DT,
                                                  HoistRuntimeChecks),
-                            Second = expandBounds(Check.second, L, Loc, Exp,
+                            Second = expandBounds(Check.second, L, Loc, Exp, DT,
                                                   HoistRuntimeChecks);
               return std::make_pair(First, Second);
             });
@@ -2221,11 +2237,11 @@ expandBounds(const SmallVectorImpl<RuntimePointerCheck> &PointerChecks, Loop *L,
 Value *llvm::addRuntimeChecks(
     Instruction *Loc, Loop *TheLoop,
     const SmallVectorImpl<RuntimePointerCheck> &PointerChecks,
-    SCEVExpander &Exp, bool HoistRuntimeChecks) {
+    SCEVExpander &Exp, const DominatorTree &DT, bool HoistRuntimeChecks) {
   // TODO: Move noalias annotation code from LoopVersioning here and share with LV if possible.
   // TODO: Pass  RtPtrChecking instead of PointerChecks and SE separately, if possible
   auto ExpandedChecks =
-      expandBounds(PointerChecks, TheLoop, Loc, Exp, HoistRuntimeChecks);
+      expandBounds(PointerChecks, TheLoop, Loc, Exp, DT, HoistRuntimeChecks);
 
   IRBuilder ChkBuilder(Loc->getIterator(),
                        InstSimplifyFolder(Loc->getDataLayout()));

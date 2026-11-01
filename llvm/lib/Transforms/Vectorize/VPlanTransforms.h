@@ -220,8 +220,8 @@ struct VPlanTransforms {
   static void attachMemoryChecks(VPlan &Plan,
                                  const RuntimePointerChecking &RtPtrChecking,
                                  const Loop *TheLoop, ScalarEvolution &SE,
-                                 ElementCount VF, unsigned UF,
-                                 bool AddBranchWeights);
+                                 const DominatorTree &DT, ElementCount VF,
+                                 unsigned UF, bool AddBranchWeights);
 
   /// Model the blocks the executed \p MainPlan generated for the main vector
   /// loop in \p EpiPlan during epilogue vectorization, wrapping each in a

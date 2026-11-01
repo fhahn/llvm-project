@@ -1589,7 +1589,7 @@ static VPValue *createRuntimeChecks(VPlan &Plan, VPBuilder &Builder,
                                     VPSCEVExpander &Expander,
                                     ArrayRef<RuntimePointerCheck> Checks,
                                     const Loop *TheLoop, ScalarEvolution &SE,
-                                    DebugLoc DL) {
+                                    const DominatorTree &DT, DebugLoc DL) {
   // Expand each group's bounds once so all checks reuse the same frozen values.
   SmallDenseMap<const RuntimeCheckingPtrGroup *,
                 std::tuple<VPValue *, VPValue *, const SCEV *>, 8>
@@ -1599,7 +1599,7 @@ static VPValue *createRuntimeChecks(VPlan &Plan, VPBuilder &Builder,
       if (GroupToBounds.contains(CG))
         continue;
       auto [Low, High, Stride] = getRuntimeCheckBounds(
-          CG, TheLoop, SE, VectorizerParams::HoistRuntimeChecks);
+          CG, TheLoop, SE, DT, VectorizerParams::HoistRuntimeChecks);
       VPValue *Start = Expander.expand(Low);
       VPValue *End = Expander.expand(High);
       if (CG->NeedsFreeze) {
@@ -1678,8 +1678,8 @@ static VPValue *createDiffRuntimeChecks(VPlan &Plan, VPBuilder &Builder,
 
 void VPlanTransforms::attachMemoryChecks(
     VPlan &Plan, const RuntimePointerChecking &RtPtrChecking,
-    const Loop *TheLoop, ScalarEvolution &SE, ElementCount VF, unsigned UF,
-    bool AddBranchWeights) {
+    const Loop *TheLoop, ScalarEvolution &SE, const DominatorTree &DT,
+    ElementCount VF, unsigned UF, bool AddBranchWeights) {
   assert(!RtPtrChecking.getChecks().empty() && "No checks to generate");
 
   DebugLoc DL = TheLoop->getStartLoc();
@@ -1692,7 +1692,7 @@ void VPlanTransforms::attachMemoryChecks(
           ? createDiffRuntimeChecks(Plan, Builder, Expander, *DiffChecks, SE,
                                     VF, UF, DL)
           : createRuntimeChecks(Plan, Builder, Expander,
-                                RtPtrChecking.getChecks(), TheLoop, SE, DL);
+                                RtPtrChecking.getChecks(), TheLoop, SE, DT, DL);
   attachVPCheckBlock(Plan, Cond, MemCheckVPBB, AddBranchWeights);
 }
 

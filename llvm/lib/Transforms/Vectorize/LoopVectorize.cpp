@@ -1302,7 +1302,7 @@ public:
       } else {
         MemRuntimeCheckCond = addRuntimeChecks(
             MemCheckBlock->getTerminator(), L, RtPtrChecking.getChecks(),
-            MemCheckExp, VectorizerParams::HoistRuntimeChecks);
+            MemCheckExp, *DT, VectorizerParams::HoistRuntimeChecks);
       }
       assert(MemRuntimeCheckCond &&
              "no RT checks generated although RtPtrChecking "
@@ -6746,7 +6746,7 @@ void LoopVectorizationPlanner::attachRuntimeChecks(
     // Erase the temporary IR before recipe expansion can reuse its values.
     RTChecks.eraseMemCheckBlock();
     RUN_VPLAN_PASS(VPlanTransforms::attachMemoryChecks, Plan, RtPtrChecking,
-                   OrigLoop, *PSE.getSE(), VF, UF, HasBranchWeights);
+                   OrigLoop, *PSE.getSE(), *DT, VF, UF, HasBranchWeights);
   }
 }
 
