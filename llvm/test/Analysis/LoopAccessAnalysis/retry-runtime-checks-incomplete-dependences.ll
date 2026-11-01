@@ -98,3 +98,129 @@ exit:
   ret void
 }
 
+; If not all dependences are recorded, all pointers are checked against each
+; other on retry, including the two pointers of the forked store.
+define void @forked_store_and_unknown_deps_to_other_object(ptr %a, ptr %b, ptr %c, i1 %cond, i64 %offset, i64 %n) {
+; DEFAULT-LABEL: 'forked_store_and_unknown_deps_to_other_object'
+; DEFAULT-NEXT:    loop:
+; DEFAULT-NEXT:      Memory dependences are safe with run-time checks
+; DEFAULT-NEXT:      Dependences:
+; DEFAULT-NEXT:      Run-time memory checks:
+; DEFAULT-NEXT:      Check 0:
+; DEFAULT-NEXT:        Comparing group GRP0:
+; DEFAULT-NEXT:          %gep.sel = getelementptr inbounds i32, ptr %sel, i64 %iv
+; DEFAULT-NEXT:        Against group GRP2:
+; DEFAULT-NEXT:          %gep.c = getelementptr inbounds i32, ptr %c, i64 %iv
+; DEFAULT-NEXT:      Check 1:
+; DEFAULT-NEXT:        Comparing group GRP0:
+; DEFAULT-NEXT:          %gep.sel = getelementptr inbounds i32, ptr %sel, i64 %iv
+; DEFAULT-NEXT:        Against group GRP3:
+; DEFAULT-NEXT:          %gep.c.off = getelementptr inbounds i32, ptr %c, i64 %iv.off
+; DEFAULT-NEXT:      Check 2:
+; DEFAULT-NEXT:        Comparing group GRP1:
+; DEFAULT-NEXT:          %gep.sel = getelementptr inbounds i32, ptr %sel, i64 %iv
+; DEFAULT-NEXT:        Against group GRP2:
+; DEFAULT-NEXT:          %gep.c = getelementptr inbounds i32, ptr %c, i64 %iv
+; DEFAULT-NEXT:      Check 3:
+; DEFAULT-NEXT:        Comparing group GRP1:
+; DEFAULT-NEXT:          %gep.sel = getelementptr inbounds i32, ptr %sel, i64 %iv
+; DEFAULT-NEXT:        Against group GRP3:
+; DEFAULT-NEXT:          %gep.c.off = getelementptr inbounds i32, ptr %c, i64 %iv.off
+; DEFAULT-NEXT:      Check 4:
+; DEFAULT-NEXT:        Comparing group GRP2:
+; DEFAULT-NEXT:          %gep.c = getelementptr inbounds i32, ptr %c, i64 %iv
+; DEFAULT-NEXT:        Against group GRP3:
+; DEFAULT-NEXT:          %gep.c.off = getelementptr inbounds i32, ptr %c, i64 %iv.off
+; DEFAULT-NEXT:      Grouped accesses:
+; DEFAULT-NEXT:        Group GRP0:
+; DEFAULT-NEXT:          (Low: %a High: ((4 * %n) + %a))
+; DEFAULT-NEXT:            Member: {%a,+,4}<nw><%loop>
+; DEFAULT-NEXT:        Group GRP1:
+; DEFAULT-NEXT:          (Low: %b High: ((4 * %n) + %b))
+; DEFAULT-NEXT:            Member: {%b,+,4}<nw><%loop>
+; DEFAULT-NEXT:        Group GRP2:
+; DEFAULT-NEXT:          (Low: %c High: ((4 * %n) + %c))
+; DEFAULT-NEXT:            Member: {%c,+,4}<nuw><%loop>
+; DEFAULT-NEXT:        Group GRP3:
+; DEFAULT-NEXT:          (Low: ((4 * %offset) + %c) High: ((4 * %offset) + (4 * %n) + %c))
+; DEFAULT-NEXT:            Member: {((4 * %offset) + %c),+,4}<%loop>
+; DEFAULT-EMPTY:
+; DEFAULT-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; DEFAULT-NEXT:      SCEV assumptions:
+; DEFAULT-EMPTY:
+; DEFAULT-NEXT:      Expressions re-written:
+;
+; INCOMPLETE-LABEL: 'forked_store_and_unknown_deps_to_other_object'
+; INCOMPLETE-NEXT:    loop:
+; INCOMPLETE-NEXT:      Memory dependences are safe with run-time checks
+; INCOMPLETE-NEXT:      Too many dependences, not recorded
+; INCOMPLETE-NEXT:      Run-time memory checks:
+; INCOMPLETE-NEXT:      Check 0:
+; INCOMPLETE-NEXT:        Comparing group GRP0:
+; INCOMPLETE-NEXT:          %gep.sel = getelementptr inbounds i32, ptr %sel, i64 %iv
+; INCOMPLETE-NEXT:        Against group GRP1:
+; INCOMPLETE-NEXT:          %gep.sel = getelementptr inbounds i32, ptr %sel, i64 %iv
+; INCOMPLETE-NEXT:      Check 1:
+; INCOMPLETE-NEXT:        Comparing group GRP0:
+; INCOMPLETE-NEXT:          %gep.sel = getelementptr inbounds i32, ptr %sel, i64 %iv
+; INCOMPLETE-NEXT:        Against group GRP2:
+; INCOMPLETE-NEXT:          %gep.c = getelementptr inbounds i32, ptr %c, i64 %iv
+; INCOMPLETE-NEXT:      Check 2:
+; INCOMPLETE-NEXT:        Comparing group GRP0:
+; INCOMPLETE-NEXT:          %gep.sel = getelementptr inbounds i32, ptr %sel, i64 %iv
+; INCOMPLETE-NEXT:        Against group GRP3:
+; INCOMPLETE-NEXT:          %gep.c.off = getelementptr inbounds i32, ptr %c, i64 %iv.off
+; INCOMPLETE-NEXT:      Check 3:
+; INCOMPLETE-NEXT:        Comparing group GRP1:
+; INCOMPLETE-NEXT:          %gep.sel = getelementptr inbounds i32, ptr %sel, i64 %iv
+; INCOMPLETE-NEXT:        Against group GRP2:
+; INCOMPLETE-NEXT:          %gep.c = getelementptr inbounds i32, ptr %c, i64 %iv
+; INCOMPLETE-NEXT:      Check 4:
+; INCOMPLETE-NEXT:        Comparing group GRP1:
+; INCOMPLETE-NEXT:          %gep.sel = getelementptr inbounds i32, ptr %sel, i64 %iv
+; INCOMPLETE-NEXT:        Against group GRP3:
+; INCOMPLETE-NEXT:          %gep.c.off = getelementptr inbounds i32, ptr %c, i64 %iv.off
+; INCOMPLETE-NEXT:      Check 5:
+; INCOMPLETE-NEXT:        Comparing group GRP2:
+; INCOMPLETE-NEXT:          %gep.c = getelementptr inbounds i32, ptr %c, i64 %iv
+; INCOMPLETE-NEXT:        Against group GRP3:
+; INCOMPLETE-NEXT:          %gep.c.off = getelementptr inbounds i32, ptr %c, i64 %iv.off
+; INCOMPLETE-NEXT:      Grouped accesses:
+; INCOMPLETE-NEXT:        Group GRP0:
+; INCOMPLETE-NEXT:          (Low: %a High: ((4 * %n) + %a))
+; INCOMPLETE-NEXT:            Member: {%a,+,4}<nw><%loop>
+; INCOMPLETE-NEXT:        Group GRP1:
+; INCOMPLETE-NEXT:          (Low: %b High: ((4 * %n) + %b))
+; INCOMPLETE-NEXT:            Member: {%b,+,4}<nw><%loop>
+; INCOMPLETE-NEXT:        Group GRP2:
+; INCOMPLETE-NEXT:          (Low: %c High: ((4 * %n) + %c))
+; INCOMPLETE-NEXT:            Member: {%c,+,4}<nuw><%loop>
+; INCOMPLETE-NEXT:        Group GRP3:
+; INCOMPLETE-NEXT:          (Low: ((4 * %offset) + %c) High: ((4 * %offset) + (4 * %n) + %c))
+; INCOMPLETE-NEXT:            Member: {((4 * %offset) + %c),+,4}<%loop>
+; INCOMPLETE-EMPTY:
+; INCOMPLETE-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; INCOMPLETE-NEXT:      SCEV assumptions:
+; INCOMPLETE-EMPTY:
+; INCOMPLETE-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %sel = select i1 %cond, ptr %a, ptr %b
+  %gep.sel = getelementptr inbounds i32, ptr %sel, i64 %iv
+  store i32 0, ptr %gep.sel, align 4
+  %gep.c = getelementptr inbounds i32, ptr %c, i64 %iv
+  store i32 1, ptr %gep.c, align 4
+  %iv.off = add i64 %iv, %offset
+  %gep.c.off = getelementptr inbounds i32, ptr %c, i64 %iv.off
+  %l.c.off = load i32, ptr %gep.c.off, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
