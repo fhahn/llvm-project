@@ -556,17 +556,15 @@ define void@sext_sub_nsw_for_address(ptr %base, i64 %n, ptr %src) #0 {
 ; CHECK-NEXT:    [[TMP20:%.*]] = or i1 [[TMP19]], [[TMP17]]
 ; CHECK-NEXT:    br i1 [[TMP20]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[SCEVGEP10:%.*]] = getelementptr i8, ptr [[SRC]], i64 -8
 ; CHECK-NEXT:    [[TMP21:%.*]] = shl i64 [[N]], 4
-; CHECK-NEXT:    [[SMIN11:%.*]] = call i64 @llvm.smin.i64(i64 [[N]], i64 0)
-; CHECK-NEXT:    [[TMP23:%.*]] = shl i64 [[SMIN11]], 4
+; CHECK-NEXT:    [[TMP23:%.*]] = shl i64 [[SMIN]], 4
 ; CHECK-NEXT:    [[TMP22:%.*]] = add i64 [[TMP21]], 8
 ; CHECK-NEXT:    [[TMP24:%.*]] = sub i64 [[TMP22]], [[TMP23]]
 ; CHECK-NEXT:    [[SCEVGEP12:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP24]]
 ; CHECK-NEXT:    [[TMP25:%.*]] = sub i64 [[TMP23]], [[TMP21]]
 ; CHECK-NEXT:    [[SCEVGEP13:%.*]] = getelementptr i8, ptr [[BASE]], i64 [[TMP25]]
 ; CHECK-NEXT:    [[SCEVGEP14:%.*]] = getelementptr i8, ptr [[BASE]], i64 8
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP10]], [[SCEVGEP14]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP]], [[SCEVGEP14]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP13]], [[SCEVGEP12]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VECTOR_MAIN_LOOP_ITER_CHECK:.*]]

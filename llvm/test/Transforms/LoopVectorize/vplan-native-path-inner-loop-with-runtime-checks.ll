@@ -7,14 +7,6 @@ define void @expand(ptr %src, ptr %dst, i64 %0) {
 ; CHECK-LABEL: define void @expand(
 ; CHECK-SAME: ptr [[SRC:%.*]], ptr [[DST:%.*]], i64 [[TMP0:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], 1
-; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[TMP1]], i64 1000)
-; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[SMAX]], -1
-; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], [[TMP0]]
-; CHECK-NEXT:    [[TMP4:%.*]] = shl i64 [[TMP0]], 4
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP4]]
-; CHECK-NEXT:    [[TMP5:%.*]] = add nuw nsw i64 [[TMP4]], 8
-; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP5]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[TMP0]], 1
 ; CHECK-NEXT:    [[SMAX6:%.*]] = call i64 @llvm.smax.i64(i64 [[TMP6]], i64 1000)
 ; CHECK-NEXT:    [[TMP7:%.*]] = shl i64 [[SMAX6]], 4
@@ -22,6 +14,10 @@ define void @expand(ptr %src, ptr %dst, i64 %0) {
 ; CHECK-NEXT:    [[TMP9:%.*]] = shl i64 [[TMP0]], 4
 ; CHECK-NEXT:    [[SCEVGEP9:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP9]]
 ; CHECK-NEXT:    [[SCEVGEP8:%.*]] = getelementptr i8, ptr [[SRC]], i64 8
+; CHECK-NEXT:    [[TMP4:%.*]] = add nuw nsw i64 [[TMP9]], 8
+; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP4]]
+; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[SMAX6]], -1
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP5]], [[TMP0]]
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
 ; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
@@ -34,8 +30,8 @@ define void @expand(ptr %src, ptr %dst, i64 %0) {
 ; CHECK-NEXT:    [[MUL:%.*]] = call { i64, i1 } @llvm.umul.with.overflow.i64(i64 16, i64 [[TMP3]])
 ; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i64, i1 } [[MUL]], 0
 ; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i64, i1 } [[MUL]], 1
-; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr i8, ptr [[SCEVGEP]], i64 [[MUL_RESULT]]
-; CHECK-NEXT:    [[TMP11:%.*]] = icmp ult ptr [[TMP10]], [[SCEVGEP]]
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr i8, ptr [[SCEVGEP9]], i64 [[MUL_RESULT]]
+; CHECK-NEXT:    [[TMP11:%.*]] = icmp ult ptr [[TMP10]], [[SCEVGEP9]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = or i1 [[TMP11]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr i8, ptr [[SCEVGEP1]], i64 [[MUL_RESULT]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = icmp ult ptr [[TMP14]], [[SCEVGEP1]]

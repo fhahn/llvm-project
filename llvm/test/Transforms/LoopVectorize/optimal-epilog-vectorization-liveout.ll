@@ -206,9 +206,9 @@ define ptr @test_ptr_iv_live_out(ptr %start, ptr %end, ptr %dst) {
 ; CHECK-LABEL: define ptr @test_ptr_iv_live_out(
 ; CHECK-SAME: ptr [[START:%.*]], ptr [[END:%.*]], ptr [[DST:%.*]]) {
 ; CHECK-NEXT:  [[ITER_CHECK:.*]]:
+; CHECK-NEXT:    [[END1:%.*]] = ptrtoaddr ptr [[END]] to i64
 ; CHECK-NEXT:    [[DST3:%.*]] = ptrtoaddr ptr [[DST]] to i64
 ; CHECK-NEXT:    [[START2:%.*]] = ptrtoaddr ptr [[START]] to i64
-; CHECK-NEXT:    [[END1:%.*]] = ptrtoaddr ptr [[END]] to i64
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[END1]], -4
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[START2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = lshr i64 [[TMP1]], 2

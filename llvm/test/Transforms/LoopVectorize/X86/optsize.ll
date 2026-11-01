@@ -237,16 +237,13 @@ define void @scev_predicate_no_vec(i32 %start, ptr %dst) {
 ; CHECK-NEXT:    [[TMP4:%.*]] = sub i32 [[TMP3]], [[TMP1]]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[TMP5:%.*]] = trunc i32 [[START]] to i16
-; CHECK-NEXT:    [[TMP6:%.*]] = zext i16 [[TMP5]] to i32
-; CHECK-NEXT:    [[UMAX:%.*]] = call i32 @llvm.umax.i32(i32 [[TMP6]], i32 4)
-; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[UMAX]], [[TMP6]]
+; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[TMP2]], [[TMP1]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = trunc i32 [[TMP7]] to i16
-; CHECK-NEXT:    [[TMP9:%.*]] = add i16 [[TMP5]], [[TMP8]]
-; CHECK-NEXT:    [[TMP10:%.*]] = icmp ult i16 [[TMP9]], [[TMP5]]
+; CHECK-NEXT:    [[TMP9:%.*]] = add i16 [[TMP0]], [[TMP8]]
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp ult i16 [[TMP9]], [[TMP0]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp ugt i32 [[TMP7]], 65535
 ; CHECK-NEXT:    [[TMP12:%.*]] = or i1 [[TMP10]], [[TMP11]]
-; CHECK-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i32 [[START]], [[TMP6]]
+; CHECK-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i32 [[START]], [[TMP1]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = or i1 [[TMP12]], [[IDENT_CHECK]]
 ; CHECK-NEXT:    br i1 [[TMP13]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:

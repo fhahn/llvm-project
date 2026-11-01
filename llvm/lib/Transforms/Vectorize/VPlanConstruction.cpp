@@ -1080,6 +1080,10 @@ bool VPlanTransforms::finalizeSCEVPredicates(VPlan &Plan,
     return false;
   }
 
+  // Record the final assumptions on the plan, to be checked at runtime.
+  if (TotalComplexity)
+    Plan.addPredicate(std::make_unique<VPSCEVPredicate>(
+        cast<SCEVUnionPredicate>(PSE.getPredicate()), TheLoop));
   return true;
 }
 
@@ -1596,13 +1600,29 @@ void VPlanTransforms::attachVPCheckBlock(VPlan &Plan, VPValue *Cond,
   addBypassBranch(Plan, CheckBlock, Cond, AddBranchWeights);
 }
 
-void VPlanTransforms::attachCheckBlock(VPlan &Plan, Value *Cond,
-                                       BasicBlock *CheckBlock,
-                                       bool AddBranchWeights) {
-  VPValue *CondVPV = Plan.getOrAddLiveIn(Cond);
-  VPBasicBlock *CheckBlockVPBB = Plan.createVPIRBasicBlock(CheckBlock);
-  attachVPCheckBlock(Plan, CondVPV, CheckBlockVPBB, AddBranchWeights);
+VPValue *VPSCEVPredicate::expandNegated(VPBuilder &Builder, ScalarEvolution &SE,
+                                        ElementCount VF, unsigned UF) const {
+  DebugLoc DL = TheLoop->getStartLoc();
+  // For inner loops of loop nests, expand the parts of the checks invariant in
+  // the parent loop outside of it.
+  VPSCEVExpander Expander(Builder, SE, DL, TheLoop->getParentLoop());
+  SmallVector<VPValue *> Checks;
+  // The union may contain the same predicate several times; check it once.
+  for (const SCEVPredicate *P : SmallSetVector<const SCEVPredicate *, 4>(
+           from_range, UnionPred.getPredicates()))
+    Checks.push_back(Expander.expandCodeForPredicate(P));
+  VPValue *Cond = Checks.front();
+  for (VPValue *C : drop_begin(Checks))
+    Cond = Builder.createOr(Cond, C, DL);
+  return Cond;
 }
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+void VPSCEVPredicate::print(raw_ostream &O, const Twine &Indent) const {
+  for (const SCEVPredicate *P : UnionPred.getPredicates())
+    P->print(O << Indent);
+}
+#endif
 
 VPMemoryChecksPredicate::VPMemoryChecksPredicate(
     const RuntimePointerChecking &RtPtrChecking, const Loop *TheLoop)

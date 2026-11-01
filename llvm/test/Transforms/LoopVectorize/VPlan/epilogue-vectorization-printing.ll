@@ -162,12 +162,12 @@ define i64 @bypass_blocks(ptr %A, ptr %B, i32 %n) {
 ; CHECK-NEXT:    IR   %A3 = ptrtoaddr ptr %A to i64
 ; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%n>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
-; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, ir-bb<vector.scevcheck>
+; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.scevcheck
 ; CHECK-EMPTY:
-; CHECK-NEXT:  ir-bb<vector.scevcheck>:
-; CHECK-NEXT:    IR   %0 = add i32 %n, -1
-; CHECK-NEXT:    IR   %1 = icmp slt i32 %0, 0
-; CHECK-NEXT:    EMIT branch-on-cond ir<%1>
+; CHECK-NEXT:  vector.scevcheck:
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = add ir<%n>, ir<-1>
+; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = icmp slt vp<[[VP3]]>, ir<0>
+; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP4]]>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.memcheck
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.memcheck:
@@ -497,12 +497,12 @@ define void @all_iterations_in_main_loop_with_scevcheck(ptr %p, i32 %off) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    EMIT branch-on-cond ir<false>
-; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, ir-bb<vector.scevcheck>
+; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.scevcheck
 ; CHECK-EMPTY:
-; CHECK-NEXT:  ir-bb<vector.scevcheck>:
-; CHECK-NEXT:    IR   %0 = add i32 %off, 15
-; CHECK-NEXT:    IR   %1 = icmp ult i32 %0, %off
-; CHECK-NEXT:    EMIT branch-on-cond ir<%1>
+; CHECK-NEXT:  vector.scevcheck:
+; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = add ir<%off>, ir<15>
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp ult vp<[[VP2]]>, ir<%off>
+; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP3]]>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.main.loop.iter.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.main.loop.iter.check:

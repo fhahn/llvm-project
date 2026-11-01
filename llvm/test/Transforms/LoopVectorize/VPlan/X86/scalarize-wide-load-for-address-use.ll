@@ -257,6 +257,8 @@ define void @symbolic_stride_versioned_to_one(ptr noalias %src, ptr noalias %dst
 ; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
+; CHECK-NEXT:  Predicates:
+; CHECK-NEXT:    Equal predicate: %stride == 1
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph

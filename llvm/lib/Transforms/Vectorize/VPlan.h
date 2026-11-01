@@ -4958,8 +4958,9 @@ inline const VPRegionBlock *VPRecipeBase::getRegion() const {
 /// VPlanTransforms::materializePredicates().
 class VPPredicate {
 public:
-  /// An enumeration for keeping track of the concrete subclass of VPPredicate.
-  enum VPPredicateKind { VPMemoryChecksPredicateSC };
+  /// An enumeration for keeping track of the concrete subclass of VPPredicate,
+  /// in the order their runtime checks are generated.
+  enum VPPredicateKind { VPSCEVPredicateSC, VPMemoryChecksPredicateSC };
 
   virtual ~VPPredicate() = default;
 
@@ -4986,6 +4987,42 @@ protected:
 
 private:
   const VPPredicateKind Kind;
+};
+
+/// The SCEV predicates in UnionPred hold for TheLoop. They are the assumptions
+/// the vectorizer makes using PredicatedScalarEvolution, e.g. to assume away
+/// wrapping inductions or to version symbolic strides. UnionPred is a copy of
+/// the union predicate of PSE; its members are owned by ScalarEvolution and
+/// outlive the plan.
+class VPSCEVPredicate : public VPPredicate {
+  SCEVUnionPredicate UnionPred;
+  const Loop *TheLoop;
+
+public:
+  VPSCEVPredicate(const SCEVUnionPredicate &UnionPred, const Loop *TheLoop)
+      : VPPredicate(VPSCEVPredicateSC), UnionPred(UnionPred), TheLoop(TheLoop) {
+    assert(!UnionPred.getPredicates().empty() && "No predicates to check");
+  }
+
+  static bool classof(const VPPredicate *P) {
+    return P->getKind() == VPSCEVPredicateSC;
+  }
+
+  const SCEVUnionPredicate &getUnionPredicate() const { return UnionPred; }
+
+  std::unique_ptr<VPPredicate> clone() const override {
+    return std::make_unique<VPSCEVPredicate>(*this);
+  }
+
+  StringRef getCheckBlockName() const override { return "vector.scevcheck"; }
+
+  /// Expand all predicates before combining them, like SCEVExpander.
+  VPValue *expandNegated(VPBuilder &Builder, ScalarEvolution &SE,
+                         ElementCount VF, unsigned UF) const override;
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  void print(raw_ostream &O, const Twine &Indent) const override;
+#endif
 };
 
 /// The memory accesses of a loop do not alias: the ranges of each pair in
@@ -5230,9 +5267,15 @@ public:
   /// Returns true if \p VPBB is an exit block.
   bool isExitBlock(VPBlockBase *VPBB);
 
-  /// Add \p P to the conditions the vector loop needs.
+  /// Add \p P to the conditions the vector loop needs. The predicates are
+  /// ordered by kind.
   void addPredicate(std::unique_ptr<VPPredicate> P) {
-    Predicates.push_back(std::move(P));
+    auto It = partition_point(Predicates, [&P](const auto &Q) {
+      return Q->getKind() < P->getKind();
+    });
+    assert((It == Predicates.end() || (*It)->getKind() != P->getKind()) &&
+           "Predicate kind already added");
+    Predicates.insert(It, std::move(P));
   }
 
   /// Return the predicates not materialized as runtime checks yet.

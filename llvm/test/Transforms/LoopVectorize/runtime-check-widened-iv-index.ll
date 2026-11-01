@@ -102,11 +102,7 @@ define void @index_zext_i32(ptr %a, i32 %start, i32 %n, ptr %len.p) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP5]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[START]], 1
-; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[N]], i32 [[TMP6]])
-; CHECK-NEXT:    [[TMP7:%.*]] = add i32 [[SMAX]], -1
-; CHECK-NEXT:    [[TMP8:%.*]] = sub i32 [[TMP7]], [[START]]
-; CHECK-NEXT:    [[TMP9:%.*]] = add i32 [[START_M32]], [[TMP8]]
+; CHECK-NEXT:    [[TMP9:%.*]] = add i32 [[START_M32]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp ult i32 [[TMP9]], [[START_M32]]
 ; CHECK-NEXT:    br i1 [[TMP10]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:

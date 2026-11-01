@@ -17,9 +17,7 @@ define void @test_predicated_load_cast_hint(ptr %dst.1, ptr %dst.2, ptr %src, i8
 ; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i32 [[TMP2]], 1
 ; CHECK-NEXT:    br label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[N_SUB]], i32 4)
-; CHECK-NEXT:    [[TMP4:%.*]] = add nsw i32 [[SMAX]], -1
-; CHECK-NEXT:    [[TMP5:%.*]] = lshr i32 [[TMP4]], 2
+; CHECK-NEXT:    [[TMP5:%.*]] = lshr i32 [[TMP1]], 2
 ; CHECK-NEXT:    [[TMP6:%.*]] = trunc i32 [[TMP5]] to i8
 ; CHECK-NEXT:    [[MUL:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 4, i8 [[TMP6]])
 ; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL]], 0
@@ -43,24 +41,22 @@ define void @test_predicated_load_cast_hint(ptr %dst.1, ptr %dst.2, ptr %src, i8
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr i8, ptr [[DST_2]], i64 1
 ; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr i8, ptr [[SRC]], i64 1
-; CHECK-NEXT:    [[TMP20:%.*]] = shl i64 [[OFF]], 3
-; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr i8, ptr [[DST_1]], i64 [[TMP20]]
 ; CHECK-NEXT:    [[TMP22:%.*]] = zext nneg i32 [[TMP0]] to i64
 ; CHECK-NEXT:    [[TMP23:%.*]] = add nsw i64 [[TMP22]], -1
 ; CHECK-NEXT:    [[TMP24:%.*]] = lshr i64 [[TMP23]], 2
 ; CHECK-NEXT:    [[TMP25:%.*]] = shl nuw nsw i64 [[TMP24]], 9
-; CHECK-NEXT:    [[TMP26:%.*]] = add i64 [[TMP25]], [[TMP20]]
+; CHECK-NEXT:    [[TMP26:%.*]] = add i64 [[TMP25]], [[TMP12]]
 ; CHECK-NEXT:    [[TMP27:%.*]] = add i64 [[TMP26]], 8
 ; CHECK-NEXT:    [[TMP28:%.*]] = getelementptr i8, ptr [[DST_1]], i64 [[TMP27]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST_2]], [[TMP19]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC]], [[TMP18]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    [[BOUND016:%.*]] = icmp ult ptr [[DST_2]], [[TMP28]]
-; CHECK-NEXT:    [[BOUND117:%.*]] = icmp ult ptr [[TMP21]], [[TMP18]]
+; CHECK-NEXT:    [[BOUND117:%.*]] = icmp ult ptr [[SCEVGEP]], [[TMP18]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT18:%.*]] = and i1 [[BOUND016]], [[BOUND117]]
 ; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT18]]
 ; CHECK-NEXT:    [[BOUND019:%.*]] = icmp ult ptr [[SRC]], [[TMP28]]
-; CHECK-NEXT:    [[BOUND120:%.*]] = icmp ult ptr [[TMP21]], [[TMP19]]
+; CHECK-NEXT:    [[BOUND120:%.*]] = icmp ult ptr [[SCEVGEP]], [[TMP19]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT21:%.*]] = and i1 [[BOUND019]], [[BOUND120]]
 ; CHECK-NEXT:    [[CONFLICT_RDX22:%.*]] = or i1 [[CONFLICT_RDX]], [[FOUND_CONFLICT21]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX22]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]

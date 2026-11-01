@@ -9,8 +9,10 @@ define void @variable_stride_predicate(i64 %n, ptr noalias %a, ptr noalias %b, i
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
+; CHECK-NEXT:    [[IDENT_CHECK:%.*]] = icmp sle i64 [[STRIDE]], 0
 ; CHECK-NEXT:    [[IDENT_CHECK2:%.*]] = icmp ne i64 [[STRIDE]], 1
-; CHECK-NEXT:    br i1 [[IDENT_CHECK2]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP8:%.*]] = or i1 [[IDENT_CHECK]], [[IDENT_CHECK2]]
+; CHECK-NEXT:    br i1 [[TMP8]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[TMP1:%.*]] = and i64 [[TMP0]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[TMP1]]
