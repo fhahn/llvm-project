@@ -1227,52 +1227,21 @@ for.cond.cleanup:                                 ; preds = %for.inc
 ; the incoming value is from the previous iteration. %Base is accessed at index
 ; 0 in the first iteration and at index 101 in all later ones.
 define void @forked_ptrs_header_phi_varying_latch_value(ptr %Base, ptr %Dest, i64 %n) {
-; FULLDEPTH-LABEL: 'forked_ptrs_header_phi_varying_latch_value'
-; FULLDEPTH-NEXT:    loop:
-; FULLDEPTH-NEXT:      Memory dependences are safe with run-time checks
-; FULLDEPTH-NEXT:      Dependences:
-; FULLDEPTH-NEXT:      Run-time memory checks:
-; FULLDEPTH-NEXT:      Check 0:
-; FULLDEPTH-NEXT:        Comparing group GRP0:
-; FULLDEPTH-NEXT:          %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
-; FULLDEPTH-NEXT:        Against group GRP1:
-; FULLDEPTH-NEXT:          %gep.Base = getelementptr i32, ptr %Base, i64 %idx
-; FULLDEPTH-NEXT:      Check 1:
-; FULLDEPTH-NEXT:        Comparing group GRP0:
-; FULLDEPTH-NEXT:          %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
-; FULLDEPTH-NEXT:        Against group GRP2:
-; FULLDEPTH-NEXT:          %gep.Base = getelementptr i32, ptr %Base, i64 %idx
-; FULLDEPTH-NEXT:      Grouped accesses:
-; FULLDEPTH-NEXT:        Group GRP0:
-; FULLDEPTH-NEXT:          (Low: %Dest High: ((4 * %n) + %Dest))
-; FULLDEPTH-NEXT:            Member: {%Dest,+,4}<nuw><%loop>
-; FULLDEPTH-NEXT:        Group GRP1:
-; FULLDEPTH-NEXT:          (Low: %Base High: ((4 * %n) + %Base))
-; FULLDEPTH-NEXT:            Member: {%Base,+,4}<nw><%loop>
-; FULLDEPTH-NEXT:        Group GRP2:
-; FULLDEPTH-NEXT:          (Low: (400 + %Base) High: (404 + %Base))
-; FULLDEPTH-NEXT:            Member: (400 + %Base)
-; FULLDEPTH-EMPTY:
-; FULLDEPTH-NEXT:      Non vectorizable stores to invariant address were not found in loop.
-; FULLDEPTH-NEXT:      SCEV assumptions:
-; FULLDEPTH-EMPTY:
-; FULLDEPTH-NEXT:      Expressions re-written:
-;
-; DEPTH2-LABEL: 'forked_ptrs_header_phi_varying_latch_value'
-; DEPTH2-NEXT:    loop:
-; DEPTH2-NEXT:      Report: cannot identify array bounds
-; DEPTH2-NEXT:      Dependences:
-; DEPTH2-NEXT:      Run-time memory checks:
-; DEPTH2-NEXT:      Grouped accesses:
-; DEPTH2-NEXT:        Group GRP0:
-; DEPTH2-NEXT:          (Low: %Dest High: ((4 * %n) + %Dest))
-; DEPTH2-NEXT:            Member: {%Dest,+,4}<nuw><%loop>
-; DEPTH2-NEXT:      Generated run-time checks are incomplete
-; DEPTH2-EMPTY:
-; DEPTH2-NEXT:      Non vectorizable stores to invariant address were not found in loop.
-; DEPTH2-NEXT:      SCEV assumptions:
-; DEPTH2-EMPTY:
-; DEPTH2-NEXT:      Expressions re-written:
+; CHECK-LABEL: 'forked_ptrs_header_phi_varying_latch_value'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %Dest High: ((4 * %n) + %Dest))
+; CHECK-NEXT:            Member: {%Dest,+,4}<nuw><%loop>
+; CHECK-NEXT:      Generated run-time checks are incomplete
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
 ;
 entry:
   br label %loop
@@ -1371,29 +1340,14 @@ exit:
 define void @forked_ptrs_header_phi_as_index(ptr %Base, ptr %Dest, i64 %n) {
 ; CHECK-LABEL: 'forked_ptrs_header_phi_as_index'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Report: cannot identify array bounds
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.Base = getelementptr i32, ptr %Base, i64 %off
-; CHECK-NEXT:      Check 1:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.Base = getelementptr i32, ptr %Base, i64 %off
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
 ; CHECK-NEXT:          (Low: %Dest High: ((4 * %n) + %Dest))
 ; CHECK-NEXT:            Member: {%Dest,+,4}<nuw><%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: (28 + %Base) High: (32 + %Base))
-; CHECK-NEXT:            Member: (28 + %Base)
-; CHECK-NEXT:        Group GRP2:
-; CHECK-NEXT:          (Low: (404 + (-4 * %n) + %Base) High: (404 + %Base))
-; CHECK-NEXT:            Member: {(400 + %Base),+,-4}<%loop>
+; CHECK-NEXT:      Generated run-time checks are incomplete
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -1424,29 +1378,14 @@ exit:
 define void @forked_ptrs_header_ptr_phi(ptr %Base, ptr %A, ptr %Dest, i64 %n) {
 ; CHECK-LABEL: 'forked_ptrs_header_ptr_phi'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Report: cannot identify array bounds
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %ptr = phi ptr [ %A, %entry ], [ %gep.Base, %loop ]
-; CHECK-NEXT:      Check 1:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %ptr = phi ptr [ %A, %entry ], [ %gep.Base, %loop ]
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
 ; CHECK-NEXT:          (Low: %Dest High: ((4 * %n) + %Dest))
 ; CHECK-NEXT:            Member: {%Dest,+,4}<nuw><%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: (4 + %A))
-; CHECK-NEXT:            Member: %A
-; CHECK-NEXT:        Group GRP2:
-; CHECK-NEXT:          (Low: %Base High: ((4 * %n) + %Base))
-; CHECK-NEXT:            Member: {%Base,+,4}<%loop>
+; CHECK-NEXT:      Generated run-time checks are incomplete
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -1477,31 +1416,22 @@ exit:
 define void @forked_ptrs_header_ptr_phi_strided(ptr %Base, ptr %Dest, i64 %n) {
 ; CHECK-LABEL: 'forked_ptrs_header_ptr_phi_strided'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Report: cannot identify array bounds
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Check 0:
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
 ; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %ptr = phi ptr [ %Base, %entry ], [ %gep.Base, %loop ]
-; CHECK-NEXT:      Check 1:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %ptr = phi ptr [ %Base, %entry ], [ %gep.Base, %loop ]
 ; CHECK-NEXT:          %gep.Base = getelementptr inbounds nuw i32, ptr %Base, i64 %off
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
 ; CHECK-NEXT:          (Low: %Dest High: ((4 * %n) + %Dest))
 ; CHECK-NEXT:            Member: {%Dest,+,4}<nuw><%loop>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %Base High: (4 + %Base))
-; CHECK-NEXT:            Member: %Base
-; CHECK-NEXT:        Group GRP2:
 ; CHECK-NEXT:          (Low: %Base High: (-252 + (256 * %n) + %Base))
 ; CHECK-NEXT:            Member: {%Base,+,256}<nuw><%loop>
-; CHECK-NEXT:            Member: {%Base,+,256}<nuw><%loop>
+; CHECK-NEXT:      Generated run-time checks are incomplete
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:

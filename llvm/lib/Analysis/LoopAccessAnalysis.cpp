@@ -2047,7 +2047,15 @@ static void findForkedSCEVs(
     // A phi means we've found a forked pointer, but we currently only
     // support a single phi per pointer so if there's another behind this
     // then we just bail out and return the generic SCEV.
-    if (I->getNumOperands() == 2) {
+    // The latch value of a header phi is from the previous iteration, so header
+    // phis are only forks if their incoming values are loop-invariant.
+    // TODO: Use the latch value of the previous iteration, guarded by wrap
+    // predicates.
+    if (I->getNumOperands() == 2 &&
+        (I->getParent() != L->getHeader() ||
+         all_of(I->operands(), [&](Value *V) {
+           return SE->isLoopInvariant(SE->getSCEV(V), L);
+         }))) {
       findForkedSCEVs(SE, L, I->getOperand(0), ChildScevs, Depth);
       findForkedSCEVs(SE, L, I->getOperand(1), ChildScevs, Depth);
     }
