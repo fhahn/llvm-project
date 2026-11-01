@@ -633,3 +633,55 @@ loop:
 exit:
   ret void
 }
+
+; The induction shared by all members is only narrowed for fixed VFs, as
+; the narrowed plan processes vscale iterations per part for scalable VFs.
+define void @shared_iv_narrowed_for_fixed_vf_only(ptr noalias %A, ptr noalias %B, i64 %n) {
+; CHECK-LABEL: define void @shared_iv_narrowed_for_fixed_vf_only(
+; CHECK-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], i64 [[N:%.*]]) #[[ATTR0]] {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 2
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i64> poison, i64 [[INDEX]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT]], <2 x i64> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP0:%.*]] = shl nuw nsw i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP0]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i64>, ptr [[TMP1]], align 8
+; CHECK-NEXT:    [[TMP2:%.*]] = add <2 x i64> [[WIDE_LOAD]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP0]]
+; CHECK-NEXT:    store <2 x i64> [[TMP2]], ptr [[TMP3]], align 8
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP28:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br [[EXIT:label %.*]]
+; CHECK:       [[SCALAR_PH]]:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %i0 = shl nuw nsw i64 %iv, 1
+  %i1 = or disjoint i64 %i0, 1
+  %b0.p = getelementptr inbounds i64, ptr %B, i64 %i0
+  %b1.p = getelementptr inbounds i64, ptr %B, i64 %i1
+  %b0 = load i64, ptr %b0.p, align 8
+  %b1 = load i64, ptr %b1.p, align 8
+  %r0 = add i64 %b0, %iv
+  %r1 = add i64 %b1, %iv
+  %a0.p = getelementptr inbounds i64, ptr %A, i64 %i0
+  %a1.p = getelementptr inbounds i64, ptr %A, i64 %i1
+  store i64 %r0, ptr %a0.p, align 8
+  store i64 %r1, ptr %a1.p, align 8
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}

@@ -4398,6 +4398,8 @@ void VPlanTransforms::widenMemoryAccessesByUF(VPlan &Plan, ElementCount VF,
 /// WideMember0). A VPInterleaveRecipe can be narrowed to a wide load, if \p V
 /// is defined at \p Idx of a load interleave group. Scalar steps can be used by
 /// replicate recipes shared by all members, for fixed VFs only.
+/// A VPWidenIntOrFpInductionRecipe shared by all members can be narrowed to a
+/// broadcast of its value for the current iteration, for fixed VFs only.
 /// A live-in or recipe defined outside the loop region can be converted, if it
 /// is the same across all lanes, or we can create a BuildVector for it.
 static bool canNarrowLoad(VPSingleDefRecipe *WideMember0, unsigned OpIdx,
@@ -4424,6 +4426,10 @@ static bool canNarrowLoad(VPSingleDefRecipe *WideMember0, unsigned OpIdx,
   // lane, which is all replicate recipes use.
   if (isa<VPScalarIVStepsRecipe>(Member0OpR))
     return !IsScalable && isa<VPReplicateRecipe>(WideMember0);
+  // Inductions shared by all members are narrowed to a broadcast of their
+  // value for the current iteration, which requires a fixed VF.
+  if (isa<VPWidenIntOrFpInductionRecipe>(Member0OpR))
+    return !IsScalable && Member0Op == OpV;
   return false;
 }
 
@@ -4587,6 +4593,14 @@ static VPValue *narrowInterleaveGroupOp(ArrayRef<VPValue *> Members,
         Op = narrowInterleaveGroupOp(Op, NarrowedOps, Preheader);
       Ops.push_back(Op);
     }
+    // Keep casts of narrowed inductions wide, as single-scalar casts of their
+    // scalar steps are not supported.
+    if (isa<VPWidenCastRecipe>(Def) &&
+        match(Ops[0], m_Broadcast(m_VPValue()))) {
+      Def->setOperand(0, Ops[0]);
+      NarrowedOps.insert(Def);
+      return Def;
+    }
     auto *N = VPBuilder::createSingleScalarOp(
         vputils::getOpcode(Def), Ops, /*Mask=*/nullptr, *Def,
         getMetadataOf(Def), Def->getDebugLoc(), Def->getScalarType(),
@@ -4622,6 +4636,18 @@ static VPValue *narrowInterleaveGroupOp(ArrayRef<VPValue *> Members,
         IG->getAlign(), *LoadGroup, LoadGroup->getDebugLoc());
     NarrowedOps.insert(L);
     return L;
+  }
+
+  if (auto *WideIV = dyn_cast<VPWidenIntOrFpInductionRecipe>(R)) {
+    // WideIV is shared by all members. Replace it with a broadcast of scalar
+    // steps, which provide its value for the current iteration, as the
+    // canonical IV of the narrowed plan counts original iterations.
+    VPBuilder B(WideIV->getParent()->getFirstNonPhi());
+    VPValue *Bcast = B.createNaryOp(VPInstruction::Broadcast,
+                                    createScalarIVSteps(WideIV, B));
+    WideIV->replaceAllUsesWith(Bcast);
+    NarrowedOps.insert(Bcast);
+    return Bcast;
   }
 
   auto *WideLoad = cast<VPWidenLoadRecipe>(R);
@@ -4669,10 +4695,11 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
       continue;
 
     // Bail out on recipes not supported at the moment:
-    //  * phi recipes other than the canonical induction
+    //  * phi recipes other than the canonical induction and int or fp
+    //    inductions
     //  * recipes writing to memory except interleave groups
     // Only support plans with a canonical induction phi.
-    if (R.isPhi())
+    if (R.isPhi() && !isa<VPWidenIntOrFpInductionRecipe>(&R))
       return nullptr;
 
     auto *InterleaveR = dyn_cast<VPInterleaveRecipe>(&R);
