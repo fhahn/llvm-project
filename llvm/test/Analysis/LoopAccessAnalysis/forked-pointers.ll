@@ -1222,3 +1222,309 @@ for.inc:                                          ; preds = %if.br1, %if.br0
 for.cond.cleanup:                                 ; preds = %for.inc
   ret void
 }
+
+; A header phi with a loop-varying incoming value from the latch is not a fork:
+; the incoming value is from the previous iteration. %Base is accessed at index
+; 0 in the first iteration and at index 101 in all later ones.
+define void @forked_ptrs_header_phi_varying_latch_value(ptr %Base, ptr %Dest, i64 %n) {
+; FULLDEPTH-LABEL: 'forked_ptrs_header_phi_varying_latch_value'
+; FULLDEPTH-NEXT:    loop:
+; FULLDEPTH-NEXT:      Memory dependences are safe with run-time checks
+; FULLDEPTH-NEXT:      Dependences:
+; FULLDEPTH-NEXT:      Run-time memory checks:
+; FULLDEPTH-NEXT:      Check 0:
+; FULLDEPTH-NEXT:        Comparing group GRP0:
+; FULLDEPTH-NEXT:          %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
+; FULLDEPTH-NEXT:        Against group GRP1:
+; FULLDEPTH-NEXT:          %gep.Base = getelementptr i32, ptr %Base, i64 %idx
+; FULLDEPTH-NEXT:      Check 1:
+; FULLDEPTH-NEXT:        Comparing group GRP0:
+; FULLDEPTH-NEXT:          %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
+; FULLDEPTH-NEXT:        Against group GRP2:
+; FULLDEPTH-NEXT:          %gep.Base = getelementptr i32, ptr %Base, i64 %idx
+; FULLDEPTH-NEXT:      Grouped accesses:
+; FULLDEPTH-NEXT:        Group GRP0:
+; FULLDEPTH-NEXT:          (Low: %Dest High: ((4 * %n) + %Dest))
+; FULLDEPTH-NEXT:            Member: {%Dest,+,4}<nuw><%loop>
+; FULLDEPTH-NEXT:        Group GRP1:
+; FULLDEPTH-NEXT:          (Low: %Base High: ((4 * %n) + %Base))
+; FULLDEPTH-NEXT:            Member: {%Base,+,4}<nw><%loop>
+; FULLDEPTH-NEXT:        Group GRP2:
+; FULLDEPTH-NEXT:          (Low: (400 + %Base) High: (404 + %Base))
+; FULLDEPTH-NEXT:            Member: (400 + %Base)
+; FULLDEPTH-EMPTY:
+; FULLDEPTH-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; FULLDEPTH-NEXT:      SCEV assumptions:
+; FULLDEPTH-EMPTY:
+; FULLDEPTH-NEXT:      Expressions re-written:
+;
+; DEPTH2-LABEL: 'forked_ptrs_header_phi_varying_latch_value'
+; DEPTH2-NEXT:    loop:
+; DEPTH2-NEXT:      Report: cannot identify array bounds
+; DEPTH2-NEXT:      Dependences:
+; DEPTH2-NEXT:      Run-time memory checks:
+; DEPTH2-NEXT:      Grouped accesses:
+; DEPTH2-NEXT:        Group GRP0:
+; DEPTH2-NEXT:          (Low: %Dest High: ((4 * %n) + %Dest))
+; DEPTH2-NEXT:            Member: {%Dest,+,4}<nuw><%loop>
+; DEPTH2-NEXT:      Generated run-time checks are incomplete
+; DEPTH2-EMPTY:
+; DEPTH2-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; DEPTH2-NEXT:      SCEV assumptions:
+; DEPTH2-EMPTY:
+; DEPTH2-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %off = phi i64 [ 0, %entry ], [ %off.next, %loop ]
+  %off.next = sub i64 100, %iv
+  %idx = add i64 %iv, %off
+  %gep.Base = getelementptr i32, ptr %Base, i64 %idx
+  %l = load i32, ptr %gep.Base, align 4
+  %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
+  store i32 %l, ptr %gep.Dest, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; A header phi with a loop-invariant incoming value from the latch is a fork.
+; %Base is accessed at index %iv in the first iteration and at index
+; %iv + 100 - %x in all later ones.
+define void @forked_ptrs_header_phi_invariant_latch_value(ptr %Base, ptr %Dest, i64 %x, i64 %n) {
+; FULLDEPTH-LABEL: 'forked_ptrs_header_phi_invariant_latch_value'
+; FULLDEPTH-NEXT:    loop:
+; FULLDEPTH-NEXT:      Memory dependences are safe with run-time checks
+; FULLDEPTH-NEXT:      Dependences:
+; FULLDEPTH-NEXT:      Run-time memory checks:
+; FULLDEPTH-NEXT:      Check 0:
+; FULLDEPTH-NEXT:        Comparing group GRP0:
+; FULLDEPTH-NEXT:          %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
+; FULLDEPTH-NEXT:        Against group GRP1:
+; FULLDEPTH-NEXT:          %gep.Base = getelementptr i32, ptr %Base, i64 %idx
+; FULLDEPTH-NEXT:      Check 1:
+; FULLDEPTH-NEXT:        Comparing group GRP0:
+; FULLDEPTH-NEXT:          %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
+; FULLDEPTH-NEXT:        Against group GRP2:
+; FULLDEPTH-NEXT:          %gep.Base = getelementptr i32, ptr %Base, i64 %idx
+; FULLDEPTH-NEXT:      Grouped accesses:
+; FULLDEPTH-NEXT:        Group GRP0:
+; FULLDEPTH-NEXT:          (Low: %Dest High: ((4 * %n) + %Dest))
+; FULLDEPTH-NEXT:            Member: {%Dest,+,4}<nuw><%loop>
+; FULLDEPTH-NEXT:        Group GRP1:
+; FULLDEPTH-NEXT:          (Low: %Base High: ((4 * %n) + %Base))
+; FULLDEPTH-NEXT:            Member: {%Base,+,4}<nw><%loop>
+; FULLDEPTH-NEXT:        Group GRP2:
+; FULLDEPTH-NEXT:          (Low: (400 + (-4 * %x) + %Base) High: (400 + (4 * %n) + (-4 * %x) + %Base))
+; FULLDEPTH-NEXT:            Member: {(400 + (-4 * %x) + %Base),+,4}<%loop>
+; FULLDEPTH-EMPTY:
+; FULLDEPTH-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; FULLDEPTH-NEXT:      SCEV assumptions:
+; FULLDEPTH-EMPTY:
+; FULLDEPTH-NEXT:      Expressions re-written:
+;
+; DEPTH2-LABEL: 'forked_ptrs_header_phi_invariant_latch_value'
+; DEPTH2-NEXT:    loop:
+; DEPTH2-NEXT:      Report: cannot identify array bounds
+; DEPTH2-NEXT:      Dependences:
+; DEPTH2-NEXT:      Run-time memory checks:
+; DEPTH2-NEXT:      Grouped accesses:
+; DEPTH2-NEXT:        Group GRP0:
+; DEPTH2-NEXT:          (Low: %Dest High: ((4 * %n) + %Dest))
+; DEPTH2-NEXT:            Member: {%Dest,+,4}<nuw><%loop>
+; DEPTH2-NEXT:      Generated run-time checks are incomplete
+; DEPTH2-EMPTY:
+; DEPTH2-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; DEPTH2-NEXT:      SCEV assumptions:
+; DEPTH2-EMPTY:
+; DEPTH2-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %off = phi i64 [ 0, %entry ], [ %off.next, %loop ]
+  %off.next = sub i64 100, %x
+  %idx = add i64 %iv, %off
+  %gep.Base = getelementptr i32, ptr %Base, i64 %idx
+  %l = load i32, ptr %gep.Base, align 4
+  %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
+  store i32 %l, ptr %gep.Dest, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; A header phi with a loop-varying incoming value from the latch, used directly
+; as index. %Base is accessed at index 7 in the first iteration and at index
+; 101 - %iv in all later ones.
+define void @forked_ptrs_header_phi_as_index(ptr %Base, ptr %Dest, i64 %n) {
+; CHECK-LABEL: 'forked_ptrs_header_phi_as_index'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.Base = getelementptr i32, ptr %Base, i64 %off
+; CHECK-NEXT:      Check 1:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.Base = getelementptr i32, ptr %Base, i64 %off
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %Dest High: ((4 * %n) + %Dest))
+; CHECK-NEXT:            Member: {%Dest,+,4}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: (28 + %Base) High: (32 + %Base))
+; CHECK-NEXT:            Member: (28 + %Base)
+; CHECK-NEXT:        Group GRP2:
+; CHECK-NEXT:          (Low: (404 + (-4 * %n) + %Base) High: (404 + %Base))
+; CHECK-NEXT:            Member: {(400 + %Base),+,-4}<%loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %off = phi i64 [ 7, %entry ], [ %off.next, %loop ]
+  %off.next = sub i64 100, %iv
+  %gep.Base = getelementptr i32, ptr %Base, i64 %off
+  %l = load i32, ptr %gep.Base, align 4
+  %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
+  store i32 %l, ptr %gep.Dest, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; A pointer header phi with a loop-varying incoming value from the latch. %A is
+; accessed in the first iteration and %Base at index %iv - 1 in all later ones.
+define void @forked_ptrs_header_ptr_phi(ptr %Base, ptr %A, ptr %Dest, i64 %n) {
+; CHECK-LABEL: 'forked_ptrs_header_ptr_phi'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %ptr = phi ptr [ %A, %entry ], [ %gep.Base, %loop ]
+; CHECK-NEXT:      Check 1:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %ptr = phi ptr [ %A, %entry ], [ %gep.Base, %loop ]
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %Dest High: ((4 * %n) + %Dest))
+; CHECK-NEXT:            Member: {%Dest,+,4}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %A High: (4 + %A))
+; CHECK-NEXT:            Member: %A
+; CHECK-NEXT:        Group GRP2:
+; CHECK-NEXT:          (Low: %Base High: ((4 * %n) + %Base))
+; CHECK-NEXT:            Member: {%Base,+,4}<%loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %ptr = phi ptr [ %A, %entry ], [ %gep.Base, %loop ]
+  %l = load i32, ptr %ptr, align 4
+  %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
+  store i32 %l, ptr %gep.Dest, align 4
+  %gep.Base = getelementptr i32, ptr %Base, i64 %iv
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; A pointer header phi with a loop-varying, strided incoming value from the
+; latch, which is also accessed directly. Via the phi, %Base is accessed at
+; index 0 in the first iteration and at index 64 * (%iv - 1) in all later ones.
+define void @forked_ptrs_header_ptr_phi_strided(ptr %Base, ptr %Dest, i64 %n) {
+; CHECK-LABEL: 'forked_ptrs_header_ptr_phi_strided'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %ptr = phi ptr [ %Base, %entry ], [ %gep.Base, %loop ]
+; CHECK-NEXT:      Check 1:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %ptr = phi ptr [ %Base, %entry ], [ %gep.Base, %loop ]
+; CHECK-NEXT:          %gep.Base = getelementptr inbounds nuw i32, ptr %Base, i64 %off
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %Dest High: ((4 * %n) + %Dest))
+; CHECK-NEXT:            Member: {%Dest,+,4}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %Base High: (4 + %Base))
+; CHECK-NEXT:            Member: %Base
+; CHECK-NEXT:        Group GRP2:
+; CHECK-NEXT:          (Low: %Base High: (-252 + (256 * %n) + %Base))
+; CHECK-NEXT:            Member: {%Base,+,256}<nuw><%loop>
+; CHECK-NEXT:            Member: {%Base,+,256}<nuw><%loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %ptr = phi ptr [ %Base, %entry ], [ %gep.Base, %loop ]
+  %off = mul nuw nsw i64 %iv, 64
+  %gep.Base = getelementptr inbounds nuw i32, ptr %Base, i64 %off
+  %l.Base = load i32, ptr %gep.Base, align 4
+  %l.ptr = load i32, ptr %ptr, align 4
+  %add = add i32 %l.ptr, %l.Base
+  %gep.Dest = getelementptr inbounds i32, ptr %Dest, i64 %iv
+  store i32 %add, ptr %gep.Dest, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
