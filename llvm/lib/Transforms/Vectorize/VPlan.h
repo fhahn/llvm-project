@@ -4911,7 +4911,13 @@ inline const VPRegionBlock *VPRecipeBase::getRegion() const {
 /// VPlanTransforms::materializePredicates().
 class VPPredicate {
 public:
+  /// An enumeration for keeping track of the concrete subclass of VPPredicate.
+  enum VPPredicateKind { VPSCEVPredicateSC, VPMemoryChecksPredicateSC };
+
+  explicit VPPredicate(VPPredicateKind Kind) : Kind(Kind) {}
   virtual ~VPPredicate() = default;
+
+  VPPredicateKind getKind() const { return Kind; }
 
   virtual std::unique_ptr<VPPredicate> clone() const = 0;
 
@@ -4928,6 +4934,45 @@ public:
   /// Print the predicate to \p O, each line prefixed by \p Indent.
   virtual void print(raw_ostream &O, const Twine &Indent) const = 0;
 #endif
+
+private:
+  const VPPredicateKind Kind;
+};
+
+/// The SCEV predicates in UnionPred hold for TheLoop. They are the assumptions
+/// the vectorizer makes using PredicatedScalarEvolution, e.g. to assume away
+/// wrapping inductions or to version symbolic strides. UnionPred is a copy of
+/// the union predicate of PSE; its members are owned by ScalarEvolution and
+/// outlive the plan.
+class VPSCEVPredicate : public VPPredicate {
+  SCEVUnionPredicate UnionPred;
+  const Loop *TheLoop;
+
+public:
+  VPSCEVPredicate(const SCEVUnionPredicate &UnionPred, const Loop *TheLoop)
+      : VPPredicate(VPSCEVPredicateSC), UnionPred(UnionPred), TheLoop(TheLoop) {
+    assert(!UnionPred.getPredicates().empty() && "No predicates to check");
+  }
+
+  static bool classof(const VPPredicate *P) {
+    return P->getKind() == VPSCEVPredicateSC;
+  }
+
+  const SCEVUnionPredicate &getUnionPredicate() const { return UnionPred; }
+
+  std::unique_ptr<VPPredicate> clone() const override {
+    return std::make_unique<VPSCEVPredicate>(*this);
+  }
+
+  StringRef getCheckBlockName() const override { return "vector.scevcheck"; }
+
+  /// Expand all predicates before combining them, like SCEVExpander.
+  VPValue *expandNegated(VPBuilder &Builder, ScalarEvolution &SE,
+                         ElementCount VF, unsigned UF) const override;
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  void print(raw_ostream &O, const Twine &Indent) const override;
+#endif
 };
 
 /// The memory accesses of a loop do not alias, as checked by the runtime
@@ -4939,7 +4984,8 @@ class VPMemoryChecksPredicate : public VPPredicate {
 public:
   VPMemoryChecksPredicate(const RuntimePointerChecking &RtPtrChecking,
                           const Loop *TheLoop)
-      : RtPtrChecking(RtPtrChecking), TheLoop(TheLoop) {
+      : VPPredicate(VPMemoryChecksPredicateSC), RtPtrChecking(RtPtrChecking),
+        TheLoop(TheLoop) {
     assert(!RtPtrChecking.getChecks().empty() && "No checks to generate");
   }
 
@@ -5130,6 +5176,7 @@ public:
 
   /// Add \p P to the conditions the vector loop needs.
   void addPredicate(std::unique_ptr<VPPredicate> P) {
+    assert(!getPredicate(P->getKind()) && "Predicate kind already added");
     Predicates.push_back(std::move(P));
   }
 
@@ -5140,6 +5187,19 @@ public:
 
   /// Remove all predicates, e.g. once they are known to hold.
   void clearPredicates() { Predicates.clear(); }
+
+  /// Return the predicate of kind \p Kind, or nullptr if there is none.
+  const VPPredicate *getPredicate(VPPredicate::VPPredicateKind Kind) const {
+    auto It = find_if(Predicates,
+                      [Kind](const auto &P) { return P->getKind() == Kind; });
+    return It == Predicates.end() ? nullptr : It->get();
+  }
+
+  /// Remove the predicate of kind \p Kind, if any.
+  void clearPredicates(VPPredicate::VPPredicateKind Kind) {
+    erase_if(Predicates,
+             [Kind](const auto &P) { return P->getKind() == Kind; });
+  }
 
   /// The trip count of the original loop.
   VPValue *getTripCount() const {

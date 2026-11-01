@@ -16,8 +16,11 @@ define i32 @clamped_load_predicated(ptr %A, i32 %n) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; CHECK-NEXT:    [[TMP5:%.*]] = trunc i32 [[TMP0]] to i7
+; CHECK-NEXT:    [[TMP34:%.*]] = icmp ult i7 [[TMP5]], 0
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 127
-; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP4:%.*]] = or i1 [[TMP34]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[TMP4]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
@@ -111,8 +114,11 @@ define i32 @clamped_load_predicated(ptr %A, i32 %n) {
 ; IC4-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; IC4:       [[VECTOR_SCEVCHECK]]:
 ; IC4-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; IC4-NEXT:    [[TMP116:%.*]] = trunc i32 [[TMP0]] to i7
+; IC4-NEXT:    [[TMP117:%.*]] = icmp ult i7 [[TMP116]], 0
 ; IC4-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 127
-; IC4-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; IC4-NEXT:    [[TMP118:%.*]] = or i1 [[TMP117]], [[TMP1]]
+; IC4-NEXT:    br i1 [[TMP118]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; IC4:       [[VECTOR_PH]]:
 ; IC4-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 15
 ; IC4-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
@@ -350,8 +356,11 @@ define i32 @clamped_load_predicated(ptr %A, i32 %n) {
 ; IC8-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; IC8:       [[VECTOR_SCEVCHECK]]:
 ; IC8-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; IC8-NEXT:    [[TMP228:%.*]] = trunc i32 [[TMP0]] to i7
+; IC8-NEXT:    [[TMP229:%.*]] = icmp ult i7 [[TMP228]], 0
 ; IC8-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 127
-; IC8-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; IC8-NEXT:    [[TMP230:%.*]] = or i1 [[TMP229]], [[TMP1]]
+; IC8-NEXT:    br i1 [[TMP230]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; IC8:       [[VECTOR_PH]]:
 ; IC8-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 31
 ; IC8-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
@@ -817,8 +826,11 @@ define i32 @clamped_load_predicated_ic_capped(ptr %A, i32 %n) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; CHECK-NEXT:    [[TMP32:%.*]] = trunc i32 [[TMP0]] to i4
+; CHECK-NEXT:    [[TMP33:%.*]] = icmp ult i4 [[TMP32]], 0
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 15
-; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP34:%.*]] = or i1 [[TMP33]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[TMP34]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
@@ -912,8 +924,11 @@ define i32 @clamped_load_predicated_ic_capped(ptr %A, i32 %n) {
 ; IC4-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; IC4:       [[VECTOR_SCEVCHECK]]:
 ; IC4-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; IC4-NEXT:    [[TMP116:%.*]] = trunc i32 [[TMP0]] to i4
+; IC4-NEXT:    [[TMP117:%.*]] = icmp ult i4 [[TMP116]], 0
 ; IC4-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 15
-; IC4-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; IC4-NEXT:    [[TMP118:%.*]] = or i1 [[TMP117]], [[TMP1]]
+; IC4-NEXT:    br i1 [[TMP118]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; IC4:       [[VECTOR_PH]]:
 ; IC4-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 15
 ; IC4-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
@@ -1151,8 +1166,11 @@ define i32 @clamped_load_predicated_ic_capped(ptr %A, i32 %n) {
 ; IC8-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; IC8:       [[VECTOR_SCEVCHECK]]:
 ; IC8-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; IC8-NEXT:    [[TMP228:%.*]] = trunc i32 [[TMP0]] to i4
+; IC8-NEXT:    [[TMP229:%.*]] = icmp ult i4 [[TMP228]], 0
 ; IC8-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 15
-; IC8-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; IC8-NEXT:    [[TMP230:%.*]] = or i1 [[TMP229]], [[TMP1]]
+; IC8-NEXT:    br i1 [[TMP230]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; IC8:       [[VECTOR_PH]]:
 ; IC8-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 31
 ; IC8-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]

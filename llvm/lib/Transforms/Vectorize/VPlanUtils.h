@@ -299,6 +299,15 @@ class VPSCEVExpander {
 
   VPValue *expandImpl(const SCEV *S);
 
+  /// Create a select of \p TrueV and \p FalseV on \p Cond, with an unknown
+  /// profile if the function has profile data, like SCEVExpander.
+  VPValue *createSelectWithUnknownProfile(VPValue *Cond, VPValue *TrueV,
+                                          VPValue *FalseV);
+
+  /// Expand the condition that \p AR wraps, signed if \p Signed. Mirrors
+  /// SCEVExpander::generateOverflowCheck; keep the two in sync.
+  VPValue *generateOverflowCheck(const SCEVAddRecExpr *AR, bool Signed);
+
 public:
   VPSCEVExpander(VPBuilder &Builder, ScalarEvolution &SE, DebugLoc DL,
                  const Loop *HoistOutOf = nullptr)
@@ -312,6 +321,11 @@ public:
   VPValue *expand(VPExpandSCEVRecipe &R) {
     return R.expandInIR() ? &R : expand(R.getSCEV());
   }
+
+  /// Expand the condition under which \p Pred does not hold. Mirrors
+  /// SCEVExpander::expandCodeForPredicate for compare and wrap predicates, but
+  /// folds less, as VPBuilder has no InstSimplifyFolder.
+  VPValue *expandCodeForPredicate(const SCEVPredicate *Pred);
 };
 //===----------------------------------------------------------------------===//
 // Utilities for modifying predecessors and successors of VPlan blocks.

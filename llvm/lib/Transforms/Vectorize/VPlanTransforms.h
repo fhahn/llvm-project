@@ -160,8 +160,8 @@ struct VPlanTransforms {
       const SmallPtrSetImpl<PHINode *> &InLoopReductions, bool AllowReordering);
 
   /// Finalize SCEV predicates by adding induction predicates from \p Plan to
-  /// \p PSE and checking constraints. Returns false if predicated IVs have
-  /// outside-loop uses via ExitingIVValue, if SCEV predicate complexity exceeds
+  /// \p PSE, checking constraints and recording the predicates of \p PSE on
+  /// \p Plan. Returns false if SCEV predicate complexity exceeds
   /// \p SCEVCheckThreshold, or if predicates are needed but \p OptForSize is
   /// true.
   static bool
@@ -211,8 +211,6 @@ struct VPlanTransforms {
   static void attachVPCheckBlock(VPlan &Plan, VPValue *Cond,
                                  VPBasicBlock *CheckBlock,
                                  bool AddBranchWeights);
-  static void attachCheckBlock(VPlan &Plan, Value *Cond, BasicBlock *CheckBlock,
-                               bool AddBranchWeights);
 
   /// Expand each predicate of \p Plan into a check block bypassing the vector
   /// loop if it does not hold, inserted before the vector preheader, and remove

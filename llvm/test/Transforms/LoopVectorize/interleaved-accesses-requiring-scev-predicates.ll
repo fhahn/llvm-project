@@ -188,9 +188,12 @@ define void @wrap_predicate_for_interleave_group_unknown_trip_count(ptr noalias 
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N]], -1
 ; CHECK-NEXT:    [[TMP9:%.*]] = trunc i64 [[TMP0]] to i4
 ; CHECK-NEXT:    [[MUL:%.*]] = call { i4, i1 } @llvm.umul.with.overflow.i4(i4 3, i4 [[TMP9]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i4, i1 } [[MUL]], 0
 ; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i4, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP11:%.*]] = icmp ult i4 [[MUL_RESULT]], 0
+; CHECK-NEXT:    [[TMP12:%.*]] = or i1 [[TMP11]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i64 [[TMP0]], 15
-; CHECK-NEXT:    [[TMP10:%.*]] = or i1 [[MUL_OVERFLOW]], [[TMP1]]
+; CHECK-NEXT:    [[TMP10:%.*]] = or i1 [[TMP12]], [[TMP1]]
 ; CHECK-NEXT:    br i1 [[TMP10]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[N]], 3

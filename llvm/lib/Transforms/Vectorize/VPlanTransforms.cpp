@@ -1286,6 +1286,15 @@ static VPValue *simplifyRecipe(VPlan &Plan, VPSingleDefRecipe *Def) {
   if (match(Def, m_c_Mul(m_VPValue(A), m_One())))
     return A;
 
+  // umul.with.overflow(A, 1) produces A and never overflows.
+  if (match(Def, m_VPInstruction<Instruction::ExtractValue>(
+                     m_CombineOr(m_Intrinsic<Intrinsic::umul_with_overflow>(
+                                     m_VPValue(A), m_One()),
+                                 m_Intrinsic<Intrinsic::umul_with_overflow>(
+                                     m_One(), m_VPValue(A))),
+                     m_VPValue(B))))
+    return match(B, m_ZeroInt()) ? A : Plan.getFalse();
+
   if (match(Def, m_c_Mul(m_VPValue(), m_ZeroInt())))
     return Plan.getZero(Def->getScalarType());
 

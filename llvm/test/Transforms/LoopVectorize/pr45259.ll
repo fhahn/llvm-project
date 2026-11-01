@@ -21,8 +21,8 @@ define i8 @widget(ptr %arr, i8 %t9) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP3]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
 ; CHECK:       vector.scevcheck:
-; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 -1, [[ARR1]]
-; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[TMP4]], [[T1_0_LCSSA2]]
+; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[T1_0_LCSSA2]], -1
+; CHECK-NEXT:    [[TMP5:%.*]] = sub i64 [[TMP4]], [[ARR1]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = trunc i64 [[TMP5]] to i8
 ; CHECK-NEXT:    [[TMP7:%.*]] = add i8 1, [[TMP6]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp slt i8 [[TMP7]], 1

@@ -20,8 +20,11 @@ define void @load_bounded_index(ptr %A, ptr %B, i32 %N) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; CHECK-NEXT:    [[TMP9:%.*]] = trunc i32 [[TMP0]] to i2
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp ult i2 [[TMP9]], 0
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 3
-; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP10]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[TMP11]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[B1]], [[A2]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], 1
@@ -93,8 +96,11 @@ define i32 @bounded_load_reduction(ptr %A, i32 %N) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; CHECK-NEXT:    [[TMP7:%.*]] = trunc i32 [[TMP0]] to i2
+; CHECK-NEXT:    [[TMP8:%.*]] = icmp ult i2 [[TMP7]], 0
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 3
-; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[TMP8]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[TMP9]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
@@ -161,8 +167,11 @@ define void @store_bounded_index(ptr %A, ptr %B, i32 %N) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; CHECK-NEXT:    [[TMP9:%.*]] = trunc i32 [[TMP0]] to i2
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp ult i2 [[TMP9]], 0
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 3
-; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP10]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[TMP11]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[A1]], [[B2]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], 1
@@ -432,8 +441,11 @@ define void @bounded_index_equal_dependence(ptr %A, ptr %B, i32 %N) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; CHECK-NEXT:    [[TMP6:%.*]] = trunc i32 [[TMP0]] to i2
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp ult i2 [[TMP6]], 0
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 3
-; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP8:%.*]] = or i1 [[TMP7]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[TMP8]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
@@ -497,14 +509,17 @@ define void @wider_nusw_does_not_imply_narrower(ptr %dst, i64 %n) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP1]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[N]], i64 1)
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP0]], -1
 ; CHECK-NEXT:    [[TMP3:%.*]] = trunc i64 [[TMP2]] to i32
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i32 1, [[TMP3]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp ult i32 [[TMP4]], 1
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp ugt i64 [[TMP2]], 4294967295
 ; CHECK-NEXT:    [[TMP7:%.*]] = or i1 [[TMP5]], [[TMP6]]
+; CHECK-NEXT:    [[TMP18:%.*]] = trunc i64 [[TMP2]] to i4
+; CHECK-NEXT:    [[TMP19:%.*]] = icmp ult i4 [[TMP18]], 0
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp ugt i64 [[TMP2]], 15
-; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[TMP7]], [[TMP8]]
+; CHECK-NEXT:    [[TMP20:%.*]] = or i1 [[TMP19]], [[TMP8]]
+; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[TMP7]], [[TMP20]]
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP1]], 3
@@ -581,8 +596,11 @@ define void @load_bounded_mod8_i32(ptr %A, ptr %B, i32 %N) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; CHECK-NEXT:    [[TMP9:%.*]] = trunc i32 [[TMP0]] to i3
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp ult i3 [[TMP9]], 0
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 7
-; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP10]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[TMP11]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[B1]], [[A2]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], 1
@@ -653,8 +671,11 @@ define void @load_bounded_mod4_i64(ptr %A, ptr %B, i32 %N) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; CHECK-NEXT:    [[TMP9:%.*]] = trunc i32 [[TMP0]] to i2
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp ult i2 [[TMP9]], 0
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 3
-; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP10]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[TMP11]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[B1]], [[A2]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], 1
@@ -726,8 +747,11 @@ define void @load_bounded_mod128_i32(ptr %A, ptr %B, i32 %N) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; CHECK-NEXT:    [[TMP9:%.*]] = trunc i32 [[TMP0]] to i7
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp ult i7 [[TMP9]], 0
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 127
-; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP10]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[TMP11]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[B1]], [[A2]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], 1
@@ -797,8 +821,11 @@ define void @two_bounded_loads_mixed_bounds(ptr %A, ptr %C, ptr %B, i32 %N) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; CHECK-NEXT:    [[TMP13:%.*]] = trunc i32 [[TMP0]] to i2
+; CHECK-NEXT:    [[TMP14:%.*]] = icmp ult i2 [[TMP13]], 0
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 3
-; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK-NEXT:    [[TMP15:%.*]] = or i1 [[TMP14]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[TMP15]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[B1]], [[A2]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], 1

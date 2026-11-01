@@ -366,7 +366,7 @@ define void @zext_iv_increment(ptr %dst, i64 %N) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[UMAX1]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[N]], i64 1)
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[UMAX1]], -1
 ; CHECK-NEXT:    [[TMP1:%.*]] = trunc i64 [[TMP0]] to i32
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i32 1, [[TMP1]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp ult i32 [[TMP2]], 1
@@ -556,17 +556,15 @@ define void@sext_sub_nsw_for_address(ptr %base, i64 %n, ptr %src) #0 {
 ; CHECK-NEXT:    [[TMP20:%.*]] = or i1 [[TMP19]], [[TMP17]]
 ; CHECK-NEXT:    br i1 [[TMP20]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[SCEVGEP10:%.*]] = getelementptr i8, ptr [[SRC]], i64 -8
 ; CHECK-NEXT:    [[TMP21:%.*]] = shl i64 [[N]], 4
-; CHECK-NEXT:    [[SMIN11:%.*]] = call i64 @llvm.smin.i64(i64 [[N]], i64 0)
-; CHECK-NEXT:    [[TMP23:%.*]] = shl i64 [[SMIN11]], 4
+; CHECK-NEXT:    [[TMP23:%.*]] = shl i64 [[SMIN]], 4
 ; CHECK-NEXT:    [[TMP22:%.*]] = add i64 [[TMP21]], 8
 ; CHECK-NEXT:    [[TMP24:%.*]] = sub i64 [[TMP22]], [[TMP23]]
 ; CHECK-NEXT:    [[SCEVGEP12:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP24]]
 ; CHECK-NEXT:    [[TMP25:%.*]] = sub i64 [[TMP23]], [[TMP21]]
 ; CHECK-NEXT:    [[SCEVGEP13:%.*]] = getelementptr i8, ptr [[BASE]], i64 [[TMP25]]
 ; CHECK-NEXT:    [[SCEVGEP14:%.*]] = getelementptr i8, ptr [[BASE]], i64 8
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP10]], [[SCEVGEP14]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP]], [[SCEVGEP14]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP13]], [[SCEVGEP12]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VECTOR_MAIN_LOOP_ITER_CHECK:.*]]
@@ -994,8 +992,7 @@ define i32 @scev_usub_sat_n_2(ptr %ptr, i32 %n) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 12
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP1:%.*]] = zext i32 [[N]] to i64
-; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[TMP1]], i64 2)
+; CHECK-NEXT:    [[TMP2:%.*]] = add nsw i64 [[WIDE_TRIP_COUNT]], -2
 ; CHECK-NEXT:    [[TMP3:%.*]] = trunc i64 [[TMP2]] to i30
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i30 1, [[TMP3]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp ult i30 [[TMP4]], 1

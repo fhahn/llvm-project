@@ -1755,7 +1755,10 @@ define void @udiv_known_nonzero(ptr %dst, ptr %src, i64 %n, i64 noundef %x) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[IDENT_CHECK:%.*]] = icmp sle i64 [[S]], 0
-; CHECK-NEXT:    br i1 [[IDENT_CHECK]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK-NEXT:    [[TMP31:%.*]] = or i1 [[IDENT_CHECK]], [[IDENT_CHECK]]
+; CHECK-NEXT:    [[TMP32:%.*]] = or i1 [[TMP31]], [[IDENT_CHECK]]
+; CHECK-NEXT:    [[TMP33:%.*]] = or i1 [[TMP32]], [[IDENT_CHECK]]
+; CHECK-NEXT:    br i1 [[TMP33]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC]], [[SCEVGEP5]]
@@ -1873,7 +1876,10 @@ define void @udiv_known_nonzero_maybe_poison(ptr %dst, ptr %src, i64 %n, i64 %x,
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[IDENT_CHECK:%.*]] = icmp sle i64 [[S]], 0
-; CHECK-NEXT:    br i1 [[IDENT_CHECK]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK-NEXT:    [[TMP33:%.*]] = or i1 [[IDENT_CHECK]], [[IDENT_CHECK]]
+; CHECK-NEXT:    [[TMP34:%.*]] = or i1 [[TMP33]], [[IDENT_CHECK]]
+; CHECK-NEXT:    [[TMP35:%.*]] = or i1 [[TMP34]], [[IDENT_CHECK]]
+; CHECK-NEXT:    br i1 [[TMP35]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP5:%.*]] = udiv i64 [[TMP0]], [[S]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = shl i64 [[TMP5]], 2

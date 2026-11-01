@@ -12,7 +12,7 @@ define void @outer_loop_needs_scev_predicate(ptr %dst, i32 %n) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP0]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @llvm.usub.sat.i32(i32 [[N]], i32 1)
+; CHECK-NEXT:    [[TMP3:%.*]] = add i32 [[TMP0]], -1
 ; CHECK-NEXT:    [[TMP4:%.*]] = trunc i32 [[TMP3]] to i16
 ; CHECK-NEXT:    [[TMP5:%.*]] = add i16 1, [[TMP4]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp ult i16 [[TMP5]], 1

@@ -179,17 +179,17 @@ define void @bound_is_addrec_of_sibling_loop(ptr %a, ptr %b, i64 %n, i64 %d, i1 
 ; CHECK-NEXT:    IR   %iv.1.lcssa = phi i64 [ %iv.1, %loop.1 ]
 ; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%n>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
-; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, ir-bb<vector.scevcheck>
+; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.scevcheck
 ; CHECK-EMPTY:
-; CHECK-NEXT:  ir-bb<vector.scevcheck>:
-; CHECK-NEXT:    IR   %0 = add i64 %n, -1
-; CHECK-NEXT:    IR   %mul = call { i64, i1 } @llvm.umul.with.overflow.i64(i64 8, i64 %0)
-; CHECK-NEXT:    IR   %mul.result = extractvalue { i64, i1 } %mul, 0
-; CHECK-NEXT:    IR   %mul.overflow = extractvalue { i64, i1 } %mul, 1
-; CHECK-NEXT:    IR   %1 = getelementptr i8, ptr %a, i64 %mul.result
-; CHECK-NEXT:    IR   %2 = icmp ult ptr %1, %a
-; CHECK-NEXT:    IR   %3 = or i1 %2, %mul.overflow
-; CHECK-NEXT:    EMIT branch-on-cond ir<%3>
+; CHECK-NEXT:  vector.scevcheck:
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = add ir<%n>, ir<-1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%mul> = call { i64, i1 } @llvm.umul.with.overflow(ir<8>, vp<[[VP3]]>)
+; CHECK-NEXT:    EMIT vp<%mul.result> = extractvalue vp<%mul>, ir<0>
+; CHECK-NEXT:    EMIT vp<%mul.overflow> = extractvalue vp<%mul>, ir<1>
+; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = ptradd ir<%a>, vp<%mul.result>
+; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = icmp ult vp<[[VP4]]>, ir<%a>
+; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = or vp<[[VP5]]>, vp<%mul.overflow>
+; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP6]]>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.memcheck
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.memcheck:

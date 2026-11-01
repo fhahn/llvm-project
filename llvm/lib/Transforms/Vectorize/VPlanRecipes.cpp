@@ -738,6 +738,8 @@ bool VPInstruction::doesGenerateSingleScalar() const {
   if (isSingleScalar() || isVectorToScalar())
     return true;
   switch (Opcode) {
+  case Instruction::ExtractValue:
+    return vputils::isSingleScalar(getOperand(0));
   case Instruction::Freeze:
   case Instruction::ICmp:
   case Instruction::PHI:
@@ -827,6 +829,11 @@ Value *VPInstruction::generate(VPTransformState &State,
   case Instruction::Freeze: {
     Value *Op = State.get(getOperand(0), GenerateSingleScalar);
     return Builder.CreateFreeze(Op, Name);
+  }
+  case Instruction::ExtractValue: {
+    Value *Agg = State.get(getOperand(0), GenerateSingleScalar);
+    return Builder.CreateExtractValue(Agg, getExtractValueIndices(operands()),
+                                      Name);
   }
   case Instruction::FCmp:
   case Instruction::ICmp: {

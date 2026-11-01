@@ -1182,11 +1182,7 @@ VPValue *VPSCEVExpander::expandImpl(const SCEV *S) {
       // pointer-typed min/max as cmp + select, matching SCEVExpander.
       VPValue *Cmp = Builder.createICmp(
           MinMaxIntrinsic::getPredicate(IntrinsicID), Result, Op, DL);
-      Result = Builder.createSelect(Cmp, Result, Op, DL);
-      Function &F = *Builder.getPlan().getIRFunction();
-      if (MDNode *MD =
-              getExplicitlyUnknownBranchWeightsIfProfiled(F, "scev-expander"))
-        cast<VPInstruction>(Result)->setMetadata(LLVMContext::MD_prof, MD);
+      Result = createSelectWithUnknownProfile(Cmp, Result, Op);
     }
     return Result;
   }
@@ -1245,6 +1241,129 @@ VPValue *VPSCEVExpander::expandImpl(const SCEV *S) {
     llvm_unreachable("Attempt to expand a SCEVCouldNotCompute");
   }
   llvm_unreachable("Unknown SCEV kind!");
+}
+
+VPValue *VPSCEVExpander::createSelectWithUnknownProfile(VPValue *Cond,
+                                                        VPValue *TrueV,
+                                                        VPValue *FalseV) {
+  VPInstruction *Sel = Builder.createSelect(Cond, TrueV, FalseV, DL);
+  if (MDNode *MD = getExplicitlyUnknownBranchWeightsIfProfiled(
+          *Builder.getPlan().getIRFunction(), "scev-expander"))
+    Sel->setMetadata(LLVMContext::MD_prof, MD);
+  return Sel;
+}
+
+VPValue *VPSCEVExpander::generateOverflowCheck(const SCEVAddRecExpr *AR,
+                                               bool Signed) {
+  assert(AR->isAffine() &&
+         "Cannot generate RT check for non-affine expression");
+  VPlan &Plan = Builder.getPlan();
+
+  // FIXME: It is highly suspicious that we're ignoring the predicates here.
+  SmallVector<const SCEVPredicate *> Preds;
+  const SCEV *BTC =
+      SE.getPredicatedSymbolicMaxBackedgeTakenCount(AR->getLoop(), Preds);
+  assert(!isa<SCEVCouldNotCompute>(BTC) && "Invalid loop count");
+
+  const SCEV *Step = AR->getStepRecurrence(SE);
+  const SCEV *Start = AR->getStart();
+  Type *ARTy = AR->getType();
+  unsigned SrcBits = SE.getTypeSizeInBits(BTC->getType());
+  unsigned DstBits = SE.getTypeSizeInBits(ARTy);
+
+  // The expression {Start,+,Step} has nusw/nssw if
+  //   Step < 0, Start - |Step| * Backedge <= Start
+  //   Step >= 0, Start + |Step| * Backedge > Start
+  // and |Step| * Backedge doesn't unsigned overflow.
+  VPValue *BTCValue = expand(BTC);
+  Type *Ty = IntegerType::get(Plan.getContext(), DstBits);
+  VPValue *StepValue = expand(Step);
+  VPValue *NegStepValue = expand(SE.getNegativeSCEV(Step));
+  VPValue *StartValue = expand(Start);
+  VPValue *Zero = Plan.getZero(Ty);
+
+  // Compute |Step|.
+  VPValue *StepCompare =
+      Builder.createICmp(CmpInst::ICMP_SLT, StepValue, Zero, DL);
+  VPValue *AbsStep =
+      createSelectWithUnknownProfile(StepCompare, NegStepValue, StepValue);
+
+  // Compute |Step| * Backedge and whether it overflows.
+  VPValue *TruncBTC = Builder.createScalarZExtOrTrunc(BTCValue, Ty, DL);
+  auto *OverflowTy = StructType::get(Ty, Type::getInt1Ty(Plan.getContext()));
+  VPInstruction *Mul =
+      Builder.createScalarIntrinsic(Intrinsic::umul_with_overflow,
+                                    {AbsStep, TruncBTC}, OverflowTy, DL, "mul");
+  VPValue *MulV =
+      Builder.createNaryOp(Instruction::ExtractValue,
+                           {Mul, Plan.getConstantInt(32, 0)}, DL, "mul.result");
+  VPValue *OfMul = Builder.createNaryOp(Instruction::ExtractValue,
+                                        {Mul, Plan.getConstantInt(32, 1)}, DL,
+                                        "mul.overflow");
+
+  // Only check the directions Step can take.
+  VPValue *Add = nullptr, *Sub = nullptr;
+  bool NeedPosCheck = !SE.isKnownNegative(Step);
+  bool NeedNegCheck = !SE.isKnownPositive(Step);
+  if (ARTy->isPointerTy()) {
+    VPValue *NegMulV = Builder.createSub(Zero, MulV, DL);
+    if (NeedPosCheck)
+      Add = Builder.createPtrAdd(StartValue, MulV, DL);
+    if (NeedNegCheck)
+      Sub = Builder.createPtrAdd(StartValue, NegMulV, DL);
+  } else {
+    if (NeedPosCheck)
+      Add = Builder.createAdd(StartValue, MulV, DL);
+    if (NeedNegCheck)
+      Sub = Builder.createSub(StartValue, MulV, DL);
+  }
+
+  VPValue *EndCompareLT = nullptr, *EndCompareGT = nullptr, *EndCheck = nullptr;
+  if (NeedPosCheck)
+    EndCheck = EndCompareLT = Builder.createICmp(
+        Signed ? CmpInst::ICMP_SLT : CmpInst::ICMP_ULT, Add, StartValue, DL);
+  if (NeedNegCheck)
+    EndCheck = EndCompareGT = Builder.createICmp(
+        Signed ? CmpInst::ICMP_SGT : CmpInst::ICMP_UGT, Sub, StartValue, DL);
+  if (NeedPosCheck && NeedNegCheck) {
+    // Select the answer based on the sign of Step.
+    EndCheck =
+        createSelectWithUnknownProfile(StepCompare, EndCompareGT, EndCompareLT);
+  }
+  EndCheck = Builder.createOr(EndCheck, OfMul, DL);
+
+  // If the backedge taken count type is larger than the AddRec type, check that
+  // we don't drop any bits by truncating it. If we are dropping bits, then we
+  // have overflow (unless the step is zero).
+  if (SrcBits > DstBits) {
+    APInt MaxVal = APInt::getMaxValue(DstBits).zext(SrcBits);
+    VPValue *BackedgeCheck = Builder.createICmp(
+        CmpInst::ICMP_UGT, BTCValue, Plan.getConstantInt(MaxVal), DL);
+    BackedgeCheck = Builder.createAnd(
+        BackedgeCheck,
+        Builder.createICmp(CmpInst::ICMP_NE, StepValue, Zero, DL), DL);
+    EndCheck = Builder.createOr(EndCheck, BackedgeCheck, DL);
+  }
+  return EndCheck;
+}
+
+VPValue *VPSCEVExpander::expandCodeForPredicate(const SCEVPredicate *Pred) {
+  if (const auto *CP = dyn_cast<SCEVComparePredicate>(Pred)) {
+    VPValue *LHS = expand(CP->getLHS());
+    VPValue *RHS = expand(CP->getRHS());
+    return Builder.createICmp(ICmpInst::getInversePredicate(CP->getPredicate()),
+                              LHS, RHS, DL, "ident.check");
+  }
+  const auto *WP = cast<SCEVWrapPredicate>(Pred);
+  const auto *AR = cast<SCEVAddRecExpr>(WP->getExpr());
+  VPValue *Check = nullptr;
+  if (WP->getFlags() & SCEVWrapPredicate::IncrementNUSW)
+    Check = generateOverflowCheck(AR, /*Signed=*/false);
+  if (WP->getFlags() & SCEVWrapPredicate::IncrementNSSW) {
+    VPValue *NSSWCheck = generateOverflowCheck(AR, /*Signed=*/true);
+    Check = Check ? Builder.createOr(Check, NSSWCheck, DL) : NSSWCheck;
+  }
+  return Check ? Check : Builder.getPlan().getFalse();
 }
 
 bool vputils::isDeadRecipe(VPRecipeBase &R) {
@@ -1448,6 +1567,11 @@ VPIRValue *vputils::tryToFoldLiveIns(VPSingleDefRecipe &R,
       return Folder.FoldGEP(DL, IntegerType::getInt8Ty(Plan.getContext()),
                             Ops[0], Ops[1],
                             cast<VPRecipeWithIRFlags>(R).getGEPNoWrapFlags());
+    case Instruction::ExtractValue:
+      return Folder.FoldExtractValue(
+          Ops[0], map_to_vector(drop_begin(Ops), [](Value *Idx) {
+            return unsigned(cast<ConstantInt>(Idx)->getZExtValue());
+          }));
     // An extract of a live-in is an extract of a broadcast, so return the
     // broadcasted element.
     case Instruction::ExtractElement:

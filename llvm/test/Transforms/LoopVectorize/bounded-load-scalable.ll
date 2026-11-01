@@ -18,8 +18,11 @@ define i32 @bounded_load_bound64_max_vscale_16(ptr %A, i64 %N) #0 {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[N]], -1
+; CHECK-NEXT:    [[TMP9:%.*]] = trunc i64 [[TMP2]] to i6
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp ult i6 [[TMP9]], 0
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp ugt i64 [[TMP2]], 63
-; CHECK-NEXT:    br i1 [[TMP3]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP10]], [[TMP3]]
+; CHECK-NEXT:    br i1 [[TMP11]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N]], [[TMP1]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
@@ -71,8 +74,11 @@ define i32 @bounded_load_bound32_max_vscale_16(ptr %A, i64 %N) #0 {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[N]], -1
+; CHECK-NEXT:    [[TMP9:%.*]] = trunc i64 [[TMP2]] to i5
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp ult i5 [[TMP9]], 0
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp ugt i64 [[TMP2]], 31
-; CHECK-NEXT:    br i1 [[TMP3]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP10]], [[TMP3]]
+; CHECK-NEXT:    br i1 [[TMP11]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N]], [[TMP1]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
@@ -123,8 +129,11 @@ define i32 @bounded_load_bound8_max_vscale_2(ptr %A, i64 %N) #1 {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[N]], -1
+; CHECK-NEXT:    [[TMP9:%.*]] = trunc i64 [[TMP2]] to i3
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp ult i3 [[TMP9]], 0
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp ugt i64 [[TMP2]], 7
-; CHECK-NEXT:    br i1 [[TMP3]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP10]], [[TMP3]]
+; CHECK-NEXT:    br i1 [[TMP11]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N]], [[TMP1]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
@@ -176,8 +185,11 @@ define i32 @bounded_load_unknown_max_vscale(ptr %A, i64 %N) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[N]], -1
+; CHECK-NEXT:    [[TMP9:%.*]] = trunc i64 [[TMP2]] to i6
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp ult i6 [[TMP9]], 0
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp ugt i64 [[TMP2]], 63
-; CHECK-NEXT:    br i1 [[TMP3]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP10]], [[TMP3]]
+; CHECK-NEXT:    br i1 [[TMP11]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N]], [[TMP1]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
@@ -227,8 +239,11 @@ define i32 @bounded_load_bound64_user_ic(ptr %A, i64 %N) #0 {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[N]], -1
+; CHECK-NEXT:    [[TMP12:%.*]] = trunc i64 [[TMP2]] to i6
+; CHECK-NEXT:    [[TMP13:%.*]] = icmp ult i6 [[TMP12]], 0
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp ugt i64 [[TMP2]], 63
-; CHECK-NEXT:    br i1 [[TMP3]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP14:%.*]] = or i1 [[TMP13]], [[TMP3]]
+; CHECK-NEXT:    br i1 [[TMP14]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[TMP4:%.*]] = shl nuw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N]], [[TMP1]]

@@ -26,8 +26,7 @@ define void @test_pr63368(i1 %c, ptr %A) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP3]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[TMP0]], i32 -1)
-; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[SMAX]], 1
+; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[TMP2]], 1
 ; CHECK-NEXT:    [[TMP5:%.*]] = trunc i32 [[TMP4]] to i8
 ; CHECK-NEXT:    [[TMP6:%.*]] = add i8 1, [[TMP5]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp slt i8 [[TMP6]], 1

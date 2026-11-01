@@ -407,10 +407,12 @@ define i64 @for_and_ind_liveout_gep(ptr %dst, i64 %n) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
-; CHECK-NEXT:    [[TMP1:%.*]] = add nsw i64 [[SMAX]], -1
+; CHECK-NEXT:    [[TMP1:%.*]] = add nsw i64 [[TMP0]], -1
+; CHECK-NEXT:    [[TMP11:%.*]] = trunc i64 [[TMP1]] to i16
+; CHECK-NEXT:    [[TMP12:%.*]] = icmp ult i16 [[TMP11]], 0
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp ugt i64 [[TMP1]], 65535
-; CHECK-NEXT:    br i1 [[TMP2]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP13:%.*]] = or i1 [[TMP12]], [[TMP2]]
+; CHECK-NEXT:    br i1 [[TMP13]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[TMP3:%.*]] = and i64 [[TMP0]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[TMP3]]
@@ -893,8 +895,7 @@ define void @for_and_ind_indupdate_feeds_gep_index(ptr %dst, ptr %dst2, i64 %n) 
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
-; CHECK-NEXT:    [[TMP1:%.*]] = add nsw i64 [[SMAX]], -1
+; CHECK-NEXT:    [[TMP1:%.*]] = add nsw i64 [[TMP0]], -1
 ; CHECK-NEXT:    [[TMP2:%.*]] = trunc i64 [[TMP1]] to i16
 ; CHECK-NEXT:    [[MUL:%.*]] = call { i16, i1 } @llvm.umul.with.overflow.i16(i16 3, i16 [[TMP2]])
 ; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i16, i1 } [[MUL]], 0
@@ -1342,10 +1343,12 @@ define i64 @for_and_ind_widest_type_modeled_as_induction(ptr noalias %dst, ptr n
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP0]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[N]], i32 1)
-; CHECK-NEXT:    [[TMP1:%.*]] = add nsw i32 [[SMAX]], -1
+; CHECK-NEXT:    [[TMP1:%.*]] = add nsw i32 [[TMP0]], -1
+; CHECK-NEXT:    [[TMP12:%.*]] = trunc i32 [[TMP1]] to i16
+; CHECK-NEXT:    [[TMP13:%.*]] = icmp ult i16 [[TMP12]], 0
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp ugt i32 [[TMP1]], 65535
-; CHECK-NEXT:    br i1 [[TMP2]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP14:%.*]] = or i1 [[TMP13]], [[TMP2]]
+; CHECK-NEXT:    br i1 [[TMP14]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[TMP3:%.*]] = and i32 [[TMP0]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP0]], [[TMP3]]
@@ -1444,9 +1447,12 @@ define i64 @for_and_ind_kept_must_not_be_uniform(ptr %dst, i64 %n) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[N]], i64 1)
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], -1
+; CHECK-NEXT:    [[TMP13:%.*]] = trunc i64 [[TMP1]] to i6
+; CHECK-NEXT:    [[TMP14:%.*]] = icmp ult i6 [[TMP13]], 0
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp ugt i64 [[TMP1]], 63
-; CHECK-NEXT:    br i1 [[TMP2]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP15:%.*]] = or i1 [[TMP14]], [[TMP2]]
+; CHECK-NEXT:    br i1 [[TMP15]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[TMP3:%.*]] = and i64 [[TMP0]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[TMP3]]
