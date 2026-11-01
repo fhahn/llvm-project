@@ -1368,6 +1368,8 @@ AArch64LegalizerInfo::AArch64LegalizerInfo(const AArch64Subtarget &ST)
         return Query.Types[0].isFixedVector() &&
                Query.Types[0].getScalarSizeInBits() < 8;
       })
+      // Non-power-of-2 sources straddle the power-of-2 pieces of the result.
+      .scalarizeIf(numElementsNotPow2(1), 1)
       .bitcastIf(
           [=](const LegalityQuery &Query) {
             return Query.Types[0].isFixedVector() &&

@@ -131,3 +131,66 @@ body:             |
     $q0 = COPY %f(<8 x i16>)
     RET_ReallyLR implicit $q0
 ...
+---
+name:            illegal_v6s32_v3s32
+tracksRegLiveness: true
+body:             |
+  bb.0:
+    liveins: $q0, $x0
+
+    ; CHECK-LABEL: name: illegal_v6s32_v3s32
+    ; CHECK: liveins: $q0, $x0
+    ; CHECK-NEXT: {{  $}}
+    ; CHECK-NEXT: %p:_(p0) = COPY $x0
+    ; CHECK-NEXT: %v:_(<4 x i32>) = COPY $q0
+    ; CHECK-NEXT: %e0:_(i32), %e1:_(i32), %e2:_(i32), %e3:_(i32) = G_UNMERGE_VALUES %v(<4 x i32>)
+    ; CHECK-NEXT: [[UV:%[0-9]+]]:_(<2 x i32>), [[UV1:%[0-9]+]]:_(<2 x i32>) = G_UNMERGE_VALUES %v(<4 x i32>)
+    ; CHECK-NEXT: [[BUILD_VECTOR:%[0-9]+]]:_(<2 x i32>) = G_BUILD_VECTOR %e2(i32), %e1(i32)
+    ; CHECK-NEXT: [[UV2:%[0-9]+]]:_(<2 x i32>), [[UV3:%[0-9]+]]:_(<2 x i32>) = G_UNMERGE_VALUES %v(<4 x i32>)
+    ; CHECK-NEXT: [[CONCAT_VECTORS:%[0-9]+]]:_(<4 x i32>) = G_CONCAT_VECTORS [[UV]](<2 x i32>), [[UV3]](<2 x i32>)
+    ; CHECK-NEXT: G_STORE [[CONCAT_VECTORS]](<4 x i32>), %p(p0) :: (store (<4 x i32>), align 32)
+    ; CHECK-NEXT: [[C:%[0-9]+]]:_(i64) = G_CONSTANT i64 16
+    ; CHECK-NEXT: [[PTR_ADD:%[0-9]+]]:_(p0) = nuw inbounds G_PTR_ADD %p, [[C]](i64)
+    ; CHECK-NEXT: G_STORE [[BUILD_VECTOR]](<2 x i32>), [[PTR_ADD]](p0) :: (store (<2 x i32>) into unknown-address + 16, align 16)
+    ; CHECK-NEXT: RET_ReallyLR
+    %p:_(p0) = COPY $x0
+    %v:_(<4 x i32>) = COPY $q0
+    %e0:_(i32), %e1:_(i32), %e2:_(i32), %e3:_(i32) = G_UNMERGE_VALUES %v(<4 x i32>)
+    %a:_(<3 x i32>) = G_BUILD_VECTOR %e0(i32), %e1(i32), %e2(i32)
+    %b:_(<3 x i32>) = G_BUILD_VECTOR %e3(i32), %e2(i32), %e1(i32)
+    %c:_(<6 x i32>) = G_CONCAT_VECTORS %a(<3 x i32>), %b(<3 x i32>)
+    G_STORE %c(<6 x i32>), %p(p0) :: (store (<6 x i32>), align 32)
+    RET_ReallyLR
+...
+---
+name:            illegal_v12s16_v6s16_v3s16
+tracksRegLiveness: true
+body:             |
+  bb.0:
+    liveins: $d0, $x0
+
+    ; CHECK-LABEL: name: illegal_v12s16_v6s16_v3s16
+    ; CHECK: liveins: $d0, $x0
+    ; CHECK-NEXT: {{  $}}
+    ; CHECK-NEXT: %p:_(p0) = COPY $x0
+    ; CHECK-NEXT: %v:_(<4 x i16>) = COPY $d0
+    ; CHECK-NEXT: %e0:_(i16), %e1:_(i16), %e2:_(i16), %e3:_(i16) = G_UNMERGE_VALUES %v(<4 x i16>)
+    ; CHECK-NEXT: [[BUILD_VECTOR:%[0-9]+]]:_(<4 x i16>) = G_BUILD_VECTOR %e2(i16), %e1(i16), %e3(i16), %e2(i16)
+    ; CHECK-NEXT: [[BUILD_VECTOR1:%[0-9]+]]:_(<4 x i16>) = G_BUILD_VECTOR %e1(i16), %e0(i16), %e1(i16), %e2(i16)
+    ; CHECK-NEXT: [[CONCAT_VECTORS:%[0-9]+]]:_(<8 x i16>) = G_CONCAT_VECTORS %v(<4 x i16>), [[BUILD_VECTOR]](<4 x i16>)
+    ; CHECK-NEXT: G_STORE [[CONCAT_VECTORS]](<8 x i16>), %p(p0) :: (store (<8 x i16>), align 32)
+    ; CHECK-NEXT: [[C:%[0-9]+]]:_(i64) = G_CONSTANT i64 16
+    ; CHECK-NEXT: [[PTR_ADD:%[0-9]+]]:_(p0) = nuw inbounds G_PTR_ADD %p, [[C]](i64)
+    ; CHECK-NEXT: G_STORE [[BUILD_VECTOR1]](<4 x i16>), [[PTR_ADD]](p0) :: (store (<4 x i16>) into unknown-address + 16, align 16)
+    ; CHECK-NEXT: RET_ReallyLR
+    %p:_(p0) = COPY $x0
+    %v:_(<4 x i16>) = COPY $d0
+    %e0:_(i16), %e1:_(i16), %e2:_(i16), %e3:_(i16) = G_UNMERGE_VALUES %v(<4 x i16>)
+    %a:_(<3 x i16>) = G_BUILD_VECTOR %e0(i16), %e1(i16), %e2(i16)
+    %b:_(<3 x i16>) = G_BUILD_VECTOR %e3(i16), %e2(i16), %e1(i16)
+    %c:_(<6 x i16>) = G_CONCAT_VECTORS %a(<3 x i16>), %b(<3 x i16>)
+    %d:_(<6 x i16>) = G_CONCAT_VECTORS %b(<3 x i16>), %a(<3 x i16>)
+    %f:_(<12 x i16>) = G_CONCAT_VECTORS %c(<6 x i16>), %d(<6 x i16>)
+    G_STORE %f(<12 x i16>), %p(p0) :: (store (<12 x i16>), align 32)
+    RET_ReallyLR
+...

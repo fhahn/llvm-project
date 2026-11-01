@@ -5539,20 +5539,18 @@ LegalizerHelper::fewerElementsVectorMerge(MachineInstr &MI, unsigned TypeIdx,
   // Requires compatible types. Otherwise user of DstReg did not perform unmerge
   // that should have been artifact combined. Most likely instruction that uses
   // DstReg has to do more/fewer elements legalization compatible with NarrowTy.
-  assert(DstTy.isVector() && NarrowTy.isVector() && "Expected vector types");
+  assert(DstTy.isVector() && "Expected vector types");
   assert((DstTy.getScalarType() == NarrowTy.getScalarType()) && "bad type");
   if (NarrowTy == SrcTy)
     return UnableToLegalize;
 
-  // This attempts to lower part of LCMTy merge/unmerge sequence. Intended use
-  // is for old mir tests. Since the changes to more/fewer elements it should no
-  // longer be possible to generate MIR like this when starting from llvm-ir
-  // because LCMTy approach was replaced with merge/unmerge to vector elements.
+  // Split the sources into elements and rebuild the result from NarrowTy
+  // pieces, or directly from the elements when scalarizing.
   if (TypeIdx == 1) {
     assert(SrcTy.isVector() && "Expected vector types");
     assert((SrcTy.getScalarType() == NarrowTy.getScalarType()) && "bad type");
     if ((DstTy.getSizeInBits() % NarrowTy.getSizeInBits() != 0) ||
-        (NarrowTy.getNumElements() >= SrcTy.getNumElements()))
+        (NarrowTy.getSizeInBits() >= SrcTy.getSizeInBits()))
       return UnableToLegalize;
     // %2:_(DstTy) = G_CONCAT_VECTORS %0:_(SrcTy), %1:_(SrcTy)
     //
@@ -5571,6 +5569,12 @@ LegalizerHelper::fewerElementsVectorMerge(MachineInstr &MI, unsigned TypeIdx,
         Elts.push_back(Unmerge.getReg(j));
     }
 
+    if (!NarrowTy.isVector()) {
+      MIRBuilder.buildBuildVector(DstReg, Elts);
+      MI.eraseFromParent();
+      return Legalized;
+    }
+
     SmallVector<Register, 8> NarrowTyElts;
     unsigned NumNarrowTyElts = NarrowTy.getNumElements();
     unsigned NumNarrowTyPieces = DstTy.getNumElements() / NumNarrowTyElts;
@@ -5587,6 +5591,7 @@ LegalizerHelper::fewerElementsVectorMerge(MachineInstr &MI, unsigned TypeIdx,
   }
 
   assert(TypeIdx == 0 && "Bad type index");
+  assert(NarrowTy.isVector() && "Expected vector types");
   if ((NarrowTy.getSizeInBits() % SrcTy.getSizeInBits() != 0) ||
       (DstTy.getSizeInBits() % NarrowTy.getSizeInBits() != 0))
     return UnableToLegalize;
