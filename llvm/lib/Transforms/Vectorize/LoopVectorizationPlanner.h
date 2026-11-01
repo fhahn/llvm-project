@@ -500,7 +500,7 @@ public:
     if (Instruction::isCast(Opcode)) {
       assert(!Mask && "Cast cannot be predicated");
       auto *VPI = new VPInstruction(Opcode, Operands, Flags, Metadata, DL,
-                                    UV->getName(), ResultTy);
+                                    UV ? UV->getName() : "", ResultTy);
       VPI->setUnderlyingValue(UV);
       return VPI;
     }

@@ -315,37 +315,37 @@ define void @single_fmul_used_by_each_member(ptr noalias %A, ptr noalias %B, ptr
 ; CHECK-NEXT:    [[TMP36:%.*]] = getelementptr double, ptr [[A]], i64 [[TMP20]]
 ; CHECK-NEXT:    [[TMP38:%.*]] = getelementptr double, ptr [[A]], i64 [[TMP22]]
 ; CHECK-NEXT:    [[TMP39:%.*]] = load double, ptr [[TMP23]], align 8
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <2 x double> poison, double [[TMP39]], i64 0
+; CHECK-NEXT:    [[TMP29:%.*]] = load double, ptr [[TMP27]], align 8
+; CHECK-NEXT:    [[TMP30:%.*]] = load double, ptr [[TMP36]], align 8
+; CHECK-NEXT:    [[TMP31:%.*]] = load double, ptr [[TMP38]], align 8
+; CHECK-NEXT:    [[TMP28:%.*]] = fmul double [[TMP39]], 5.000000e+00
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <2 x double> poison, double [[TMP28]], i64 0
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = shufflevector <2 x double> [[BROADCAST_SPLATINSERT1]], <2 x double> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP24:%.*]] = load double, ptr [[TMP27]], align 8
+; CHECK-NEXT:    [[TMP24:%.*]] = fmul double [[TMP29]], 5.000000e+00
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT12:%.*]] = insertelement <2 x double> poison, double [[TMP24]], i64 0
 ; CHECK-NEXT:    [[WIDE_LOAD12:%.*]] = shufflevector <2 x double> [[BROADCAST_SPLATINSERT12]], <2 x double> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP25:%.*]] = load double, ptr [[TMP36]], align 8
+; CHECK-NEXT:    [[TMP25:%.*]] = fmul double [[TMP30]], 5.000000e+00
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT14:%.*]] = insertelement <2 x double> poison, double [[TMP25]], i64 0
 ; CHECK-NEXT:    [[WIDE_LOAD13:%.*]] = shufflevector <2 x double> [[BROADCAST_SPLATINSERT14]], <2 x double> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP26:%.*]] = load double, ptr [[TMP38]], align 8
+; CHECK-NEXT:    [[TMP26:%.*]] = fmul double [[TMP31]], 5.000000e+00
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT16:%.*]] = insertelement <2 x double> poison, double [[TMP26]], i64 0
 ; CHECK-NEXT:    [[WIDE_LOAD14:%.*]] = shufflevector <2 x double> [[BROADCAST_SPLATINSERT16]], <2 x double> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP28:%.*]] = fmul <2 x double> [[WIDE_LOAD]], splat (double 5.000000e+00)
-; CHECK-NEXT:    [[TMP29:%.*]] = fmul <2 x double> [[WIDE_LOAD12]], splat (double 5.000000e+00)
-; CHECK-NEXT:    [[TMP30:%.*]] = fmul <2 x double> [[WIDE_LOAD13]], splat (double 5.000000e+00)
-; CHECK-NEXT:    [[TMP31:%.*]] = fmul <2 x double> [[WIDE_LOAD14]], splat (double 5.000000e+00)
 ; CHECK-NEXT:    [[TMP32:%.*]] = getelementptr { double, double }, ptr [[B]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP34:%.*]] = getelementptr { double, double }, ptr [[B]], i64 [[TMP21]]
 ; CHECK-NEXT:    [[TMP33:%.*]] = getelementptr { double, double }, ptr [[B]], i64 [[TMP20]]
 ; CHECK-NEXT:    [[TMP35:%.*]] = getelementptr { double, double }, ptr [[B]], i64 [[TMP22]]
-; CHECK-NEXT:    store <2 x double> [[TMP28]], ptr [[TMP32]], align 8
-; CHECK-NEXT:    store <2 x double> [[TMP29]], ptr [[TMP34]], align 8
-; CHECK-NEXT:    store <2 x double> [[TMP30]], ptr [[TMP33]], align 8
-; CHECK-NEXT:    store <2 x double> [[TMP31]], ptr [[TMP35]], align 8
+; CHECK-NEXT:    store <2 x double> [[WIDE_LOAD]], ptr [[TMP32]], align 8
+; CHECK-NEXT:    store <2 x double> [[WIDE_LOAD12]], ptr [[TMP34]], align 8
+; CHECK-NEXT:    store <2 x double> [[WIDE_LOAD13]], ptr [[TMP33]], align 8
+; CHECK-NEXT:    store <2 x double> [[WIDE_LOAD14]], ptr [[TMP35]], align 8
 ; CHECK-NEXT:    [[TMP40:%.*]] = getelementptr { double, double }, ptr [[C]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP42:%.*]] = getelementptr { double, double }, ptr [[C]], i64 [[TMP21]]
 ; CHECK-NEXT:    [[TMP37:%.*]] = getelementptr { double, double }, ptr [[C]], i64 [[TMP20]]
 ; CHECK-NEXT:    [[TMP43:%.*]] = getelementptr { double, double }, ptr [[C]], i64 [[TMP22]]
-; CHECK-NEXT:    store <2 x double> [[TMP28]], ptr [[TMP40]], align 8
-; CHECK-NEXT:    store <2 x double> [[TMP29]], ptr [[TMP42]], align 8
-; CHECK-NEXT:    store <2 x double> [[TMP30]], ptr [[TMP37]], align 8
-; CHECK-NEXT:    store <2 x double> [[TMP31]], ptr [[TMP43]], align 8
+; CHECK-NEXT:    store <2 x double> [[WIDE_LOAD]], ptr [[TMP40]], align 8
+; CHECK-NEXT:    store <2 x double> [[WIDE_LOAD12]], ptr [[TMP42]], align 8
+; CHECK-NEXT:    store <2 x double> [[WIDE_LOAD13]], ptr [[TMP37]], align 8
+; CHECK-NEXT:    store <2 x double> [[WIDE_LOAD14]], ptr [[TMP43]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP44:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP44]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
@@ -362,13 +362,13 @@ define void @single_fmul_used_by_each_member(ptr noalias %A, ptr noalias %B, ptr
 ; CHECK-NEXT:    [[INDEX24:%.*]] = phi i64 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT25:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP45:%.*]] = getelementptr double, ptr [[A]], i64 [[INDEX24]]
 ; CHECK-NEXT:    [[TMP47:%.*]] = load double, ptr [[TMP45]], align 8
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x double> poison, double [[TMP47]], i64 0
+; CHECK-NEXT:    [[TMP46:%.*]] = fmul double [[TMP47]], 5.000000e+00
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x double> poison, double [[TMP46]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x double> [[BROADCAST_SPLATINSERT]], <2 x double> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP48:%.*]] = fmul <2 x double> [[BROADCAST_SPLAT]], splat (double 5.000000e+00)
 ; CHECK-NEXT:    [[TMP49:%.*]] = getelementptr { double, double }, ptr [[B]], i64 [[INDEX24]]
-; CHECK-NEXT:    store <2 x double> [[TMP48]], ptr [[TMP49]], align 8
+; CHECK-NEXT:    store <2 x double> [[BROADCAST_SPLAT]], ptr [[TMP49]], align 8
 ; CHECK-NEXT:    [[TMP50:%.*]] = getelementptr { double, double }, ptr [[C]], i64 [[INDEX24]]
-; CHECK-NEXT:    store <2 x double> [[TMP48]], ptr [[TMP50]], align 8
+; CHECK-NEXT:    store <2 x double> [[BROADCAST_SPLAT]], ptr [[TMP50]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT25]] = add nuw i64 [[INDEX24]], 1
 ; CHECK-NEXT:    [[TMP51:%.*]] = icmp eq i64 [[INDEX_NEXT25]], [[TMP0]]
 ; CHECK-NEXT:    br i1 [[TMP51]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]

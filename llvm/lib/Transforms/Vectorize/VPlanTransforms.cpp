@@ -4389,7 +4389,8 @@ void VPlanTransforms::widenMemoryAccessesByUF(VPlan &Plan, ElementCount VF,
 /// an index-independent load if it feeds all wide ops at all indices (\p OpV
 /// must be the operand at index \p OpIdx for both the recipe at lane 0, \p
 /// WideMember0). A VPInterleaveRecipe can be narrowed to a wide load, if \p V
-/// is defined at \p Idx of a load interleave group.
+/// is defined at \p Idx of a load interleave group. Scalar steps can be used by
+/// replicate recipes shared by all members, for fixed VFs only.
 /// A live-in or recipe defined outside the loop region can be converted, if it
 /// is the same across all lanes, or we can create a BuildVector for it.
 static bool canNarrowLoad(VPSingleDefRecipe *WideMember0, unsigned OpIdx,
@@ -4412,6 +4413,10 @@ static bool canNarrowLoad(VPSingleDefRecipe *WideMember0, unsigned OpIdx,
            Member0Op == OpV;
   if (auto *IR = dyn_cast<VPInterleaveRecipe>(Member0OpR))
     return IR->getInterleaveGroup()->isFull() && IR->getVPValue(Idx) == OpV;
+  // Scalar steps provide the value of the current iteration in their first
+  // lane, which is all replicate recipes use.
+  if (isa<VPScalarIVStepsRecipe>(Member0OpR))
+    return !IsScalable && isa<VPReplicateRecipe>(WideMember0);
   return false;
 }
 
@@ -4424,8 +4429,13 @@ canNarrowOps(ArrayRef<VPValue *> Ops, bool IsScalable,
   auto *WideMember0 = dyn_cast<VPRecipeWithIRFlags>(Ops[0]);
   if (!WideMember0)
     return false;
+  // Replicate recipes must be shared by all members and are narrowed to a
+  // single scalar.
+  if (any_of(Ops, IsaPred<VPReplicateRecipe>) &&
+      (!all_equal(Ops) || cast<VPReplicateRecipe>(Ops[0])->isSingleScalar()))
+    return false;
   for (VPValue *V : Ops) {
-    if (!isa<VPWidenRecipe, VPWidenCastRecipe>(V))
+    if (!isa<VPWidenRecipe, VPWidenCastRecipe, VPReplicateRecipe>(V))
       return false;
     auto *R = cast<VPRecipeWithIRFlags>(V);
     if (vputils::getOpcode(R) != vputils::getOpcode(WideMember0))
@@ -4529,9 +4539,9 @@ static bool isAlreadyNarrow(VPValue *VPV) {
 }
 
 // Convert the wide recipes defining the VPValues in \p Members feeding an
-// interleave group to a single narrow variant. The first member is reused as
-// the narrowed recipe. BuildVectors for live-in operands are inserted into \p
-// Preheader.
+// interleave group to a single narrow variant. Recipes shared by all members
+// are replaced by single scalars, otherwise the first member is narrowed in
+// place. BuildVectors for live-in operands are inserted into \p Preheader.
 static VPValue *narrowInterleaveGroupOp(ArrayRef<VPValue *> Members,
                                         SmallPtrSetImpl<VPValue *> &NarrowedOps,
                                         VPBasicBlock *Preheader) {
@@ -4556,6 +4566,30 @@ static VPValue *narrowInterleaveGroupOp(ArrayRef<VPValue *> Members,
     return V;
 
   VPRecipeBase *R = V->getDefiningRecipe();
+  if (isa<VPWidenRecipe, VPWidenCastRecipe, VPReplicateRecipe>(R) &&
+      all_equal(Members)) {
+    // R is shared by all members. Replace it with a single scalar of the
+    // current iteration, using the first lanes of its narrowed operands.
+    auto *Def = cast<VPRecipeWithIRFlags>(R);
+    assert((!isa<VPReplicateRecipe>(Def) ||
+            !cast<VPReplicateRecipe>(Def)->isPredicated()) &&
+           "predicated replicate recipes are not expected");
+    SmallVector<VPValue *> Ops;
+    for (VPValue *Op : Def->operands()) {
+      if (!Op->isDefinedOutsideLoopRegions() && !isa<VPScalarIVStepsRecipe>(Op))
+        Op = narrowInterleaveGroupOp(Op, NarrowedOps, Preheader);
+      Ops.push_back(Op);
+    }
+    auto *N = VPBuilder::createSingleScalarOp(
+        vputils::getOpcode(Def), Ops, /*Mask=*/nullptr, *Def,
+        getMetadataOf(Def), Def->getDebugLoc(), Def->getScalarType(),
+        cast_or_null<Instruction>(Def->getUnderlyingValue()));
+    N->insertBefore(Def);
+    Def->replaceAllUsesWith(N);
+    NarrowedOps.insert(N);
+    return N;
+  }
+
   if (isa<VPWidenRecipe, VPWidenCastRecipe>(R)) {
     auto *WideMember0 = cast<VPRecipeWithIRFlags>(R);
     for (VPValue *Member : Members.drop_front())

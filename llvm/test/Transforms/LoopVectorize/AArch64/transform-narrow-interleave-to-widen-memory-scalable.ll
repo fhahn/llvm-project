@@ -470,9 +470,9 @@ define void @shared_wide_load_with_cast_not_narrowed(ptr noalias %src, ptr noali
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x double>, ptr [[TMP0]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [4 x i8], ptr [[SCALES]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = load float, ptr [[TMP1]], align 4
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x float> poison, float [[TMP2]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x float> [[BROADCAST_SPLATINSERT]], <2 x float> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP3:%.*]] = fpext <2 x float> [[BROADCAST_SPLAT]] to <2 x double>
+; CHECK-NEXT:    [[TMP7:%.*]] = fpext float [[TMP2]] to double
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x double> poison, double [[TMP7]], i64 0
+; CHECK-NEXT:    [[TMP3:%.*]] = shufflevector <2 x double> [[BROADCAST_SPLATINSERT]], <2 x double> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP4:%.*]] = fmul <2 x double> [[WIDE_LOAD]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [16 x i8], ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <2 x double> [[TMP4]], ptr [[TMP5]], align 8
@@ -513,10 +513,15 @@ exit:
 define void @interleave_group_with_gather(ptr %indices, ptr %src, i64 %n) {
 ; CHECK-LABEL: define void @interleave_group_with_gather(
 ; CHECK-SAME: ptr [[INDICES:%.*]], ptr [[SRC:%.*]], i64 [[N:%.*]]) #[[ATTR0]] {
-; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N]], 1
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 2
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[EXIT:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], 0
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    [[OUT_GEP:%.*]] = getelementptr { double, double }, ptr null, i64 [[IV]]
 ; CHECK-NEXT:    [[IDX_GEP:%.*]] = getelementptr i32, ptr [[INDICES]], i64 [[IV]]
 ; CHECK-NEXT:    [[IDX:%.*]] = load i32, ptr [[IDX_GEP]], align 4
@@ -524,18 +529,17 @@ define void @interleave_group_with_gather(ptr %indices, ptr %src, i64 %n) {
 ; CHECK-NEXT:    [[SRC_GEP:%.*]] = getelementptr double, ptr [[SRC]], i64 [[IDX_EXT]]
 ; CHECK-NEXT:    [[SRC_VAL:%.*]] = load double, ptr [[SRC_GEP]], align 8
 ; CHECK-NEXT:    [[OUT_M1_0_GEP:%.*]] = getelementptr i8, ptr [[OUT_GEP]], i64 -16
-; CHECK-NEXT:    [[OUT_M1_0:%.*]] = load double, ptr [[OUT_M1_0_GEP]], align 8
-; CHECK-NEXT:    [[ADD_0:%.*]] = fadd double 1.000000e+01, [[SRC_VAL]]
-; CHECK-NEXT:    store double [[ADD_0]], ptr [[OUT_M1_0_GEP]], align 8
-; CHECK-NEXT:    [[OUT_M1_1_GEP:%.*]] = getelementptr i8, ptr [[OUT_GEP]], i64 -8
-; CHECK-NEXT:    [[OUT_M1_1:%.*]] = load double, ptr [[OUT_M1_1_GEP]], align 8
 ; CHECK-NEXT:    [[ADD_1:%.*]] = fadd double 1.000000e+01, [[SRC_VAL]]
-; CHECK-NEXT:    store double [[ADD_1]], ptr [[OUT_M1_1_GEP]], align 8
-; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
-; CHECK-NEXT:    [[EXIT_COND:%.*]] = icmp eq i64 [[IV]], [[N]]
-; CHECK-NEXT:    br i1 [[EXIT_COND]], label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x double> poison, double [[ADD_1]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x double> [[BROADCAST_SPLATINSERT]], <2 x double> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    store <2 x double> [[BROADCAST_SPLAT]], ptr [[OUT_M1_0_GEP]], align 8
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 1
+; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP9]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP24:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], [[EXIT1:label %.*]], label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    ret void
 ;
 entry:
   br label %loop
@@ -598,7 +602,7 @@ define void @forward_load_reverse_store_interleave_group(ptr noalias %src, ptr n
 ; CHECK-NEXT:    store <vscale x 4 x i64> [[INTERLEAVED_VEC]], ptr [[TMP11]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP1]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP24:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP26:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 100, [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[SCALAR_PH]]

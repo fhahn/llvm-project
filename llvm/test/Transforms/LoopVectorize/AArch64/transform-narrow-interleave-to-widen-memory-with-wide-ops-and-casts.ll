@@ -17,9 +17,9 @@ define void @test_2xi64_matching_zext_interleave_group(ptr noalias %dst, ptr %sr
 ; VF2-NEXT:    [[TMP0:%.*]] = shl nsw i64 [[INDEX]], 1
 ; VF2-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[INDEX]]
 ; VF2-NEXT:    [[TMP4:%.*]] = load i32, ptr [[TMP1]], align 8
-; VF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i32> poison, i32 [[TMP4]], i64 0
-; VF2-NEXT:    [[WIDE_LOAD:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT]], <2 x i32> poison, <2 x i32> zeroinitializer
-; VF2-NEXT:    [[TMP2:%.*]] = zext <2 x i32> [[WIDE_LOAD]] to <2 x i64>
+; VF2-NEXT:    [[TMP6:%.*]] = zext i32 [[TMP4]] to i64
+; VF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i64> poison, i64 [[TMP6]], i64 0
+; VF2-NEXT:    [[TMP2:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT]], <2 x i64> poison, <2 x i32> zeroinitializer
 ; VF2-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[TMP0]]
 ; VF2-NEXT:    store <2 x i64> [[TMP2]], ptr [[TMP3]], align 8
 ; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 1
@@ -89,9 +89,9 @@ define void @test_2xi64_matching_sext_interleave_group(ptr noalias %dst, ptr %sr
 ; VF2-NEXT:    [[TMP0:%.*]] = shl nsw i64 [[INDEX]], 1
 ; VF2-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[INDEX]]
 ; VF2-NEXT:    [[TMP4:%.*]] = load i32, ptr [[TMP1]], align 8
-; VF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i32> poison, i32 [[TMP4]], i64 0
-; VF2-NEXT:    [[WIDE_LOAD:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT]], <2 x i32> poison, <2 x i32> zeroinitializer
-; VF2-NEXT:    [[TMP2:%.*]] = sext <2 x i32> [[WIDE_LOAD]] to <2 x i64>
+; VF2-NEXT:    [[TMP6:%.*]] = sext i32 [[TMP4]] to i64
+; VF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i64> poison, i64 [[TMP6]], i64 0
+; VF2-NEXT:    [[TMP2:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT]], <2 x i64> poison, <2 x i32> zeroinitializer
 ; VF2-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[TMP0]]
 ; VF2-NEXT:    store <2 x i64> [[TMP2]], ptr [[TMP3]], align 8
 ; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 1
@@ -235,10 +235,10 @@ define void @test_2xi64_matching_cast_add_interleave_group(ptr noalias %dst, ptr
 ; VF2-NEXT:    [[TMP0:%.*]] = shl nsw i64 [[INDEX]], 1
 ; VF2-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[INDEX]]
 ; VF2-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP1]], align 8
-; VF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i32> poison, i32 [[TMP5]], i64 0
-; VF2-NEXT:    [[WIDE_LOAD:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT]], <2 x i32> poison, <2 x i32> zeroinitializer
-; VF2-NEXT:    [[TMP2:%.*]] = zext <2 x i32> [[WIDE_LOAD]] to <2 x i64>
-; VF2-NEXT:    [[TMP3:%.*]] = add <2 x i64> [[TMP2]], splat (i64 2)
+; VF2-NEXT:    [[TMP7:%.*]] = zext i32 [[TMP5]] to i64
+; VF2-NEXT:    [[TMP8:%.*]] = add i64 [[TMP7]], 2
+; VF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i64> poison, i64 [[TMP8]], i64 0
+; VF2-NEXT:    [[TMP3:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT]], <2 x i64> poison, <2 x i32> zeroinitializer
 ; VF2-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[TMP0]]
 ; VF2-NEXT:    store <2 x i64> [[TMP3]], ptr [[TMP4]], align 8
 ; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 1
@@ -391,10 +391,10 @@ define void @test_2xi64_add_cast_interleave_group(ptr noalias %dst, ptr %src) {
 ; VF2-NEXT:    [[TMP0:%.*]] = shl nsw i64 [[INDEX]], 1
 ; VF2-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[INDEX]]
 ; VF2-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP1]], align 8
-; VF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i32> poison, i32 [[TMP5]], i64 0
-; VF2-NEXT:    [[WIDE_LOAD:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT]], <2 x i32> poison, <2 x i32> zeroinitializer
-; VF2-NEXT:    [[TMP2:%.*]] = add <2 x i32> [[WIDE_LOAD]], splat (i32 2)
-; VF2-NEXT:    [[TMP3:%.*]] = zext <2 x i32> [[TMP2]] to <2 x i64>
+; VF2-NEXT:    [[TMP7:%.*]] = add i32 [[TMP5]], 2
+; VF2-NEXT:    [[TMP8:%.*]] = zext i32 [[TMP7]] to i64
+; VF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i64> poison, i64 [[TMP8]], i64 0
+; VF2-NEXT:    [[TMP3:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT]], <2 x i64> poison, <2 x i32> zeroinitializer
 ; VF2-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[TMP0]]
 ; VF2-NEXT:    store <2 x i64> [[TMP3]], ptr [[TMP4]], align 8
 ; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 1
