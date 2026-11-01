@@ -1065,7 +1065,7 @@ public:
         [=](const LegalityQuery &Query) {
           const LLT VecTy = Query.Types[TypeIdx];
           unsigned NumElts = VecTy.getNumElements();
-          unsigned MinSize = VectorSize / NumElts;
+          unsigned MinSize = PowerOf2Ceil(divideCeil(VectorSize, NumElts));
           LLT NewTy = LLT::fixed_vector(
               NumElts, VecTy.getElementType().changeElementSize(MinSize));
           return std::make_pair(TypeIdx, NewTy);
