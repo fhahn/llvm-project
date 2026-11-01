@@ -2852,12 +2852,14 @@ void MemoryDepChecker::mergeInStatus(VectorizationSafetyStatus S) {
 ///       out[i+D] =
 ///     }
 static bool isSafeDependenceDistance(ScalarEvolution &SE, const SCEV &MaxBTC,
-                                     const SCEV &Dist, uint64_t MaxStride) {
+                                     const SCEV &Dist, uint64_t MaxStride,
+                                     uint64_t TypeByteSize) {
 
   // If we can prove that
-  //      (**) |Dist| > MaxBTC * Step
-  // where Step is the absolute stride of the memory accesses in bytes,
-  // then there is no dependence.
+  //      (**) |Dist| >= MaxBTC * Step + TypeByteSize
+  // where Step is the absolute stride of the memory accesses in bytes and
+  // TypeByteSize their size, then there is no dependence. The size is needed,
+  // as the distance may not be a multiple of it.
   //
   // Rationale:
   // We basically want to check if the absolute distance (|Dist/Step|)
@@ -2881,18 +2883,19 @@ static bool isSafeDependenceDistance(ScalarEvolution &SE, const SCEV &MaxBTC,
   const SCEV *CastedDist = SE.getNoopOrSignExtend(&Dist, WideTy);
   const SCEV *CastedProduct =
       SE.getMulExpr(SE.getNoopOrZeroExtend(&MaxBTC, WideTy), Step);
+  const SCEV *Size = SE.getConstant(WideTy, TypeByteSize);
 
-  // Is  Dist - (MaxBTC * Step) > 0 ?
+  // Is  Dist - (MaxBTC * Step) >= TypeByteSize ?
   // (If so, then we have proven (**) because |Dist| >= Dist)
   const SCEV *Minus = SE.getMinusSCEV(CastedDist, CastedProduct);
-  if (SE.isKnownPositive(Minus))
+  if (SE.isKnownPredicate(CmpInst::ICMP_SGE, Minus, Size))
     return true;
 
-  // Second try: Is  -Dist - (MaxBTC * Step) > 0 ?
+  // Second try: Is  -Dist - (MaxBTC * Step) >= TypeByteSize ?
   // (If so, then we have proven (**) because |Dist| >= -1*Dist)
   const SCEV *NegDist = SE.getNegativeSCEV(CastedDist);
   Minus = SE.getMinusSCEV(NegDist, CastedProduct);
-  return SE.isKnownPositive(Minus);
+  return SE.isKnownPredicate(CmpInst::ICMP_SGE, Minus, Size);
 }
 
 /// Check the dependence for two accesses with the same stride \p Stride.
@@ -3114,14 +3117,14 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
   ScalarEvolution &SE = *PSE.getSE();
   auto &DL = InnermostLoop->getHeader()->getDataLayout();
 
-  // If the distance between the acecsses is larger than their maximum absolute
+  // If the distance between the accesses is at least their maximum absolute
   // stride multiplied by the symbolic maximum backedge taken count (which is an
-  // upper bound of the number of iterations), the accesses are independet, i.e.
-  // they are far enough appart that accesses won't access the same location
-  // across all loop ierations.
+  // upper bound of the number of iterations) plus their size, the accesses are
+  // independent, i.e. they are far enough apart that accesses won't access the
+  // same location across all loop iterations.
   if (HasSameSize &&
       isSafeDependenceDistance(SE, *(PSE.getSymbolicMaxBackedgeTakenCount()),
-                               *Dist, MaxStride))
+                               *Dist, MaxStride, TypeByteSize))
     return Dependence::NoDep;
 
   const APInt *APDist = nullptr;
