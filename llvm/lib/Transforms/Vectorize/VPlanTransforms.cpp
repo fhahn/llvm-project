@@ -4395,9 +4395,10 @@ void VPlanTransforms::widenMemoryAccessesByUF(VPlan &Plan, ElementCount VF,
 /// the same interleave group at index 0. A VPWidenLoadRecipe can be narrowed to
 /// an index-independent load if it feeds all wide ops at all indices (\p OpV
 /// must be the operand at index \p OpIdx for both the recipe at lane 0, \p
-/// WideMember0). A VPInterleaveRecipe can be narrowed to a wide load, if \p V
-/// is defined at \p Idx of a load interleave group. Scalar steps can be used by
-/// replicate recipes shared by all members, for fixed VFs only.
+/// WideMember0). A VPInterleaveRecipe can be narrowed to a wide load, if \p OpV
+/// is the member at \p Idx after the operand of \p WideMember0 in a full load
+/// interleave group. Scalar steps can be used by replicate recipes shared by
+/// all members, for fixed VFs only.
 /// A VPWidenIntOrFpInductionRecipe shared by all members can be narrowed to a
 /// broadcast of its value for the current iteration, for fixed VFs only.
 /// A live-in or recipe defined outside the loop region can be converted, if it
@@ -4420,8 +4421,13 @@ static bool canNarrowLoad(VPSingleDefRecipe *WideMember0, unsigned OpIdx,
     // so a shared wide load cannot be narrowed to a uniform scalar; bail out.
     return !IsScalable && !W->getMask() && W->isConsecutive() &&
            Member0Op == OpV;
-  if (auto *IR = dyn_cast<VPInterleaveRecipe>(Member0OpR))
-    return IR->getInterleaveGroup()->isFull() && IR->getVPValue(Idx) == OpV;
+  if (auto *IR = dyn_cast<VPInterleaveRecipe>(Member0OpR)) {
+    // The lanes must use consecutive members, starting at Member0Op.
+    auto Defs = IR->definedValues();
+    unsigned I = std::distance(Defs.begin(), find(Defs, Member0Op)) + Idx;
+    return IR->getInterleaveGroup()->isFull() && I < Defs.size() &&
+           Defs[I] == OpV;
+  }
   // Scalar steps provide the value of the current iteration in their first
   // lane, which is all replicate recipes use.
   if (isa<VPScalarIVStepsRecipe>(Member0OpR))
@@ -4497,8 +4503,8 @@ canNarrowOps(ArrayRef<VPValue *> Ops, bool IsScalable,
 }
 
 /// Returns VF from \p VFs if \p IR is a full interleave group with factor and
-/// number of members both equal to VF. The interleave group must also access
-/// the full vector width.
+/// number of members both equal to VF, or a multiple of VF for fixed VFs. VF
+/// elements must also access the full vector width.
 static std::optional<ElementCount>
 isConsecutiveInterleaveGroup(VPInterleaveRecipe *InterleaveR,
                              ArrayRef<ElementCount> VFs,
@@ -4537,10 +4543,30 @@ isConsecutiveInterleaveGroup(VPInterleaveRecipe *InterleaveR,
   for (ElementCount VF : VFs) {
     unsigned MinVal = VF.getKnownMinValue();
     unsigned GroupSize = GroupElementTy->getScalarSizeInBits() * MinVal;
-    if (IG->getFactor() == MinVal && GroupSize == GetVectorBitWidthForVF(VF))
+    // For fixed VFs, groups with a factor that is a multiple of VF are
+    // narrowed to multiple wide recipes, each accessing VF members.
+    if (GroupSize == GetVectorBitWidthForVF(VF) &&
+        (IG->getFactor() == MinVal ||
+         (VF.isFixed() && IG->getFactor() % MinVal == 0)))
       return {VF};
   }
   return std::nullopt;
+}
+
+/// Returns the address of member \p Idx of \p IR, creating it if needed, and
+/// its alignment.
+static std::pair<VPValue *, Align> getMemberAddr(VPInterleaveRecipe *IR,
+                                                 unsigned Idx) {
+  const InterleaveGroup<Instruction> *IG = IR->getInterleaveGroup();
+  if (Idx == 0)
+    return {IR->getAddr(), IG->getAlign()};
+  Instruction *I = IG->getInsertPos();
+  uint64_t Offset =
+      I->getDataLayout().getTypeAllocSize(getLoadStoreType(I)) * Idx;
+  VPValue *Addr = VPBuilder(IR).createPtrAdd(
+      IR->getAddr(), IR->getParent()->getPlan()->getConstantInt(64, Offset),
+      IR->getDebugLoc());
+  return {Addr, commonAlignment(IG->getAlign(), Offset)};
 }
 
 /// Returns true if \p VPValue is a narrow VPValue.
@@ -4628,12 +4654,16 @@ static VPValue *narrowInterleaveGroupOp(ArrayRef<VPValue *> Members,
 
   if (auto *LoadGroup = dyn_cast<VPInterleaveRecipe>(R)) {
     // Narrow interleave group to wide load, as transformed VPlan will only
-    // process one original iteration.
+    // process one original iteration. Members are consecutive members of the
+    // group, starting at V.
     const InterleaveGroup<Instruction> *IG = LoadGroup->getInterleaveGroup();
     auto *LI = cast<LoadInst>(IG->getInsertPos());
+    auto Defs = LoadGroup->definedValues();
+    auto [Addr, Alignment] =
+        getMemberAddr(LoadGroup, std::distance(Defs.begin(), find(Defs, V)));
     auto *L = VPBuilder(LoadGroup).createWidenLoad(
-        *LI, LoadGroup->getAddr(), LoadGroup->getMask(), /*Consecutive=*/true,
-        IG->getAlign(), *LoadGroup, LoadGroup->getDebugLoc());
+        *LI, Addr, LoadGroup->getMask(), /*Consecutive=*/true, Alignment,
+        *LoadGroup, LoadGroup->getDebugLoc());
     NarrowedOps.insert(L);
     return L;
   }
@@ -4755,6 +4785,7 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
             return false;
           auto *IR = dyn_cast<VPInterleaveRecipe>(DefR);
           return IR && IR->getInterleaveGroup()->isFull() &&
+                 Op.index() < IR->getNumDefinedValues() &&
                  IR->getVPValue(Op.index()) == Op.value();
         })) {
       StoreGroups.push_back(InterleaveR);
@@ -4763,9 +4794,12 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
 
     // Check if all values feeding InterleaveR are matching wide recipes whose
     // operands can be narrowed, without conflicting uses across groups.
-    if (!canNarrowOps(InterleaveR->getStoredValues(),
-                      VFToOptimize->isScalable(), FirstMembersOf))
-      return nullptr;
+    unsigned VF = VFToOptimize->getKnownMinValue();
+    unsigned Factor = InterleaveR->getInterleaveGroup()->getFactor();
+    for (unsigned Start = 0; Start != Factor; Start += VF)
+      if (!canNarrowOps(InterleaveR->getStoredValues().slice(Start, VF),
+                        VFToOptimize->isScalable(), FirstMembersOf))
+        return nullptr;
     StoreGroups.push_back(InterleaveR);
   }
 
@@ -4794,16 +4828,21 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
   // Convert InterleaveGroup \p R to a single VPWidenLoadRecipe.
   SmallPtrSet<VPValue *, 4> NarrowedOps;
   VPBasicBlock *Preheader = Plan.getVectorPreheader();
-  // Narrow operation tree rooted at store groups.
+  // Narrow operation tree rooted at store groups, with one wide store per VF
+  // members.
+  unsigned VF = VFToOptimize->getKnownMinValue();
   for (auto *StoreGroup : StoreGroups) {
-    VPValue *Res = narrowInterleaveGroupOp(StoreGroup->getStoredValues(),
-                                           NarrowedOps, Preheader);
     const InterleaveGroup<Instruction> *IG = StoreGroup->getInterleaveGroup();
     auto *SI = cast<StoreInst>(IG->getInsertPos());
-    VPBuilder(StoreGroup)
-        .createWidenStore(*SI, StoreGroup->getAddr(), Res, nullptr,
-                          /*Consecutive=*/true, IG->getAlign(), *StoreGroup,
-                          StoreGroup->getDebugLoc());
+    for (unsigned Start = 0; Start != IG->getFactor(); Start += VF) {
+      VPValue *Res = narrowInterleaveGroupOp(
+          StoreGroup->getStoredValues().slice(Start, VF), NarrowedOps,
+          Preheader);
+      auto [Addr, Alignment] = getMemberAddr(StoreGroup, Start);
+      VPBuilder(StoreGroup)
+          .createWidenStore(*SI, Addr, Res, nullptr, /*Consecutive=*/true,
+                            Alignment, *StoreGroup, StoreGroup->getDebugLoc());
+    }
     StoreGroup->eraseFromParent();
   }
 
