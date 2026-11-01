@@ -280,6 +280,25 @@ static std::optional<ElementCount> getSmallBestKnownTC(
   return std::nullopt;
 }
 
+/// Returns true if the vector loop of \p Plan with \p VF and \p UF is known to
+/// never execute, because the minimum iteration check is known to always branch
+/// to the scalar loop. This uses the plan's trip count, which may be more
+/// precise than the trip count of the original loop, e.g. after replacing
+/// symbolic strides with their versioned constant values.
+static bool isVectorLoopKnownDead(VPlan &Plan, ElementCount VF, unsigned UF,
+                                  PredicatedScalarEvolution &PSE, Loop *L) {
+  if (Plan.hasTailFolded())
+    return false;
+  ScalarEvolution &SE = *PSE.getSE();
+  const SCEV *TC = vputils::getSCEVExprForVPValue(Plan.getTripCount(), PSE);
+  if (isa<SCEVCouldNotCompute>(TC))
+    return false;
+  CmpInst::Predicate Pred =
+      Plan.requiresScalarEpilogue() ? ICmpInst::ICMP_ULE : ICmpInst::ICMP_ULT;
+  const SCEV *VFxUF = SE.getElementCount(TC->getType(), VF * UF);
+  return SE.isKnownPredicate(Pred, SE.applyLoopGuards(TC, L), VFxUF);
+}
+
 namespace {
 // Forward declare GeneratedRTChecks.
 class GeneratedRTChecks;
@@ -3550,6 +3569,11 @@ LoopVectorizationPlanner::selectInterleaveCount(VPlan &Plan, ElementCount VF,
     }
   }
 
+  // Do not pick an IC for which the vector loop is known to never execute.
+  while (MaxInterleaveCount > 1 &&
+         isVectorLoopKnownDead(Plan, VF, MaxInterleaveCount, PSE, OrigLoop))
+    MaxInterleaveCount /= 2;
+
   assert(MaxInterleaveCount > 0 &&
          "Maximum interleave count must be greater than 0");
 
@@ -5474,6 +5498,11 @@ LoopVectorizationPlanner::computeBestVF() {
             dbgs()
             << "LV: Not considering vector loop of width " << VF
             << " because it will not generate any vector instructions.\n");
+        continue;
+      }
+      if (isVectorLoopKnownDead(*P, VF, /*UF=*/1, PSE, OrigLoop)) {
+        LLVM_DEBUG(dbgs() << "LV: Not considering vector loop of width " << VF
+                          << " because it is known to never execute.\n");
         continue;
       }
       if (Config.OptForSize && !ForceVectorization && hasReplicatorRegion(*P)) {
