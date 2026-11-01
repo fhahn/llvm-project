@@ -2074,6 +2074,10 @@ public:
   LLVM_ABI ReductionShuffle
   getPreferredExpandedReductionShuffle(const IntrinsicInst *II) const;
 
+  /// \returns True if the target wants to expand the given matrix intrinsic
+  /// into vector operations. Otherwise, the target must lower it itself.
+  LLVM_ABI bool shouldExpandMatrixIntrinsic(const IntrinsicInst *II) const;
+
   /// \returns the size cost of rematerializing a GlobalValue address relative
   /// to a stack reload.
   LLVM_ABI unsigned getGISelRematGlobalCost() const;

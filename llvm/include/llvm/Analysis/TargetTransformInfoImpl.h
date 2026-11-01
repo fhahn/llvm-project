@@ -1210,6 +1210,10 @@ public:
     return TTI::ReductionShuffle::SplitHalf;
   }
 
+  virtual bool shouldExpandMatrixIntrinsic(const IntrinsicInst *II) const {
+    return true;
+  }
+
   virtual unsigned getGISelRematGlobalCost() const { return 1; }
 
   virtual unsigned getMinTripCountTailFoldingThreshold() const { return 0; }

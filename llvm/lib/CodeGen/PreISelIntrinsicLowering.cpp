@@ -39,10 +39,12 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/Scalar/LowerConstantIntrinsics.h"
+#include "llvm/Transforms/Scalar/LowerMatrixIntrinsics.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/BuildLibCalls.h"
 #include "llvm/Transforms/Utils/LowerMemIntrinsics.h"
 #include "llvm/Transforms/Utils/LowerVectorIntrinsics.h"
+#include "llvm/Transforms/Utils/MatrixUtils.h"
 
 using namespace llvm;
 
@@ -869,6 +871,37 @@ bool PreISelIntrinsicLowering::lowerIntrinsics(Module &M) const {
             RTLIB::Unsupported)
           return false;
         return lowerUnaryVectorIntrinsicAsLoop(M, CI);
+      });
+      break;
+    case Intrinsic::matrix_multiply:
+    case Intrinsic::matrix_transpose:
+    case Intrinsic::matrix_column_major_load:
+    case Intrinsic::matrix_column_major_store:
+      Changed |= forEachCall(F, [&](CallInst *CI) {
+        auto *II = cast<IntrinsicInst>(CI);
+        const TargetTransformInfo &TTI = LookupTTI(*II->getFunction());
+        if (!TTI.shouldExpandMatrixIntrinsic(II))
+          return false;
+        // TODO: The layout should be encoded in the IR instead of depending on
+        // -matrix-default-layout.
+        bool IsColumnMajor = isMatrixLayoutColumnMajor(M.getContext());
+        switch (II->getIntrinsicID()) {
+        case Intrinsic::matrix_multiply:
+          lowerMatrixMultiply(II, TTI, IsColumnMajor);
+          break;
+        case Intrinsic::matrix_transpose:
+          lowerMatrixTranspose(II, IsColumnMajor);
+          break;
+        case Intrinsic::matrix_column_major_load:
+          lowerMatrixColumnMajorLoad(II);
+          break;
+        case Intrinsic::matrix_column_major_store:
+          lowerMatrixColumnMajorStore(II);
+          break;
+        default:
+          llvm_unreachable("unexpected intrinsic");
+        }
+        return true;
       });
       break;
     case Intrinsic::ptrauth_sign:

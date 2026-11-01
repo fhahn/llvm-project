@@ -16,6 +16,8 @@
 #include "llvm/IR/PassManager.h"
 
 namespace llvm {
+class LLVMContext;
+
 class LowerMatrixIntrinsicsPass
     : public RequiredPassInfoMixin<LowerMatrixIntrinsicsPass> {
   bool Minimal;
@@ -27,6 +29,10 @@ public:
   printPipeline(raw_ostream &OS,
                 function_ref<StringRef(StringRef)> MapClassName2PassName);
 };
+
+/// Returns true if matrices in \p Ctx use column-major layout, as selected by
+/// -matrix-default-layout.
+LLVM_ABI bool isMatrixLayoutColumnMajor(const LLVMContext &Ctx);
 } // namespace llvm
 
 #endif

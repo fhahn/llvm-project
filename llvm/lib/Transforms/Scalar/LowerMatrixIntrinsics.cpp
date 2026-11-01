@@ -2619,3 +2619,8 @@ void LowerMatrixIntrinsicsPass::printPipeline(
     OS << "minimal";
   OS << '>';
 }
+
+bool llvm::isMatrixLayoutColumnMajor(const LLVMContext &Ctx) {
+  return getScalarOptions(Ctx).matrix_default_layout ==
+         MatrixLayoutTy::ColumnMajor;
+}

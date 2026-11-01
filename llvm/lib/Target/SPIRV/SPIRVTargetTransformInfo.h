@@ -66,6 +66,15 @@ public:
   bool isLegalMaskedGather(Type *DataType, Align Alignment) const override;
   bool isLegalMaskedScatter(Type *DataType, Align Alignment) const override;
 
+  bool shouldExpandMatrixIntrinsic(const IntrinsicInst *II) const override {
+    // Multiplies and transposes are lowered by the pre-legalizer combiner.
+    // Logical SPIR-V cannot select the strided accesses of expanded
+    // column-major loads and stores yet.
+    Intrinsic::ID IID = II->getIntrinsicID();
+    return IID != Intrinsic::matrix_multiply &&
+           IID != Intrinsic::matrix_transpose && !ST->isLogicalSPIRV();
+  }
+
   InstructionCost getPartialReductionCost(
       unsigned Opcode, Type *InputTypeA, Type *InputTypeB, Type *AccumType,
       ElementCount VF, TTI::PartialReductionExtendKind OpAExtend,

@@ -21,6 +21,7 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/ProfDataUtils.h"
 #include "llvm/IR/Type.h"
@@ -481,4 +482,61 @@ unsigned llvm::emitMatrixMultiply(IRBuilderBase &Builder,
     }
   }
   return NumComputeOps;
+}
+
+static unsigned getDimension(IntrinsicInst *II, unsigned ArgIdx) {
+  return cast<ConstantInt>(II->getArgOperand(ArgIdx))->getZExtValue();
+}
+
+void llvm::lowerMatrixMultiply(IntrinsicInst *MatMul,
+                               const TargetTransformInfo &TTI,
+                               bool IsColumnMajor) {
+  IRBuilder<> Builder(MatMul);
+  if (isa<FPMathOperator>(MatMul))
+    Builder.setFastMathFlags(MatMul->getFastMathFlags());
+  unsigned R = getDimension(MatMul, 2);
+  unsigned M = getDimension(MatMul, 3);
+  unsigned C = getDimension(MatMul, 4);
+  SmallVector<Value *> A =
+      splitMatrix(Builder, MatMul->getArgOperand(0), IsColumnMajor ? R : M);
+  SmallVector<Value *> B =
+      splitMatrix(Builder, MatMul->getArgOperand(1), IsColumnMajor ? M : C);
+  auto *VecTy = FixedVectorType::get(MatMul->getType()->getScalarType(),
+                                     IsColumnMajor ? R : C);
+  SmallVector<Value *> Result(IsColumnMajor ? C : R, PoisonValue::get(VecTy));
+  emitMatrixMultiply(Builder, Result, A, B, TTI, IsColumnMajor);
+  MatMul->replaceAllUsesWith(flattenMatrix(Builder, Result));
+  MatMul->eraseFromParent();
+}
+
+void llvm::lowerMatrixTranspose(IntrinsicInst *Transpose, bool IsColumnMajor) {
+  IRBuilder<> Builder(Transpose);
+  SmallVector<Value *> Vectors =
+      splitMatrix(Builder, Transpose->getArgOperand(0),
+                  getDimension(Transpose, IsColumnMajor ? 1 : 2));
+  SmallVector<Value *> Result = emitMatrixTranspose(Builder, Vectors);
+  Transpose->replaceAllUsesWith(flattenMatrix(Builder, Result));
+  Transpose->eraseFromParent();
+}
+
+void llvm::lowerMatrixColumnMajorLoad(IntrinsicInst *Load) {
+  IRBuilder<> Builder(Load);
+  Type *EltTy = Load->getType()->getScalarType();
+  auto *ColumnTy = FixedVectorType::get(EltTy, getDimension(Load, 3));
+  bool IsVolatile = cast<ConstantInt>(Load->getArgOperand(2))->isOne();
+  SmallVector<Value *> Columns = emitMatrixLoad(
+      Builder, ColumnTy, getDimension(Load, 4), Load->getArgOperand(0),
+      Load->getArgOperand(1), Load->getParamAlign(0), IsVolatile);
+  Load->replaceAllUsesWith(flattenMatrix(Builder, Columns));
+  Load->eraseFromParent();
+}
+
+void llvm::lowerMatrixColumnMajorStore(IntrinsicInst *Store) {
+  IRBuilder<> Builder(Store);
+  SmallVector<Value *> Columns =
+      splitMatrix(Builder, Store->getArgOperand(0), getDimension(Store, 4));
+  bool IsVolatile = cast<ConstantInt>(Store->getArgOperand(3))->isOne();
+  emitMatrixStore(Builder, Columns, Store->getArgOperand(1),
+                  Store->getArgOperand(2), Store->getParamAlign(1), IsVolatile);
+  Store->eraseFromParent();
 }

@@ -8,7 +8,7 @@
 //
 // Utilities for lowering matrix operations: emitting code for matrices split
 // into vectors of the same type (columns for column-major, rows for row-major
-// layout) and generating tiled loops.
+// layout), lowering single matrix intrinsic calls and generating tiled loops.
 //
 //===----------------------------------------------------------------------===//
 
@@ -25,6 +25,7 @@ class DomTreeUpdater;
 class BasicBlock;
 class ConstantInt;
 class FixedVectorType;
+class IntrinsicInst;
 class Value;
 class Loop;
 class LoopInfo;
@@ -142,6 +143,25 @@ LLVM_ABI unsigned emitMatrixMultiply(IRBuilderBase &Builder,
                                      bool Accumulate = false,
                                      bool IsScalarMatrixTransposed = false,
                                      unsigned SplitRemainderThreshold = 0);
+
+/// Lower the llvm.matrix.multiply call \p MatMul to vector operations and
+/// erase it. \p IsColumnMajor selects the layout of the flat matrices.
+LLVM_ABI void lowerMatrixMultiply(IntrinsicInst *MatMul,
+                                  const TargetTransformInfo &TTI,
+                                  bool IsColumnMajor = true);
+
+/// Lower the llvm.matrix.transpose call \p Transpose to vector operations and
+/// erase it. \p IsColumnMajor selects the layout of the flat matrices.
+LLVM_ABI void lowerMatrixTranspose(IntrinsicInst *Transpose,
+                                   bool IsColumnMajor = true);
+
+/// Lower the llvm.matrix.column.major.load call \p Load to vector loads and
+/// erase it.
+LLVM_ABI void lowerMatrixColumnMajorLoad(IntrinsicInst *Load);
+
+/// Lower the llvm.matrix.column.major.store call \p Store to vector stores and
+/// erase it.
+LLVM_ABI void lowerMatrixColumnMajorStore(IntrinsicInst *Store);
 } // namespace llvm
 
 #endif

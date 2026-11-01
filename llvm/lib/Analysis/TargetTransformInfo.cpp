@@ -1594,6 +1594,11 @@ TargetTransformInfo::getPreferredExpandedReductionShuffle(
   return TTIImpl->getPreferredExpandedReductionShuffle(II);
 }
 
+bool TargetTransformInfo::shouldExpandMatrixIntrinsic(
+    const IntrinsicInst *II) const {
+  return TTIImpl->shouldExpandMatrixIntrinsic(II);
+}
+
 unsigned TargetTransformInfo::getGISelRematGlobalCost() const {
   return TTIImpl->getGISelRematGlobalCost();
 }
