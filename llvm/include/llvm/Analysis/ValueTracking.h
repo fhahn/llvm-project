@@ -14,6 +14,7 @@
 #ifndef LLVM_ANALYSIS_VALUETRACKING_H
 #define LLVM_ANALYSIS_VALUETRACKING_H
 
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/Analysis/SimplifyQuery.h"
 #include "llvm/Analysis/WithCache.h"
 #include "llvm/IR/Constants.h"
@@ -519,6 +520,17 @@ LLVM_ABI void getUnderlyingObjects(const Value *V,
                                    SmallVectorImpl<const Value *> &Objects,
                                    const LoopInfo *LI = nullptr,
                                    unsigned MaxLookup = MaxLookupSearchDepth);
+
+/// Like the above, but calls \p Pred on each underlying object instead of
+/// collecting them. Returns false as soon as \p Pred returns false. If
+/// \p MaxVisited is non-zero, also returns false if more than \p MaxVisited
+/// distinct values would be visited or a phi with more than \p MaxVisited
+/// incoming values would be looked through; zero means no limit.
+LLVM_ABI bool getUnderlyingObjects(const Value *V,
+                                   function_ref<bool(const Value *)> Pred,
+                                   const LoopInfo *LI = nullptr,
+                                   unsigned MaxLookup = MaxLookupSearchDepth,
+                                   unsigned MaxVisited = 0);
 
 /// This is a wrapper around getUnderlyingObjects and adds support for basic
 /// ptrtoint+arithmetic+inttoptr sequences.
