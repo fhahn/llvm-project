@@ -515,10 +515,16 @@ getUnderlyingObjectAggressive(const Value *V,
 /// Since A[i] and A[i-1] are independent pointers, getUnderlyingObjects
 /// should not assume that Curr and Prev share the same underlying object thus
 /// it shouldn't look through the phi above.
-LLVM_ABI void getUnderlyingObjects(const Value *V,
+///
+/// If \p MaxVisited is non-zero, at most \p MaxVisited distinct values are
+/// visited and phis with more than \p MaxVisited incoming values are not
+/// looked through. Returns false if the limit was hit, in which case \p Objects
+/// is incomplete.
+LLVM_ABI bool getUnderlyingObjects(const Value *V,
                                    SmallVectorImpl<const Value *> &Objects,
                                    const LoopInfo *LI = nullptr,
-                                   unsigned MaxLookup = MaxLookupSearchDepth);
+                                   unsigned MaxLookup = MaxLookupSearchDepth,
+                                   unsigned MaxVisited = 0);
 
 /// This is a wrapper around getUnderlyingObjects and adds support for basic
 /// ptrtoint+arithmetic+inttoptr sequences.

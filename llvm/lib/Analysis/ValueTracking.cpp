@@ -7504,9 +7504,10 @@ const Value *llvm::getUnderlyingObject(const Value *V, unsigned MaxLookup,
   return V;
 }
 
-void llvm::getUnderlyingObjects(const Value *V,
+bool llvm::getUnderlyingObjects(const Value *V,
                                 SmallVectorImpl<const Value *> &Objects,
-                                const LoopInfo *LI, unsigned MaxLookup) {
+                                const LoopInfo *LI, unsigned MaxLookup,
+                                unsigned MaxVisited) {
   SmallPtrSet<const Value *, 4> Visited;
   SmallVector<const Value *, 4> Worklist;
   Worklist.push_back(V);
@@ -7517,6 +7518,9 @@ void llvm::getUnderlyingObjects(const Value *V,
     if (!Visited.insert(P).second)
       continue;
 
+    if (MaxVisited && Visited.size() > MaxVisited)
+      return false;
+
     if (auto *SI = dyn_cast<SelectInst>(P)) {
       Worklist.push_back(SI->getTrueValue());
       Worklist.push_back(SI->getFalseValue());
@@ -7524,6 +7528,8 @@ void llvm::getUnderlyingObjects(const Value *V,
     }
 
     if (auto *PN = dyn_cast<PHINode>(P)) {
+      if (MaxVisited && PN->getNumIncomingValues() > MaxVisited)
+        return false;
       // If this PHI changes the underlying object in every iteration of the
       // loop, don't look through it.  Consider:
       //   int **A;
@@ -7544,6 +7550,7 @@ void llvm::getUnderlyingObjects(const Value *V,
 
     Objects.push_back(P);
   } while (!Worklist.empty());
+  return true;
 }
 
 const Value *llvm::getUnderlyingObjectAggressive(const Value *V,
