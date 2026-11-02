@@ -278,16 +278,11 @@ class VPSCEVExpander {
   ScalarEvolution &SE;
   DebugLoc DL;
 
-  /// When true, nested SCEVUDivExprs are expanded so that they cannot divide by
-  /// zero, matching SCEVExpander's SafeUDivMode.
-  bool SafeUDivMode = false;
-
   /// If set, expressions invariant in this loop are expanded in IR via
   /// VPExpandSCEVRecipes, which hoists them out of it.
   const Loop *HoistOutOf;
 
-  DenseMap<PointerIntPair<const SCEV *, 1, bool>, VPValue *>
-      InsertedExpressions;
+  DenseMap<const SCEV *, VPValue *> InsertedExpressions;
 
   /// Try to find a loop-invariant IR value in the plan's entry block whose
   /// SCEV matches \p S. Returns the corresponding live-in VPValue, or nullptr

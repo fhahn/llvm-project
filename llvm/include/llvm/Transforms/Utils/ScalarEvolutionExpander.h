@@ -136,11 +136,6 @@ class SCEVExpander : public SCEVUseVisitor<SCEVExpander, Value *> {
   /// "expanded" form.
   bool LSRMode;
 
-  /// When true, rewrite any divisors of UDiv expressions that may be 0 to
-  /// umax(Divisor, 1) to avoid introducing UB. If the divisor may be poison,
-  /// freeze it first.
-  bool SafeUDivMode = false;
-
   typedef IRBuilder<InstSimplifyFolder, IRBuilderCallbackInserter> BuilderType;
   BuilderType Builder;
 
@@ -589,6 +584,14 @@ private:
                              const DominatorTree *DT,
                              SmallVectorImpl<WeakTrackingVH> &DeadInsts);
 };
+
+/// Try to prove that the divisor \p V is not poison and non-zero whenever
+/// \p CtxI executes, because otherwise an instruction that is guaranteed to
+/// execute together with \p CtxI triggers UB. Sets \p NotPoison and \p NonZero
+/// to true for the respective facts proven; never sets them to false.
+LLVM_ABI void proveDivisorSafeAt(const Value *V, const Instruction *CtxI,
+                                 const DominatorTree &DT, const LoopInfo &LI,
+                                 bool &NotPoison, bool &NonZero);
 
 /// Helper to remove instructions inserted during SCEV expansion, unless they
 /// are marked as used.

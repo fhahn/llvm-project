@@ -972,14 +972,13 @@ static bool dominatesInsertPoint(const VPValue *V, const VPBuilder &Builder) {
 #endif
 
 VPValue *VPSCEVExpander::expand(const SCEV *S) {
-  PointerIntPair<const SCEV *, 1, bool> Key(S, SafeUDivMode);
-  if (VPValue *V = InsertedExpressions.lookup(Key)) {
+  if (VPValue *V = InsertedExpressions.lookup(S)) {
     assert(dominatesInsertPoint(V, Builder) &&
            "reused expansion must dominate the insert point");
     return V;
   }
   VPValue *V = expandImpl(S);
-  InsertedExpressions[Key] = V;
+  InsertedExpressions[S] = V;
   return V;
 }
 
@@ -987,7 +986,7 @@ VPValue *VPSCEVExpander::expandImpl(const SCEV *S) {
   if (VPValue *V = tryToReuseIRValue(S))
     return V;
 
-  if (HoistOutOf && !SafeUDivMode && SE.isLoopInvariant(S, HoistOutOf) &&
+  if (HoistOutOf && SE.isLoopInvariant(S, HoistOutOf) &&
       SE.isGuaranteedNotToCauseUB(S))
     return vputils::getOrCreateVPValueForSCEVExpr(Builder.getPlan(), S,
                                                   /*ExpandInIR=*/true);
@@ -1063,19 +1062,26 @@ VPValue *VPSCEVExpander::expandImpl(const SCEV *S) {
     VPValue *LHS = expand(UDiv->getLHS());
     const SCEV *RHSExpr = UDiv->getRHS();
     VPValue *RHS = expand(RHSExpr);
-    if (SafeUDivMode) {
-      // Make sure the UDiv's divisor is guaranteed to not be zero/poison, to
-      // avoid UB.
-      Type *Ty = UDiv->getType();
-      bool GuaranteedNotPoison =
-          ScalarEvolution::isGuaranteedNotToBePoison(RHSExpr);
-      if (!GuaranteedNotPoison)
-        RHS = Builder.createFreeze(RHS, DL);
-      if (!SE.isKnownNonZero(RHSExpr) || !GuaranteedNotPoison)
-        RHS = Builder.createScalarIntrinsic(
-            Intrinsic::umax, {RHS, Builder.getPlan().getConstantInt(Ty, 1)}, Ty,
-            DL);
+    // Make sure the UDiv's divisor is guaranteed to not be zero/poison, to
+    // avoid UB, unless that holds already for the original loop. All
+    // expansions execute after the plan's entry block, which is the original
+    // preheader.
+    Type *Ty = UDiv->getType();
+    bool GuaranteedNotPoison =
+        ScalarEvolution::isGuaranteedNotToBePoison(RHSExpr);
+    bool KnownNonZero = SE.isKnownNonZero(RHSExpr);
+    if ((!GuaranteedNotPoison || !KnownNonZero) && isa<VPIRValue>(RHS)) {
+      BasicBlock *PH =
+          cast<VPIRBasicBlock>(Builder.getPlan().getEntry())->getIRBasicBlock();
+      proveDivisorSafeAt(cast<VPIRValue>(RHS)->getValue(), PH->getTerminator(),
+                         SE.DT, SE.LI, GuaranteedNotPoison, KnownNonZero);
     }
+    if (!GuaranteedNotPoison)
+      RHS = Builder.createFreeze(RHS, DL);
+    if (!KnownNonZero || !GuaranteedNotPoison)
+      RHS = Builder.createScalarIntrinsic(
+          Intrinsic::umax, {RHS, Builder.getPlan().getConstantInt(Ty, 1)}, Ty,
+          DL);
     return Builder.createNaryOp(Instruction::UDiv, {LHS, RHS},
                                 VPIRFlags::getDefaultFlags(Instruction::UDiv),
                                 DL);
@@ -1154,19 +1160,15 @@ VPValue *VPSCEVExpander::expandImpl(const SCEV *S) {
       llvm_unreachable("Unexpected min/max SCEV type");
     }
     // Chain operands in reverse order matching SCEVExpander's expansion of
-    // min/max expressions. In SafeUDivMode freeze expansion results of operands
-    // other than the first for sequential UMins, to avoid short-circuiting
-    // divide-by-0/poison.
+    // min/max expressions. Freeze expansion results of operands other than the
+    // first for sequential UMins, to avoid short-circuiting poison.
     bool IsSequential = S->getSCEVType() == scSequentialUMinExpr;
     Type *ResultTy = MinMax->getType();
-    bool PrevSafeMode = SafeUDivMode;
     SmallVector<VPValue *, 2> Ops;
     for (const SCEV *SCEVOp : reverse(MinMax->operands())) {
       bool MayShortCircuit =
           IsSequential && Ops.size() != MinMax->getNumOperands() - 1;
-      SafeUDivMode = MayShortCircuit || PrevSafeMode;
       VPValue *OpV = expand(SCEVOp);
-      SafeUDivMode = PrevSafeMode;
       if (MayShortCircuit)
         OpV = Builder.createFreeze(OpV, DL);
       Ops.push_back(OpV);

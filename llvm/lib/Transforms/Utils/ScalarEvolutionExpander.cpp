@@ -17,6 +17,7 @@
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/MustExecute.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
@@ -705,6 +706,86 @@ Value *SCEVExpander::visitMulExpr(SCEVUseT<const SCEVMulExpr *> S) {
   return Prod;
 }
 
+/// Returns true if \p I is guaranteed to execute whenever \p CtxI executes,
+/// either because \p I dominates \p CtxI, or because all paths starting at
+/// \p CtxI reach \p I, possibly in the first iteration of a loop entered
+/// after \p CtxI.
+static bool isGuaranteedToExecuteWith(const Instruction *I,
+                                      const Instruction *CtxI,
+                                      const DominatorTree &DT,
+                                      const LoopInfo &LI) {
+  if (DT.dominates(I, CtxI))
+    return true;
+
+  const BasicBlock *BB = CtxI->getParent();
+  BasicBlock::const_iterator Begin = CtxI->getIterator();
+  for (unsigned Steps = 0; Steps != 8; ++Steps) {
+    if (I->getParent() == BB)
+      return isGuaranteedToTransferExecutionToSuccessor(Begin,
+                                                        I->getIterator());
+    if (!isGuaranteedToTransferExecutionToSuccessor(Begin, BB->end()))
+      return false;
+    // Stop at backedges, as values defined in the loop may differ in the next
+    // iteration.
+    const BasicBlock *Succ = BB->getUniqueSuccessor();
+    if (!Succ || DT.dominates(Succ, BB))
+      return false;
+
+    const Loop *L = LI.getLoopFor(Succ);
+    if (L && L->getHeader() == Succ && L->contains(I)) {
+      // Instructions in inner loops of L may be preceded by inner loops that
+      // never terminate.
+      if (LI.getLoopFor(I->getParent()) != L ||
+          (!L->isInnermost() && I->getParent() != Succ))
+        return false;
+      return SimpleLoopSafetyInfo(L).isGuaranteedToExecute(*I, &DT);
+    }
+    BB = Succ;
+    Begin = BB->begin();
+  }
+  return false;
+}
+
+void llvm::proveDivisorSafeAt(const Value *V, const Instruction *CtxI,
+                              const DominatorTree &DT, const LoopInfo &LI,
+                              bool &NotPoison, bool &NonZero) {
+  if (isa<Constant>(V))
+    return;
+
+  // Values in PoisonIfV are poison if V is poison.
+  SmallPtrSet<const Value *, 8> PoisonIfV;
+  SmallVector<const Value *> Worklist;
+  PoisonIfV.insert(V);
+  Worklist.push_back(V);
+  unsigned NumUsesVisited = 0;
+  while (!Worklist.empty()) {
+    const Value *P = Worklist.pop_back_val();
+    for (const Use &U : P->uses()) {
+      if (++NumUsesVisited > 64)
+        return;
+      auto *UI = dyn_cast<Instruction>(U.getUser());
+      if (!UI)
+        continue;
+      // Division by zero or poison is UB.
+      bool IsDivisor = P == V && U.getOperandNo() == 1 &&
+                       (UI->getOpcode() == Instruction::UDiv ||
+                        UI->getOpcode() == Instruction::URem ||
+                        UI->getOpcode() == Instruction::SDiv ||
+                        UI->getOpcode() == Instruction::SRem);
+      if (((IsDivisor && !NonZero) ||
+           (!NotPoison && mustTriggerUB(UI, PoisonIfV))) &&
+          isGuaranteedToExecuteWith(UI, CtxI, DT, LI)) {
+        NotPoison = true;
+        NonZero |= IsDivisor;
+        if (NonZero)
+          return;
+      }
+      if (propagatesPoison(U) && PoisonIfV.insert(UI).second)
+        Worklist.push_back(UI);
+    }
+  }
+}
+
 Value *SCEVExpander::visitUDivExpr(SCEVUseT<const SCEVUDivExpr *> S) {
   Value *LHS = expand(S->getLHS());
   if (const SCEVConstant *SC = dyn_cast<SCEVConstant>(S->getRHS())) {
@@ -717,21 +798,31 @@ Value *SCEVExpander::visitUDivExpr(SCEVUseT<const SCEVUDivExpr *> S) {
 
   const SCEV *RHSExpr = S->getRHS();
   Value *RHS = expand(RHSExpr);
-  if (SafeUDivMode) {
-    bool GuaranteedNotPoison =
-        ScalarEvolution::isGuaranteedNotToBePoison(RHSExpr);
-    if (!GuaranteedNotPoison)
-      RHS = Builder.CreateFreeze(RHS);
+  bool GuaranteedNotPoison =
+      ScalarEvolution::isGuaranteedNotToBePoison(RHSExpr);
+  bool KnownNonZero = SE.isKnownNonZero(RHSExpr);
+  // The expansion may execute where the original division does not, e.g.
+  // when expanding the exit count of an exit that is not reached on all paths.
+  // Unless the divisor is known to be non-zero and not poison, at least at the
+  // insertion point, make sure the division cannot trigger UB.
+  bool IsSafeToHoist = GuaranteedNotPoison && KnownNonZero;
+  if (!IsSafeToHoist &&
+      Builder.GetInsertPoint() != Builder.GetInsertBlock()->end())
+    proveDivisorSafeAt(RHS, &*Builder.GetInsertPoint(), SE.DT, SE.LI,
+                       GuaranteedNotPoison, KnownNonZero);
+  if (!GuaranteedNotPoison)
+    RHS = Builder.CreateFreeze(RHS);
 
-    // We need an umax if either RHSExpr is not known to be zero, or if it is
-    // not guaranteed to be non-poison. In the later case, the frozen poison may
-    // be 0.
-    if (!SE.isKnownNonZero(RHSExpr) || !GuaranteedNotPoison)
-      RHS = Builder.CreateIntrinsic(RHS->getType(), Intrinsic::umax,
-                                    {RHS, ConstantInt::get(RHS->getType(), 1)});
+  // We need an umax if either RHSExpr is not known to be zero, or if it is
+  // not guaranteed to be non-poison. In the later case, the frozen poison may
+  // be 0.
+  if (!KnownNonZero || !GuaranteedNotPoison) {
+    RHS = Builder.CreateIntrinsic(RHS->getType(), Intrinsic::umax,
+                                  {RHS, ConstantInt::get(RHS->getType(), 1)});
+    IsSafeToHoist = true;
   }
   return InsertBinop(Instruction::UDiv, LHS, RHS, SCEV::FlagNone,
-                     /*IsSafeToHoist*/ SE.isKnownNonZero(S->getRHS()));
+                     IsSafeToHoist);
 }
 
 /// Determine if this is a well-behaved chain of instructions leading back to
@@ -1500,14 +1591,11 @@ SCEVExpander::visitSignExtendExpr(SCEVUseT<const SCEVSignExtendExpr *> S) {
 Value *SCEVExpander::expandMinMaxExpr(SCEVUseT<const SCEVNAryExpr *> S,
                                       Intrinsic::ID IntrinID, Twine Name,
                                       bool IsSequential) {
-  bool PrevSafeMode = SafeUDivMode;
-  SafeUDivMode |= IsSequential;
   Value *LHS = expand(S->getOperand(S->getNumOperands() - 1));
   Type *Ty = LHS->getType();
   if (IsSequential)
     LHS = Builder.CreateFreeze(LHS);
   for (int i = S->getNumOperands() - 2; i >= 0; --i) {
-    SafeUDivMode = (IsSequential && i != 0) || PrevSafeMode;
     Value *RHS = expand(S->getOperand(i));
     if (IsSequential && i != 0)
       RHS = Builder.CreateFreeze(RHS);
@@ -1523,7 +1611,6 @@ Value *SCEVExpander::expandMinMaxExpr(SCEVUseT<const SCEVNAryExpr *> S,
     }
     LHS = Sel;
   }
-  SafeUDivMode = PrevSafeMode;
   return LHS;
 }
 
