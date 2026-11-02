@@ -338,8 +338,8 @@ define void @test8() {
 ; CHECK-NEXT:    [[I:%.*]] = tail call noalias ptr @malloc(i64 noundef 4)
 ; CHECK-NEXT:    tail call void @no_sync_func(ptr nofree captures(none) [[I]])
 ; CHECK-NEXT:    store i32 10, ptr [[I]], align 4
-; CHECK-NEXT:    tail call void @foo(ptr nonnull align 4 dereferenceable(4) [[I]])
-; CHECK-NEXT:    tail call void @free(ptr nonnull align 4 captures(none) dereferenceable(4) [[I]])
+; CHECK-NEXT:    tail call void @foo(ptr noundef nonnull align 4 dereferenceable(4) [[I]])
+; CHECK-NEXT:    tail call void @free(ptr noundef nonnull align 4 captures(none) dereferenceable(4) [[I]])
 ; CHECK-NEXT:    ret void
 ;
 bb:
@@ -359,8 +359,8 @@ define void @test9() {
 ; CHECK-NEXT:    [[I:%.*]] = tail call noalias ptr @malloc(i64 noundef 4)
 ; CHECK-NEXT:    tail call void @no_sync_func(ptr nofree captures(none) [[I]])
 ; CHECK-NEXT:    store i32 10, ptr [[I]], align 4
-; CHECK-NEXT:    tail call void @foo_nounw(ptr nofree nonnull align 4 dereferenceable(4) [[I]]) #[[ATTR11]]
-; CHECK-NEXT:    tail call void @free(ptr nonnull align 4 captures(none) dereferenceable(4) [[I]])
+; CHECK-NEXT:    tail call void @foo_nounw(ptr nofree noundef nonnull align 4 dereferenceable(4) [[I]]) #[[ATTR11]]
+; CHECK-NEXT:    tail call void @free(ptr noundef nonnull align 4 captures(none) dereferenceable(4) [[I]])
 ; CHECK-NEXT:    ret void
 ;
 bb:
@@ -528,7 +528,7 @@ define i32 @test13() {
 ; CHECK-NEXT:    tail call void @no_sync_func(ptr noalias nofree captures(none) [[I]])
 ; CHECK-NEXT:    store i32 10, ptr [[I]], align 4
 ; CHECK-NEXT:    [[I2:%.*]] = load i32, ptr [[I]], align 4
-; CHECK-NEXT:    tail call void @free(ptr noalias nonnull align 4 captures(none) dereferenceable(4) [[I]])
+; CHECK-NEXT:    tail call void @free(ptr noalias noundef nonnull align 4 captures(none) dereferenceable(4) [[I]])
 ; CHECK-NEXT:    ret i32 [[I2]]
 ;
 bb:
@@ -547,7 +547,7 @@ define i32 @test_sle() {
 ; CHECK-NEXT:    tail call void @no_sync_func(ptr noalias nofree captures(none) [[I]])
 ; CHECK-NEXT:    store i32 10, ptr [[I]], align 4
 ; CHECK-NEXT:    [[I2:%.*]] = load i32, ptr [[I]], align 4
-; CHECK-NEXT:    tail call void @free(ptr noalias nonnull align 4 captures(none) dereferenceable(4) [[I]])
+; CHECK-NEXT:    tail call void @free(ptr noalias noundef nonnull align 4 captures(none) dereferenceable(4) [[I]])
 ; CHECK-NEXT:    ret i32 [[I2]]
 ;
 bb:
@@ -566,7 +566,7 @@ define i32 @test_overflow() {
 ; CHECK-NEXT:    tail call void @no_sync_func(ptr noalias nofree captures(none) [[I]])
 ; CHECK-NEXT:    store i32 10, ptr [[I]], align 4
 ; CHECK-NEXT:    [[I2:%.*]] = load i32, ptr [[I]], align 4
-; CHECK-NEXT:    tail call void @free(ptr noalias nonnull align 4 captures(none) dereferenceable(4) [[I]])
+; CHECK-NEXT:    tail call void @free(ptr noalias noundef nonnull align 4 captures(none) dereferenceable(4) [[I]])
 ; CHECK-NEXT:    ret i32 [[I2]]
 ;
 bb:

@@ -91,6 +91,15 @@ using namespace llvm::PatternMatch;
 static cl::opt<unsigned> DomConditionsMaxUses("dom-conditions-max-uses",
                                               cl::Hidden, cl::init(20));
 
+// Controls the number of uses of a value that are UB if the value is undef or
+// poison, checked for dominating the context instruction.
+static cl::opt<unsigned> DomUBUsersMaxUses("dom-ub-users-max-uses", cl::Hidden,
+                                           cl::init(32));
+
+/// Maximum number of uses of a value to scan for uses that are UB if the value
+/// is undef or poison.
+static constexpr unsigned MaxUsesToScanForUBUsers = 256;
+
 /// Maximum number of instructions to check between assume and context
 /// instruction.
 static constexpr unsigned MaxInstrsToCheckForFree = 32;
@@ -8299,6 +8308,8 @@ bool llvm::impliesPoison(const Value *ValAssumedPoison, const Value *V) {
 }
 
 static bool programUndefinedIfUndefOrPoison(const Value *V, bool PoisonOnly);
+static bool isUBIfUndefOrPoisonOperand(const Instruction *I, const Value *V,
+                                       bool PoisonOnly);
 
 static bool isGuaranteedNotToBeUndefOrPoison(
     const Value *V, AssumptionCache *AC, const Instruction *CtxI,
@@ -8437,6 +8448,8 @@ static bool isGuaranteedNotToBeUndefOrPoison(
       }
 
       if (Cond) {
+        // The scan of V's users below also finds this case, but only for a
+        // limited number of users.
         if (Cond == V)
           return true;
         else if (!includesUndef(Kind) && isa<Operator>(Cond)) {
@@ -8451,6 +8464,28 @@ static bool isGuaranteedNotToBeUndefOrPoison(
 
       Dominator = Dominator->getIDom();
     }
+
+  // If V is used by an instruction that dominates CtxI and is immediate UB if
+  // V is undef or poison (e.g. as the address of a load or store), V is
+  // neither at CtxI: V's definition dominates that user, so the user executes
+  // after the last definition of V on every path to CtxI. Limit the number of
+  // users scanned and checked for dominance to bound compile time for values
+  // with many users.
+  if (!isa<Constant>(V)) {
+    const bool PoisonOnly = !includesUndef(Kind);
+    unsigned NumUses = 0, NumUBUses = 0;
+    for (const User *U : V->users()) {
+      if (++NumUses > MaxUsesToScanForUBUsers)
+        break;
+      const auto *UI = dyn_cast<Instruction>(U);
+      if (!UI || !isUBIfUndefOrPoisonOperand(UI, V, PoisonOnly))
+        continue;
+      if (++NumUBUses > DomUBUsersMaxUses)
+        break;
+      if (DT->dominates(UI, CtxI))
+        return true;
+    }
+  }
 
   if (AC && getKnowledgeValidInContext(V, {Attribute::NoUndef}, *AC, CtxI, DT))
     return true;
@@ -8800,6 +8835,15 @@ static bool handleGuaranteedNonPoisonOps(const Instruction *I,
   default:
     return false;
   }
+}
+
+/// Return true if \p I has immediate UB when its operand \p V is poison, or, if
+/// \p PoisonOnly is false, undef or poison.
+static bool isUBIfUndefOrPoisonOperand(const Instruction *I, const Value *V,
+                                       bool PoisonOnly) {
+  auto IsV = [V](const Value *Op) { return Op == V; };
+  return PoisonOnly ? handleGuaranteedNonPoisonOps(I, IsV)
+                    : handleGuaranteedWellDefinedOps(I, IsV);
 }
 
 bool llvm::mustTriggerUB(const Instruction *I,

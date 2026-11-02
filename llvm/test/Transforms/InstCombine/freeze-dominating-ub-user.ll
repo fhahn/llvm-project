@@ -22,7 +22,7 @@ define void @freeze_icmp_store_addr_recurrence(ptr noundef %base, ptr noundef %e
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp ult ptr [[P]], [[END]]
 ; CHECK-NEXT:    br i1 [[CMP]], label %[[LATCH]], label %[[EXIT]]
 ; CHECK:       [[LATCH]]:
-; CHECK-NEXT:    [[P_NEXT]] = getelementptr i8, ptr [[P]], i64 4
+; CHECK-NEXT:    [[P_NEXT]] = getelementptr inbounds nuw i8, ptr [[P]], i64 4
 ; CHECK-NEXT:    br label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
@@ -52,14 +52,13 @@ define ptr @freeze_ptr_load_dominates(ptr %p, i1 %c0, i1 %c) {
 ; CHECK-LABEL: define ptr @freeze_ptr_load_dominates(
 ; CHECK-SAME: ptr [[P:%.*]], i1 [[C0:%.*]], i1 [[C:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[FR:%.*]] = freeze ptr [[P]]
 ; CHECK-NEXT:    br i1 [[C0]], label %[[LD:.*]], label %[[ELSE:.*]]
 ; CHECK:       [[LD]]:
-; CHECK-NEXT:    [[V:%.*]] = load i8, ptr [[FR]], align 1
+; CHECK-NEXT:    [[V:%.*]] = load i8, ptr [[P]], align 1
 ; CHECK-NEXT:    call void @use(i8 [[V]])
 ; CHECK-NEXT:    br i1 [[C]], label %[[THEN:.*]], label %[[ELSE]]
 ; CHECK:       [[THEN]]:
-; CHECK-NEXT:    ret ptr [[FR]]
+; CHECK-NEXT:    ret ptr [[P]]
 ; CHECK:       [[ELSE]]:
 ; CHECK-NEXT:    ret ptr null
 ;
@@ -85,44 +84,43 @@ define ptr @freeze_ptr_store_many_other_users(ptr %p, i1 %c0) {
 ; CHECK-LABEL: define ptr @freeze_ptr_store_many_other_users(
 ; CHECK-SAME: ptr [[P:%.*]], i1 [[C0:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[FR:%.*]] = freeze ptr [[P]]
 ; CHECK-NEXT:    br i1 [[C0]], label %[[ST:.*]], label %[[ELSE:.*]]
 ; CHECK:       [[ST]]:
-; CHECK-NEXT:    store i8 0, ptr [[FR]], align 1
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    call void @use_ptr(ptr nonnull [[FR]])
-; CHECK-NEXT:    ret ptr [[FR]]
+; CHECK-NEXT:    store i8 0, ptr [[P]], align 1
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    call void @use_ptr(ptr [[P]])
+; CHECK-NEXT:    ret ptr [[P]]
 ; CHECK:       [[ELSE]]:
 ; CHECK-NEXT:    ret ptr null
 ;
@@ -252,13 +250,12 @@ define i32 @freeze_int_noundef_arg_dominates(i32 %x, i1 %c0, i1 %c) {
 ; CHECK-LABEL: define i32 @freeze_int_noundef_arg_dominates(
 ; CHECK-SAME: i32 [[X:%.*]], i1 [[C0:%.*]], i1 [[C:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[FR:%.*]] = freeze i32 [[X]]
 ; CHECK-NEXT:    br i1 [[C0]], label %[[USE:.*]], label %[[ELSE:.*]]
 ; CHECK:       [[USE]]:
-; CHECK-NEXT:    call void @use_noundef(i32 [[FR]])
+; CHECK-NEXT:    call void @use_noundef(i32 [[X]])
 ; CHECK-NEXT:    br i1 [[C]], label %[[THEN:.*]], label %[[ELSE]]
 ; CHECK:       [[THEN]]:
-; CHECK-NEXT:    ret i32 [[FR]]
+; CHECK-NEXT:    ret i32 [[X]]
 ; CHECK:       [[ELSE]]:
 ; CHECK-NEXT:    ret i32 0
 ;
@@ -285,10 +282,9 @@ define ptr @freeze_ptr_store_then_may_not_return(ptr %p, i1 %c0) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br i1 [[C0]], label %[[ST:.*]], label %[[ELSE:.*]]
 ; CHECK:       [[ST]]:
-; CHECK-NEXT:    [[FR:%.*]] = freeze ptr [[P]]
-; CHECK-NEXT:    store i8 0, ptr [[FR]], align 1
+; CHECK-NEXT:    store i8 0, ptr [[P]], align 1
 ; CHECK-NEXT:    call void @may_not_return()
-; CHECK-NEXT:    ret ptr [[FR]]
+; CHECK-NEXT:    ret ptr [[P]]
 ; CHECK:       [[ELSE]]:
 ; CHECK-NEXT:    ret ptr null
 ;
@@ -354,8 +350,7 @@ define i32 @phi_undef_udiv_divisor_dominates(i32 %x, i32 %y, i1 %c0, i1 %c) {
 ; CHECK:       [[ELSE]]:
 ; CHECK-NEXT:    br label %[[MERGE]]
 ; CHECK:       [[MERGE]]:
-; CHECK-NEXT:    [[PHI:%.*]] = phi i32 [ [[X]], %[[THEN]] ], [ undef, %[[ELSE]] ]
-; CHECK-NEXT:    ret i32 [[PHI]]
+; CHECK-NEXT:    ret i32 [[X]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret i32 0
 ;

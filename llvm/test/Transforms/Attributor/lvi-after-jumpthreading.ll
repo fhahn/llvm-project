@@ -142,7 +142,7 @@ define i32 @test4(i32 %i, i1 %f, i32 %n) {
 ; CHECK-NEXT:    [[C1:%.*]] = icmp ne i32 [[I]], -42
 ; CHECK-NEXT:    br i1 [[C1]], label [[EXIT2:%.*]], label [[EXIT]]
 ; CHECK:       cont:
-; CHECK-NEXT:    call void @dummy(i1 [[F]]) #[[ATTR2:[0-9]+]]
+; CHECK-NEXT:    call void @dummy(i1 noundef [[F]]) #[[ATTR2:[0-9]+]]
 ; CHECK-NEXT:    br label [[EXIT2]]
 ; CHECK:       do:
 ; CHECK-NEXT:    call void @dummy(i1 [[F]]) #[[ATTR2]]

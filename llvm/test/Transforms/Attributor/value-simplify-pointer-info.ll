@@ -2605,7 +2605,7 @@ define dso_local i32 @conditional_unknown_alloc(i32 %x) {
 ; TUNIT-NEXT:    br label %[[IF_END]]
 ; TUNIT:       [[IF_END]]:
 ; TUNIT-NEXT:    [[TMP0:%.*]] = load i32, ptr [[CALL]], align 4
-; TUNIT-NEXT:    call void @free(ptr nonnull align 4 dereferenceable(4) [[CALL]]) #[[ATTR20]]
+; TUNIT-NEXT:    call void @free(ptr noundef nonnull align 4 dereferenceable(4) [[CALL]]) #[[ATTR20]]
 ; TUNIT-NEXT:    ret i32 [[TMP0]]
 ;
 ; CGSCC-LABEL: define dso_local i32 @conditional_unknown_alloc(
@@ -2619,7 +2619,7 @@ define dso_local i32 @conditional_unknown_alloc(i32 %x) {
 ; CGSCC-NEXT:    br label %[[IF_END]]
 ; CGSCC:       [[IF_END]]:
 ; CGSCC-NEXT:    [[TMP0:%.*]] = load i32, ptr [[CALL]], align 4
-; CGSCC-NEXT:    call void @free(ptr nonnull align 4 dereferenceable(4) [[CALL]]) #[[ATTR23]]
+; CGSCC-NEXT:    call void @free(ptr noundef nonnull align 4 dereferenceable(4) [[CALL]]) #[[ATTR23]]
 ; CGSCC-NEXT:    ret i32 [[TMP0]]
 ;
 entry:

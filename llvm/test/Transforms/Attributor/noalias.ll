@@ -756,7 +756,7 @@ define internal void @test16_sub(ptr noalias %p, i32 %c1, i32 %c2) {
 ; CGSCC-NEXT:    br i1 [[TOBOOL]], label [[IF_END:%.*]], label [[IF_THEN:%.*]]
 ; CGSCC:       if.then:
 ; CGSCC-NEXT:    tail call void @only_store(ptr nofree noundef nonnull writeonly align 4 captures(none) dereferenceable(4) [[P]]) #[[ATTR15]]
-; CGSCC-NEXT:    tail call void @make_alias(ptr nofree nonnull writeonly align 4 dereferenceable(4) [[P]]) #[[ATTR15]]
+; CGSCC-NEXT:    tail call void @make_alias(ptr nofree noundef nonnull writeonly align 4 dereferenceable(4) [[P]]) #[[ATTR15]]
 ; CGSCC-NEXT:    br label [[IF_END]]
 ; CGSCC:       if.end:
 ; CGSCC-NEXT:    [[TOBOOL1:%.*]] = icmp eq i32 [[C2]], 0
