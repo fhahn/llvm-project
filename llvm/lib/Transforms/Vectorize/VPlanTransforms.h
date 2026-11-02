@@ -221,6 +221,14 @@ struct VPlanTransforms {
                                     ElementCount VF, unsigned UF,
                                     bool AddBranchWeights);
 
+  /// Return the cost of the check materializePredicates() generates for the
+  /// predicate \p P of \p Plan with \p VF and \p UF, simplified on its own.
+  /// Leaves \p Plan unchanged, except for new live-ins and an empty,
+  /// unreachable block.
+  static InstructionCost computePredicateCost(VPlan &Plan, const VPPredicate &P,
+                                              ElementCount VF, unsigned UF,
+                                              VPCostContext &Ctx);
+
   /// Model the blocks the executed \p MainPlan generated for the main vector
   /// loop in \p EpiPlan during epilogue vectorization, wrapping each in a
   /// VPIRBasicBlock. Bypass edges are redirected to \p EpiPlan's scalar

@@ -770,9 +770,10 @@ static bool tryToRemoveDeadCycle(VPRecipeBase *R) {
   return true;
 }
 
-void VPlanTransforms::removeDeadRecipes(VPlan &Plan) {
-  PostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> POT(
-      Plan.getEntry());
+/// Remove the dead recipes of the blocks reachable from \p Entry, see
+/// VPlanTransforms::removeDeadRecipes.
+static void removeDeadRecipesFrom(VPBlockBase *Entry) {
+  PostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> POT(Entry);
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(POT)) {
     // The recipes in the block are processed in reverse order, to catch chains
     // of dead recipes.
@@ -795,6 +796,10 @@ void VPlanTransforms::removeDeadRecipes(VPlan &Plan) {
       }
     }
   }
+}
+
+void VPlanTransforms::removeDeadRecipes(VPlan &Plan) {
+  removeDeadRecipesFrom(Plan.getEntry());
 }
 
 /// Legalize VPWidenPointerInductionRecipe, by replacing it with a PtrAdd
@@ -1769,10 +1774,12 @@ static VPSingleDefRecipe *combineRecipe(VPlan &Plan, VPSingleDefRecipe *Def,
   return nullptr;
 }
 
-void VPlanTransforms::combineRecipes(VPlan &Plan) {
+/// Combine the recipes of the blocks reachable from \p Entry, see
+/// VPlanTransforms::combineRecipes.
+static void combineRecipesFrom(VPBlockBase *Entry) {
+  VPlan &Plan = *Entry->getPlan();
   SmallVector<VPSingleDefRecipe *, 256> Worklist;
-  PostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> POT(
-      Plan.getEntry());
+  PostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> POT(Entry);
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(POT))
     for (VPSingleDefRecipe &Def :
          make_isa_range<VPSingleDefRecipe>(reverse(*VPBB)))
@@ -1799,6 +1806,10 @@ void VPlanTransforms::combineRecipes(VPlan &Plan) {
       Def->eraseFromParent();
     }
   }
+}
+
+void VPlanTransforms::combineRecipes(VPlan &Plan) {
+  combineRecipesFrom(Plan.getEntry());
 }
 
 void VPlanTransforms::simplifyReverses(VPlan &Plan) {
@@ -2430,9 +2441,13 @@ struct VPCSEDenseMapInfo : public DenseMapInfo<VPSingleDefRecipe *> {
 };
 } // end anonymous namespace
 
-/// Perform a common-subexpression-elimination of VPSingleDefRecipes on the \p
-/// Plan.
-void VPlanTransforms::cse(VPlan &Plan, const VPDominatorTree &VPDT) {
+/// Perform a common-subexpression-elimination of VPSingleDefRecipes on the
+/// blocks reachable from \p Entry. \p VPDT may only be omitted if \p Entry is
+/// a single basic block.
+static void cseFrom(VPBlockBase *Entry, const VPDominatorTree *VPDT) {
+  assert((VPDT || (isa<VPBasicBlock>(Entry) && !Entry->hasSuccessors())) &&
+         "dominator tree required for multiple blocks");
+  VPlan &Plan = *Entry->getPlan();
   DenseMap<VPSingleDefRecipe *, VPSingleDefRecipe *, VPCSEDenseMapInfo> CSEMap;
   // CSE map for loads. Must be cleared on recipes that may write to memory, and
   // at the end of each VPBB.
@@ -2440,7 +2455,7 @@ void VPlanTransforms::cse(VPlan &Plan, const VPDominatorTree &VPDT) {
       LoadCSEMap;
 
   ReversePostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> RPOT(
-      Plan.getEntry());
+      Entry);
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
     for (VPRecipeBase &R : *VPBB) {
       if (R.mayWriteToMemory())
@@ -2455,7 +2470,7 @@ void VPlanTransforms::cse(VPlan &Plan, const VPDominatorTree &VPDT) {
         continue;
       VPSingleDefRecipe *V = It->second;
       // V must dominate Def for a valid replacement.
-      if (!VPDT.dominates(V->getParent(), VPBB))
+      if (VPDT && !VPDT->dominates(V->getParent(), VPBB))
         continue;
       if (IsLoad) {
         if (getLoadAlign(V) < getLoadAlign(Def)) {
@@ -2487,6 +2502,42 @@ void VPlanTransforms::cse(VPlan &Plan, const VPDominatorTree &VPDT) {
     }
     LoadCSEMap.clear();
   }
+}
+
+void VPlanTransforms::cse(VPlan &Plan, const VPDominatorTree &VPDT) {
+  cseFrom(Plan.getEntry(), &VPDT);
+}
+
+InstructionCost VPlanTransforms::computePredicateCost(VPlan &Plan,
+                                                      const VPPredicate &P,
+                                                      ElementCount VF,
+                                                      unsigned UF,
+                                                      VPCostContext &Ctx) {
+  // Expand the check like materializePredicates, but into a block detached
+  // from the plan's CFG, with a branch keeping the condition alive. Simplify it
+  // with combineRecipes, cse and removeDeadRecipes, which executePlan also
+  // applies to the materialized check.
+  VPBasicBlock *Entry = Plan.getEntry();
+  SmallPtrSet<VPRecipeBase *, 8> EntryRecipes(llvm::from_range,
+                                              make_pointer_range(*Entry));
+  auto *CheckVPBB = Plan.createVPBasicBlock(P.getCheckBlockName());
+  VPBuilder Builder(CheckVPBB);
+  Builder.createNaryOp(VPInstruction::BranchOnCond,
+                       P.expandNegated(Builder, *Ctx.PSE.getSE(), VF, UF));
+  combineRecipesFrom(CheckVPBB);
+  cseFrom(CheckVPBB, /*VPDT=*/nullptr);
+  removeDeadRecipesFrom(CheckVPBB);
+  InstructionCost Cost = CheckVPBB->cost(ElementCount::getFixed(1), Ctx);
+
+  // Remove the check again, users first, including the recipes the expansion
+  // added to the plan's entry, e.g. for values hoisted out of a parent loop.
+  // The empty block is deleted with the plan.
+  for (VPRecipeBase &R : make_early_inc_range(reverse(*CheckVPBB)))
+    R.eraseFromParent();
+  for (VPRecipeBase &R : make_early_inc_range(*Entry))
+    if (!EntryRecipes.contains(&R))
+      R.eraseFromParent();
+  return Cost;
 }
 
 /// Return true if we do not know how to (mechanically) hoist or sink a
