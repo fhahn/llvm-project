@@ -16,6 +16,8 @@
 #include "VPlanUtils.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/Analysis/LoopAccessAnalysis.h"
+#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 
@@ -392,21 +394,109 @@ static bool writesDisjointLocationsPerIteration(VPValue *Addr, Type *StoredTy,
   return Stride && *Stride != 0;
 }
 
+namespace {
+/// A load or store of the nest, and the index of its range in the checked
+/// ranges, once formed.
+struct Access {
+  VPValue *Addr;
+  Type *AccessTy;
+  VPBasicBlock *VPBB;
+  std::optional<unsigned> RangeIdx = std::nullopt;
+};
+} // namespace
+
+/// Returns the range of memory \p A touches over all iterations of \p
+/// OuterLoop and the loop nested in it, or std::nullopt if it cannot be
+/// bounded. \p Latch is the latch of \p OuterLoop, and \p NestedLatch the
+/// latch of the loop nested in it, if there is exactly one.
+static std::optional<VPMemoryChecksPredicate::Range>
+getAccessRange(const Access &A, const VPBasicBlock *Latch,
+               const VPBlockBase *NestedLatch, const VPDominatorTree &VPDT,
+               PredicatedScalarEvolution &PSE, const Loop *OuterLoop,
+               ScalarEvolution::LoopGuards &LoopGuards) {
+  // Every address an inbounds GEP forms on an iteration where it is
+  // dereferenced lies in one allocated object, so none of the recurrences
+  // below wraps the address space: they are monotonic, and evaluating them at
+  // a backedge-taken count gives the last address they form. The access must
+  // execute on every iteration of the loops of those recurrences, so every
+  // address the GEP forms is a dereferenced one.
+  if (!vputils::getGEPFlagsForPtr(A.Addr).isInBounds() ||
+      !VPDT.dominates(A.VPBB, Latch))
+    return std::nullopt;
+
+  ScalarEvolution &SE = *PSE.getSE();
+  const SCEV *Expr = vputils::getSCEVExprForVPValue(A.Addr, PSE, OuterLoop);
+  if (isa<SCEVCouldNotCompute>(Expr))
+    return std::nullopt;
+  const DataLayout &DL = Latch->getPlan()->getDataLayout();
+  const SCEV *AccessSize =
+      SE.getStoreSizeOfExpr(DL.getIndexType(Expr->getType()), A.AccessTy);
+
+  // Collapse the recurrence of the loop nested in the outer loop into the
+  // number of bytes a single outer-loop iteration touches. With a
+  // non-negative step, the addresses grow from the first to the last
+  // iteration of the nested loop, so their distance is the span it adds. Where
+  // the span starts may vary with the outer loop, but its size must not.
+  const auto *AR = dyn_cast<SCEVAddRecExpr>(Expr);
+  if (AR && AR->getLoop() != OuterLoop && OuterLoop->contains(AR->getLoop())) {
+    const SCEV *NestedBTC = SE.getBackedgeTakenCount(AR->getLoop());
+    if (!AR->isAffine() || !SE.isKnownNonNegative(AR->getStepRecurrence(SE)) ||
+        !NestedLatch || !VPDT.dominates(A.VPBB, NestedLatch) ||
+        isa<SCEVCouldNotCompute>(NestedBTC))
+      return std::nullopt;
+    AccessSize = SE.getAddExpr(
+        AccessSize, SE.getMinusSCEV(AR->evaluateAtIteration(NestedBTC, SE),
+                                    AR->getStart()));
+    Expr = AR->getStart();
+  }
+
+  // What remains must be invariant in the outer loop or an affine recurrence
+  // of it.
+  const auto *OuterAR = dyn_cast<SCEVAddRecExpr>(Expr);
+  bool IsOuterAffine =
+      OuterAR && OuterAR->getLoop() == OuterLoop && OuterAR->isAffine();
+  if ((!IsOuterAffine && !SE.isLoopInvariant(Expr, OuterLoop)) ||
+      !SE.isLoopInvariant(AccessSize, OuterLoop))
+    return std::nullopt;
+  const SCEV *OuterBTC = PSE.getBackedgeTakenCount();
+  auto [Low, High] = getStartAndEndForAccess(
+      OuterLoop, Expr, AccessSize, OuterBTC, OuterBTC, &SE,
+      /*PointerBounds=*/nullptr, /*DT=*/nullptr, /*AC=*/nullptr, LoopGuards);
+  if (isa<SCEVCouldNotCompute>(Low))
+    return std::nullopt;
+  return VPMemoryChecksPredicate::Range{Low, High};
+}
+
 bool llvm::proveOuterLoopMemorySafety(VPlan &Plan,
                                       PredicatedScalarEvolution &PSE,
                                       AAResults &AA,
                                       const VPDominatorTree &VPDT,
                                       const Loop *OuterLoop) {
-  SmallVector<const Value *> LoadObjects;
-  SmallVector<const Value *> StoreObjects;
+  // Collect the loads and stores of the nest. Of the loads, and of the stores,
+  // through the same address only the widest is kept, as the bytes it touches
+  // include those of the others.
+  using AccessMap = MapVector<VPValue *, Access>;
+  AccessMap Loads, Stores;
+  const DataLayout &DL = Plan.getDataLayout();
+  auto IsNoWider = [&DL](Type *A, Type *B) {
+    return TypeSize::isKnownLE(DL.getTypeStoreSize(A), DL.getTypeStoreSize(B));
+  };
+  auto AddAccess = [&IsNoWider](AccessMap &Accesses, Access A) {
+    auto [It, Inserted] = Accesses.try_emplace(A.Addr, A);
+    if (!Inserted && !IsNoWider(A.AccessTy, It->second.AccessTy))
+      It->second = A;
+  };
+  SmallVector<const VPBlockBase *> NestedLatches;
   auto [Header, Latch] = VPBlockUtils::getPlainCFGHeaderAndLatch(Plan);
   for (VPBasicBlock *VPBB : vp_rpo_plain_cfg_loop_body(Header)) {
+    if (VPBB != Latch && VPBlockUtils::isLatch(VPBB, VPDT))
+      NestedLatches.push_back(VPBB);
     for (VPRecipeBase &R : *VPBB) {
       if (!R.mayReadOrWriteMemory())
         continue;
       VPValue *Addr, *StoredVal;
       if (match(&R, m_VPInstruction<Instruction::Load>(m_VPValue(Addr)))) {
-        LoadObjects.push_back(getBaseObject(Addr));
+        AddAccess(Loads, {Addr, R.getVPSingleValue()->getScalarType(), VPBB});
         continue;
       }
       // Bail out on any other memory accesses or write-after-write conflict in
@@ -417,16 +507,60 @@ bool llvm::proveOuterLoopMemorySafety(VPlan &Plan,
                                                VPBB, Latch, VPDT, PSE,
                                                OuterLoop))
         return false;
-      StoreObjects.push_back(getBaseObject(Addr));
+      AddAccess(Stores, {Addr, StoredVal->getScalarType(), VPBB});
     }
   }
+  // Recurrences of a nested loop are only lowered to SCEV if it is the only
+  // one (see getSCEVExprForVPValue).
+  const VPBlockBase *NestedLatch =
+      NestedLatches.size() == 1 ? NestedLatches.front() : nullptr;
 
-  // Stores must access objects not accessed by any other load or store in the
-  // nest.
-  for (auto [I, StoreObj] : enumerate(StoreObjects))
-    for (const Value *Obj : concat<const Value *const>(
-             ArrayRef(StoreObjects).drop_front(I + 1), LoadObjects))
-      if (!provablyDistinctObjects(AA, StoreObj, Obj))
+  // Stores must access memory not accessed by any other load or store in the
+  // nest, on a different outer-loop iteration. Other pairs that cannot be
+  // separated statically are checked at runtime, if the memory both access can
+  // be bounded and is in the same address space.
+  SmallVector<VPMemoryChecksPredicate::Range> Ranges;
+  SmallVector<VPMemoryChecksPredicate::RangeCheck> RangeChecks;
+  auto LoopGuards =
+      ScalarEvolution::LoopGuards::collectOnDemand(OuterLoop, *PSE.getSE());
+  auto GetRangeIdx = [&, Latch = Latch](Access &A) {
+    if (!A.RangeIdx) {
+      if (std::optional<VPMemoryChecksPredicate::Range> Range = getAccessRange(
+              A, Latch, NestedLatch, VPDT, PSE, OuterLoop, LoopGuards)) {
+        A.RangeIdx = Ranges.size();
+        Ranges.push_back(*Range);
+      }
+    }
+    return A.RangeIdx;
+  };
+  auto StoreAccesses = make_second_range(Stores);
+  auto LoadAccesses = make_second_range(Loads);
+  for (auto [I, Store] : enumerate(StoreAccesses))
+    for (Access &Other :
+         concat<Access>(drop_begin(StoreAccesses, I + 1), LoadAccesses)) {
+      // The address of a store advances by at least as many bytes as the store
+      // writes on each outer-loop iteration (see
+      // writesDisjointLocationsPerIteration), so a load through the same
+      // address touching no more bytes only reads bytes of its own lane. The
+      // ranges of a wider load and the store would always overlap.
+      if (Store.Addr == Other.Addr) {
+        if (!IsNoWider(Other.AccessTy, Store.AccessTy))
+          return false;
+        continue;
+      }
+      if (provablyDistinctObjects(AA, getBaseObject(Store.Addr),
+                                  getBaseObject(Other.Addr)))
+        continue;
+      std::optional<unsigned> StoreIdx = GetRangeIdx(Store);
+      std::optional<unsigned> OtherIdx = GetRangeIdx(Other);
+      if (!StoreIdx || !OtherIdx ||
+          Store.Addr->getScalarType() != Other.Addr->getScalarType() ||
+          RangeChecks.size() == VectorizerParams::VectorizeMemoryCheckThreshold)
         return false;
+      RangeChecks.push_back({*StoreIdx, *OtherIdx});
+    }
+  if (!RangeChecks.empty())
+    Plan.addPredicate(std::make_unique<VPMemoryChecksPredicate>(
+        std::move(Ranges), std::move(RangeChecks), OuterLoop));
   return true;
 }

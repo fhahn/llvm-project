@@ -4998,7 +4998,7 @@ public:
   struct Range {
     const SCEV *Low;
     const SCEV *High;
-    bool NeedsFreeze;
+    bool NeedsFreeze = false;
   };
 
   /// The ranges at indices A and B into Ranges do not overlap. Strides holds
@@ -5007,7 +5007,7 @@ public:
   struct RangeCheck {
     unsigned A;
     unsigned B;
-    SmallVector<const SCEV *, 2> Strides;
+    SmallVector<const SCEV *, 2> Strides = {};
   };
 
   /// The distance Diff from a source to a sink pointer, each accessing
@@ -5026,6 +5026,16 @@ private:
   const Loop *TheLoop;
 
 public:
+  /// Check that, for each of \p RangeChecks, the two ranges of \p Ranges it
+  /// indexes do not overlap.
+  VPMemoryChecksPredicate(SmallVector<Range> Ranges,
+                          SmallVector<RangeCheck> RangeChecks,
+                          const Loop *TheLoop)
+      : VPPredicate(VPMemoryChecksPredicateSC), Ranges(std::move(Ranges)),
+        RangeChecks(std::move(RangeChecks)), TheLoop(TheLoop) {
+    assert(!this->RangeChecks.empty() && "No checks to generate");
+  }
+
   /// Check the runtime checks of \p RtPtrChecking, computed by
   /// LoopAccessInfo for \p TheLoop.
   VPMemoryChecksPredicate(const RuntimePointerChecking &RtPtrChecking,

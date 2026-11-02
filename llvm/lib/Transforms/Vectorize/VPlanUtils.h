@@ -51,7 +51,9 @@ VPValue *getOrCreateVPValueForSCEVExpr(VPlan &Plan, const SCEV *Expr,
                                        bool ExpandInIR = false);
 
 /// Return the SCEV expression for \p V. Returns SCEVCouldNotCompute if no
-/// SCEV expression could be constructed.
+/// SCEV expression could be constructed. A VPPhi recurrence is lowered to an
+/// AddRec of the single loop nested in \p L, so the header phis of \p L must
+/// already have been replaced by header-phi recipes.
 LLVM_ABI_FOR_TEST const SCEV *
 getSCEVExprForVPValue(const VPValue *V, PredicatedScalarEvolution &PSE,
                       const Loop *L = nullptr);

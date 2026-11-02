@@ -356,6 +356,27 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
   const SCEV *Expr =
       TypeSwitch<const VPRecipeBase *, const SCEV *>(DefR)
           .Case([](const VPExpandSCEVRecipe *R) { return R->getSCEV(); })
+          .Case([&SE, &CreateSCEV, L](const VPPhi *R) -> const SCEV * {
+            // The header phis of L have been replaced by header-phi recipes,
+            // so phi(start, add(phi, step)) heads a loop nested in L; only a
+            // single, innermost nested loop is handled, which identifies it.
+            // Header predecessors are canonical, so the start comes first. A
+            // live-in step is invariant in the nested loop and does not recurse
+            // into R, e.g. for add(phi, phi).
+            VPValue *Step;
+            if (!L || !hasSingleElement(L->getSubLoops()) ||
+                !L->getSubLoops()[0]->isInnermost() ||
+                R->getNumOperands() != 2 ||
+                !match(R->getOperand(1),
+                       m_c_Add(m_Specific(R), m_VPValue(Step, m_LiveIn()))))
+              return SE.getCouldNotCompute();
+            // No wrap flags: VPlan cannot reproduce SCEV's reasoning for them.
+            return CreateSCEV(
+                {R->getOperand(0), Step}, [&](ArrayRef<SCEVUse> Ops) {
+                  return SE.getAddRecExpr(Ops[0], Ops[1], L->getSubLoops()[0],
+                                          SCEV::FlagNone);
+                });
+          })
           .Case([&SE, &PSE, L](const VPWidenIntOrFpInductionRecipe *R) {
             const SCEV *Step = getSCEVExprForVPValue(R->getStepValue(), PSE, L);
             if (!L || isa<SCEVCouldNotCompute>(Step))

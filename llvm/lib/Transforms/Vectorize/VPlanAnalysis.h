@@ -30,7 +30,8 @@ void collectEphemeralRecipesForVPlan(VPlan &Plan,
                                      DenseSet<VPRecipeBase *> &EphRecipes);
 
 /// Returns true if the memory accesses in outer loop plain CFG \p Plan can be
-/// vectorized.
+/// vectorized, adding a VPMemoryChecksPredicate to \p Plan for the pairs of
+/// accesses that need runtime checks.
 bool proveOuterLoopMemorySafety(VPlan &Plan, PredicatedScalarEvolution &PSE,
                                 AAResults &AA, const VPDominatorTree &VPDT,
                                 const Loop *OuterLoop);

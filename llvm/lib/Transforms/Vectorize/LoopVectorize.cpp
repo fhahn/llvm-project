@@ -1153,9 +1153,9 @@ public:
   /// accurately estimate the cost of the runtime checks. The memory checks are
   /// generated if \p Plan has a memory checks predicate. The blocks are
   /// un-linked from the IR and attached to VPlan as IR or recipes if
-  /// profitable. Otherwise, the check blocks are removed completely. \p LAI
-  /// may only be nullptr (outer loops have no LoopAccessInfo) if \p Plan has
-  /// no memory checks predicate.
+  /// profitable. Otherwise, the check blocks are removed completely. \p LAI is
+  /// nullptr for outer loops, which have no LoopAccessInfo; their memory checks
+  /// are not generated here.
   void create(Loop *L, const LoopAccessInfo *LAI,
               const SCEVPredicate &UnionPred, const VPlan &Plan,
               ElementCount VF, unsigned IC, OptimizationRemarkEmitter &ORE) {
@@ -1204,8 +1204,7 @@ public:
     // TODO: We need to estimate the cost of alias-masking in
     // GeneratedRTChecks::getCost(). We can't check the MemCheckBlock as the
     // alias-mask is generated later in VPlan.
-    if (Plan.getPredicate<VPMemoryChecksPredicate>()) {
-      assert(LAI && "Memory checks predicate without LoopAccessInfo");
+    if (LAI && Plan.getPredicate<VPMemoryChecksPredicate>()) {
       const auto &RtPtrChecking = *LAI->getRuntimePointerChecking();
       auto *Pred = SCEVCheckBlock ? SCEVCheckBlock : Preheader;
       MemCheckBlock = SplitBlock(Pred, Pred->getTerminator(), DT, LI, nullptr,
@@ -1226,7 +1225,9 @@ public:
     }
 
     SCEVExp.eraseDeadInstructions(SCEVCheckCond);
-    HasChecks = getSCEVChecks().first || getMemRuntimeChecks().first;
+    // The memory checks of outer loops are only generated from the plan.
+    HasChecks = getSCEVChecks().first || getMemRuntimeChecks().first ||
+                (!LAI && Plan.getPredicate<VPMemoryChecksPredicate>());
 
     if (!MemCheckBlock && !SCEVCheckBlock)
       return;
@@ -6847,11 +6848,6 @@ void LoopVectorizationPlanner::attachRuntimeChecks(
                    SCEVCheckBlock, HasBranchWeights);
   }
   if (Plan.getPredicate<VPMemoryChecksPredicate>()) {
-    // VPlan-native path does not do any analysis for memory runtime checks
-    // currently.
-    assert((!Opts.enable_vplan_native_path || !Plan.isOuterLoop()) &&
-           "Memory runtime checks are not supported for outer loops yet");
-
     if (Config.OptForSize) {
       assert(
           Config.getHints().getForce() == LoopVectorizeHints::FK_Enabled &&
@@ -6868,7 +6864,8 @@ void LoopVectorizationPlanner::attachRuntimeChecks(
       });
     }
     // Erase the temporary IR before recipe expansion can reuse its values.
-    RTChecks.eraseMemCheckBlock();
+    if (!Plan.isOuterLoop())
+      RTChecks.eraseMemCheckBlock();
     RUN_VPLAN_PASS(VPlanTransforms::materializePredicates, Plan, *PSE.getSE(),
                    VF, UF, HasBranchWeights);
   }
@@ -7730,9 +7727,9 @@ bool LoopVectorizePass::processLoop(Loop *L) {
       }
     }
     // No memory checks are needed if none were generated or the pre-built
-    // checks fold to false.
+    // checks fold to false. Outer loops have no pre-built memory checks.
     // TODO: Fold the predicates in VPlan once the pre-built blocks are gone.
-    if (!Checks.getMemRuntimeChecks().first)
+    if (IsInnerLoop && !Checks.getMemRuntimeChecks().first)
       BestPlanPtr->removePredicate<VPMemoryChecksPredicate>();
 
     // Check if it is profitable to vectorize with runtime checks.
