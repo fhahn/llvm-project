@@ -1521,5 +1521,74 @@ define nofpclass(snan) float @qnan_result_demands_snan_rhs(i1 %cond, float %unkn
   ret float %mul
 }
 
+; Source is never NaN, so x * x is never NaN.
+define float @square_uitofp_infer_nnan(i32 noundef %i) {
+; CHECK-LABEL: define float @square_uitofp_infer_nnan(
+; CHECK-SAME: i32 noundef [[I:%.*]]) {
+; CHECK-NEXT:    [[X:%.*]] = uitofp i32 [[I]] to float
+; CHECK-NEXT:    [[MUL:%.*]] = fmul float [[X]], [[X]]
+; CHECK-NEXT:    ret float [[MUL]]
+;
+  %x = uitofp i32 %i to float
+  %mul = fmul float %x, %x
+  ret float %mul
+}
+
+define float @square_uitofp_infer_nnan_maybe_undef(i32 %i) {
+; CHECK-LABEL: define float @square_uitofp_infer_nnan_maybe_undef(
+; CHECK-SAME: i32 [[I:%.*]]) {
+; CHECK-NEXT:    [[X:%.*]] = uitofp i32 [[I]] to float
+; CHECK-NEXT:    [[MUL:%.*]] = fmul nnan float [[X]], [[X]]
+; CHECK-NEXT:    ret float [[MUL]]
+;
+  %x = uitofp i32 %i to float
+  %mul = fmul float %x, %x
+  ret float %mul
+}
+
+define <2 x float> @square_uitofp_infer_nnan_vec(<2 x i32> noundef %i) {
+; CHECK-LABEL: define <2 x float> @square_uitofp_infer_nnan_vec(
+; CHECK-SAME: <2 x i32> noundef [[I:%.*]]) {
+; CHECK-NEXT:    [[X:%.*]] = uitofp <2 x i32> [[I]] to <2 x float>
+; CHECK-NEXT:    [[MUL:%.*]] = fmul <2 x float> [[X]], [[X]]
+; CHECK-NEXT:    ret <2 x float> [[MUL]]
+;
+  %x = uitofp <2 x i32> %i to <2 x float>
+  %mul = fmul <2 x float> %x, %x
+  ret <2 x float> %mul
+}
+
+; Source is never inf and inf results are not demanded.
+define nofpclass(inf) float @ret_no_inf_square_infer_ninf(float noundef nofpclass(inf) %x) {
+; CHECK-LABEL: define nofpclass(inf) float @ret_no_inf_square_infer_ninf(
+; CHECK-SAME: float noundef nofpclass(inf) [[X:%.*]]) {
+; CHECK-NEXT:    [[MUL:%.*]] = fmul float [[X]], [[X]]
+; CHECK-NEXT:    ret float [[MUL]]
+;
+  %mul = fmul float %x, %x
+  ret float %mul
+}
+
+define nofpclass(inf nan) float @ret_no_inf_nan_square_infer_nnan_ninf(float noundef nofpclass(inf nan) %x) {
+; CHECK-LABEL: define nofpclass(nan inf) float @ret_no_inf_nan_square_infer_nnan_ninf(
+; CHECK-SAME: float noundef nofpclass(nan inf) [[X:%.*]]) {
+; CHECK-NEXT:    [[MUL:%.*]] = fmul float [[X]], [[X]]
+; CHECK-NEXT:    ret float [[MUL]]
+;
+  %mul = fmul float %x, %x
+  ret float %mul
+}
+
+; Negative test: the source may be NaN and NaN results are demanded.
+define float @square_maybe_nan_no_infer_nnan(float noundef %x) {
+; CHECK-LABEL: define float @square_maybe_nan_no_infer_nnan(
+; CHECK-SAME: float noundef [[X:%.*]]) {
+; CHECK-NEXT:    [[MUL:%.*]] = fmul float [[X]], [[X]]
+; CHECK-NEXT:    ret float [[MUL]]
+;
+  %mul = fmul float %x, %x
+  ret float %mul
+}
+
 attributes #0 = { denormal_fpenv(preservesign) }
 attributes #1 = { denormal_fpenv(dynamic) }
