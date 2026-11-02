@@ -2638,6 +2638,13 @@ Value *InstCombinerImpl::SimplifyDemandedUseFPClass(Instruction *I,
         return Fabs;
       }
 
+      FastMathFlags InferredFMF =
+          inferFastMathValueFlags(FMF, Known.getKnownFPClasses(), KnownLHS);
+      if (InferredFMF != FMF) {
+        I->setFastMathFlags(InferredFMF);
+        return I;
+      }
+
       return nullptr;
     }
 

@@ -1991,7 +1991,7 @@ define nofpclass(nan) float @exp_select_must_be_0_commute(float noundef %arg, fl
 define nofpclass(nan) float @ret_nonan_fmul_select_fmul_select_nan_multiple_use(i1 %cond, float noundef %x) {
 ; CHECK-LABEL: define nofpclass(nan) float @ret_nonan_fmul_select_fmul_select_nan_multiple_use
 ; CHECK-SAME: (i1 [[COND:%.*]], float noundef [[X:%.*]]) {
-; CHECK-NEXT:    [[FMUL:%.*]] = fmul float [[X]], [[X]]
+; CHECK-NEXT:    [[FMUL:%.*]] = fmul nnan float [[X]], [[X]]
 ; CHECK-NEXT:    ret float [[FMUL]]
 ;
   %select = select i1 %cond, float %x, float +qnan
@@ -2002,7 +2002,7 @@ define nofpclass(nan) float @ret_nonan_fmul_select_fmul_select_nan_multiple_use(
 define nofpclass(nan) float @ret_nonan_fmul_select_fmul_select_nan_multiple_use_commute(i1 %cond, float noundef %x) {
 ; CHECK-LABEL: define nofpclass(nan) float @ret_nonan_fmul_select_fmul_select_nan_multiple_use_commute
 ; CHECK-SAME: (i1 [[COND:%.*]], float noundef [[X:%.*]]) {
-; CHECK-NEXT:    [[FMUL:%.*]] = fmul float [[X]], [[X]]
+; CHECK-NEXT:    [[FMUL:%.*]] = fmul nnan float [[X]], [[X]]
 ; CHECK-NEXT:    ret float [[FMUL]]
 ;
   %select = select i1 %cond, float +qnan, float %x

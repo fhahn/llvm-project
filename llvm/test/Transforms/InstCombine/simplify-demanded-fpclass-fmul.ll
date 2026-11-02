@@ -1526,7 +1526,7 @@ define float @square_uitofp_infer_nnan(i32 noundef %i) {
 ; CHECK-LABEL: define float @square_uitofp_infer_nnan(
 ; CHECK-SAME: i32 noundef [[I:%.*]]) {
 ; CHECK-NEXT:    [[X:%.*]] = uitofp i32 [[I]] to float
-; CHECK-NEXT:    [[MUL:%.*]] = fmul float [[X]], [[X]]
+; CHECK-NEXT:    [[MUL:%.*]] = fmul nnan float [[X]], [[X]]
 ; CHECK-NEXT:    ret float [[MUL]]
 ;
   %x = uitofp i32 %i to float
@@ -1550,7 +1550,7 @@ define <2 x float> @square_uitofp_infer_nnan_vec(<2 x i32> noundef %i) {
 ; CHECK-LABEL: define <2 x float> @square_uitofp_infer_nnan_vec(
 ; CHECK-SAME: <2 x i32> noundef [[I:%.*]]) {
 ; CHECK-NEXT:    [[X:%.*]] = uitofp <2 x i32> [[I]] to <2 x float>
-; CHECK-NEXT:    [[MUL:%.*]] = fmul <2 x float> [[X]], [[X]]
+; CHECK-NEXT:    [[MUL:%.*]] = fmul nnan <2 x float> [[X]], [[X]]
 ; CHECK-NEXT:    ret <2 x float> [[MUL]]
 ;
   %x = uitofp <2 x i32> %i to <2 x float>
@@ -1562,7 +1562,7 @@ define <2 x float> @square_uitofp_infer_nnan_vec(<2 x i32> noundef %i) {
 define nofpclass(inf) float @ret_no_inf_square_infer_ninf(float noundef nofpclass(inf) %x) {
 ; CHECK-LABEL: define nofpclass(inf) float @ret_no_inf_square_infer_ninf(
 ; CHECK-SAME: float noundef nofpclass(inf) [[X:%.*]]) {
-; CHECK-NEXT:    [[MUL:%.*]] = fmul float [[X]], [[X]]
+; CHECK-NEXT:    [[MUL:%.*]] = fmul ninf float [[X]], [[X]]
 ; CHECK-NEXT:    ret float [[MUL]]
 ;
   %mul = fmul float %x, %x
@@ -1572,7 +1572,7 @@ define nofpclass(inf) float @ret_no_inf_square_infer_ninf(float noundef nofpclas
 define nofpclass(inf nan) float @ret_no_inf_nan_square_infer_nnan_ninf(float noundef nofpclass(inf nan) %x) {
 ; CHECK-LABEL: define nofpclass(nan inf) float @ret_no_inf_nan_square_infer_nnan_ninf(
 ; CHECK-SAME: float noundef nofpclass(nan inf) [[X:%.*]]) {
-; CHECK-NEXT:    [[MUL:%.*]] = fmul float [[X]], [[X]]
+; CHECK-NEXT:    [[MUL:%.*]] = fmul nnan ninf float [[X]], [[X]]
 ; CHECK-NEXT:    ret float [[MUL]]
 ;
   %mul = fmul float %x, %x
