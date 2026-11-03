@@ -798,6 +798,23 @@ void VPlanTransforms::removeDeadRecipes(VPlan &Plan) {
   }
 }
 
+/// Create scalar steps for \p WideIV using \p Builder, built on the canonical
+/// IV.
+static VPScalarIVStepsRecipe *
+createScalarIVSteps(VPWidenIntOrFpInductionRecipe *WideIV, VPBuilder &Builder) {
+  const InductionDescriptor &ID = WideIV->getInductionDescriptor();
+  VPIRFlags::WrapFlagsTy WrapFlags;
+  // We can preserve nuw when the step is non-negative.
+  const APInt *Step;
+  if (match(WideIV->getStepValue(), m_APInt(Step)) && Step->isNonNegative())
+    WrapFlags = WideIV->getNoWrapFlagsOrNone().withoutNoSignedWrap();
+  return vputils::createScalarIVSteps(
+      *WideIV->getParent()->getPlan(), ID.getKind(), ID.getInductionOpcode(),
+      dyn_cast_or_null<FPMathOperator>(ID.getInductionBinOp()),
+      WideIV->getScalarType(), WideIV->getStartValue(), WideIV->getStepValue(),
+      WideIV->getDebugLoc(), Builder, WrapFlags);
+}
+
 /// Legalize VPWidenPointerInductionRecipe, by replacing it with a PtrAdd
 /// (IndStart, ScalarIVSteps (0, Step)) if only its scalar values are used, as
 /// VPWidenPointerInductionRecipe will generate vectors only. If some users
@@ -877,17 +894,7 @@ static void legalizeAndOptimizeInductions(VPlan &Plan) {
         }))
       continue;
 
-    const InductionDescriptor &ID = WideIV->getInductionDescriptor();
-    VPIRFlags::WrapFlagsTy WrapFlags;
-    // We can preserve nuw when the step is non-negative.
-    const APInt *Step;
-    if (match(WideIV->getStepValue(), m_APInt(Step)) && Step->isNonNegative())
-      WrapFlags = WideIV->getNoWrapFlagsOrNone().withoutNoSignedWrap();
-    VPScalarIVStepsRecipe *Steps = vputils::createScalarIVSteps(
-        Plan, ID.getKind(), ID.getInductionOpcode(),
-        dyn_cast_or_null<FPMathOperator>(ID.getInductionBinOp()),
-        WideIV->getScalarType(), WideIV->getStartValue(),
-        WideIV->getStepValue(), WideIV->getDebugLoc(), Builder, WrapFlags);
+    VPScalarIVStepsRecipe *Steps = createScalarIVSteps(WideIV, Builder);
 
     // Update scalar users of IV to use Step instead.
     if (!HasOnlyVectorVFs) {
