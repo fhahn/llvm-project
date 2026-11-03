@@ -4679,11 +4679,11 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
       continue;
     }
 
-    // For now, we only support full interleave groups storing load interleave
-    // groups.
-    if (all_of(enumerate(InterleaveR->getStoredValues()), [](auto Op) {
+    // For now, we only support full interleave groups storing a single load
+    // interleave group.
+    if (all_of(enumerate(InterleaveR->getStoredValues()), [Member0](auto Op) {
           VPRecipeBase *DefR = Op.value()->getDefiningRecipe();
-          if (!DefR)
+          if (!DefR || DefR != Member0->getDefiningRecipe())
             return false;
           auto *IR = dyn_cast<VPInterleaveRecipe>(DefR);
           return IR && IR->getInterleaveGroup()->isFull() &&
