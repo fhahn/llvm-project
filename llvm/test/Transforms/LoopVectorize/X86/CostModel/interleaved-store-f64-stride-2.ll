@@ -95,7 +95,7 @@ for.body:
   %v = uitofp i8 %v.narrow to double
 
   %v0 = fadd double %v, 0.0
-  %v1 = fadd double %v, 1.0
+  %v1 = fsub double %v, -1.0
 
   %out0 = getelementptr inbounds [1024 x double], ptr @B, i64 0, i64 %iv.0
   %out1 = getelementptr inbounds [1024 x double], ptr @B, i64 0, i64 %iv.1

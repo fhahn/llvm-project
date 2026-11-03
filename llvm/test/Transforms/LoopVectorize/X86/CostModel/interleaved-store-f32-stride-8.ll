@@ -221,7 +221,7 @@ for.body:
   %v = uitofp i8 %v.narrow to float
 
   %v0 = fadd float %v, 0.0
-  %v1 = fadd float %v, 1.0
+  %v1 = fsub float %v, -1.0
   %v2 = fadd float %v, 2.0
   %v3 = fadd float %v, 3.0
   %v4 = fadd float %v, 4.0

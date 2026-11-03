@@ -144,7 +144,7 @@ for.body:
   %v = uitofp i8 %v.narrow to double
 
   %v0 = fadd double %v, 0.0
-  %v1 = fadd double %v, 1.0
+  %v1 = fsub double %v, -1.0
   %v2 = fadd double %v, 2.0
   %v3 = fadd double %v, 3.0
   %v4 = fadd double %v, 4.0
