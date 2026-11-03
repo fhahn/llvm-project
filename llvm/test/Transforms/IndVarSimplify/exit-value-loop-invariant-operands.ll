@@ -6,14 +6,18 @@ target datalayout = "e-m:o-i64:64-i128:128-n32:64-S128"
 define ptr @gep_invariant_operands(ptr %p, i64 %n) {
 ; CHECK-LABEL: define ptr @gep_invariant_operands(
 ; CHECK-SAME: ptr [[P:%.*]], i64 [[N:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[G:%.*]] = getelementptr i8, ptr [[P]], i64 [[N]]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[Q:%.*]] = getelementptr inbounds i8, ptr [[G]], i64 -1
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 10
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N]], -1
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP0]]
-; CHECK-NEXT:    ret ptr [[SCEVGEP]]
+; CHECK-NEXT:    [[R:%.*]] = phi ptr [ [[Q]], %[[LOOP]] ]
+; CHECK-NEXT:    ret ptr [[R]]
 ;
 entry:
   %g = getelementptr i8, ptr %p, i64 %n
@@ -34,14 +38,18 @@ exit:
 define i64 @add_nsw_invariant_operands(i64 %a, i64 %n) {
 ; CHECK-LABEL: define i64 @add_nsw_invariant_operands(
 ; CHECK-SAME: i64 [[A:%.*]], i64 [[N:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[SUM:%.*]] = add i64 [[A]], [[N]]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[Q:%.*]] = add nsw i64 [[SUM]], -1
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 10
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N]], [[A]]
-; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], -1
-; CHECK-NEXT:    ret i64 [[TMP1]]
+; CHECK-NEXT:    [[R:%.*]] = phi i64 [ [[Q]], %[[LOOP]] ]
+; CHECK-NEXT:    ret i64 [[R]]
 ;
 entry:
   %sum = add i64 %a, %n
@@ -65,19 +73,20 @@ define i64 @invariant_operands_not_in_header(i64 %a, i64 %n, i1 %c) {
 ; CHECK-SAME: i64 [[A:%.*]], i64 [[N:%.*]], i1 [[C:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[SUM:%.*]] = add i64 [[A]], [[N]]
-; CHECK-NEXT:    [[TMP0:%.*]] = mul i64 [[SUM]], 3
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LATCH:.*]] ]
 ; CHECK-NEXT:    br i1 [[C]], label %[[LATCH]], label %[[EXIT_1:.*]]
 ; CHECK:       [[LATCH]]:
+; CHECK-NEXT:    [[Q:%.*]] = mul nuw i64 [[SUM]], 3
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 10
 ; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT_2:.*]], label %[[LOOP]]
 ; CHECK:       [[EXIT_1]]:
 ; CHECK-NEXT:    ret i64 0
 ; CHECK:       [[EXIT_2]]:
-; CHECK-NEXT:    ret i64 [[TMP0]]
+; CHECK-NEXT:    [[R:%.*]] = phi i64 [ [[Q]], %[[LATCH]] ]
+; CHECK-NEXT:    ret i64 [[R]]
 ;
 entry:
   %sum = add i64 %a, %n
@@ -105,22 +114,25 @@ exit.2:
 define i64 @invariant_operands_two_exits(i64 %a, i64 %n, i64 %k) {
 ; CHECK-LABEL: define i64 @invariant_operands_two_exits(
 ; CHECK-SAME: i64 [[A:%.*]], i64 [[N:%.*]], i64 [[K:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[SUM:%.*]] = add i64 [[A]], [[N]]
-; CHECK-NEXT:    [[TMP0:%.*]] = mul i64 [[SUM]], 3
-; CHECK-NEXT:    [[UMIN:%.*]] = call i64 @llvm.umin.i64(i64 [[K]], i64 9)
-; CHECK-NEXT:    [[TMP1:%.*]] = icmp eq i64 [[K]], [[UMIN]]
-; CHECK-NEXT:    [[TMP2:%.*]] = icmp eq i64 9, [[UMIN]]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    br i1 [[TMP1]], label %[[EXIT_1:.*]], label %[[LATCH:.*]]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LATCH:.*]] ]
+; CHECK-NEXT:    [[Q:%.*]] = mul nuw i64 [[SUM]], 3
+; CHECK-NEXT:    [[C:%.*]] = icmp eq i64 [[IV]], [[K]]
+; CHECK-NEXT:    br i1 [[C]], label %[[EXIT_1:.*]], label %[[LATCH]]
 ; CHECK:       [[LATCH]]:
-; CHECK-NEXT:    br i1 [[TMP2]], label %[[EXIT_2:.*]], label %[[LOOP]]
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 10
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT_2:.*]], label %[[LOOP]]
 ; CHECK:       [[EXIT_1]]:
-; CHECK-NEXT:    [[ADD:%.*]] = add i64 [[TMP0]], 1
+; CHECK-NEXT:    [[R_1:%.*]] = phi i64 [ [[Q]], %[[LOOP]] ]
+; CHECK-NEXT:    [[ADD:%.*]] = add i64 [[R_1]], 1
 ; CHECK-NEXT:    ret i64 [[ADD]]
 ; CHECK:       [[EXIT_2]]:
-; CHECK-NEXT:    ret i64 [[TMP0]]
+; CHECK-NEXT:    [[R_2:%.*]] = phi i64 [ [[Q]], %[[LATCH]] ]
+; CHECK-NEXT:    ret i64 [[R_2]]
 ;
 entry:
   %sum = add i64 %a, %n
@@ -152,26 +164,26 @@ define i64 @invariant_operands_inner_loop(i64 %a, i64 %n, i64 %m) {
 ; CHECK-LABEL: define i64 @invariant_operands_inner_loop(
 ; CHECK-SAME: i64 [[A:%.*]], i64 [[N:%.*]], i64 [[M:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = mul i64 [[A]], 3
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[INDVARS_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ], [ [[TMP0]], %[[ENTRY]] ]
-; CHECK-NEXT:    [[J:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[J_NEXT:%.*]], %[[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[J:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[J_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
+; CHECK-NEXT:    [[SUM:%.*]] = add i64 [[A]], [[J]]
 ; CHECK-NEXT:    br label %[[INNER:.*]]
 ; CHECK:       [[INNER]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[OUTER_HEADER]] ], [ [[IV_NEXT:%.*]], %[[INNER]] ]
+; CHECK-NEXT:    [[Q:%.*]] = mul nuw i64 [[SUM]], 3
 ; CHECK-NEXT:    call void @use(i64 [[IV]])
 ; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[OUTER_LATCH]], label %[[INNER]]
 ; CHECK:       [[OUTER_LATCH]]:
-; CHECK-NEXT:    call void @use(i64 [[INDVARS_IV]])
+; CHECK-NEXT:    [[R:%.*]] = phi i64 [ [[Q]], %[[INNER]] ]
+; CHECK-NEXT:    call void @use(i64 [[R]])
 ; CHECK-NEXT:    [[J_NEXT]] = add i64 [[J]], 1
 ; CHECK-NEXT:    [[EC_OUTER:%.*]] = icmp eq i64 [[J_NEXT]], [[M]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add i64 [[INDVARS_IV]], 3
 ; CHECK-NEXT:    br i1 [[EC_OUTER]], label %[[EXIT:.*]], label %[[OUTER_HEADER]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[R_LCSSA:%.*]] = phi i64 [ [[INDVARS_IV]], %[[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[R_LCSSA:%.*]] = phi i64 [ [[R]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    ret i64 [[R_LCSSA]]
 ;
 entry:

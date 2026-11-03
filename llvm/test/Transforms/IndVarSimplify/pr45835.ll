@@ -12,19 +12,19 @@ target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16
 define internal fastcc void @d(ptr %c) unnamed_addr #0 {
 ; ALWAYS-LABEL: @d(
 ; ALWAYS-NEXT:  entry:
-; ALWAYS-NEXT:    [[ADD_PTR:%.*]] = getelementptr inbounds i8, ptr [[C:%.*]], i64 -65535
-; ALWAYS-NEXT:    [[TMP0:%.*]] = icmp ugt ptr [[C]], @a
-; ALWAYS-NEXT:    [[UMAX:%.*]] = select i1 [[TMP0]], ptr [[C]], ptr @a
+; ALWAYS-NEXT:    [[CMP:%.*]] = icmp ule ptr [[C:%.*]], @a
+; ALWAYS-NEXT:    [[ADD_PTR:%.*]] = getelementptr inbounds i8, ptr [[C]], i64 -65535
 ; ALWAYS-NEXT:    br label [[WHILE_COND:%.*]]
 ; ALWAYS:       while.cond:
 ; ALWAYS-NEXT:    br i1 false, label [[CONT:%.*]], label [[WHILE_END_LOOPEXIT:%.*]]
 ; ALWAYS:       cont:
+; ALWAYS-NEXT:    [[A_MUX:%.*]] = select i1 [[CMP]], ptr @a, ptr [[C]]
 ; ALWAYS-NEXT:    switch i64 0, label [[WHILE_COND]] [
 ; ALWAYS-NEXT:    i64 -1, label [[HANDLER_POINTER_OVERFLOW_I:%.*]]
 ; ALWAYS-NEXT:    i64 0, label [[HANDLER_POINTER_OVERFLOW_I]]
 ; ALWAYS-NEXT:    ]
 ; ALWAYS:       handler.pointer_overflow.i:
-; ALWAYS-NEXT:    [[A_MUX_LCSSA4:%.*]] = phi ptr [ [[UMAX]], [[CONT]] ], [ [[UMAX]], [[CONT]] ]
+; ALWAYS-NEXT:    [[A_MUX_LCSSA4:%.*]] = phi ptr [ [[A_MUX]], [[CONT]] ], [ [[A_MUX]], [[CONT]] ]
 ; ALWAYS-NEXT:    [[X5:%.*]] = ptrtoint ptr [[A_MUX_LCSSA4]] to i64
 ; ALWAYS-NEXT:    br label [[WHILE_END:%.*]]
 ; ALWAYS:       while.end.loopexit:

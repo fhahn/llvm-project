@@ -9,12 +9,13 @@ define void @f(ptr addrspace(7) %arg) {
 ; CHECK-NEXT:  bb:
 ; CHECK-NEXT:    br label [[BB1:%.*]]
 ; CHECK:       bb1:
+; CHECK-NEXT:    [[I:%.*]] = getelementptr i32, ptr addrspace(7) [[ARG]], i32 2
 ; CHECK-NEXT:    br i1 false, label [[BB2:%.*]], label [[BB1]]
 ; CHECK:       bb2:
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr addrspace(7) [[ARG]], i32 8
+; CHECK-NEXT:    [[I_LCSSA:%.*]] = phi ptr addrspace(7) [ [[I]], [[BB1]] ]
 ; CHECK-NEXT:    br label [[BB3:%.*]]
 ; CHECK:       bb3:
-; CHECK-NEXT:    [[I4:%.*]] = load i32, ptr addrspace(7) [[SCEVGEP]], align 4
+; CHECK-NEXT:    [[I4:%.*]] = load i32, ptr addrspace(7) [[I_LCSSA]], align 4
 ; CHECK-NEXT:    br label [[BB3]]
 ;
 bb:

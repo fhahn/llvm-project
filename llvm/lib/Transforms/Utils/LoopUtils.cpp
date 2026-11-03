@@ -32,6 +32,7 @@
 #include "llvm/Analysis/ScalarEvolutionAliasAnalysis.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instructions.h"
@@ -1945,6 +1946,15 @@ int llvm::rewriteLoopExitValues(Loop *L, LoopInfo *LI, TargetLibraryInfo *TLI,
         SCEVUse ExitValue = SE->getSCEVAtExit(Inst, L, PN->getIncomingBlock(i));
         if (!SE->isLoopInvariant(ExitValue, L) ||
             !Rewriter.isSafeToExpand(ExitValue))
+          continue;
+
+        // Keep instructions with loop-invariant operands that can be hoisted,
+        // e.g. by LICM, or by LoopDeletion if the loop is dead. Expanding their
+        // SCEV would drop their form and poison flags. Still replace them if
+        // the exit value is a constant or an existing value.
+        if (!isa<SCEVConstant, SCEVUnknown>(ExitValue) &&
+            L->hasLoopInvariantOperands(Inst) &&
+            isSafeToSpeculativelyExecute(Inst))
           continue;
 
         // Computing the value outside of the loop brings no benefit if it is

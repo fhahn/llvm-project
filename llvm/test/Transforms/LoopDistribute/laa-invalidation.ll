@@ -4,11 +4,13 @@
 define void @test_pr50940(ptr %A, ptr %B) {
 ; CHECK-LABEL: @test_pr50940(
 ; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[GEP_A_1:%.*]] = getelementptr inbounds i16, ptr [[A:%.*]], i64 1
 ; CHECK-NEXT:    br label [[OUTER_HEADER:%.*]]
 ; CHECK:       outer.header:
+; CHECK-NEXT:    [[GEP_A_2:%.*]] = getelementptr inbounds i16, ptr [[GEP_A_1]], i64 1
 ; CHECK-NEXT:    br i1 false, label [[OUTER_LATCH:%.*]], label [[INNER_PH:%.*]]
 ; CHECK:       inner.ph:
-; CHECK-NEXT:    [[UGLYGEP:%.*]] = getelementptr i8, ptr [[A:%.*]], i64 4
+; CHECK-NEXT:    [[UGLYGEP:%.*]] = phi ptr [ [[GEP_A_2]], [[OUTER_HEADER]] ]
 ; CHECK-NEXT:    [[GEP_A_3:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 3
 ; CHECK-NEXT:    br label [[INNER_LVER_CHECK:%.*]]
 ; CHECK:       inner.lver.check:
@@ -18,7 +20,7 @@ define void @test_pr50940(ptr %A, ptr %B) {
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[UGLYGEP1]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label [[INNER_PH3_LVER_ORIG:%.*]], label [[INNER_PH3_LDIST1:%.*]]
-; CHECK:       inner.ph3.lver.orig:
+; CHECK:       inner.ph2.lver.orig:
 ; CHECK-NEXT:    br label [[INNER_LVER_ORIG:%.*]]
 ; CHECK:       inner.lver.orig:
 ; CHECK-NEXT:    [[IV_LVER_ORIG:%.*]] = phi i16 [ 0, [[INNER_PH3_LVER_ORIG]] ], [ [[IV_NEXT_LVER_ORIG:%.*]], [[INNER_LVER_ORIG]] ]
@@ -28,7 +30,7 @@ define void @test_pr50940(ptr %A, ptr %B) {
 ; CHECK-NEXT:    [[IV_NEXT_LVER_ORIG]] = add nuw nsw i16 [[IV_LVER_ORIG]], 1
 ; CHECK-NEXT:    [[C_1_LVER_ORIG:%.*]] = icmp samesign ult i16 [[IV_LVER_ORIG]], 38
 ; CHECK-NEXT:    br i1 [[C_1_LVER_ORIG]], label [[INNER_LVER_ORIG]], label [[EXIT_LOOPEXIT:%.*]], !llvm.loop [[LOOP0:![0-9]+]]
-; CHECK:       inner.ph3.ldist1:
+; CHECK:       inner.ph2.ldist1:
 ; CHECK-NEXT:    br label [[INNER_LDIST1:%.*]]
 ; CHECK:       inner.ldist1:
 ; CHECK-NEXT:    [[IV_LDIST1:%.*]] = phi i16 [ 0, [[INNER_PH3_LDIST1]] ], [ [[IV_NEXT_LDIST1:%.*]], [[INNER_LDIST1]] ]
@@ -37,7 +39,7 @@ define void @test_pr50940(ptr %A, ptr %B) {
 ; CHECK-NEXT:    [[IV_NEXT_LDIST1]] = add nuw nsw i16 [[IV_LDIST1]], 1
 ; CHECK-NEXT:    [[C_1_LDIST1:%.*]] = icmp samesign ult i16 [[IV_LDIST1]], 38
 ; CHECK-NEXT:    br i1 [[C_1_LDIST1]], label [[INNER_LDIST1]], label [[INNER_PH3:%.*]]
-; CHECK:       inner.ph3:
+; CHECK:       inner.ph2:
 ; CHECK-NEXT:    br label [[INNER:%.*]]
 ; CHECK:       inner:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i16 [ 0, [[INNER_PH3]] ], [ [[IV_NEXT:%.*]], [[INNER]] ]
@@ -49,7 +51,7 @@ define void @test_pr50940(ptr %A, ptr %B) {
 ; CHECK-NEXT:    br label [[OUTER_HEADER]]
 ; CHECK:       exit.loopexit:
 ; CHECK-NEXT:    br label [[EXIT:%.*]]
-; CHECK:       exit.loopexit4:
+; CHECK:       exit.loopexit3:
 ; CHECK-NEXT:    br label [[EXIT]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    ret void
