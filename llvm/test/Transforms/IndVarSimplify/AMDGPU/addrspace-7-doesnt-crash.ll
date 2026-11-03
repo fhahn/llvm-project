@@ -57,3 +57,30 @@ bb3:
   %i4 = load i32, ptr addrspace(7) %i, align 4
   br label %bb3
 }
+
+define void @f_operand_in_loop(ptr addrspace(7) %arg) {
+; CHECK-LABEL: define void @f_operand_in_loop
+; CHECK-SAME: (ptr addrspace(7) [[ARG:%.*]]) {
+; CHECK-NEXT:  bb:
+; CHECK-NEXT:    br label [[BB1:%.*]]
+; CHECK:       bb1:
+; CHECK-NEXT:    br i1 false, label [[BB2:%.*]], label [[BB1]]
+; CHECK:       bb2:
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr addrspace(7) [[ARG]], i32 8
+; CHECK-NEXT:    br label [[BB3:%.*]]
+; CHECK:       bb3:
+; CHECK-NEXT:    [[I4:%.*]] = load i32, ptr addrspace(7) [[SCEVGEP]], align 4
+; CHECK-NEXT:    br label [[BB3]]
+;
+bb:
+  br label %bb1
+bb1:
+  %p = getelementptr i32, ptr addrspace(7) %arg, i32 1
+  %i = getelementptr i32, ptr addrspace(7) %p, i32 1
+  br i1 false, label %bb2, label %bb1
+bb2:
+  br label %bb3
+bb3:
+  %i4 = load i32, ptr addrspace(7) %i, align 4
+  br label %bb3
+}
