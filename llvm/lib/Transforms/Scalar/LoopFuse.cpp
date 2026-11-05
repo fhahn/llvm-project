@@ -1376,9 +1376,6 @@ private:
       return true;
     }
 
-    if (DepResult->getNextPredecessor() || DepResult->getNextSuccessor())
-      LLVM_DEBUG(dbgs() << "TODO: Implement pred/succ dependence handling!\n");
-
     return false;
   }
 

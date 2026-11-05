@@ -186,19 +186,6 @@ public:
   /// the induction variable associated with the loop at this level.
   virtual bool isScalar(unsigned Level, bool SameSD = false) const;
 
-  /// getNextPredecessor - Returns the value of the NextPredecessor field.
-  const Dependence *getNextPredecessor() const { return NextPredecessor; }
-
-  /// getNextSuccessor - Returns the value of the NextSuccessor field.
-  const Dependence *getNextSuccessor() const { return NextSuccessor; }
-
-  /// setNextPredecessor - Sets the value of the NextPredecessor
-  /// field.
-  void setNextPredecessor(const Dependence *pred) { NextPredecessor = pred; }
-
-  /// setNextSuccessor - Sets the value of the NextSuccessor field.
-  void setNextSuccessor(const Dependence *succ) { NextSuccessor = succ; }
-
   /// getRuntimeAssumptions - Returns the runtime assumptions under which this
   /// Dependence relation is valid.
   SCEVUnionPredicate getRuntimeAssumptions() const { return Assumptions; }
@@ -215,7 +202,6 @@ protected:
 
 private:
   SCEVUnionPredicate Assumptions;
-  const Dependence *NextPredecessor = nullptr, *NextSuccessor = nullptr;
   friend class DependenceInfo;
 };
 
