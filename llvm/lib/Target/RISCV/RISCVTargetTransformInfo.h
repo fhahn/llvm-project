@@ -583,10 +583,6 @@ public:
 
   bool shouldTreatInstructionLikeSelect(const Instruction *I) const override;
 
-  bool
-  shouldCopyAttributeWhenOutliningFrom(const Function *Caller,
-                                       const Attribute &Attr) const override;
-
   std::optional<Instruction *>
   instCombineIntrinsic(InstCombiner &IC, IntrinsicInst &II) const override;
 };
