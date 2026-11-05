@@ -5103,6 +5103,32 @@ static const Loop *isIntegerLoopHeaderPHI(const PHINode *PN, LoopInfo &LI) {
   return L;
 }
 
+/// The loop may have multiple entrances or multiple exits; we can analyze \p PN
+/// as an addrec if it has a unique entry value and a unique backedge value.
+/// Return them if so, otherwise return nullptr for the value that is not
+/// unique.
+static std::pair<Value *, Value *>
+getUniqueStartAndBackedgeValue(const PHINode *PN, const Loop *L) {
+  Value *BEValueV = nullptr, *StartValueV = nullptr;
+  for (unsigned i = 0, e = PN->getNumIncomingValues(); i != e; ++i) {
+    Value *V = PN->getIncomingValue(i);
+    if (L->contains(PN->getIncomingBlock(i))) {
+      if (!BEValueV) {
+        BEValueV = V;
+      } else if (BEValueV != V) {
+        BEValueV = nullptr;
+        break;
+      }
+    } else if (!StartValueV) {
+      StartValueV = V;
+    } else if (StartValueV != V) {
+      StartValueV = nullptr;
+      break;
+    }
+  }
+  return {StartValueV, BEValueV};
+}
+
 // Analyze \p SymbolicPHI, a SCEV expression of a phi node, and check if the
 // computation that updates the phi follows the following pattern:
 //   (SExt/ZExt ix (Trunc iy (%SymbolicPHI) to ix) to iy) + InvariantAccum
@@ -5167,26 +5193,7 @@ ScalarEvolution::createAddRecFromPHIWithCastsImpl(const SCEVUnknown *SymbolicPHI
   const Loop *L = isIntegerLoopHeaderPHI(PN, LI);
   assert(L && "Expecting an integer loop header phi");
 
-  // The loop may have multiple entrances or multiple exits; we can analyze
-  // this phi as an addrec if it has a unique entry value and a unique
-  // backedge value.
-  Value *BEValueV = nullptr, *StartValueV = nullptr;
-  for (unsigned i = 0, e = PN->getNumIncomingValues(); i != e; ++i) {
-    Value *V = PN->getIncomingValue(i);
-    if (L->contains(PN->getIncomingBlock(i))) {
-      if (!BEValueV) {
-        BEValueV = V;
-      } else if (BEValueV != V) {
-        BEValueV = nullptr;
-        break;
-      }
-    } else if (!StartValueV) {
-      StartValueV = V;
-    } else if (StartValueV != V) {
-      StartValueV = nullptr;
-      break;
-    }
-  }
+  auto [StartValueV, BEValueV] = getUniqueStartAndBackedgeValue(PN, L);
   if (!BEValueV || !StartValueV)
     return std::nullopt;
 
@@ -5520,26 +5527,7 @@ const SCEV *ScalarEvolution::createAddRecFromPHI(PHINode *PN) {
   if (!L || L->getHeader() != PN->getParent())
     return nullptr;
 
-  // The loop may have multiple entrances or multiple exits; we can analyze
-  // this phi as an addrec if it has a unique entry value and a unique
-  // backedge value.
-  Value *BEValueV = nullptr, *StartValueV = nullptr;
-  for (unsigned i = 0, e = PN->getNumIncomingValues(); i != e; ++i) {
-    Value *V = PN->getIncomingValue(i);
-    if (L->contains(PN->getIncomingBlock(i))) {
-      if (!BEValueV) {
-        BEValueV = V;
-      } else if (BEValueV != V) {
-        BEValueV = nullptr;
-        break;
-      }
-    } else if (!StartValueV) {
-      StartValueV = V;
-    } else if (StartValueV != V) {
-      StartValueV = nullptr;
-      break;
-    }
-  }
+  auto [StartValueV, BEValueV] = getUniqueStartAndBackedgeValue(PN, L);
   if (!BEValueV || !StartValueV)
     return nullptr;
 
