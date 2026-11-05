@@ -4739,20 +4739,8 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I,
         {TTI::OK_AnyValue, TTI::OP_None}, {TTI::OK_AnyValue, TTI::OP_None}, I);
   }
   case Instruction::Store:
-  case Instruction::Load: {
-    ElementCount Width = VF;
-    if (Width.isVector()) {
-      InstWidening Decision = getWideningDecision(I, Width);
-      assert(Decision != CM_Unknown &&
-             "CM decision should be taken at this point");
-      if (getWideningCost(I, VF) == InstructionCost::getInvalid())
-        return InstructionCost::getInvalid();
-      if (Decision == CM_Scalarize)
-        Width = ElementCount::getFixed(1);
-    }
-    VectorTy = toVectorTy(getLoadStoreType(I), Width);
+  case Instruction::Load:
     return getMemoryInstructionCost(I, VF);
-  }
   case Instruction::BitCast:
     if (I->getType()->isPointerTy())
       return 0;
