@@ -4430,13 +4430,9 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I,
     return InstsToScalarize[VF][I];
 
   // Forced scalars do not have any scalarization overhead.
-  auto ForcedScalar = ForcedScalars.find(VF);
-  if (VF.isVector() && ForcedScalar != ForcedScalars.end()) {
-    auto InstSet = ForcedScalar->second;
-    if (InstSet.count(I))
-      return getInstructionCost(I, ElementCount::getFixed(1)) *
-             VF.getKnownMinValue();
-  }
+  if (VF.isVector() && isForcedScalar(I, VF))
+    return getInstructionCost(I, ElementCount::getFixed(1)) *
+           VF.getKnownMinValue();
 
   const auto &MinBWs = Config.getMinimalBitwidths();
   uint64_t InstrMinBWs = MinBWs.lookup(I);
