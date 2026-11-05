@@ -3147,6 +3147,13 @@ public:
     return {op_end() - (getNumStoreOperands() + (HasMask ? 1 : 0)),
             getNumStoreOperands()};
   }
+
+protected:
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  /// Print the recipe.
+  void printRecipe(raw_ostream &O, const Twine &Indent,
+                   VPSlotTracker &SlotTracker) const override;
+#endif
 };
 
 /// VPInterleaveRecipe is a recipe for transforming an interleave group of load
@@ -3183,13 +3190,6 @@ public:
   unsigned getNumStoreOperands() const override {
     return getNumOperands() - (getMask() ? 2 : 1);
   }
-
-protected:
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-  /// Print the recipe.
-  void printRecipe(raw_ostream &O, const Twine &Indent,
-                   VPSlotTracker &SlotTracker) const override;
-#endif
 };
 
 /// A recipe for interleaved memory operations with vector-predication
@@ -3233,13 +3233,6 @@ public:
   unsigned getNumStoreOperands() const override {
     return getNumOperands() - (getMask() ? 3 : 2);
   }
-
-protected:
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-  /// Print the recipe.
-  void printRecipe(raw_ostream &O, const Twine &Indent,
-                   VPSlotTracker &SlotTracker) const override;
-#endif
 };
 
 /// A recipe to represent inloop, ordered or partial reduction operations. It

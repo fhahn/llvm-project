@@ -4945,29 +4945,35 @@ void VPInterleaveRecipe::execute(VPTransformState &State) {
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-void VPInterleaveRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
-                                     VPSlotTracker &SlotTracker) const {
+void VPInterleaveBase::printRecipe(raw_ostream &O, const Twine &Indent,
+                                   VPSlotTracker &SlotTracker) const {
   const InterleaveGroup<Instruction> *IG = getInterleaveGroup();
   O << Indent << "INTERLEAVE-GROUP with factor " << IG->getFactor() << ", ";
   getAddr()->printAsOperand(O, SlotTracker);
-  VPValue *Mask = getMask();
-  if (Mask) {
+  auto *EVLR = dyn_cast<VPInterleaveEVLRecipe>(this);
+  if (EVLR) {
+    O << ", ";
+    EVLR->getEVL()->printAsOperand(O, SlotTracker);
+  }
+  if (VPValue *Mask = getMask()) {
     O << ", ";
     Mask->printAsOperand(O, SlotTracker);
   }
 
+  StringRef Prefix = EVLR ? "vp." : "";
+  ArrayRef<VPValue *> StoredValues = getStoredValues();
   unsigned OpIdx = 0;
   for (unsigned i = 0; i < IG->getFactor(); ++i) {
     if (!IG->getMember(i))
       continue;
-    if (getNumStoreOperands() > 0) {
-      O << "\n" << Indent << "  store ";
-      getOperand(1 + OpIdx)->printAsOperand(O, SlotTracker);
+    if (!StoredValues.empty()) {
+      O << "\n" << Indent << "  " << Prefix << "store ";
+      StoredValues[OpIdx]->printAsOperand(O, SlotTracker);
       O << " to index " << i;
     } else {
       O << "\n" << Indent << "  ";
       getVPValue(OpIdx)->printAsOperand(O, SlotTracker);
-      O << " = load from index " << i;
+      O << " = " << Prefix << "load from index " << i;
     }
     ++OpIdx;
   }
@@ -5085,36 +5091,6 @@ void VPInterleaveEVLRecipe::execute(VPTransformState &State) {
   Group->addMetadata(NewStore);
 }
 
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-void VPInterleaveEVLRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
-                                        VPSlotTracker &SlotTracker) const {
-  const InterleaveGroup<Instruction> *IG = getInterleaveGroup();
-  O << Indent << "INTERLEAVE-GROUP with factor " << IG->getFactor() << ", ";
-  getAddr()->printAsOperand(O, SlotTracker);
-  O << ", ";
-  getEVL()->printAsOperand(O, SlotTracker);
-  if (VPValue *Mask = getMask()) {
-    O << ", ";
-    Mask->printAsOperand(O, SlotTracker);
-  }
-
-  unsigned OpIdx = 0;
-  for (unsigned i = 0; i < IG->getFactor(); ++i) {
-    if (!IG->getMember(i))
-      continue;
-    if (getNumStoreOperands() > 0) {
-      O << "\n" << Indent << "  vp.store ";
-      getOperand(2 + OpIdx)->printAsOperand(O, SlotTracker);
-      O << " to index " << i;
-    } else {
-      O << "\n" << Indent << "  ";
-      getVPValue(OpIdx)->printAsOperand(O, SlotTracker);
-      O << " = vp.load from index " << i;
-    }
-    ++OpIdx;
-  }
-}
-#endif
 
 InstructionCost VPInterleaveBase::computeCost(ElementCount VF,
                                               VPCostContext &Ctx) const {
