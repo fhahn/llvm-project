@@ -57,9 +57,8 @@ getSCEVExprForVPValue(const VPValue *V, PredicatedScalarEvolution &PSE,
                       const Loop *L = nullptr);
 
 /// Return the SCEV for the vector trip count of \p Plan for \p VF and \p UF,
-/// computed as (TC / (VF * UF)) * (VF * UF), if it is a constant. Returns
-/// SCEVCouldNotCompute if the trip count is not a constant, if the
-/// tail is folded, there is no scalar tail or a scalar epilogue is required
+/// computed as (TC / (VF * UF)) * (VF * UF). Returns SCEVCouldNotCompute if
+/// the tail is folded, there is no scalar tail or a scalar epilogue is required
 /// (the formula does not apply), or if the vector trip count has already been
 /// materialized (e.g. by narrowInterleaveGroups with a narrowed step).
 const SCEV *getVectorTripCountSCEV(VPlan &Plan, ElementCount VF, unsigned UF,

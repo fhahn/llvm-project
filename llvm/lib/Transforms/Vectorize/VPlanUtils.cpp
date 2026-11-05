@@ -507,11 +507,8 @@ const SCEV *vputils::getVectorTripCountSCEV(VPlan &Plan, ElementCount VF,
     return SE.getCouldNotCompute();
 
   const SCEV *TCScev = Plan.getTripCount();
-  if (!isa<SCEVConstant>(TCScev))
-    return SE.getCouldNotCompute();
   const SCEV *VFxUF = SE.getElementCount(TCScev->getType(), VF * UF);
-  const SCEV *VecTC = SE.getMulExpr(SE.getUDivExpr(TCScev, VFxUF), VFxUF);
-  return isa<SCEVConstant>(VecTC) ? VecTC : SE.getCouldNotCompute();
+  return SE.getMulExpr(SE.getUDivExpr(TCScev, VFxUF), VFxUF);
 }
 
 bool vputils::isSingleScalar(const VPValue *VPV) {

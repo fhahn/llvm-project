@@ -2213,13 +2213,15 @@ static bool simplifyBranchConditionForVFAndUF(VPlan &Plan, ElementCount BestVF,
   if (!match(Term, m_BranchOnCond(m_VPValue(Cond))))
     match(Term, m_BranchOnTwoConds(m_VPValue(), m_VPValue(Cond)));
 
-  // If the vector trip count is not available as SCEV, compare directly
-  // against the original trip count. This is stricter than necessary, as the
-  // trip count may be larger than the vector trip count.
+  // If getVectorTripCountSCEV cannot compute the vector trip count, use the
+  // trip count instead. TC <= VF * UF implies VTC <= VF * UF in all cases: the
+  // vector trip count is at most the trip count, or the trip count rounded up
+  // to a multiple of VF * UF when folding the tail.
+  const SCEV *TripCount = Plan.getTripCount();
   const SCEV *VectorTripCount =
       vputils::getVectorTripCountSCEV(Plan, BestVF, BestUF, PSE);
   if (isa<SCEVCouldNotCompute>(VectorTripCount))
-    VectorTripCount = Plan.getTripCount();
+    VectorTripCount = TripCount;
   assert(!isa<SCEVCouldNotCompute>(VectorTripCount) &&
          "Trip count SCEV must be computable");
   ScalarEvolution &SE = *PSE.getSE();
@@ -2229,8 +2231,11 @@ static bool simplifyBranchConditionForVFAndUF(VPlan &Plan, ElementCount BestVF,
   if (isVectorLatchCheck(Term, Cond, Plan)) {
     // Try to simplify the branch condition if VectorTC <= VF * UF when the
     // latch terminator is BranchOnCount or
-    // BranchOnCond(Not(ExtractVectorForPart(WideActiveLaneMask), 0))
-    if (!SE.isKnownPredicate(CmpInst::ICMP_ULE, VectorTripCount, VFxUF))
+    // BranchOnCond(Not(ExtractVectorForPart(WideActiveLaneMask), 0)). Also
+    // check TC <= VF * UF, as SCEV may fail to simplify the computed vector
+    // trip count, e.g. for scalable VFs.
+    if (!SE.isKnownPredicate(CmpInst::ICMP_ULE, VectorTripCount, VFxUF) &&
+        !SE.isKnownPredicate(CmpInst::ICMP_ULE, TripCount, VFxUF))
       return false;
   } else if (!Cond || !isVectorTripCountCompare(Cond, Plan) ||
              !SE.isKnownPredicate(CmpInst::ICMP_EQ, VectorTripCount, VFxUF)) {
