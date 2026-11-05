@@ -4908,6 +4908,14 @@ class VPlan {
   /// VPlan is destroyed.
   SmallVector<VPBlockBase *> CreatedBlocks;
 
+  /// Make \p VPB owned by this VPlan and number it accordingly.
+  template <typename BlockT> BlockT *addBlock(BlockT *VPB) {
+    VPB->setPlan(this);
+    VPB->setNumber(CreatedBlocks.size());
+    CreatedBlocks.push_back(VPB);
+    return VPB;
+  }
+
   /// Construct a VPlan with \p Entry to the plan and with \p ScalarHeader
   /// wrapping the original header of the scalar loop. The vector loop will have
   /// index type \p IdxTy.
@@ -5207,11 +5215,7 @@ public:
   /// VPlan is destroyed.
   VPBasicBlock *createVPBasicBlock(const Twine &Name,
                                    VPRecipeBase *Recipe = nullptr) {
-    auto *VPB = new VPBasicBlock(Name, Recipe);
-    VPB->setPlan(this);
-    VPB->setNumber(CreatedBlocks.size());
-    CreatedBlocks.push_back(VPB);
-    return VPB;
+    return addBlock(new VPBasicBlock(Name, Recipe));
   }
 
   /// Create a new loop region with a canonical IV using \p CanIVTy and
@@ -5222,11 +5226,7 @@ public:
                                   const std::string &Name = "",
                                   VPBlockBase *Entry = nullptr,
                                   VPBlockBase *Exiting = nullptr) {
-    auto *VPB = new VPRegionBlock(CanIVTy, DL, Entry, Exiting, Name);
-    VPB->setPlan(this);
-    VPB->setNumber(CreatedBlocks.size());
-    CreatedBlocks.push_back(VPB);
-    return VPB;
+    return addBlock(new VPRegionBlock(CanIVTy, DL, Entry, Exiting, Name));
   }
 
   /// Create a new replicate region with \p Entry, \p Exiting and \p Name. The
@@ -5234,11 +5234,7 @@ public:
   /// destroyed.
   VPRegionBlock *createReplicateRegion(VPBlockBase *Entry, VPBlockBase *Exiting,
                                        const std::string &Name = "") {
-    auto *VPB = new VPRegionBlock(Entry, Exiting, Name);
-    VPB->setPlan(this);
-    VPB->setNumber(CreatedBlocks.size());
-    CreatedBlocks.push_back(VPB);
-    return VPB;
+    return addBlock(new VPRegionBlock(Entry, Exiting, Name));
   }
 
   /// Create a VPIRBasicBlock wrapping \p IRBB, but do not create

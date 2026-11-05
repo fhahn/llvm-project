@@ -1269,13 +1269,8 @@ VPlan *VPlan::duplicate() {
 
   // Transfer all cloned blocks (the second half of all current blocks) from
   // current to new VPlan.
-  unsigned NumBlocksAfterCloning = CreatedBlocks.size();
-  for (unsigned I :
-       seq<unsigned>(NumBlocksBeforeCloning, NumBlocksAfterCloning)) {
-    this->CreatedBlocks[I]->setPlan(NewPlan);
-    this->CreatedBlocks[I]->setNumber(NewPlan->CreatedBlocks.size());
-    NewPlan->CreatedBlocks.push_back(this->CreatedBlocks[I]);
-  }
+  for (VPBlockBase *VPB : drop_begin(CreatedBlocks, NumBlocksBeforeCloning))
+    NewPlan->addBlock(VPB);
   CreatedBlocks.truncate(NumBlocksBeforeCloning);
 
   // Update ExitBlocks of the new plan.
@@ -1289,11 +1284,7 @@ VPlan *VPlan::duplicate() {
 }
 
 VPIRBasicBlock *VPlan::createEmptyVPIRBasicBlock(BasicBlock *IRBB) {
-  auto *VPIRBB = new VPIRBasicBlock(IRBB);
-  VPIRBB->setPlan(this);
-  VPIRBB->setNumber(CreatedBlocks.size());
-  CreatedBlocks.push_back(VPIRBB);
-  return VPIRBB;
+  return addBlock(new VPIRBasicBlock(IRBB));
 }
 
 VPIRBasicBlock *VPlan::createVPIRBasicBlock(BasicBlock *IRBB) {
