@@ -259,9 +259,6 @@ struct VPTransformState {
   /// Hold state information used when constructing the CFG of the output IR,
   /// traversing the VPBasicBlocks and generating corresponding IR BasicBlocks.
   struct CFGState {
-    /// The previous VPBasicBlock visited. Initially set to null.
-    VPBasicBlock *PrevVPBB = nullptr;
-
     /// The previous IR BasicBlock created or used. Initially set to the new
     /// header BasicBlock.
     BasicBlock *PrevBB = nullptr;

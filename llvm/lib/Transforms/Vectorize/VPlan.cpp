@@ -509,8 +509,6 @@ void VPBasicBlock::executeRecipes(VPTransformState *State, BasicBlock *BB) {
   LLVM_DEBUG(dbgs() << "LV: vectorizing VPBB: " << getName()
                     << " in BB: " << BB->getName() << '\n');
 
-  State->CFG.PrevVPBB = this;
-
   for (VPRecipeBase &Recipe : Recipes) {
     State->setDebugLocFrom(Recipe.getDebugLoc());
     Recipe.execute(*State);
@@ -936,7 +934,6 @@ void VPlan::execute(VPTransformState *State) {
          "all region blocks must be dissolved before ::execute");
 
   // Initialize CFG state.
-  State->CFG.PrevVPBB = nullptr;
   State->CFG.ExitBB = State->CFG.PrevBB->getSingleSuccessor();
 
   // Update VPDominatorTree since VPBasicBlock may be removed after State was
