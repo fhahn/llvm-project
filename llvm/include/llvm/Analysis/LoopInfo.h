@@ -373,9 +373,6 @@ public:
   /// unrolling pass is run more than once (which it generally is).
   void setLoopAlreadyUnrolled();
 
-  /// Add llvm.loop.mustprogress to this loop's loop id metadata.
-  void setLoopMustProgress();
-
   /// Add a string-only metadata attribute to this loop's loop-ID node.
   ///
   /// Creates an MDNode containing just \p Name (no value operand) and appends

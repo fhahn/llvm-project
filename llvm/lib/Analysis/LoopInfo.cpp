@@ -595,12 +595,6 @@ void Loop::setLoopAlreadyUnrolled() {
   addStringLoopAttribute("llvm.loop.unroll.disable", {"llvm.loop.unroll."});
 }
 
-void Loop::setLoopMustProgress() {
-  if (findOptionMDForLoop(this, "llvm.loop.mustprogress"))
-    return;
-  addStringLoopAttribute("llvm.loop.mustprogress");
-}
-
 void Loop::addStringLoopAttribute(StringRef Name,
                                   ArrayRef<StringRef> RemovePrefixes) const {
   LLVMContext &Context = getHeader()->getContext();
