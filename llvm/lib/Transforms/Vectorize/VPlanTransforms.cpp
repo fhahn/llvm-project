@@ -3858,10 +3858,6 @@ tryToMatchAndCreateExtendedReduction(VPReductionRecipe *Red, VPCostContext &Ctx,
   Type *RedTy = Red->getScalarType();
   VPValue *VecOp = Red->getVecOp();
 
-  // We don't handle partial reductions here.
-  if (Red->isPartialReduction())
-    return nullptr;
-
   // Clamp the range if using extended-reduction is profitable.
   auto IsExtendedRedValidAndClampRange =
       [&](unsigned Opcode, Instruction::CastOps ExtOpc, Type *SrcTy) -> bool {
@@ -3928,17 +3924,11 @@ static bool canFoldOuterExtendIntoMul(VPWidenRecipe *Mul) {
 ///   reduce.add(mul(...)),
 ///   reduce.add(mul(ext(A), ext(B))),
 ///   reduce.add(ext(mul(ext(A), ext(B)))).
-///   reduce.fadd(fmul(ext(A), ext(B)))
 static VPExpressionRecipe *
 tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
                                           VPCostContext &Ctx, VFRange &Range) {
   unsigned Opcode = RecurrenceDescriptor::getOpcode(Red->getRecurrenceKind());
-  if (Opcode != Instruction::Add && Opcode != Instruction::Sub &&
-      Opcode != Instruction::FAdd)
-    return nullptr;
-
-  // We don't handle partial reductions here.
-  if (Red->isPartialReduction())
+  if (Opcode != Instruction::Add && Opcode != Instruction::Sub)
     return nullptr;
 
   Type *RedTy = Red->getScalarType();
@@ -3954,10 +3944,8 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
           InstructionCost MulAccCost;
 
           // getMulAccReductionCost for in-loop reductions does not support
-          // mixed or floating-point extends.
-          if (Ext0 && Ext1 &&
-              (Ext0->getOpcode() != Ext1->getOpcode() ||
-               Ext0->getOpcode() == Instruction::CastOps::FPExt))
+          // mixed extends.
+          if (Ext0 && Ext1 && Ext0->getOpcode() != Ext1->getOpcode())
             return false;
 
           bool IsZExt =
@@ -3986,9 +3974,6 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
   VPRecipeBase *Sub = nullptr;
   VPValue *A, *B;
   VPValue *Tmp = nullptr;
-
-  if (RedTy->isFloatingPointTy())
-    return nullptr;
 
   // Sub reductions could have a sub between the add reduction and vec op.
   if (match(VecOp, m_Sub(m_ZeroInt(), m_VPValue(Tmp)))) {
