@@ -7238,7 +7238,7 @@ static bool ReduceLoopStrength(Loop *L, IVUsers &IU, ScalarEvolution &SE,
 #if LLVM_ENABLE_ABI_BREAKING_CHECKS
     Rewriter.setDebugType(DEBUG_TYPE);
 #endif
-    unsigned numFolded = Rewriter.replaceCongruentIVs(L, &DT, DeadInsts, &TTI);
+    unsigned numFolded = Rewriter.replaceCongruentIVs(L, DeadInsts, &TTI);
     Rewriter.clear();
     if (numFolded) {
       Changed = true;

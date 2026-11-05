@@ -305,8 +305,7 @@ public:
   /// replace congruent phis with their most canonical representative. Return
   /// the number of phis eliminated.
   LLVM_ABI unsigned
-  replaceCongruentIVs(Loop *L, const DominatorTree *DT,
-                      SmallVectorImpl<WeakTrackingVH> &DeadInsts,
+  replaceCongruentIVs(Loop *L, SmallVectorImpl<WeakTrackingVH> &DeadInsts,
                       const TargetTransformInfo *TTI = nullptr);
 
   /// Return true if the given expression is safe to expand in the sense that
@@ -464,7 +463,6 @@ public:
   LLVM_ABI void eraseDeadInstructions(Value *Root);
 
 private:
-  LLVMContext &getContext() const { return SE.getContext(); }
 
   /// Recursive helper function for isHighCostExpansion.
   LLVM_ABI bool
@@ -573,8 +571,7 @@ private:
   PHINode *getAddRecExprPHILiterally(const SCEVAddRecExpr *Normalized,
                                      const Loop *L, Type *&TruncTy,
                                      bool &InvertStep);
-  Value *expandIVInc(PHINode *PN, Value *StepV, const Loop *L,
-                     bool useSubtract);
+  Value *expandIVInc(PHINode *PN, Value *StepV, bool useSubtract);
 
   void fixupInsertPoints(Instruction *I);
 
@@ -586,7 +583,6 @@ private:
   /// May swap \p Phi and \p OrigPhi, if \p Phi is more canonical, due to its
   /// increment.
   void replaceCongruentIVInc(PHINode *&Phi, PHINode *&OrigPhi, Loop *L,
-                             const DominatorTree *DT,
                              SmallVectorImpl<WeakTrackingVH> &DeadInsts);
 };
 

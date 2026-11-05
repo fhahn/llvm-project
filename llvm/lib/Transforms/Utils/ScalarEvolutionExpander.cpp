@@ -914,8 +914,7 @@ bool SCEVExpander::isExpandedAddRecExprPHI(PHINode *PN, Instruction *IncV,
 /// expandIVInc - Expand an IV increment at Builder's current InsertPos.
 /// Typically this is the LatchBlock terminator or IVIncInsertPos, but we may
 /// need to materialize IV increments elsewhere to handle difficult situations.
-Value *SCEVExpander::expandIVInc(PHINode *PN, Value *StepV, const Loop *L,
-                                 bool useSubtract) {
+Value *SCEVExpander::expandIVInc(PHINode *PN, Value *StepV, bool useSubtract) {
   Value *IncV;
   // If the PHI is a pointer, use a GEP, otherwise use an add or sub.
   if (PN->getType()->isPointerTy()) {
@@ -1128,7 +1127,7 @@ SCEVExpander::getAddRecExprPHILiterally(const SCEVAddRecExpr *Normalized,
     Instruction *InsertPos = L == IVIncInsertLoop ?
       IVIncInsertPos : Pred->getTerminator();
     Builder.SetInsertPoint(InsertPos);
-    Value *IncV = expandIVInc(PN, StepV, L, useSubtract);
+    Value *IncV = expandIVInc(PN, StepV, useSubtract);
 
     if (isa<OverflowingBinaryOperator>(IncV)) {
       if (IncrementIsNUW)
@@ -1222,7 +1221,7 @@ SCEVExpander::expandAddRecExprLiterally(SCEVUseT<const SCEVAddRecExpr *> S) {
         SCEVInsertPointGuard Guard(Builder, this);
         StepV = expand(Step, L->getHeader()->getFirstInsertionPt());
       }
-      Result = expandIVInc(PN, StepV, L, useSubtract);
+      Result = expandIVInc(PN, StepV, useSubtract);
     }
   }
 
@@ -1749,7 +1748,7 @@ void SCEVExpander::dropPoisonGeneratingAnnotationsAndReinfer(
 }
 
 void SCEVExpander::replaceCongruentIVInc(
-    PHINode *&Phi, PHINode *&OrigPhi, Loop *L, const DominatorTree *DT,
+    PHINode *&Phi, PHINode *&OrigPhi, Loop *L,
     SmallVectorImpl<WeakTrackingVH> &DeadInsts) {
   BasicBlock *LatchBlock = L->getLoopLatch();
   if (!LatchBlock)
@@ -1843,7 +1842,7 @@ void SCEVExpander::replaceCongruentIVInc(
 /// This does not depend on any SCEVExpander state but should be used in
 /// the same context that SCEVExpander is used.
 unsigned
-SCEVExpander::replaceCongruentIVs(Loop *L, const DominatorTree *DT,
+SCEVExpander::replaceCongruentIVs(Loop *L,
                                   SmallVectorImpl<WeakTrackingVH> &DeadInsts,
                                   const TargetTransformInfo *TTI) {
   // Find integer phis in order of increasing width.
@@ -1920,7 +1919,7 @@ SCEVExpander::replaceCongruentIVs(Loop *L, const DominatorTree *DT,
     if (OrigPhiRef->getType()->isPointerTy() != Phi->getType()->isPointerTy())
       continue;
 
-    replaceCongruentIVInc(Phi, OrigPhiRef, L, DT, DeadInsts);
+    replaceCongruentIVInc(Phi, OrigPhiRef, L, DeadInsts);
     SCEV_DEBUG_WITH_TYPE(DebugType,
                          dbgs() << "INDVARS: Eliminated congruent iv: " << *Phi
                                 << '\n');
