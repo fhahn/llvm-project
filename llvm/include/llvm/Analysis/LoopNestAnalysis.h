@@ -168,11 +168,6 @@ public:
     return all_of(Loops, [](const Loop *L) { return L->isLoopSimplifyForm(); });
   }
 
-  /// Return true if all loops in the loop nest are in rotated form.
-  bool areAllLoopsRotatedForm() const {
-    return all_of(Loops, [](const Loop *L) { return L->isRotatedForm(); });
-  }
-
   /// Return the function to which the loop-nest belongs.
   Function *getParent() const {
     return Loops.front()->getHeader()->getParent();
