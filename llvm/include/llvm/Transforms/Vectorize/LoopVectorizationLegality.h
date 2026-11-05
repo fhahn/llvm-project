@@ -276,8 +276,8 @@ enum class UncountableExitTrait { None, ReadOnly, ReadWrite };
 /// * Scalars checks - The code in canVectorizeInstrs and canVectorizeMemory
 /// checks for a number of different conditions, such as the availability of a
 /// single induction variable, that all types are supported and vectorize-able,
-/// etc. This code reflects the capabilities of InnerLoopVectorizer.
-/// This class is also used by InnerLoopVectorizer for identifying
+/// etc. This code reflects the capabilities of the loop vectorizer.
+/// This class is also used by the vectorizer for identifying
 /// induction variable and the different reduction variables.
 class LoopVectorizationLegality {
 public:
