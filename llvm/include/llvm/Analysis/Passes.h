@@ -29,13 +29,6 @@ namespace llvm {
 
   //===--------------------------------------------------------------------===//
   //
-  // createDependenceAnalysisWrapperPass - This creates an instance of the
-  // DependenceAnalysisWrapper pass.
-  //
-  LLVM_ABI FunctionPass *createDependenceAnalysisWrapperPass();
-
-  //===--------------------------------------------------------------------===//
-  //
   // createRegionInfoPass - This pass finds all single entry single exit regions
   // in a function and builds the region hierarchy.
   //

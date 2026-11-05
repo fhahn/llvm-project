@@ -30,7 +30,6 @@ void llvm::initializeAnalysis(PassRegistry &Registry) {
   initializeDXILResourceBindingWrapperPassPass(Registry);
   initializeDXILResourceTypeWrapperPassPass(Registry);
   initializeDXILResourceWrapperPassPass(Registry);
-  initializeDependenceAnalysisWrapperPassPass(Registry);
   initializeDominanceFrontierWrapperPassPass(Registry);
   initializeDomViewerWrapperPassPass(Registry);
   initializeDomPrinterWrapperPassPass(Registry);

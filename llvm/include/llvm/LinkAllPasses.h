@@ -78,7 +78,6 @@ struct ForcePassLinking {
     (void)llvm::createDeadArgEliminationPass();
     (void)llvm::createDeadCodeEliminationPass();
     (void)llvm::createDeadStoreEliminationPass();
-    (void)llvm::createDependenceAnalysisWrapperPass();
     (void)llvm::createDomOnlyPrinterWrapperPassPass();
     (void)llvm::createDomPrinterWrapperPassPass();
     (void)llvm::createDomOnlyViewerWrapperPassPass();

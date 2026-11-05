@@ -55,7 +55,6 @@
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Module.h"
-#include "llvm/InitializePasses.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
@@ -109,42 +108,6 @@ DependenceAnalysis::run(Function &F, FunctionAnalysisManager &FAM) {
 }
 
 AnalysisKey DependenceAnalysis::Key;
-
-INITIALIZE_PASS_BEGIN(DependenceAnalysisWrapperPass, "da",
-                      "Dependence Analysis", true, true)
-INITIALIZE_PASS_DEPENDENCY(LoopInfoWrapperPass)
-INITIALIZE_PASS_DEPENDENCY(ScalarEvolutionWrapperPass)
-INITIALIZE_PASS_DEPENDENCY(AAResultsWrapperPass)
-INITIALIZE_PASS_END(DependenceAnalysisWrapperPass, "da", "Dependence Analysis",
-                    true, true)
-
-char DependenceAnalysisWrapperPass::ID = 0;
-
-DependenceAnalysisWrapperPass::DependenceAnalysisWrapperPass()
-    : FunctionPass(ID) {}
-
-FunctionPass *llvm::createDependenceAnalysisWrapperPass() {
-  return new DependenceAnalysisWrapperPass();
-}
-
-bool DependenceAnalysisWrapperPass::runOnFunction(Function &F) {
-  auto &AA = getAnalysis<AAResultsWrapperPass>().getAAResults();
-  auto &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
-  auto &LI = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
-  info.reset(new DependenceInfo(&F, &AA, &SE, &LI));
-  return false;
-}
-
-DependenceInfo &DependenceAnalysisWrapperPass::getDI() const { return *info; }
-
-void DependenceAnalysisWrapperPass::releaseMemory() { info.reset(); }
-
-void DependenceAnalysisWrapperPass::getAnalysisUsage(AnalysisUsage &AU) const {
-  AU.setPreservesAll();
-  AU.addRequiredTransitive<AAResultsWrapperPass>();
-  AU.addRequiredTransitive<ScalarEvolutionWrapperPass>();
-  AU.addRequiredTransitive<LoopInfoWrapperPass>();
-}
 
 namespace {
 
@@ -282,13 +245,6 @@ static void dumpExampleDependence(raw_ostream &OS, DependenceInfo *DA,
       }
     }
   }
-}
-
-void DependenceAnalysisWrapperPass::print(raw_ostream &OS,
-                                          const Module *) const {
-  dumpExampleDependence(
-      OS, info.get(), getAnalysis<ScalarEvolutionWrapperPass>().getSE(),
-      getAnalysis<LoopInfoWrapperPass>().getLoopInfo(), false);
 }
 
 PreservedAnalyses

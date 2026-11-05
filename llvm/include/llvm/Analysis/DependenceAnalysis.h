@@ -725,26 +725,6 @@ private:
   bool NormalizeResults;
 }; // class DependenceAnalysisPrinterPass
 
-/// Legacy pass manager pass to access dependence information
-class LLVM_ABI DependenceAnalysisWrapperPass : public FunctionPass {
-public:
-  static char ID; // Class identification, replacement for typeinfo
-  DependenceAnalysisWrapperPass();
-
-  bool runOnFunction(Function &F) override;
-  void releaseMemory() override;
-  void getAnalysisUsage(AnalysisUsage &) const override;
-  void print(raw_ostream &, const Module * = nullptr) const override;
-  DependenceInfo &getDI() const;
-
-private:
-  std::unique_ptr<DependenceInfo> info;
-}; // class DependenceAnalysisWrapperPass
-
-/// createDependenceAnalysisPass - This creates an instance of the
-/// DependenceAnalysis wrapper pass.
-LLVM_ABI FunctionPass *createDependenceAnalysisWrapperPass();
-
 } // namespace llvm
 
 #endif

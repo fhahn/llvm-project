@@ -92,7 +92,6 @@ LLVM_ABI void initializeDXILResourceTypeWrapperPassPass(PassRegistry &);
 LLVM_ABI void initializeDXILResourceWrapperPassPass(PassRegistry &);
 LLVM_ABI void initializeDeadMachineInstructionElimPass(PassRegistry &);
 LLVM_ABI void initializeDebugifyMachineModulePass(PassRegistry &);
-LLVM_ABI void initializeDependenceAnalysisWrapperPassPass(PassRegistry &);
 LLVM_ABI void initializeDetectDeadLanesLegacyPass(PassRegistry &);
 LLVM_ABI void initializeDomOnlyPrinterWrapperPassPass(PassRegistry &);
 LLVM_ABI void initializeDomOnlyViewerWrapperPassPass(PassRegistry &);
