@@ -2722,8 +2722,7 @@ LoopVectorizationCostModel::computeMaxVF(ElementCount UserVF, unsigned UserIC) {
   return FixedScalableVFPair::getNone();
 }
 
-void LoopVectorizationPlanner::emitInvalidCostRemarks(
-    OptimizationRemarkEmitter *ORE) {
+void LoopVectorizationPlanner::emitInvalidCostRemarks() {
   using RecipeVFPair = std::pair<VPRecipeBase *, ElementCount>;
   SmallVector<RecipeVFPair> InvalidCosts;
   for (const auto &Plan : VPlans) {
@@ -7410,7 +7409,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     return false;
 
   if (IsInnerLoop && ORE->allowExtraAnalysis(LV_NAME))
-    LVP.emitInvalidCostRemarks(ORE);
+    LVP.emitInvalidCostRemarks();
 
   assert((IsInnerLoop || !LVP.getCostModel().maskPartialAliasing()) &&
          "Did not expect to alias-mask outer loop");

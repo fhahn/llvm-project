@@ -1030,7 +1030,7 @@ public:
                                                 bool ScalarEpilogueAllowed);
 
   /// Emit remarks for recipes with invalid costs in the available VPlans.
-  void emitInvalidCostRemarks(OptimizationRemarkEmitter *ORE);
+  void emitInvalidCostRemarks();
 
   /// Create a check to \p Plan to see if the vector loop should be executed
   /// based on its trip count.
