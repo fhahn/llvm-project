@@ -3868,12 +3868,14 @@ InstructionCost VPExpressionRecipe::computeCost(ElementCount VF,
       cast<VectorType>(toVectorTy(getOperand(0)->getScalarType(), VF));
   unsigned Opcode = RecurrenceDescriptor::getOpcode(
       cast<VPReductionRecipe>(ExpressionRecipes.back())->getRecurrenceKind());
-  switch (ExpressionType) {
-  case ExpressionTypes::NegatedExtendedReduction:
+  if (ExpressionType == ExpressionTypes::NegatedExtendedReduction ||
+      ExpressionType == ExpressionTypes::ExtNegatedMulAccReduction) {
     assert((Opcode == Instruction::Add || Opcode == Instruction::FAdd) &&
            "Unexpected opcode");
     Opcode = Opcode == Instruction::Add ? Instruction::Sub : Instruction::FSub;
-    [[fallthrough]];
+  }
+  switch (ExpressionType) {
+  case ExpressionTypes::NegatedExtendedReduction:
   case ExpressionTypes::ExtendedReduction: {
     auto *RedR = cast<VPReductionRecipe>(ExpressionRecipes.back());
     auto *ExtR = cast<VPWidenCastRecipe>(ExpressionRecipes[0]);
@@ -3899,17 +3901,6 @@ InstructionCost VPExpressionRecipe::computeCost(ElementCount VF,
                                           Ctx.CostKind);
 
   case ExpressionTypes::ExtNegatedMulAccReduction:
-    switch (Opcode) {
-    case Instruction::Add:
-      Opcode = Instruction::Sub;
-      break;
-    case Instruction::FAdd:
-      Opcode = Instruction::FSub;
-      break;
-    default:
-      llvm_unreachable("Unsupported opcode for ExtNegatedMulAccReduction");
-    }
-    [[fallthrough]];
   case ExpressionTypes::ExtMulAccReduction: {
     auto *RedR = cast<VPReductionRecipe>(ExpressionRecipes.back());
     if (RedR->isPartialReduction()) {
