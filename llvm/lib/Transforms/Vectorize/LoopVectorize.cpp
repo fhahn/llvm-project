@@ -1668,13 +1668,6 @@ static Function *getVectorLibraryVariantFor(const CallInst &CI, ElementCount VF,
   return nullptr;
 }
 
-/// Returns true iff \p CI has a library vector variant usable at \p VF.
-static bool hasVectorLibraryVariantFor(const CallInst &CI, ElementCount VF,
-                                       bool MaskRequired,
-                                       const TargetLibraryInfo *TLI) {
-  return getVectorLibraryVariantFor(CI, VF, MaskRequired, TLI) != nullptr;
-}
-
 InstructionCost
 LoopVectorizationCostModel::getVectorCallCost(CallInst *CI,
                                               ElementCount VF) const {
@@ -1958,7 +1951,7 @@ bool LoopVectorizationCostModel::isScalarWithPredication(Instruction *I,
     auto *CI = cast<CallInst>(I);
     // A vector intrinsic or library variant lowering avoids scalarization.
     return !getVectorIntrinsicIDForCall(CI, TLI) &&
-           !hasVectorLibraryVariantFor(*CI, VF, isMaskRequired(CI), TLI);
+           !getVectorLibraryVariantFor(*CI, VF, isMaskRequired(CI), TLI);
   }
   case Instruction::Load:
   case Instruction::Store: {
