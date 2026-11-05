@@ -2220,8 +2220,6 @@ std::optional<SCEVFlags> ScalarEvolution::getStrengthenedNoWrapFlagsFromBinOp(
 // can't-overflow flags for the operation if possible.
 static SCEVFlags StrengthenNoWrapFlags(ScalarEvolution *SE, SCEVTypes Type,
                                        ArrayRef<SCEVUse> Ops, SCEVFlags Flags) {
-  using namespace std::placeholders;
-
   using OBO = OverflowingBinaryOperator;
 
   bool CanAnalyze =
@@ -4664,13 +4662,10 @@ public:
     // Only re-write AddRecExprs for this loop.
     if (Expr->getLoop() == L)
       return Expr->getPostIncExpr(SE);
-    SeenOtherLoops = true;
     return Expr;
   }
 
   bool hasSeenLoopVariantSCEVUnknown() { return SeenLoopVariantSCEVUnknown; }
-
-  bool hasSeenOtherLoops() { return SeenOtherLoops; }
 
 private:
   explicit SCEVPostIncRewriter(const Loop *L, ScalarEvolution &SE)
@@ -4678,7 +4673,6 @@ private:
 
   const Loop *L;
   bool SeenLoopVariantSCEVUnknown = false;
-  bool SeenOtherLoops = false;
 };
 
 /// This class evaluates the compare condition by matching it against the
