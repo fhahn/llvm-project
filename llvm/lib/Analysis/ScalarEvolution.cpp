@@ -9203,8 +9203,9 @@ ScalarEvolution::ExitLimit ScalarEvolution::computeExitLimitFromICmp(
   }
 
   switch (Pred) {
-  case ICmpInst::ICMP_NE: {                     // while (X != Y)
-    // Convert to: while (X-Y != 0)
+  case ICmpInst::ICMP_NE:   // while (X != Y)
+  case ICmpInst::ICMP_EQ: { // while (X == Y)
+    // Convert to: while (X-Y != 0) or while (X-Y == 0).
     if (LHS->getType()->isPointerTy()) {
       LHS = getPtrToAddrExpr(LHS);
       if (isa<SCEVCouldNotCompute>(LHS))
@@ -9215,26 +9216,19 @@ ScalarEvolution::ExitLimit ScalarEvolution::computeExitLimitFromICmp(
       if (isa<SCEVCouldNotCompute>(RHS))
         return RHS;
     }
-    ExitLimit EL = howFarToZero(getMinusSCEV(LHS, RHS), L, ControlsOnlyExit,
-                                AllowPredicates);
+    const SCEV *Diff = getMinusSCEV(LHS, RHS);
+    if (Pred == ICmpInst::ICMP_EQ) {
+      // Loops that look like: while (X == Y) are very strange indeed. Only
+      // handle the trivial case of X-Y being a non-zero constant, where the
+      // backedge executes zero times.
+      auto *C = dyn_cast<SCEVConstant>(Diff);
+      if (C && !C->getValue()->isZero())
+        return getZero(C->getType());
+      break;
+    }
+    ExitLimit EL = howFarToZero(Diff, L, ControlsOnlyExit, AllowPredicates);
     if (EL.hasAnyInfo())
       return EL;
-    break;
-  }
-  case ICmpInst::ICMP_EQ: {                     // while (X == Y)
-    // Convert to: while (X-Y == 0)
-    if (LHS->getType()->isPointerTy()) {
-      LHS = getPtrToAddrExpr(LHS);
-      if (isa<SCEVCouldNotCompute>(LHS))
-        return LHS;
-    }
-    if (RHS->getType()->isPointerTy()) {
-      RHS = getPtrToAddrExpr(RHS);
-      if (isa<SCEVCouldNotCompute>(RHS))
-        return RHS;
-    }
-    ExitLimit EL = howFarToNonZero(getMinusSCEV(LHS, RHS), L);
-    if (EL.hasAnyInfo()) return EL;
     break;
   }
   case ICmpInst::ICMP_SLE:
@@ -10663,25 +10657,6 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(const SCEV *V,
   }
   auto *S = isa<SCEVCouldNotCompute>(E) ? M : E;
   return ExitLimit(E, M, S, false, Predicates);
-}
-
-ScalarEvolution::ExitLimit
-ScalarEvolution::howFarToNonZero(const SCEV *V, const Loop *L) {
-  // Loops that look like: while (X == 0) are very strange indeed.  We don't
-  // handle them yet except for the trivial case.  This could be expanded in the
-  // future as needed.
-
-  // If the value is a constant, check to see if it is known to be non-zero
-  // already.  If so, the backedge will execute zero times.
-  if (const SCEVConstant *C = dyn_cast<SCEVConstant>(V)) {
-    if (!C->getValue()->isZero())
-      return getZero(C->getType());
-    return getCouldNotCompute();  // Otherwise it will loop infinitely.
-  }
-
-  // We could implement others, but I really doubt anyone writes loops like
-  // this, and if they did, they would already be constant folded.
-  return getCouldNotCompute();
 }
 
 std::pair<const BasicBlock *, const BasicBlock *>

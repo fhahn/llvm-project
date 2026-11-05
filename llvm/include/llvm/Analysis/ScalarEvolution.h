@@ -2231,11 +2231,6 @@ private:
   ExitLimit howFarToZero(const SCEV *V, const Loop *L, bool IsSubExpr,
                          bool AllowPredicates = false);
 
-  /// Return the number of times an exit condition checking the specified
-  /// value for nonzero will execute.  If not computable, return
-  /// CouldNotCompute.
-  ExitLimit howFarToNonZero(const SCEV *V, const Loop *L);
-
   /// Return the number of times an exit condition containing the specified
   /// less-than comparison will execute.  If not computable, return
   /// CouldNotCompute.
