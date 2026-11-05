@@ -7574,23 +7574,9 @@ ScalarEvolution::getOperandsToCreate(Value *V, SmallVectorImpl<Value *> &Ops) {
 }
 
 const SCEV *ScalarEvolution::createSCEV(Value *V) {
-  if (!isSCEVable(V->getType()))
-    return getUnknown(V);
-
-  if (Instruction *I = dyn_cast<Instruction>(V)) {
-    // Don't attempt to analyze instructions in blocks that aren't
-    // reachable. Such instructions don't matter, and they aren't required
-    // to obey basic rules for definitions dominating uses which this
-    // analysis depends on.
-    if (!DT.isReachableFromEntry(I->getParent()))
-      return getUnknown(PoisonValue::get(V->getType()));
-  } else if (ConstantInt *CI = dyn_cast<ConstantInt>(V))
-    return getConstant(CI);
-  else if (isa<GlobalAlias>(V))
-    return getUnknown(V);
-  else if (!isa<ConstantExpr>(V))
-    return getUnknown(V);
-
+  // createSCEVIter only calls this for values getOperandsToCreate did not
+  // handle directly, i.e. SCEVable instructions in reachable blocks and
+  // constant expressions.
   const SCEV *LHS;
   const SCEV *RHS;
 
