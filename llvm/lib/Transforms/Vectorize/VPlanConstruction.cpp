@@ -1820,31 +1820,24 @@ static VPInstruction *findFindIVSelect(VPValue *BackedgeVal) {
       }));
 }
 
-bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
-  auto GetMinOrMaxCompareValue =
-      [](VPReductionPHIRecipe *RedPhiR) -> VPValue * {
-    auto *MinOrMaxR =
-        dyn_cast_or_null<VPRecipeWithIRFlags>(RedPhiR->getBackedgeValue());
-    if (!MinOrMaxR)
-      return nullptr;
-
-    // Check that MinOrMaxR is a VPWidenIntrinsicRecipe or VPReplicateRecipe
-    // with an intrinsic that matches the reduction kind.
-    Intrinsic::ID ExpectedIntrinsicID =
-        getMinMaxReductionIntrinsicOp(RedPhiR->getRecurrenceKind());
-    if (!match(MinOrMaxR, m_Intrinsic(ExpectedIntrinsicID)))
-      return nullptr;
-
-    // MinOrMaxR must combine RedPhiR directly with the new element, as the NaN
-    // check added below only covers the other operand.
-    // TODO: Support multi-step min/max chains (e.g. maxnum(l, maxnum(k, phi)))
-    // by checking all operands feeding the chain for NaNs.
-    if (MinOrMaxR->getOperand(0) == RedPhiR)
-      return MinOrMaxR->getOperand(1);
-    if (MinOrMaxR->getOperand(1) == RedPhiR)
-      return MinOrMaxR->getOperand(0);
+/// If \p MinOrMaxR is a VPWidenIntrinsicRecipe or VPReplicateRecipe with the
+/// min/max intrinsic of \p PhiR's recurrence kind that combines \p PhiR
+/// directly with another value, return that value. Otherwise, including for
+/// multi-step min/max chains (e.g. max(l, max(k, phi))), return nullptr.
+static VPValue *getMinOrMaxOperandOtherThanPhi(VPRecipeWithIRFlags *MinOrMaxR,
+                                               VPReductionPHIRecipe *PhiR) {
+  Intrinsic::ID ExpectedIntrinsicID =
+      getMinMaxReductionIntrinsicOp(PhiR->getRecurrenceKind());
+  if (!match(MinOrMaxR, m_Intrinsic(ExpectedIntrinsicID)))
     return nullptr;
-  };
+  if (MinOrMaxR->getOperand(0) == PhiR)
+    return MinOrMaxR->getOperand(1);
+  if (MinOrMaxR->getOperand(1) == PhiR)
+    return MinOrMaxR->getOperand(0);
+  return nullptr;
+}
+
+bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
 
   VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
   SmallVector<std::pair<VPReductionPHIRecipe *, VPValue *>>
@@ -1865,7 +1858,14 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
       continue;
     }
 
-    VPValue *MinOrMaxOp = GetMinOrMaxCompareValue(Cur);
+    // The min/max must combine Cur directly with the new element, as the NaN
+    // check added below only covers the other operand.
+    // TODO: Support multi-step min/max chains (e.g. maxnum(l, maxnum(k, phi)))
+    // by checking all operands feeding the chain for NaNs.
+    auto *MinOrMaxR =
+        dyn_cast_or_null<VPRecipeWithIRFlags>(Cur->getBackedgeValue());
+    VPValue *MinOrMaxOp =
+        MinOrMaxR ? getMinOrMaxOperandOtherThanPhi(MinOrMaxR, Cur) : nullptr;
     if (!MinOrMaxOp)
       return false;
 
@@ -2343,10 +2343,9 @@ bool VPlanTransforms::handleMultiUseReductions(VPlan &Plan,
         return false;
     }
 
-    // Check that MinOrMaxOp is a VPWidenIntrinsicRecipe or
-    // VPReplicateRecipe with an intrinsic that matches the reduction kind.
-    Intrinsic::ID ExpectedIntrinsicID = getMinMaxReductionIntrinsicOp(RdxKind);
-    if (!match(MinOrMaxOp, m_Intrinsic(ExpectedIntrinsicID)))
+    VPValue *MinOrMaxOpValue =
+        getMinOrMaxOperandOtherThanPhi(MinOrMaxOp, MinOrMaxPhiR);
+    if (!MinOrMaxOpValue)
       return false;
 
     // Tailfolded MinOrMaxOp should only feed into the predicated
@@ -2357,17 +2356,6 @@ bool VPlanTransforms::handleMultiUseReductions(VPlan &Plan,
     // ComputeReductionResult.
     assert(MinOrMaxBackedgeR->getNumUsers() == 2 &&
            "MinOrMaxBackedgeR must have exactly 2 users");
-    // MinOrMaxOp must combine MinOrMaxPhiR directly with the new element;
-    // reject multi-step min/max chains (e.g. max(l, max(k, phi))), which
-    // this transform does not handle.
-    VPValue *MinOrMaxOpValue;
-    if (MinOrMaxOp->getOperand(0) == MinOrMaxPhiR)
-      MinOrMaxOpValue = MinOrMaxOp->getOperand(1);
-    else if (MinOrMaxOp->getOperand(1) == MinOrMaxPhiR)
-      MinOrMaxOpValue = MinOrMaxOp->getOperand(0);
-    else
-      return false;
-
     VPValue *CmpOpA;
     VPValue *CmpOpB;
     CmpPredicate Pred;
