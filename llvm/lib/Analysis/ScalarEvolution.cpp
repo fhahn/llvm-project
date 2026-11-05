@@ -8438,18 +8438,8 @@ void ScalarEvolution::forgetTopmostLoop(const Loop *L) {
 }
 
 void ScalarEvolution::forgetValue(Value *V) {
-  Instruction *I = dyn_cast<Instruction>(V);
-  if (!I) return;
-
-  // Drop information about expressions based on loop-header PHIs.
-  SmallVector<Instruction *, 16> Worklist;
-  SmallPtrSet<Instruction *, 8> Visited;
-  SmallVector<SCEVUse, 8> ToForget;
-  Worklist.push_back(I);
-  Visited.insert(I);
-  visitAndClearUsers(Worklist, Visited, ToForget);
-
-  forgetMemoizedResults(ToForget);
+  if (isa<Instruction>(V))
+    forgetValues(V);
 }
 
 void ScalarEvolution::forgetValues(ArrayRef<Value *> Values) {
