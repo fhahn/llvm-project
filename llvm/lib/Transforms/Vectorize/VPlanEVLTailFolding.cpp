@@ -390,7 +390,7 @@ static void fixupVFUsersForEVL(VPlan &Plan, VPValue &EVL) {
     // TODO: Use VPInstruction::ExplicitVectorLength to get maximum EVL.
     VPValue *MaxEVL = &Plan.getVF();
     // Emit VPScalarCastRecipe in preheader if VF is not a 32 bits integer.
-    VPBuilder Builder(LoopRegion->getPreheaderVPBB());
+    VPBuilder Builder(Plan.getVectorPreheader());
     MaxEVL = Builder.createScalarZExtOrTrunc(
         MaxEVL, Type::getInt32Ty(Plan.getContext()), DebugLoc::getUnknown());
 

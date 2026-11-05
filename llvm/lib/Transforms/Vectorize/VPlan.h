@@ -4750,12 +4750,6 @@ public:
     ExitingBlock->setParent(this);
   }
 
-  /// Returns the pre-header VPBasicBlock of the loop region.
-  VPBasicBlock *getPreheaderVPBB() {
-    assert(!isReplicator() && "should only get pre-header of loop regions");
-    return getSinglePredecessor()->getExitingBasicBlock();
-  }
-
   /// An indicator whether this region is to generate multiple replicated
   /// instances of output IR corresponding to its VPBlockBases.
   bool isReplicator() const { return !CanIVInfo; }
