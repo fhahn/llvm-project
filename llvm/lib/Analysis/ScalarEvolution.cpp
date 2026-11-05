@@ -11492,54 +11492,23 @@ bool ScalarEvolution::isKnownPredicateViaNoOverflow(CmpPredicate Pred,
     return true;
   };
 
+  ICmpInst::Predicate P = Pred;
+  if (ICmpInst::isGT(P) || ICmpInst::isGE(P)) {
+    std::swap(LHS, RHS);
+    P = ICmpInst::getSwappedPredicate(P);
+  }
+  if (!ICmpInst::isLT(P) && !ICmpInst::isLE(P))
+    return false;
+
+  // (X + C1)<nsw> s<= (X + C2)<nsw> if C1 s<= C2.
+  // (X + C1) u<= (X + C2)<nuw> if C1 u<= C2.
+  // Similarly for s< and u<.
   APInt C1;
   APInt C2;
-
-  switch (Pred) {
-  default:
-    break;
-
-  case ICmpInst::ICMP_SGE:
-    std::swap(LHS, RHS);
-    [[fallthrough]];
-  case ICmpInst::ICMP_SLE:
-    // (X + C1)<nsw> s<= (X + C2)<nsw> if C1 s<= C2.
-    if (MatchBinaryAddToConst(LHS, RHS, C1, C2, SCEV::FlagNSW) && C1.sle(C2))
-      return true;
-
-    break;
-
-  case ICmpInst::ICMP_SGT:
-    std::swap(LHS, RHS);
-    [[fallthrough]];
-  case ICmpInst::ICMP_SLT:
-    // (X + C1)<nsw> s< (X + C2)<nsw> if C1 s< C2.
-    if (MatchBinaryAddToConst(LHS, RHS, C1, C2, SCEV::FlagNSW) && C1.slt(C2))
-      return true;
-
-    break;
-
-  case ICmpInst::ICMP_UGE:
-    std::swap(LHS, RHS);
-    [[fallthrough]];
-  case ICmpInst::ICMP_ULE:
-    // (X + C1) u<= (X + C2)<nuw> for C1 u<= C2.
-    if (MatchBinaryAddToConst(LHS, RHS, C1, C2, SCEV::FlagNUW) && C1.ule(C2))
-      return true;
-
-    break;
-
-  case ICmpInst::ICMP_UGT:
-    std::swap(LHS, RHS);
-    [[fallthrough]];
-  case ICmpInst::ICMP_ULT:
-    // (X + C1) u< (X + C2)<nuw> if C1 u< C2.
-    if (MatchBinaryAddToConst(LHS, RHS, C1, C2, SCEV::FlagNUW) && C1.ult(C2))
-      return true;
-    break;
-  }
-
-  return false;
+  return MatchBinaryAddToConst(LHS, RHS, C1, C2,
+                               ICmpInst::isSigned(P) ? SCEV::FlagNSW
+                                                     : SCEV::FlagNUW) &&
+         ICmpInst::compare(C1, C2, P);
 }
 
 bool ScalarEvolution::isKnownPredicateViaSplitting(CmpPredicate Pred,
