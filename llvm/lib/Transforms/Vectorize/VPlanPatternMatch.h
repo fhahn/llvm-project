@@ -89,29 +89,19 @@ template <typename Pred, unsigned BitWidth = 0> struct int_pred_ty {
   }
 };
 
-/// Match a specified signed or unsigned integer value.
+/// Match a specified unsigned integer value.
 struct is_specific_int {
   APInt Val;
-  bool IsSigned;
 
-  is_specific_int(APInt Val, bool IsSigned = false)
-      : Val(std::move(Val)), IsSigned(IsSigned) {}
+  is_specific_int(APInt Val) : Val(std::move(Val)) {}
 
-  bool isValue(const APInt &C) const {
-    return APInt::isSameValue(Val, C, IsSigned);
-  }
+  bool isValue(const APInt &C) const { return APInt::isSameValue(Val, C); }
 };
 
-template <unsigned Bitwidth = 0>
-using specific_intval = int_pred_ty<is_specific_int, Bitwidth>;
+using specific_intval = int_pred_ty<is_specific_int>;
 
-inline specific_intval<0> m_SpecificInt(uint64_t V) {
-  return specific_intval<0>(is_specific_int(APInt(64, V)));
-}
-
-inline specific_intval<0> m_SpecificSInt(int64_t V) {
-  return specific_intval<0>(
-      is_specific_int(APInt(64, V, /*isSigned=*/true), /*IsSigned=*/true));
+inline specific_intval m_SpecificInt(uint64_t V) {
+  return specific_intval(is_specific_int(APInt(64, V)));
 }
 
 struct is_all_ones {
@@ -1151,16 +1141,6 @@ inline auto m_WidenIntrinsic(const T &...Ops) {
   return m_Isa<VPWidenIntrinsicRecipe>(m_Intrinsic<IntrID>(Ops...));
 }
 
-/// Match VPValues that represent live-ins: VPIRValues and (plain)
-/// VPSymbolicValues. VPRegionValues (which inherit from VPSymbolicValue) are
-/// not live-ins and are excluded.
-struct LiveIn_match {
-  template <typename ITy> bool match(ITy *V) const {
-    return isa<VPIRValue>(V) ||
-           (isa<VPSymbolicValue>(V) && !isa<VPRegionValue>(V));
-  }
-};
-
 inline auto m_VScale() { return m_Intrinsic<Intrinsic::vscale>(); }
 
 inline auto m_LiveIn() { return m_Isa<VPIRValue, VPSymbolicValue>(); }
@@ -1227,11 +1207,6 @@ template <typename SubPattern_t> struct OneUse_match {
 
 template <typename T> inline OneUse_match<T> m_OneUse(const T &SubPattern) {
   return SubPattern;
-}
-
-inline match_bind<VPReductionPHIRecipe>
-m_ReductionPhi(VPReductionPHIRecipe *&V) {
-  return V;
 }
 
 template <typename Op0_t, typename Op1_t>
