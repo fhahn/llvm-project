@@ -817,26 +817,10 @@ void VPlanTransforms::materializeConstantVectorTripCount(
   assert(Plan.hasVF(BestVF) && "BestVF is not available in Plan");
   assert(Plan.hasUF(BestUF) && "BestUF is not available in Plan");
 
-  // Skip cases for which the trip count may be non-trivial to materialize.
-  // I.e., when a scalar tail is absent - due to tail folding, or when a scalar
-  // tail is required.
-  auto *TCScev = dyn_cast<SCEVConstant>(Plan.getTripCount());
-  if (Plan.hasTailFolded() || !Plan.hasScalarTail() ||
-      Plan.getMiddleBlock()->getSingleSuccessor() ==
-          Plan.getScalarPreheader() ||
-      !TCScev)
-    return;
-
-  // Materialize vector trip counts for constants early if it can simply
-  // be computed as (Original TC / VF * UF) * VF * UF.
-  // TODO: Compute vector trip counts for loops requiring a scalar epilogue and
-  // tail-folded loops.
-  ScalarEvolution &SE = *PSE.getSE();
-  const SCEV *VFxUF = SE.getElementCount(TCScev->getType(), BestVF * BestUF);
-  const SCEV *VecTCScev = SE.getMulExpr(SE.getUDivExpr(TCScev, VFxUF), VFxUF);
-  if (auto *ConstVecTC = dyn_cast<SCEVConstant>(VecTCScev))
-    Plan.getVectorLoopRegion()->getVectorTripCount().setUnderlyingValue(
-        ConstVecTC->getValue());
+  if (auto *ConstVecTC = dyn_cast<SCEVConstant>(
+          vputils::getVectorTripCountSCEV(Plan, BestVF, BestUF, PSE)))
+    Plan.getVectorLoopRegion()->getVectorTripCount().replaceAllUsesWith(
+        Plan.getOrAddLiveIn(ConstVecTC->getValue()));
 }
 
 void VPlanTransforms::materializeUnpacks(VPlan &Plan) {
@@ -887,14 +871,10 @@ void VPlanTransforms::materializeVectorTripCount(
     std::optional<uint64_t> MaxRuntimeStep) {
   VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
   VPSymbolicValue &VectorTC = LoopRegion->getVectorTripCount();
-  // There's nothing to do if there are no users of the vector trip count.
+  // There's nothing to do if there are no users of the vector trip count,
+  // including when it has already been materialized.
   if (VectorTC.user_empty())
     return;
-  // Use the constant vector trip count, if it has been computed already.
-  if (Value *ConstVecTC = VectorTC.getUnderlyingValue()) {
-    VectorTC.replaceAllUsesWith(Plan.getOrAddLiveIn(ConstVecTC));
-    return;
-  }
 
   const SCEV *TCScev = Plan.getTripCount();
   Type *TCTy = TCScev->getType();

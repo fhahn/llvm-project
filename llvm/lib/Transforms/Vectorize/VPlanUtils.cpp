@@ -489,6 +489,31 @@ bool vputils::isElementwise(const VPValue *V) {
   return Instruction::isUnaryOp(Opcode) || Instruction::isBinaryOp(Opcode);
 }
 
+const SCEV *vputils::getVectorTripCountSCEV(VPlan &Plan, ElementCount VF,
+                                            unsigned UF,
+                                            PredicatedScalarEvolution &PSE) {
+  ScalarEvolution &SE = *PSE.getSE();
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  // Skip cases for which the vector trip count may be non-trivial to compute.
+  // I.e., when a scalar tail is absent - due to tail folding, or when a scalar
+  // tail is required.
+  // TODO: Compute vector trip counts for loops requiring a scalar epilogue and
+  // tail-folded loops.
+  // An already materialized vector trip count may have been computed with a
+  // different step (narrowInterleaveGroups), so the formula does not apply.
+  if (LoopRegion->getVectorTripCount().isMaterialized() ||
+      Plan.hasTailFolded() || !Plan.hasScalarTail() ||
+      Plan.getMiddleBlock()->getSingleSuccessor() == Plan.getScalarPreheader())
+    return SE.getCouldNotCompute();
+
+  const SCEV *TCScev = Plan.getTripCount();
+  if (!isa<SCEVConstant>(TCScev))
+    return SE.getCouldNotCompute();
+  const SCEV *VFxUF = SE.getElementCount(TCScev->getType(), VF * UF);
+  const SCEV *VecTC = SE.getMulExpr(SE.getUDivExpr(TCScev, VFxUF), VFxUF);
+  return isa<SCEVConstant>(VecTC) ? VecTC : SE.getCouldNotCompute();
+}
+
 bool vputils::isSingleScalar(const VPValue *VPV) {
   // Live-in, symbolic and canonical-IV region values are single-scalar.
   if (auto *RV = dyn_cast<VPRegionValue>(VPV))

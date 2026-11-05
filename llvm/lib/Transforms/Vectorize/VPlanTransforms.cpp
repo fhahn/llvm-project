@@ -2119,40 +2119,21 @@ static bool optimizeVectorInductionWidthForTCAndVFUF(VPlan &Plan,
   return MadeChange;
 }
 
-/// Return true if \p Cond is known to be true for given \p BestVF and \p
-/// BestUF.
-static bool isConditionTrueViaVFAndUF(VPValue *Cond, VPlan &Plan,
-                                      ElementCount BestVF, unsigned BestUF,
-                                      PredicatedScalarEvolution &PSE) {
+/// Return true if \p Cond is, or is an or of, the compare
+/// CanIV + VFxUF == vector trip count of the vector loop region.
+static bool isVectorTripCountCompare(VPValue *Cond, VPlan &Plan) {
   if (match(Cond, m_BinaryOr(m_VPValue(), m_VPValue())))
-    return any_of(Cond->getDefiningRecipe()->operands(), [&Plan, BestVF, BestUF,
-                                                          &PSE](VPValue *C) {
-      return isConditionTrueViaVFAndUF(C, Plan, BestVF, BestUF, PSE);
+    return any_of(Cond->getDefiningRecipe()->operands(), [&Plan](VPValue *C) {
+      return isVectorTripCountCompare(C, Plan);
     });
 
   VPRegionBlock *VectorLoop = Plan.getVectorLoopRegion();
   auto *CanIV = VectorLoop->getCanonicalIV();
-  if (!match(Cond,
-             m_SpecificICmp(CmpInst::ICMP_EQ,
-                            m_c_Add(m_Specific(CanIV),
-                                    m_Specific(&VectorLoop->getVFxUF())),
-                            m_Specific(&VectorLoop->getVectorTripCount()))))
-    return false;
-
-  // The compare checks CanIV + VFxUF == vector trip count. The vector trip
-  // count is not conveniently available as SCEV so far, so we compare directly
-  // against the original trip count. This is stricter than necessary, as we
-  // will only return true if the trip count == vector trip count.
-  const SCEV *VectorTripCount =
-      vputils::getSCEVExprForVPValue(&VectorLoop->getVectorTripCount(), PSE);
-  if (isa<SCEVCouldNotCompute>(VectorTripCount))
-    VectorTripCount = Plan.getTripCount();
-  assert(!isa<SCEVCouldNotCompute>(VectorTripCount) &&
-         "Trip count SCEV must be computable");
-  ScalarEvolution &SE = *PSE.getSE();
-  ElementCount NumElements = BestVF * BestUF;
-  const SCEV *C = SE.getElementCount(VectorTripCount->getType(), NumElements);
-  return SE.isKnownPredicate(CmpInst::ICMP_EQ, VectorTripCount, C);
+  return match(Cond,
+               m_SpecificICmp(CmpInst::ICMP_EQ,
+                              m_c_Add(m_Specific(CanIV),
+                                      m_Specific(&VectorLoop->getVFxUF())),
+                              m_Specific(&VectorLoop->getVectorTripCount())));
 }
 
 // Replaces ExtractVectorForPart instructions with ICMP when the VF is scalar
@@ -2232,23 +2213,29 @@ static bool simplifyBranchConditionForVFAndUF(VPlan &Plan, ElementCount BestVF,
   if (!match(Term, m_BranchOnCond(m_VPValue(Cond))))
     match(Term, m_BranchOnTwoConds(m_VPValue(), m_VPValue(Cond)));
 
+  // If the vector trip count is not available as SCEV, compare directly
+  // against the original trip count. This is stricter than necessary, as the
+  // trip count may be larger than the vector trip count.
+  const SCEV *VectorTripCount =
+      vputils::getVectorTripCountSCEV(Plan, BestVF, BestUF, PSE);
+  if (isa<SCEVCouldNotCompute>(VectorTripCount))
+    VectorTripCount = Plan.getTripCount();
+  assert(!isa<SCEVCouldNotCompute>(VectorTripCount) &&
+         "Trip count SCEV must be computable");
+  ScalarEvolution &SE = *PSE.getSE();
+  const SCEV *VFxUF =
+      SE.getElementCount(VectorTripCount->getType(), BestVF * BestUF);
+
   if (isVectorLatchCheck(Term, Cond, Plan)) {
     // Try to simplify the branch condition if VectorTC <= VF * UF when the
     // latch terminator is BranchOnCount or
     // BranchOnCond(Not(ExtractVectorForPart(WideActiveLaneMask), 0))
-    const SCEV *VectorTripCount = vputils::getSCEVExprForVPValue(
-        &VectorRegion->getVectorTripCount(), PSE);
-    if (isa<SCEVCouldNotCompute>(VectorTripCount))
-      VectorTripCount = Plan.getTripCount();
-    assert(!isa<SCEVCouldNotCompute>(VectorTripCount) &&
-           "Trip count SCEV must be computable");
-    ScalarEvolution &SE = *PSE.getSE();
-    ElementCount NumElements = BestVF * BestUF;
-    const SCEV *C = SE.getElementCount(VectorTripCount->getType(), NumElements);
-    if (!SE.isKnownPredicate(CmpInst::ICMP_ULE, VectorTripCount, C))
+    if (!SE.isKnownPredicate(CmpInst::ICMP_ULE, VectorTripCount, VFxUF))
       return false;
-  } else if (!Cond ||
-             !isConditionTrueViaVFAndUF(Cond, Plan, BestVF, BestUF, PSE)) {
+  } else if (!Cond || !isVectorTripCountCompare(Cond, Plan) ||
+             !SE.isKnownPredicate(CmpInst::ICMP_EQ, VectorTripCount, VFxUF)) {
+    // Otherwise, the condition CanIV + VFxUF == vector trip count is only known
+    // to be true in the first iteration if the vector trip count is VF * UF.
     return false;
   }
 

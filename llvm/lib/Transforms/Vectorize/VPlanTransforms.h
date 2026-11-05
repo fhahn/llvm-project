@@ -499,8 +499,9 @@ struct VPlanTransforms {
   static void widenMemoryAccessesByUF(VPlan &Plan, ElementCount VF, unsigned UF,
                                       const TargetTransformInfo &TTI);
 
-  // Materialize vector trip counts for constants early if it can simply be
-  // computed as (Original TC / VF * UF) * VF * UF.
+  /// Replace the vector trip count of \p Plan with a constant, if it can be
+  /// computed as (TC / (VF * UF)) * (VF * UF) for \p BestVF and \p BestUF via
+  /// vputils::getVectorTripCountSCEV.
   static void
   materializeConstantVectorTripCount(VPlan &Plan, ElementCount BestVF,
                                      unsigned BestUF,

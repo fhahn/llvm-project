@@ -56,6 +56,15 @@ LLVM_ABI_FOR_TEST const SCEV *
 getSCEVExprForVPValue(const VPValue *V, PredicatedScalarEvolution &PSE,
                       const Loop *L = nullptr);
 
+/// Return the SCEV for the vector trip count of \p Plan for \p VF and \p UF,
+/// computed as (TC / (VF * UF)) * (VF * UF), if it is a constant. Returns
+/// SCEVCouldNotCompute if the trip count is not a constant, if the
+/// tail is folded, there is no scalar tail or a scalar epilogue is required
+/// (the formula does not apply), or if the vector trip count has already been
+/// materialized (e.g. by narrowInterleaveGroups with a narrowed step).
+const SCEV *getVectorTripCountSCEV(VPlan &Plan, ElementCount VF, unsigned UF,
+                                   PredicatedScalarEvolution &PSE);
+
 /// If the pointer operand \p Addr of a memory access is an affine AddRec
 /// w.r.t. \p L with a constant stride, return the stride in units of
 /// \p AccessTy. Otherwise return std::nullopt.
