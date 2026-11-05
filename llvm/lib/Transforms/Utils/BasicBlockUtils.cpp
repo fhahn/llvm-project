@@ -1737,30 +1737,6 @@ llvm::SplitBlockAndInsertSimpleForLoop(Value *End,
 }
 
 void llvm::SplitBlockAndInsertForEachLane(
-    ElementCount EC, Type *IndexTy, BasicBlock::iterator InsertBefore,
-    std::function<void(IRBuilderBase &, Value *)> Func) {
-
-  IRBuilder<> IRB(InsertBefore);
-
-  if (EC.isScalable()) {
-    Value *NumElements = IRB.CreateElementCount(IndexTy, EC);
-
-    auto [BodyIP, Index] =
-      SplitBlockAndInsertSimpleForLoop(NumElements, InsertBefore);
-
-    IRB.SetInsertPoint(BodyIP);
-    Func(IRB, Index);
-    return;
-  }
-
-  unsigned Num = EC.getFixedValue();
-  for (unsigned Idx = 0; Idx < Num; ++Idx) {
-    IRB.SetInsertPoint(InsertBefore);
-    Func(IRB, ConstantInt::get(IndexTy, Idx));
-  }
-}
-
-void llvm::SplitBlockAndInsertForEachLane(
     Value *EVL, BasicBlock::iterator InsertBefore,
     std::function<void(IRBuilderBase &, Value *)> Func) {
 
