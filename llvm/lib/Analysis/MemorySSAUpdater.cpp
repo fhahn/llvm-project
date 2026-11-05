@@ -859,41 +859,18 @@ void MemorySSAUpdater::updateForClonedBlockIntoPred(
       /*CloneWasSimplified=*/true);
 }
 
-template <typename Iter>
-void MemorySSAUpdater::privateUpdateExitBlocksForClonedLoop(
-    ArrayRef<BasicBlock *> ExitBlocks, Iter ValuesBegin, Iter ValuesEnd,
-    DominatorTree &DT) {
+void MemorySSAUpdater::updateExitBlocksForClonedLoop(
+    ArrayRef<BasicBlock *> ExitBlocks,
+    ArrayRef<std::unique_ptr<ValueToValueMapTy>> VMaps, DominatorTree &DT) {
   SmallVector<CFGUpdate, 4> Updates;
   // Update/insert phis in all successors of exit blocks.
   for (auto *Exit : ExitBlocks)
-    for (const ValueToValueMapTy *VMap : make_range(ValuesBegin, ValuesEnd))
+    for (const std::unique_ptr<ValueToValueMapTy> &VMap : VMaps)
       if (BasicBlock *NewExit = cast_or_null<BasicBlock>(VMap->lookup(Exit))) {
         BasicBlock *ExitSucc = NewExit->getTerminator()->getSuccessor(0);
         Updates.push_back({DT.Insert, NewExit, ExitSucc});
       }
   applyInsertUpdates(Updates, DT);
-}
-
-void MemorySSAUpdater::updateExitBlocksForClonedLoop(
-    ArrayRef<BasicBlock *> ExitBlocks, const ValueToValueMapTy &VMap,
-    DominatorTree &DT) {
-  const ValueToValueMapTy *const Arr[] = {&VMap};
-  privateUpdateExitBlocksForClonedLoop(ExitBlocks, std::begin(Arr),
-                                       std::end(Arr), DT);
-}
-
-void MemorySSAUpdater::updateExitBlocksForClonedLoop(
-    ArrayRef<BasicBlock *> ExitBlocks,
-    ArrayRef<std::unique_ptr<ValueToValueMapTy>> VMaps, DominatorTree &DT) {
-  auto GetPtr = [&](const std::unique_ptr<ValueToValueMapTy> &I) {
-    return I.get();
-  };
-  using MappedIteratorType =
-      mapped_iterator<const std::unique_ptr<ValueToValueMapTy> *,
-                      decltype(GetPtr)>;
-  auto MapBegin = MappedIteratorType(VMaps.begin(), GetPtr);
-  auto MapEnd = MappedIteratorType(VMaps.end(), GetPtr);
-  privateUpdateExitBlocksForClonedLoop(ExitBlocks, MapBegin, MapEnd, DT);
 }
 
 void MemorySSAUpdater::applyUpdates(ArrayRef<CFGUpdate> Updates,

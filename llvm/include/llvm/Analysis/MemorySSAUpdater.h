@@ -112,9 +112,6 @@ public:
                                              const ValueToValueMapTy &VM);
   /// Update phi nodes in exit block successors following cloning. Exit blocks
   /// that were not cloned don't have additional predecessors added.
-  LLVM_ABI void updateExitBlocksForClonedLoop(ArrayRef<BasicBlock *> ExitBlocks,
-                                              const ValueToValueMapTy &VMap,
-                                              DominatorTree &DT);
   LLVM_ABI void updateExitBlocksForClonedLoop(
       ArrayRef<BasicBlock *> ExitBlocks,
       ArrayRef<std::unique_ptr<ValueToValueMapTy>> VMaps, DominatorTree &DT);
@@ -289,10 +286,6 @@ private:
                         function_ref<bool(BasicBlock *)> IsInClonedRegion,
                         bool CloneWasSimplified = false);
 
-  template <typename Iter>
-  void privateUpdateExitBlocksForClonedLoop(ArrayRef<BasicBlock *> ExitBlocks,
-                                            Iter ValuesBegin, Iter ValuesEnd,
-                                            DominatorTree &DT);
   void applyInsertUpdates(ArrayRef<CFGUpdate>, DominatorTree &DT,
                           const GraphDiff<BasicBlock *> *GD);
 };
