@@ -6277,7 +6277,7 @@ bool InstCombinerImpl::prepareWorklist(Function &F) {
       continue;
     }
 
-    Worklist.push(Inst);
+    Worklist.pushInitial(Inst);
   }
 
   return MadeIRChange;
