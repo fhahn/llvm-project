@@ -29,6 +29,18 @@ class InstructionWorklist {
   /// combine has finished. This means that these instructions will be visited
   /// in the order they have been added.
   SmallSetVector<Instruction *, 16> Deferred;
+  /// True if instructions queued by pushInitial() are not in the map yet.
+  bool MapIsIncomplete = false;
+
+  /// Add the instructions queued by pushInitial() to the map.
+  void completeMap() {
+    if (!std::exchange(MapIsIncomplete, false))
+      return;
+    for (auto [Idx, I] : enumerate(Worklist)) {
+      [[maybe_unused]] bool Inserted = WorklistMap.try_emplace(I, Idx).second;
+      assert(Inserted && "pushInitial() of a queued instruction?");
+    }
+  }
 
 public:
   InstructionWorklist() = default;
@@ -58,6 +70,7 @@ public:
   void push(Instruction *I) {
     assert(I);
     assert(I->getParent() && "Instruction not inserted yet?");
+    completeMap();
 
     // Popped instructions keep their entry, so I is only queued if its slot
     // still holds it.
@@ -67,6 +80,18 @@ public:
       LLVM_DEBUG(dbgs() << "ADD: " << *I << '\n');
       Worklist.push_back(I);
     }
+  }
+
+  /// Like push(), for filling an empty worklist with distinct instructions.
+  /// Adding \p I to the map is deferred to the first push() or remove().
+  void pushInitial(Instruction *I) {
+    assert(I);
+    assert(I->getParent() && "Instruction not inserted yet?");
+    assert((MapIsIncomplete || (Worklist.empty() && WorklistMap.empty())) &&
+           "Worklist already in use?");
+    LLVM_DEBUG(dbgs() << "ADD: " << *I << '\n');
+    Worklist.push_back(I);
+    MapIsIncomplete = true;
   }
 
   void pushValue(Value *V) {
@@ -87,6 +112,7 @@ public:
 
   /// Remove I from the worklist if it exists.
   void remove(Instruction *I) {
+    completeMap();
     auto It = WorklistMap.find(I);
     if (It != WorklistMap.end() && It->second < Worklist.size() &&
         Worklist[It->second] == I) {
