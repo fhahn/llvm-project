@@ -2360,15 +2360,7 @@ MachineInstrExpressionTrait::getHashValue(const MachineInstr* const &MI) {
     if (MO.isReg() && MO.isDef() && MO.getReg().isVirtual())
       continue;  // Skip virtual register defs.
 
-    unsigned OpHash;
-    if (MO.isReg())
-      OpHash = detail::combineHashValue(MO.getSubReg() << 1 | MO.isDef(),
-                                        MO.getReg().id());
-    else if (MO.isImm())
-      OpHash = hash_value(MO.getImm()) ^ MO.getTargetFlags();
-    else
-      OpHash = hash_value(MO);
-    Hash = detail::combineHashValue(OpHash, Hash);
+    Hash = detail::combineHashValue(hash_value(MO), Hash);
   }
   return Hash;
 }
