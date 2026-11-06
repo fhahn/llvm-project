@@ -5153,6 +5153,18 @@ static Slice *findOverlappingCopySlice(Slice &S,
 bool SROA::presplitLoadsAndStores(AllocaInst &AI, AllocaSlices &AS) {
   LLVM_DEBUG(dbgs() << "Pre-splitting loads and stores\n");
 
+  // Candidates must be splittable loads used only by stores or splittable
+  // stores of loads. Most allocas have neither, so skip the partition scan.
+  if (none_of(AS, [](const Slice &S) {
+        if (!S.isSplittable())
+          return false;
+        auto *I = S.getUse()->getUser();
+        if (auto *SI = dyn_cast<StoreInst>(I))
+          return isa<LoadInst>(SI->getValueOperand());
+        return isa<LoadInst>(I) && all_of(I->users(), IsaPred<StoreInst>);
+      }))
+    return false;
+
   // Track the loads and stores which are candidates for pre-splitting here, in
   // the order they first appear during the partition scan. These give stable
   // iteration order and a basis for tracking which loads and stores we
