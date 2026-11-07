@@ -9428,12 +9428,15 @@ bool SimplifyCFGOpt::simplifyOnce(BasicBlock *BB) {
   Changed |= ConstantFoldTerminator(BB, /*DeleteDeadConditions=*/true,
                                     /*TLI=*/nullptr, DTU);
 
-  // Check for and eliminate duplicate PHI nodes in this block.
-  Changed |= EliminateDuplicatePHINodes(BB);
+  // Both of these only look at PHI nodes, which most blocks do not have.
+  if (isa<PHINode>(BB->begin())) {
+    // Check for and eliminate duplicate PHI nodes in this block.
+    Changed |= EliminateDuplicatePHINodes(BB);
 
-  // Check for and remove branches that will always cause undefined behavior.
-  if (removeUndefIntroducingPredecessor(BB, DTU, Options.AC))
-    return requestResimplify();
+    // Check for and remove branches that will always cause undefined behavior.
+    if (removeUndefIntroducingPredecessor(BB, DTU, Options.AC))
+      return requestResimplify();
+  }
 
   // Merge basic blocks into their predecessor if there is only one distinct
   // pred, and if there is only one distinct successor of the predecessor, and
