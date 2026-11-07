@@ -257,7 +257,8 @@ class AttributeBitSet {
 
 public:
   bool hasAttribute(Attribute::AttrKind Kind) const {
-    return AvailableAttrs[Kind / 8] & (1 << (Kind % 8));
+    // Kinds are never negative, avoid the rounding fixup of a signed division.
+    return AvailableAttrs[unsigned(Kind) / 8] & (1 << (Kind % 8));
   }
 
   void addAttribute(Attribute::AttrKind Kind) {
