@@ -1330,13 +1330,23 @@ void VPlanTransforms::handleCountableEarlyExits(VPlan &Plan) {
 }
 
 void VPlanTransforms::addMiddleCheck(VPlan &Plan) {
-  auto *MiddleVPBB = VPBlockUtils::getPlainCFGMiddleBlock(Plan);
+  VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
   // If MiddleVPBB has a single successor then the original loop does not exit
   // via the latch and the single successor must be the scalar preheader.
   // There's no need to add a runtime check to MiddleVPBB.
   if (MiddleVPBB->getNumSuccessors() == 1) {
     assert(MiddleVPBB->getSingleSuccessor() == Plan.getScalarPreheader() &&
            "must have ScalarPH as single successor");
+    return;
+  }
+  // Keep an existing middle block check. Only uncountable early exits with
+  // side-effects create one, comparing against the trip count the IV reached
+  // when leaving the vector loop.
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  auto *LatchVPBB = LoopRegion->getExitingBasicBlock();
+  if (!MiddleVPBB->empty() && match(&MiddleVPBB->back(), m_BranchOnCond())) {
+    assert(match(LatchVPBB->getTerminator(), m_BranchOnTwoConds()) &&
+           "only uncountable early exit handling creates a middle block check");
     return;
   }
 
@@ -1357,13 +1367,13 @@ void VPlanTransforms::addMiddleCheck(VPlan &Plan) {
   // the corresponding compare because they may have ended up with different
   // line numbers and we want to avoid awkward line stepping while debugging.
   // E.g., if the compare has got a line number inside the loop.
-  auto *LatchVPBB = cast<VPBasicBlock>(MiddleVPBB->getSinglePredecessor());
   DebugLoc LatchDL = LatchVPBB->getTerminator()->getDebugLoc();
   VPBuilder Builder(MiddleVPBB);
   VPValue *TC =
       vputils::getOrCreateVPValueForSCEVExpr(Plan, Plan.getTripCount());
-  VPValue *Cmp = Builder.createICmp(
-      CmpInst::ICMP_EQ, TC, &Plan.getVectorTripCount(), LatchDL, "cmp.n");
+  VPValue *Cmp =
+      Builder.createICmp(CmpInst::ICMP_EQ, TC,
+                         &LoopRegion->getVectorTripCount(), LatchDL, "cmp.n");
   Builder.createNaryOp(VPInstruction::BranchOnCond, {Cmp}, LatchDL);
 }
 

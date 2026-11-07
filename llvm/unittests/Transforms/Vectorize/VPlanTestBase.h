@@ -112,10 +112,11 @@ protected:
                                                    AC.get(), *Style);
     } else
       VPlanTransforms::handleCountableEarlyExits(*Plan);
-    VPlanTransforms::addMiddleCheck(*Plan);
 
-    if (CreateLoopRegions)
+    if (CreateLoopRegions) {
       VPlanTransforms::createLoopRegions(*Plan, {});
+      VPlanTransforms::addMiddleCheck(*Plan);
+    }
     return Plan;
   }
 };

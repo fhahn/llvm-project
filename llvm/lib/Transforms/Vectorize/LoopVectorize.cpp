@@ -6259,8 +6259,6 @@ LoopVectorizationPlanner::tryToBuildVPlan1(LoopVectorizationCostModel &PlanCM) {
                       OptForSize, SCEVCheckThreshold, ORE, OrigLoop))
     return nullptr;
 
-  RUN_VPLAN_PASS(VPlanTransforms::addMiddleCheck, *VPlan0);
-
   // If we're vectorizing a loop with an uncountable exit, make sure that the
   // recipes are safe to handle.
   // TODO: Remove this once we can properly check the VPlan itself for the
@@ -6283,6 +6281,7 @@ LoopVectorizationPlanner::tryToBuildVPlan1(LoopVectorizationCostModel &PlanCM) {
 
   RUN_VPLAN_PASS(VPlanTransforms::createLoopRegions, *VPlan0,
                  getDebugLocFromInstOrOperands(Legal->getPrimaryInduction()));
+  RUN_VPLAN_PASS(VPlanTransforms::addMiddleCheck, *VPlan0);
   if (PlanCM.foldTailByMasking())
     RUN_VPLAN_PASS(VPlanTransforms::foldTailByMasking, *VPlan0);
 

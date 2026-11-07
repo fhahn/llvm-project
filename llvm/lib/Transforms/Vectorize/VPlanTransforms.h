@@ -177,7 +177,8 @@ struct VPlanTransforms {
   static void createInLoopReductionRecipes(VPlan &Plan, ElementCount MinVF);
 
   /// If a check is needed to guard executing the scalar epilogue loop, it will
-  /// be added to the middle block.
+  /// be added to the middle block. Must run after createLoopRegions. A middle
+  /// block already terminated by a BranchOnCond is left unchanged.
   LLVM_ABI_FOR_TEST static void addMiddleCheck(VPlan &Plan);
 
   // Create a check in \p CheckBlock to see if the vector loop should be
@@ -409,7 +410,9 @@ struct VPlanTransforms {
   /// Update \p Plan to account for uncountable early exits by introducing
   /// appropriate branching logic in the latch that handles early exits and the
   /// latch exit condition. Multiple exits are handled with a dispatch block
-  /// that determines which exit to take based on lane-by-lane semantics.
+  /// that determines which exit to take based on lane-by-lane semantics. For
+  /// UncountableExitStyle::MaskedHandleExitInScalarLoop, also terminates the
+  /// middle block with its own check.
   LLVM_ABI_FOR_TEST static bool
   handleUncountableEarlyExits(VPlan &Plan, OptimizationRemarkEmitter *ORE,
                               Loop *TheLoop, PredicatedScalarEvolution &PSE,

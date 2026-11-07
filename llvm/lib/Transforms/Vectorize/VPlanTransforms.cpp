@@ -3498,15 +3498,13 @@ static bool handleUncountableExitsWithSideEffects(
         cast<VPInstruction>(&R)->addMask(Mask);
       }
 
-  // Update middle block branch to compare (IV + however many lanes were active)
-  // against the full trip count, since we may be exiting the vector loop early.
-  // If we didn't take an early exit, we should get the equivalent of VF from
-  // the FirstActiveLane.
-  assert(match(MiddleVPBB->getTerminator(), m_BranchOnCond()) &&
-         "Expected BranchOnCond terminator for MiddleVPBB");
-  // The trip count may be wider than the IV; compute the exit IV in its type,
-  // as it may be one past the largest IV value.
-  VPBuilder MiddleBuilder(MiddleVPBB->getTerminator());
+  // Branch in the middle block on comparing (IV + however many lanes were
+  // active) against the full trip count, since we may be exiting the vector
+  // loop early. If we didn't take an early exit, we should get the equivalent
+  // of VF from the FirstActiveLane. The trip count may be wider than the IV;
+  // compute the exit IV in its type, as it may be one past the largest IV
+  // value.
+  VPBuilder MiddleBuilder(MiddleVPBB);
   Type *IVScalarTy = IV->getScalarType();
   Type *TCTy = Plan.getTripCount()->getType();
   VPValue *Zero = Plan.getZero(IVScalarTy);
@@ -3520,7 +3518,8 @@ static bool handleUncountableExitsWithSideEffects(
   VPValue *TC =
       vputils::getOrCreateVPValueForSCEVExpr(Plan, Plan.getTripCount());
   VPValue *FullTC = MiddleBuilder.createICmp(CmpInst::ICMP_EQ, ExitIV, TC);
-  MiddleVPBB->getTerminator()->setOperand(0, FullTC);
+  MiddleBuilder.createNaryOp(VPInstruction::BranchOnCond, {FullTC},
+                             LatchVPBB->getTerminator()->getDebugLoc());
 
   // Update resume phi in scalar.ph.
   VPBasicBlock *ScalarPH = Plan.getScalarPreheader();

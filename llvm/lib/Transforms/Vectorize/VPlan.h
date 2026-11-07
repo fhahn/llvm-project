@@ -5193,11 +5193,6 @@ public:
   /// Returns VF * UF, while there is no vector loop region.
   VPSymbolicValue &getVFxUF() { return getLoopParams().getVFxUF(); }
 
-  /// Returns the vector trip count, while there is no vector loop region.
-  VPSymbolicValue &getVectorTripCount() {
-    return getLoopParams().getVectorTripCount();
-  }
-
   LLVMContext &getContext() const {
     return getScalarHeader()->getIRBasicBlock()->getContext();
   }
