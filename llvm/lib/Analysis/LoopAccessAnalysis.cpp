@@ -504,12 +504,6 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
   const PointerInfo *Src = &Pointers[CGI.Members[0]];
   const PointerInfo *Sink = &Pointers[CGJ.Members[0]];
 
-  // If either pointer is read and written, multiple checks may be needed. Bail
-  // out.
-  if (!DC.getOrderForAccess(Src->PointerValue, !Src->IsWritePtr).empty() ||
-      !DC.getOrderForAccess(Sink->PointerValue, !Sink->IsWritePtr).empty())
-    return false;
-
   ArrayRef<unsigned> AccSrc =
       DC.getOrderForAccess(Src->PointerValue, Src->IsWritePtr);
   ArrayRef<unsigned> AccSink =
@@ -519,8 +513,20 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
   if (AccSrc.size() != 1 || AccSink.size() != 1)
     return false;
 
+  // If both pointers are read and written, there is no single src/sink order
+  // and dependences may exist in both directions. Check the absolute
+  // pointer-difference in that case. If only one of them is read and written,
+  // multiple checks may be needed. Bail out.
+  bool SrcIsReadWrite =
+      !DC.getOrderForAccess(Src->PointerValue, !Src->IsWritePtr).empty();
+  bool SinkIsReadWrite =
+      !DC.getOrderForAccess(Sink->PointerValue, !Sink->IsWritePtr).empty();
+  if (SrcIsReadWrite != SinkIsReadWrite)
+    return false;
+  bool CheckBothDirections = SrcIsReadWrite;
+
   // If the sink is accessed before src, swap src/sink.
-  if (AccSink[0] < AccSrc[0])
+  if (!CheckBothDirections && AccSink[0] < AccSrc[0])
     std::swap(Src, Sink);
 
   const SCEVConstant *Step;
@@ -535,18 +541,20 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
                                  m_SpecificLoop(InnerLoop))))
     return false;
 
-  SmallVector<Instruction *, 4> SrcInsts =
-      DC.getInstructionsForAccess(Src->PointerValue, Src->IsWritePtr);
-  SmallVector<Instruction *, 4> SinkInsts =
-      DC.getInstructionsForAccess(Sink->PointerValue, Sink->IsWritePtr);
-  Type *SrcTy = getLoadStoreType(SrcInsts[0]);
-  Type *DstTy = getLoadStoreType(SinkInsts[0]);
-  if (isa<ScalableVectorType>(SrcTy) || isa<ScalableVectorType>(DstTy))
-    return false;
-
+  // Use the largest type accessed through either pointer.
   const DataLayout &DL = InnerLoop->getHeader()->getDataLayout();
-  unsigned AllocSize =
-      std::max(DL.getTypeAllocSize(SrcTy), DL.getTypeAllocSize(DstTy));
+  unsigned AllocSize = 0;
+  for (const PointerInfo *PI : {Src, Sink}) {
+    for (bool IsWrite : {false, true}) {
+      for (Instruction *I :
+           DC.getInstructionsForAccess(PI->PointerValue, IsWrite)) {
+        Type *Ty = getLoadStoreType(I);
+        if (isa<ScalableVectorType>(Ty))
+          return false;
+        AllocSize = std::max<unsigned>(AllocSize, DL.getTypeAllocSize(Ty));
+      }
+    }
+  }
 
   // Only matching constant steps matching the AllocSize are supported at the
   // moment. This simplifies the difference computation. Can be extended in the
@@ -590,7 +598,8 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
                     << "SrcStart: " << *SrcStartInt << '\n'
                     << "SinkStartInt: " << *SinkStartInt << '\n');
   DiffChecks.emplace_back(SrcStartInt, SinkStartInt, AllocSize,
-                          Src->NeedsFreeze || Sink->NeedsFreeze);
+                          Src->NeedsFreeze || Sink->NeedsFreeze,
+                          CheckBothDirections);
   return true;
 }
 

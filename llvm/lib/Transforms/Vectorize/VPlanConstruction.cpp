@@ -1656,7 +1656,8 @@ static VPValue *createDiffRuntimeChecks(VPlan &Plan, VPBuilder &Builder,
   // re-using redundant compares.
   SmallDenseSet<std::pair<const SCEV *, const SCEV *>, 8> SeenCompares;
   VPValue *Cond = Plan.getFalse();
-  for (const auto &[SrcStart, SinkStart, AccessSize, NeedsFreeze] : Checks) {
+  for (const auto &[SrcStart, SinkStart, AccessSize, NeedsFreeze,
+                    CheckBothDirections] : Checks) {
     assert(UF * AccessSize > 0 &&
            "Threshold must be non-zero to use diff-check");
     Type *Ty = SinkStart->getType();
@@ -1664,20 +1665,29 @@ static VPValue *createDiffRuntimeChecks(VPlan &Plan, VPBuilder &Builder,
     const SCEV *ThresholdMinusOneSCEV =
         SE.getMinusSCEV(TotalAccessSize, SE.getOne(Ty));
     const SCEV *DiffSCEV = SE.getMinusSCEV(SinkStart, SrcStart);
+    const SCEV *LHSSCEV = DiffSCEV;
+    const SCEV *RHSSCEV = ThresholdMinusOneSCEV;
+    if (CheckBothDirections) {
+      // Use (Diff + (Threshold - 1)) <u (2 * Threshold - 1), equivalent to
+      // -Threshold < Diff < Threshold.
+      LHSSCEV = SE.getAddExpr(DiffSCEV, ThresholdMinusOneSCEV);
+      RHSSCEV = SE.getAddExpr(TotalAccessSize, ThresholdMinusOneSCEV);
+    }
 
     // If the same compare has already been created earlier, there is no need to
     // check it again.
-    if (!SeenCompares.insert({DiffSCEV, ThresholdMinusOneSCEV}).second)
+    if (!SeenCompares.insert({LHSSCEV, RHSSCEV}).second)
       continue;
 
-    VPValue *ThresholdMinusOne = Expander.expand(ThresholdMinusOneSCEV);
-    VPValue *Diff = Expander.expand(DiffSCEV);
-    // Use (Diff - 1) <u (Threshold - 1), equivalent to 0 <u Diff <u Threshold,
-    // to exclude Diff == 0 (equal pointers are safe).
-    VPValue *DiffMinusOne =
-        Builder.createSub(Diff, Plan.getConstantInt(Ty, 1), DL);
-    VPValue *IsConflict = Builder.createICmp(
-        CmpInst::ICMP_ULT, DiffMinusOne, ThresholdMinusOne, DL, "diff.check");
+    VPValue *RHS = Expander.expand(RHSSCEV);
+    VPValue *LHS = Expander.expand(LHSSCEV);
+    // For one-directional checks, use (Diff - 1) <u (Threshold - 1),
+    // equivalent to 0 <u Diff <u Threshold, to exclude Diff == 0 (equal
+    // pointers are safe).
+    if (!CheckBothDirections)
+      LHS = Builder.createSub(LHS, Plan.getConstantInt(Ty, 1), DL);
+    VPValue *IsConflict =
+        Builder.createICmp(CmpInst::ICMP_ULT, LHS, RHS, DL, "diff.check");
     if (NeedsFreeze)
       IsConflict = Builder.createFreeze(IsConflict, DL, "diff.check.fr");
     Cond = Builder.createOr(Cond, IsConflict, DL, "conflict.rdx");

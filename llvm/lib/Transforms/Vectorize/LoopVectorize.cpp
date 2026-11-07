@@ -768,6 +768,12 @@ public:
     if (!DiffChecks || DiffChecks->empty())
       return;
 
+    // The alias mask only handles dependences from source to sink.
+    if (any_of(*DiffChecks, [](const PointerDiffInfo &Check) {
+          return Check.CheckBothDirections;
+        }))
+      return;
+
     [[maybe_unused]] auto HasPointerArgs = [](CallBase *CB) {
       return any_of(CB->args(), [](Value const *Arg) {
         return Arg->getType()->isPointerTy();

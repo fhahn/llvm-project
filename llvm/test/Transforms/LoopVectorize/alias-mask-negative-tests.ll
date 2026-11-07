@@ -146,14 +146,8 @@ define void @read_modify_write_both_pointers(ptr %x, i64 %s, i64 %n) {
 ; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[S]], 2
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP0]]
-; CHECK-NEXT:    [[TMP2:%.*]] = shl i64 [[N]], 2
-; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[TMP2]], [[TMP0]]
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP3]]
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP2]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP1]], [[TMP5]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[X]], [[TMP4]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 15, [[TMP0]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP1]], 31
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_RND_UP:%.*]] = add i64 [[N]], 3
@@ -170,16 +164,16 @@ define void @read_modify_write_both_pointers(ptr %x, i64 %s, i64 %n) {
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i32, ptr [[X]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = add nsw i64 [[INDEX]], [[S]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i32, ptr [[X]], i64 [[TMP9]]
-; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <4 x i32> @llvm.masked.load.v4i32.p0(ptr align 4 [[TMP8]], <4 x i1> [[TMP7]], <4 x i32> poison), !alias.scope [[META11:![0-9]+]]
-; CHECK-NEXT:    [[WIDE_MASKED_LOAD3:%.*]] = call <4 x i32> @llvm.masked.load.v4i32.p0(ptr align 4 [[TMP10]], <4 x i1> [[TMP7]], <4 x i32> poison), !alias.scope [[META14:![0-9]+]], !noalias [[META11]]
+; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <4 x i32> @llvm.masked.load.v4i32.p0(ptr align 4 [[TMP8]], <4 x i1> [[TMP7]], <4 x i32> poison)
+; CHECK-NEXT:    [[WIDE_MASKED_LOAD3:%.*]] = call <4 x i32> @llvm.masked.load.v4i32.p0(ptr align 4 [[TMP10]], <4 x i1> [[TMP7]], <4 x i32> poison)
 ; CHECK-NEXT:    [[TMP11:%.*]] = add <4 x i32> [[WIDE_MASKED_LOAD]], [[WIDE_MASKED_LOAD3]]
-; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[TMP11]], ptr align 4 [[TMP10]], <4 x i1> [[TMP7]]), !alias.scope [[META14]], !noalias [[META11]]
+; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[TMP11]], ptr align 4 [[TMP10]], <4 x i1> [[TMP7]])
 ; CHECK-NEXT:    [[TMP12:%.*]] = sub <4 x i32> [[WIDE_MASKED_LOAD]], [[WIDE_MASKED_LOAD3]]
-; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[TMP12]], ptr align 4 [[TMP8]], <4 x i1> [[TMP7]]), !alias.scope [[META11]]
+; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[TMP12]], ptr align 4 [[TMP8]], <4 x i1> [[TMP7]])
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i64> [[VEC_IND]], splat (i64 4)
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br [[EXIT:label %.*]]
 ; CHECK:       [[SCALAR_PH]]:

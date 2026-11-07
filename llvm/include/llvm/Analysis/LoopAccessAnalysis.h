@@ -545,11 +545,16 @@ struct PointerDiffInfo {
   const SCEV *SinkStart;
   unsigned AccessSize;
   bool NeedsFreeze;
+  /// If true, both pointers are read and written, so there is no single
+  /// source/sink order and dependences may exist in both directions. The
+  /// absolute pointer-difference must be checked.
+  bool CheckBothDirections;
 
   PointerDiffInfo(const SCEV *SrcStart, const SCEV *SinkStart,
-                  unsigned AccessSize, bool NeedsFreeze)
+                  unsigned AccessSize, bool NeedsFreeze,
+                  bool CheckBothDirections)
       : SrcStart(SrcStart), SinkStart(SinkStart), AccessSize(AccessSize),
-        NeedsFreeze(NeedsFreeze) {}
+        NeedsFreeze(NeedsFreeze), CheckBothDirections(CheckBothDirections) {}
 };
 
 /// Holds information about the memory runtime legality checks to verify
@@ -627,7 +632,8 @@ public:
   // Returns an optional list of (pointer-difference expressions, access size)
   // pairs that can be used to prove that there are no vectorization-preventing
   // dependencies at runtime. There are is a vectorization-preventing dependency
-  // if any pointer-difference is <u VF * InterleaveCount * access size. Returns
+  // if any pointer-difference is <u VF * InterleaveCount * access size (or its
+  // absolute value is, for checks with CheckBothDirections). Returns
   // std::nullopt if pointer-difference checks cannot be used.
   std::optional<ArrayRef<PointerDiffInfo>> getDiffChecks() const {
     if (!CanUseDiffCheck)

@@ -1205,14 +1205,8 @@ define void @read_modify_write_both_pointers(ptr %x, i64 %s, i64 %n, float %c, f
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[S]], 2
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP0]]
-; CHECK-NEXT:    [[TMP2:%.*]] = shl i64 [[N]], 2
-; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[TMP2]], [[TMP0]]
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP3]]
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP2]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP1]], [[TMP5]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[X]], [[TMP4]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 15, [[TMP0]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP1]], 31
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
 ;
 entry:
@@ -1252,19 +1246,9 @@ define void @read_modify_write_both_pointers_reverse(ptr %x, i64 %s, i64 %n, flo
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP2]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[S]], [[TMP1]]
-; CHECK-NEXT:    [[TMP4:%.*]] = shl i64 [[TMP3]], 2
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP4]]
-; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[N]], [[S]]
-; CHECK-NEXT:    [[TMP7:%.*]] = shl i64 [[TMP6]], 2
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP7]]
-; CHECK-NEXT:    [[TMP9:%.*]] = shl i64 [[TMP1]], 2
-; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP9]]
-; CHECK-NEXT:    [[TMP11:%.*]] = shl i64 [[N]], 2
-; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP11]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP5]], [[TMP12]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[TMP10]], [[TMP8]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[TMP3:%.*]] = shl i64 [[S]], 2
+; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[TMP3]], 15
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP4]], 31
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
 ;
 entry:

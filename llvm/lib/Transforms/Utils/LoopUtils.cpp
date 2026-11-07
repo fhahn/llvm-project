@@ -2291,28 +2291,40 @@ Value *llvm::addDiffRuntimeChecks(Instruction *Loc,
   // Map to keep track of created compares, The key is the pair of operands for
   // the compare, to allow detecting and re-using redundant compares.
   DenseMap<std::pair<Value *, Value *>, Value *> SeenCompares;
-  for (const auto &[SrcStart, SinkStart, AccessSize, NeedsFreeze] : Checks) {
+  for (const auto &[SrcStart, SinkStart, AccessSize, NeedsFreeze,
+                    CheckBothDirections] : Checks) {
     assert(IC * AccessSize > 0 &&
            "Threshold must be non-zero to use diff-check");
     Type *Ty = SinkStart->getType();
     const SCEV *TotalAccessSize = SE.getElementCount(Ty, VF * IC * AccessSize);
-    Value *ThresholdMinusOne = Expander.expandCodeFor(
-        SE.getMinusSCEV(TotalAccessSize, SE.getConstant(Ty, 1)), Ty, Loc);
-    Value *Diff =
-        Expander.expandCodeFor(SE.getMinusSCEV(SinkStart, SrcStart), Ty, Loc);
+    const SCEV *ThresholdMinusOneSCEV =
+        SE.getMinusSCEV(TotalAccessSize, SE.getConstant(Ty, 1));
+    const SCEV *DiffSCEV = SE.getMinusSCEV(SinkStart, SrcStart);
+    const SCEV *LHSSCEV = DiffSCEV;
+    const SCEV *RHSSCEV = ThresholdMinusOneSCEV;
+    if (CheckBothDirections) {
+      // Use (Diff + (Threshold - 1)) <u (2 * Threshold - 1), equivalent to
+      // -Threshold < Diff < Threshold.
+      LHSSCEV = SE.getAddExpr(DiffSCEV, ThresholdMinusOneSCEV);
+      RHSSCEV = SE.getAddExpr(TotalAccessSize, ThresholdMinusOneSCEV);
+    }
+    Value *RHS = Expander.expandCodeFor(RHSSCEV, Ty, Loc);
+    Value *LHS = Expander.expandCodeFor(LHSSCEV, Ty, Loc);
 
     // Check if the same compare has already been created earlier. In that case,
     // there is no need to check it again.
-    Value *IsConflict = SeenCompares.lookup({Diff, ThresholdMinusOne});
+    Value *IsConflict = SeenCompares.lookup({LHS, RHS});
     if (IsConflict)
       continue;
 
-    // Use (Diff - 1) <u (Threshold - 1), equivalent to 0 < Diff <u Threshold,
-    // to exclude Diff == 0 (equal pointers are safe).
-    IsConflict = ChkBuilder.CreateICmpULT(
-        ChkBuilder.CreateSub(Diff, ConstantInt::get(Ty, 1)), ThresholdMinusOne,
-        "diff.check");
-    SeenCompares.insert({{Diff, ThresholdMinusOne}, IsConflict});
+    // For one-directional checks, use (Diff - 1) <u (Threshold - 1),
+    // equivalent to 0 < Diff <u Threshold, to exclude Diff == 0 (equal pointers
+    // are safe).
+    Value *CmpLHS = CheckBothDirections
+                        ? LHS
+                        : ChkBuilder.CreateSub(LHS, ConstantInt::get(Ty, 1));
+    IsConflict = ChkBuilder.CreateICmpULT(CmpLHS, RHS, "diff.check");
+    SeenCompares.insert({{LHS, RHS}, IsConflict});
     if (NeedsFreeze)
       IsConflict =
           ChkBuilder.CreateFreeze(IsConflict, IsConflict->getName() + ".fr");
