@@ -48,7 +48,7 @@ addModuleFlags(Module &M,
 static bool runCGProfilePass(Module &M, FunctionAnalysisManager &FAM,
                              bool InLTO) {
   MapVector<std::pair<Function *, Function *>, uint64_t> Counts;
-  InstrProfSymtab Symtab;
+  std::optional<InstrProfSymtab> Symtab;
   auto UpdateCounts = [&](TargetTransformInfo &TTI, Function *F,
                           Function *CalledF, uint64_t NewCount) {
     if (NewCount == 0)
@@ -59,8 +59,6 @@ static bool runCGProfilePass(Module &M, FunctionAnalysisManager &FAM,
     uint64_t &Count = Counts[std::make_pair(F, CalledF)];
     Count = SaturatingAdd(Count, NewCount);
   };
-  // Ignore error here.  Indirect calls are ignored if this fails.
-  consumeError(Symtab.create(M, InLTO));
   for (auto &F : M) {
     // Avoid extra cost of running passes for BFI when the function doesn't have
     // entry count.
@@ -79,8 +77,11 @@ static bool runCGProfilePass(Module &M, FunctionAnalysisManager &FAM,
           uint64_t TotalC;
           auto ValueData =
               getValueProfDataFromInst(CB, IPVK_IndirectCallTarget, 8, TotalC);
+          // Build the symbol table on first use and ignore errors.
+          if (!ValueData.empty() && !Symtab)
+            consumeError(Symtab.emplace().create(M, InLTO));
           for (const auto &VD : ValueData)
-            UpdateCounts(TTI, &F, Symtab.getFunction(VD.Value), VD.Count);
+            UpdateCounts(TTI, &F, Symtab->getFunction(VD.Value), VD.Count);
           continue;
         }
         UpdateCounts(TTI, &F, CB.getCalledFunction(), *BBCount);
