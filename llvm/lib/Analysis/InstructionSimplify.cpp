@@ -5328,7 +5328,6 @@ static Value *simplifyGEPInst(Type *SrcTy, Value *Ptr,
     return Ptr;
 
   // Compute the (pointer) type returned by the GEP instruction.
-  Type *LastType = GetElementPtrInst::getIndexedType(SrcTy, Indices);
   Type *GEPTy = Ptr->getType();
   if (!GEPTy->isVectorTy()) {
     for (Value *Op : Indices) {
@@ -5364,9 +5363,10 @@ static Value *simplifyGEPInst(Type *SrcTy, Value *Ptr,
     if (!IsScalableVec && Ty->isSized()) {
       Value *P;
       uint64_t C;
-      uint64_t TyAllocSize = Q.DL.getTypeAllocSize(Ty);
       // getelementptr P, N -> P if P points to a type of zero size.
-      if (TyAllocSize == 0 && Ptr->getType() == GEPTy)
+      // Integer types are never zero-sized, so skip the size query for them.
+      if (!Ty->isIntegerTy() && Ptr->getType() == GEPTy &&
+          Q.DL.getTypeAllocSize(Ty) == 0)
         return Ptr;
 
       // The following transforms are only safe if the ptrtoint cast
@@ -5377,6 +5377,7 @@ static Value *simplifyGEPInst(Type *SrcTy, Value *Ptr,
                        Operator::getOpcode(Indices[0])) &&
           Indices[0]->getType()->getScalarSizeInBits() >=
               Q.DL.getAddressSizeInBits(AS)) {
+        uint64_t TyAllocSize = Q.DL.getTypeAllocSize(Ty);
         auto CanSimplify = [GEPTy, &P, Ptr]() -> bool {
           return P->getType() == GEPTy &&
                  getUnderlyingObject(P) == getUnderlyingObject(Ptr);
@@ -5413,7 +5414,9 @@ static Value *simplifyGEPInst(Type *SrcTy, Value *Ptr,
   Value *PtrOp;
   bool IsNeg = match(Indices.back(), m_Neg(m_PtrToInt(m_Value(PtrOp))));
   if ((IsNeg || match(Indices.back(), m_Not(m_PtrToInt(m_Value(PtrOp))))) &&
-      !IsScalableVec && Q.DL.getTypeAllocSize(LastType) == 1 &&
+      !IsScalableVec &&
+      Q.DL.getTypeAllocSize(
+          GetElementPtrInst::getIndexedType(SrcTy, Indices)) == 1 &&
       all_of(Indices.drop_back(1), match_fn(m_Zero()))) {
     unsigned IdxWidth =
         Q.DL.getIndexSizeInBits(Ptr->getType()->getPointerAddressSpace());
