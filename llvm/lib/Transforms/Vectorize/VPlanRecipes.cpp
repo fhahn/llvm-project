@@ -4273,8 +4273,15 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
     bool IsLoad = UI->getOpcode() == Instruction::Load;
     const VPValue *PtrOp = getOperand(!IsLoad);
     const SCEV *PtrSCEV = getAddressAccessSCEV(PtrOp, Ctx.PSE, Ctx.L);
-    if (isa_and_nonnull<SCEVCouldNotCompute>(PtrSCEV))
-      break;
+    if (isa_and_nonnull<SCEVCouldNotCompute>(PtrSCEV)) {
+      // The address SCEV only matters for the address computation cost of
+      // vector pointers. Single scalars use a scalar pointer; there is no need
+      // to fall back to the legacy cost model, which uses the cost of the
+      // original, scalarized memory operation for VF.
+      if (!isSingleScalar())
+        break;
+      PtrSCEV = nullptr;
+    }
 
     Type *ValTy = (IsLoad ? this : getOperand(0))->getScalarType();
     Type *ScalarPtrTy = PtrOp->getScalarType();
