@@ -220,6 +220,9 @@ TypeSize Type::getPrimitiveSizeInBits() const {
 }
 
 unsigned Type::getScalarSizeInBits() const {
+  // Integers are the common case, skip the switch in getPrimitiveSizeInBits.
+  if (auto *ITy = dyn_cast<IntegerType>(this))
+    return ITy->getBitWidth();
   // It is safe to assume that the scalar types have a fixed size.
   return getScalarType()->getPrimitiveSizeInBits().getFixedValue();
 }
