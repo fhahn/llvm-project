@@ -47,14 +47,14 @@ private:
   /// Storage for register unit liveness.
   LivePhysRegs LiveRegSet;
 
-  ReachingDefInfo *RDI = nullptr;
+  function_ref<ReachingDefInfo *()> GetRDI;
 
   /// True if the pass insert instructions or updates registers, false
   /// otherwise.
   bool Changed = false;
 
 public:
-  BreakFalseDeps(ReachingDefInfo *RDI) : RDI(RDI) {}
+  BreakFalseDeps(function_ref<ReachingDefInfo *()> GetRDI) : GetRDI(GetRDI) {}
 
   bool run(MachineFunction &CurMF);
 
@@ -168,7 +168,7 @@ bool BreakFalseDeps::pickBestRegisterForUndef(MachineInstr *MI, unsigned OpIdx,
   MCRegister MaxClearanceReg = OriginalReg;
   ArrayRef<MCPhysReg> Order = RegClassInfo.getOrder(OpRC);
   for (MCPhysReg Reg : Order) {
-    unsigned Clearance = RDI->getClearance(MI, Reg);
+    unsigned Clearance = GetRDI()->getClearance(MI, Reg);
     if (Clearance <= MaxClearance)
       continue;
     MaxClearance = Clearance;
@@ -190,7 +190,7 @@ bool BreakFalseDeps::pickBestRegisterForUndef(MachineInstr *MI, unsigned OpIdx,
 bool BreakFalseDeps::shouldBreakDependence(MachineInstr *MI, unsigned OpIdx,
                                            unsigned Pref) {
   MCRegister Reg = MI->getOperand(OpIdx).getReg().asMCReg();
-  unsigned Clearance = RDI->getClearance(MI, Reg);
+  unsigned Clearance = GetRDI()->getClearance(MI, Reg);
   LLVM_DEBUG(dbgs() << "Clearance: " << Clearance << ", want " << Pref);
 
   if (Pref > Clearance) {
@@ -323,8 +323,10 @@ bool BreakFalseDepsLegacy::runOnMachineFunction(MachineFunction &MF) {
   if (skipFunction(MF.getFunction()))
     return false;
 
-  ReachingDefInfo *RDI = &getAnalysis<ReachingDefInfoWrapperPass>().getRDI();
-  BreakFalseDeps Impl(RDI);
+  auto GetRDI = [&]() {
+    return &getAnalysis<ReachingDefInfoWrapperPass>().getRDI();
+  };
+  BreakFalseDeps Impl(GetRDI);
   return Impl.run(MF);
 }
 
@@ -332,8 +334,8 @@ PreservedAnalyses
 BreakFalseDepsPass::run(MachineFunction &MF,
                         MachineFunctionAnalysisManager &MFAM) {
   MFPropsModifier _(*this, MF);
-  ReachingDefInfo *RDI = &MFAM.getResult<ReachingDefAnalysis>(MF);
-  if (BreakFalseDeps(RDI).run(MF)) {
+  auto GetRDI = [&]() { return &MFAM.getResult<ReachingDefAnalysis>(MF); };
+  if (BreakFalseDeps(GetRDI).run(MF)) {
     PreservedAnalyses PA = getMachineFunctionPassPreservedAnalyses();
     PA.preserveSet<CFGAnalyses>();
     return PA;
