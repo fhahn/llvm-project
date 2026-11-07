@@ -41,7 +41,7 @@ class ExecutionDomainFixImpl {
   using OutRegsInfoMap = SmallVector<LiveRegsDVInfo, 4>;
   OutRegsInfoMap MBBOutRegsInfos;
 
-  ReachingDefInfo *RDI = nullptr;
+  function_ref<ReachingDefInfo *()> GetRDI;
 
 public:
   bool runOnMachineFunction(MachineFunction &MF,
@@ -378,6 +378,10 @@ void ExecutionDomainFixImpl::visitHardInstr(MachineInstr *mi, unsigned domain) {
 }
 
 void ExecutionDomainFixImpl::visitSoftInstr(MachineInstr *mi, unsigned mask) {
+  // Only soft instructions read reaching definitions. Compute them before the
+  // first domain change, which can rewrite or insert instructions.
+  ReachingDefInfo *RDI = GetRDI();
+
   // Bitmask of available domains for this instruction after taking collapsed
   // operands into account.
   unsigned available = mask;
@@ -535,7 +539,7 @@ bool ExecutionDomainFixImpl::runOnMachineFunction(
   if (!anyregs)
     return false;
 
-  RDI = GetRDI();
+  this->GetRDI = GetRDI;
 
   // Initialize the AliasMap on the first use.
   if (AliasMap.empty()) {
