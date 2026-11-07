@@ -816,6 +816,18 @@ bool GlobalsAAResult::invalidate(Module &, const PreservedAnalyses &PA,
   return !PAC.preservedWhenStateless();
 }
 
+/// Returns getUnderlyingObject(V->stripPointerCastsForAliasAnalysis()). Both
+/// stop at loads, arguments, allocas and global variables, so return those
+/// directly, also when they are the scalar pointer operand of a GEP.
+static const Value *getBaseObject(const Value *V) {
+  auto *GEP = dyn_cast<GEPOperator>(V);
+  const Value *Base = GEP ? GEP->getPointerOperand() : V;
+  if (isa<LoadInst, Argument, AllocaInst, GlobalVariable>(Base) &&
+      Base->getType()->isPointerTy())
+    return Base;
+  return getUnderlyingObject(V->stripPointerCastsForAliasAnalysis());
+}
+
 /// alias - If one of the pointers is to a global that we are tracking, and the
 /// other is some random pointer, we know there cannot be an alias, because the
 /// address of the global isn't taken.
@@ -823,10 +835,8 @@ AliasResult GlobalsAAResult::alias(const MemoryLocation &LocA,
                                    const MemoryLocation &LocB,
                                    AAQueryInfo &AAQI, const Instruction *CtxI) {
   // Get the base object these pointers point to.
-  const Value *UV1 =
-      getUnderlyingObject(LocA.Ptr->stripPointerCastsForAliasAnalysis());
-  const Value *UV2 =
-      getUnderlyingObject(LocB.Ptr->stripPointerCastsForAliasAnalysis());
+  const Value *UV1 = getBaseObject(LocA.Ptr);
+  const Value *UV2 = getBaseObject(LocB.Ptr);
 
   // If either of the underlying values is a global, they may be non-addr-taken
   // globals, which we can answer queries about.
