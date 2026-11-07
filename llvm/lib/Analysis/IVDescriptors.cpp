@@ -244,14 +244,12 @@ hasRequiredFastMathFlags(FPMathOperator *FPOp, RecurKind &RK) {
   case RecurKind::FMaximumNum:
     break;
 
+  // Without nnan and nsz, both maxnum/minnum and select-based min/max are
+  // modeled as FMaxNum/FMinNum, which require NaN-aware handling.
   case RecurKind::FMax:
-    if (!match(FPOp, m_Intrinsic<Intrinsic::maxnum>(m_Value(), m_Value())))
-      return std::nullopt;
     RK = RecurKind::FMaxNum;
     break;
   case RecurKind::FMin:
-    if (!match(FPOp, m_Intrinsic<Intrinsic::minnum>(m_Value(), m_Value())))
-      return std::nullopt;
     RK = RecurKind::FMinNum;
     break;
   default:

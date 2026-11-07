@@ -1813,6 +1813,11 @@ llvm::canParallelizeReductionWhenUnrolling(PHINode &Phi, Loop *L,
     return std::nullopt;
   Instruction *LatchInst =
       cast<Instruction>(Phi.getIncomingValueForBlock(Latch));
+  // Select-based FMinNum/FMaxNum reductions depend on the order of their
+  // operands for NaNs and signed zeros, so they cannot be reassociated.
+  if (RecurrenceDescriptor::isFPMinMaxNumRecurrenceKind(RK) &&
+      isa<SelectInst>(LatchInst))
+    return std::nullopt;
   // Don't unroll reductions with constant ops; those can be folded to a
   // single induction update. For calls (e.g. fmuladd or min/max
   // intrinsics), the called function is itself a Constant operand and is

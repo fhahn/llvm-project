@@ -1852,21 +1852,25 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
     if (!MinOrMaxR)
       return nullptr;
 
-    // Check that MinOrMaxR is a VPWidenIntrinsicRecipe or VPReplicateRecipe
-    // with an intrinsic that matches the reduction kind.
-    Intrinsic::ID ExpectedIntrinsicID =
-        getMinMaxReductionIntrinsicOp(RedPhiR->getRecurrenceKind());
-    if (!match(MinOrMaxR, m_Intrinsic(ExpectedIntrinsicID)))
+    // Check that MinOrMaxR is a select-based min/max, or a
+    // VPWidenIntrinsicRecipe or VPReplicateRecipe with an intrinsic that
+    // matches the reduction kind. The operands of a select-based min/max are
+    // its 2nd and 3rd operands.
+    unsigned FirstOpIdx = 0;
+    if (match(MinOrMaxR, m_Select(m_VPValue(), m_VPValue(), m_VPValue())))
+      FirstOpIdx = 1;
+    else if (!match(MinOrMaxR, m_Intrinsic(getMinMaxReductionIntrinsicOp(
+                                   RedPhiR->getRecurrenceKind()))))
       return nullptr;
 
     // MinOrMaxR must combine RedPhiR directly with the new element, as the NaN
     // check added below only covers the other operand.
     // TODO: Support multi-step min/max chains (e.g. maxnum(l, maxnum(k, phi)))
     // by checking all operands feeding the chain for NaNs.
-    if (MinOrMaxR->getOperand(0) == RedPhiR)
-      return MinOrMaxR->getOperand(1);
-    if (MinOrMaxR->getOperand(1) == RedPhiR)
-      return MinOrMaxR->getOperand(0);
+    if (MinOrMaxR->getOperand(FirstOpIdx) == RedPhiR)
+      return MinOrMaxR->getOperand(FirstOpIdx + 1);
+    if (MinOrMaxR->getOperand(FirstOpIdx + 1) == RedPhiR)
+      return MinOrMaxR->getOperand(FirstOpIdx);
     return nullptr;
   };
 
@@ -1951,6 +1955,8 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
       LatchBuilder.createNaryOp(VPInstruction::AnyOf, {AllNaNLanes});
   VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
   VPBuilder MiddleBuilder(MiddleVPBB->begin());
+  VPBuilder MiddleTermBuilder(MiddleVPBB->getTerminator());
+  VPValue *Rerun = nullptr;
   for (const auto &[RedPhiR, _] : MinOrMaxNumReductionsToHandle) {
     assert(RecurrenceDescriptor::isFPMinMaxNumRecurrenceKind(
                RedPhiR->getRecurrenceKind()) &&
@@ -1966,6 +1972,21 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
     RdxResult->setOperand(0, NewSel);
     assert(!RdxResults.contains(RdxResult) && "RdxResult already used");
     RdxResults.insert(RdxResult);
+
+    // Select-based min/max pick one of two equal operands depending on their
+    // order. Equal non-NaN values are bitwise identical, except for zeros of
+    // different signs. As the vector loop only combines non-NaN inputs, its
+    // result can only differ from the scalar one if it is +/-0, or NaN, which
+    // requires a NaN start value. In those cases, re-run all iterations in the
+    // scalar loop. Freeze the result, as it may be poison.
+    if (!match(RedPhiR->getBackedgeValue(),
+               m_Select(m_VPValue(), m_VPValue(), m_VPValue())))
+      continue;
+    VPValue *IsZeroOrNaN = MiddleTermBuilder.createFCmp(
+        CmpInst::FCMP_UEQ, MiddleTermBuilder.createFreeze(RdxResult),
+        Plan.getOrAddLiveIn(ConstantFP::getZero(RedPhiR->getScalarType())));
+    Rerun =
+        Rerun ? MiddleTermBuilder.createOr(Rerun, IsZeroOrNaN) : IsZeroOrNaN;
   }
 
   auto *LatchExitingBranch = LatchVPBB->getTerminator();
@@ -2014,8 +2035,17 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
   auto *MiddleTerm = MiddleVPBB->getTerminator();
   MiddleBuilder.setInsertPoint(MiddleTerm);
   VPValue *MiddleCond = MiddleTerm->getOperand(0);
-  VPValue *NewCond =
-      MiddleBuilder.createAnd(MiddleCond, MiddleBuilder.createNot(AnyNaNLane));
+  VPValue *ExitToScalar = AnyNaNLane;
+  if (Rerun) {
+    // Resume all scalar phis from their original start values, i.e. the
+    // incoming values when bypassing the vector loop.
+    for (auto &R : Plan.getScalarPreheader()->phis())
+      R.setOperand(0, MiddleBuilder.createSelect(Rerun, R.getOperand(1),
+                                                 R.getOperand(0)));
+    ExitToScalar = MiddleBuilder.createOr(AnyNaNLane, Rerun);
+  }
+  VPValue *NewCond = MiddleBuilder.createAnd(
+      MiddleCond, MiddleBuilder.createNot(ExitToScalar));
   MiddleTerm->setOperand(0, NewCond);
   return true;
 }
