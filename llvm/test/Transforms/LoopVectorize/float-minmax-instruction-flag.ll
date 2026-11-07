@@ -41,11 +41,8 @@ define float @minloop(ptr nocapture readonly %arg) {
 ; CHECK-NEXT:    [[TMP9:%.*]] = select i1 [[TMP6]], <4 x float> [[VEC_PHI]], <4 x float> [[TMP4]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP6]], i64 [[INDEX]], i64 65536
 ; CHECK-NEXT:    [[TMP11:%.*]] = call float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[TMP9]])
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x float> poison, float [[TMP11]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT1]], <4 x float> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP15:%.*]] = add i64 1, [[TMP10]]
-; CHECK-NEXT:    [[TMP20:%.*]] = fcmp uno <4 x float> [[BROADCAST_SPLAT2]], [[BROADCAST_SPLAT2]]
-; CHECK-NEXT:    [[TMP21:%.*]] = extractelement <4 x i1> [[TMP20]], i64 0
+; CHECK-NEXT:    [[TMP21:%.*]] = fcmp uno float [[TMP11]], [[TMP11]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = select i1 [[TMP21]], float [[T]], float [[TMP11]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = xor i1 [[TMP6]], true
 ; CHECK-NEXT:    br i1 [[TMP18]], label [[OUT:%.*]], label [[SCALAR_PH:%.*]]
@@ -123,11 +120,8 @@ define float @minloopattr(ptr nocapture readonly %arg) #0 {
 ; CHECK-NEXT:    [[TMP9:%.*]] = select i1 [[TMP6]], <4 x float> [[VEC_PHI]], <4 x float> [[TMP4]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP6]], i64 [[INDEX]], i64 65536
 ; CHECK-NEXT:    [[TMP11:%.*]] = call float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[TMP9]])
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x float> poison, float [[TMP11]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT1]], <4 x float> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP15:%.*]] = add i64 1, [[TMP10]]
-; CHECK-NEXT:    [[TMP20:%.*]] = fcmp uno <4 x float> [[BROADCAST_SPLAT2]], [[BROADCAST_SPLAT2]]
-; CHECK-NEXT:    [[TMP21:%.*]] = extractelement <4 x i1> [[TMP20]], i64 0
+; CHECK-NEXT:    [[TMP21:%.*]] = fcmp uno float [[TMP11]], [[TMP11]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = select i1 [[TMP21]], float [[T]], float [[TMP11]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = xor i1 [[TMP6]], true
 ; CHECK-NEXT:    br i1 [[TMP18]], label [[OUT:%.*]], label [[SCALAR_PH:%.*]]
@@ -207,11 +201,8 @@ define float @minloopnovec(ptr nocapture readonly %arg) {
 ; CHECK-NEXT:    [[TMP9:%.*]] = select i1 [[TMP6]], <4 x float> [[VEC_PHI]], <4 x float> [[TMP4]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP6]], i64 [[INDEX]], i64 65536
 ; CHECK-NEXT:    [[TMP11:%.*]] = call float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[TMP9]])
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x float> poison, float [[TMP11]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT1]], <4 x float> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP15:%.*]] = add i64 1, [[TMP10]]
-; CHECK-NEXT:    [[TMP20:%.*]] = fcmp uno <4 x float> [[BROADCAST_SPLAT2]], [[BROADCAST_SPLAT2]]
-; CHECK-NEXT:    [[TMP21:%.*]] = extractelement <4 x i1> [[TMP20]], i64 0
+; CHECK-NEXT:    [[TMP21:%.*]] = fcmp uno float [[TMP11]], [[TMP11]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = select i1 [[TMP21]], float [[T]], float [[TMP11]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = xor i1 [[TMP6]], true
 ; CHECK-NEXT:    br i1 [[TMP18]], label [[OUT:%.*]], label [[SCALAR_PH:%.*]]
@@ -289,11 +280,8 @@ define float @minloopmissingnsz(ptr nocapture readonly %arg) #1 {
 ; CHECK-NEXT:    [[TMP9:%.*]] = select i1 [[TMP6]], <4 x float> [[VEC_PHI]], <4 x float> [[TMP4]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP6]], i64 [[INDEX]], i64 65536
 ; CHECK-NEXT:    [[TMP11:%.*]] = call float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[TMP9]])
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x float> poison, float [[TMP11]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT1]], <4 x float> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP15:%.*]] = add i64 1, [[TMP10]]
-; CHECK-NEXT:    [[TMP20:%.*]] = fcmp uno <4 x float> [[BROADCAST_SPLAT2]], [[BROADCAST_SPLAT2]]
-; CHECK-NEXT:    [[TMP21:%.*]] = extractelement <4 x i1> [[TMP20]], i64 0
+; CHECK-NEXT:    [[TMP21:%.*]] = fcmp uno float [[TMP11]], [[TMP11]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = select i1 [[TMP21]], float [[T]], float [[TMP11]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = xor i1 [[TMP6]], true
 ; CHECK-NEXT:    br i1 [[TMP18]], label [[OUT:%.*]], label [[SCALAR_PH:%.*]]

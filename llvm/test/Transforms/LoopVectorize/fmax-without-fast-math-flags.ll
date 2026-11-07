@@ -1488,10 +1488,7 @@ define float @fmax_ogt_with_select_nan_start(ptr %src, i64 %n) {
 ; CHECK-NEXT:    [[TMP12:%.*]] = select i1 [[TMP9]], <4 x float> [[VEC_PHI]], <4 x float> [[TMP4]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = select i1 [[TMP9]], i64 [[IV]], i64 [[N_VEC]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = call float @llvm.vector.reduce.fmax.v4f32(<4 x float> [[TMP12]])
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x float> poison, float [[TMP14]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT]], <4 x float> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP16:%.*]] = fcmp uno <4 x float> [[BROADCAST_SPLAT]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP19:%.*]] = extractelement <4 x i1> [[TMP16]], i64 0
+; CHECK-NEXT:    [[TMP19:%.*]] = fcmp uno float [[TMP14]], [[TMP14]]
 ; CHECK-NEXT:    [[TMP20:%.*]] = select i1 [[TMP19]], float +qnan, float [[TMP14]]
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP23:%.*]] = xor i1 [[TMP9]], true
@@ -1566,10 +1563,7 @@ define float @fmax_ugt_with_select_nnan_nan_start(ptr %src, i64 %n) {
 ; CHECK-NEXT:    [[TMP12:%.*]] = select i1 [[TMP9]], <4 x float> [[VEC_PHI]], <4 x float> [[TMP4]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = select i1 [[TMP9]], i64 [[IV]], i64 [[N_VEC]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = call float @llvm.vector.reduce.fmax.v4f32(<4 x float> [[TMP12]])
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x float> poison, float [[TMP14]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT]], <4 x float> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP15:%.*]] = fcmp uno <4 x float> [[BROADCAST_SPLAT]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <4 x i1> [[TMP15]], i64 0
+; CHECK-NEXT:    [[TMP16:%.*]] = fcmp uno float [[TMP14]], [[TMP14]]
 ; CHECK-NEXT:    [[TMP17:%.*]] = select i1 [[TMP16]], float +qnan, float [[TMP14]]
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = xor i1 [[TMP9]], true

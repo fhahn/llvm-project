@@ -927,10 +927,7 @@ define double @fmin_olt_with_select_double_start_arg(ptr %src, double %start, i6
 ; CHECK-NEXT:    [[TMP16:%.*]] = select i1 [[TMP13]], <4 x double> [[VEC_PHI]], <4 x double> [[TMP8]]
 ; CHECK-NEXT:    [[TMP17:%.*]] = select i1 [[TMP13]], i64 [[IV]], i64 [[N_VEC]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = call double @llvm.vector.reduce.fmin.v4f64(<4 x double> [[TMP16]])
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <4 x double> poison, double [[TMP18]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <4 x double> [[BROADCAST_SPLATINSERT3]], <4 x double> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP19:%.*]] = fcmp uno <4 x double> [[BROADCAST_SPLAT4]], [[BROADCAST_SPLAT4]]
-; CHECK-NEXT:    [[TMP20:%.*]] = extractelement <4 x i1> [[TMP19]], i64 0
+; CHECK-NEXT:    [[TMP20:%.*]] = fcmp uno double [[TMP18]], [[TMP18]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = select i1 [[TMP20]], double [[START]], double [[TMP18]]
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP22:%.*]] = xor i1 [[TMP13]], true

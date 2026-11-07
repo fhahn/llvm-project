@@ -604,7 +604,7 @@ for.end:
 ; CHECK: fcmp uno <2 x float>
 ; CHECK: icmp eq <2 x i32>
 ; CHECK: call float @llvm.vector.reduce.fmax.v2f32
-; CHECK: fcmp uno <2 x float>
+; CHECK: fcmp uno float
 
 define float @max_red_float_nans(float %max) {
 entry:
@@ -630,7 +630,7 @@ for.end:
 ; CHECK: fcmp uno <2 x float>
 ; CHECK: icmp eq <2 x i32>
 ; CHECK: call float @llvm.vector.reduce.fmax.v2f32
-; CHECK: fcmp uno <2 x float>
+; CHECK: fcmp uno float
 
 define float @max_red_float_nsz(float %max) {
 entry:
