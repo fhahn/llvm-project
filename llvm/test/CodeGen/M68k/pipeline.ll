@@ -33,10 +33,6 @@
 ; CHECK-NEXT:      Scalarize Masked Memory Intrinsics
 ; CHECK-NEXT:      Expand reduction intrinsics
 ; CHECK-NEXT:      Natural Loop Information
-; CHECK-NEXT:      Cycle Info Analysis
-; CHECK-NEXT:      Post-Dominator Tree Construction
-; CHECK-NEXT:      Branch Probability Analysis
-; CHECK-NEXT:      Block Frequency Analysis
 ; CHECK-NEXT:      CodeGen Prepare
 ; CHECK-NEXT:      SJLJ Exception Handling preparation
 ; CHECK-NEXT:      Dominator Tree Construction
