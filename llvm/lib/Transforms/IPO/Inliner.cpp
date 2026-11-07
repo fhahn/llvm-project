@@ -306,11 +306,14 @@ PreservedAnalyses InlinerPass::run(LazyCallGraph::SCC &InitialC,
               .value_or(1);
 
       // Setup the data structure used to plumb customization into the
-      // `InlineFunction` routine.
+      // `InlineFunction` routine. A single block callee is folded into the
+      // call site's block, so its BFI is not needed.
       InlineFunctionInfo IFI(
           GetAssumptionCache, PSI,
           &FAM.getResult<BlockFrequencyAnalysis>(*(CB->getCaller())),
-          &FAM.getResult<BlockFrequencyAnalysis>(Callee));
+          hasSingleElement(Callee)
+              ? nullptr
+              : &FAM.getResult<BlockFrequencyAnalysis>(Callee));
 
       // For compile time reasons we try to only track inline history for the
       // calls where it may actually prevent inlining, which is inlining through
