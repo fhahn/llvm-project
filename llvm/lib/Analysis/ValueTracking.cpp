@@ -1506,11 +1506,6 @@ static void computeKnownBitsFromOperator(const Operator *I,
   KnownBits Known2(BitWidth);
   switch (I->getOpcode()) {
   default: break;
-  case Instruction::Load:
-    if (MDNode *MD =
-            Q.IIQ.getMetadata(cast<LoadInst>(I), LLVMContext::MD_range))
-      computeKnownBitsFromRangeMetadata(*MD, Known);
-    break;
   case Instruction::And:
     computeKnownBits(I->getOperand(1), DemandedElts, Known, Q, Depth + 1);
     computeKnownBits(I->getOperand(0), DemandedElts, Known2, Q, Depth + 1);
@@ -2725,9 +2720,13 @@ void computeKnownBits(const Value *V, const APInt &DemandedElts,
     return;
   }
 
-  if (const Operator *I = dyn_cast<Operator>(V))
+  // Handle loads here to avoid the large frame of computeKnownBitsFromOperator.
+  if (const auto *LI = dyn_cast<LoadInst>(V)) {
+    if (MDNode *MD = Q.IIQ.getMetadata(LI, LLVMContext::MD_range))
+      computeKnownBitsFromRangeMetadata(*MD, Known);
+  } else if (const Operator *I = dyn_cast<Operator>(V)) {
     computeKnownBitsFromOperator(I, DemandedElts, Known, Q, Depth);
-  else if (const GlobalValue *GV = dyn_cast<GlobalValue>(V)) {
+  } else if (const GlobalValue *GV = dyn_cast<GlobalValue>(V)) {
     if (std::optional<ConstantRange> CR = GV->getAbsoluteSymbolRange())
       Known = CR->toKnownBits();
   }
