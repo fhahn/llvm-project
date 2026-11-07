@@ -242,10 +242,21 @@ exit:
 define void @decreasing_udiv(ptr %a, ptr %b, i64 %N, i64 %M) {
 ; CHECK-LABEL: 'decreasing_udiv'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.b = getelementptr inbounds i8, ptr %b, i64 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.a = getelementptr inbounds i8, ptr %a, i64 %div
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %b High: (%N + %b))
+; CHECK-NEXT:            Member: {%b,+,1}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %a High: ((288230376151711744 umin (-1 + (-1 * (ptrtoaddr ptr %a to i64)))) + %a))
+; CHECK-NEXT:            Member: (({%M,+,-1}<nw><%loop> /u 64) + %a)<nuw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -555,10 +566,21 @@ exit:
 define void @offset_decreasing_udiv(ptr %a, ptr %b, i64 %N, i64 %M) {
 ; CHECK-LABEL: 'offset_decreasing_udiv'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.b = getelementptr inbounds i8, ptr %b, i64 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.a = getelementptr inbounds i8, ptr %a, i64 %off
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %b High: (%N + %b))
+; CHECK-NEXT:            Member: {%b,+,1}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: (7 + %a) High: ((288230376151711751 umin (-1 + (-1 * (ptrtoaddr ptr %a to i64)))) + %a))
+; CHECK-NEXT:            Member: (7 + ({%M,+,-1}<nw><%loop> /u 64) + %a)<nuw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
