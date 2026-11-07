@@ -105,13 +105,9 @@ struct SDNodeKey {
   const EVT *VTs;
   ArrayRef<SDValue> Ops;
   FoldingSetNodeID Tail;
-  /// Backs \p Ops when the key is built from a node; empty otherwise.  No
-  /// inline capacity: only that one path pays for the storage.
-  SmallVector<SDValue, 0> OpStorage;
 
   SDNodeKey(unsigned Opcode, SDVTList VTList, ArrayRef<SDValue> Ops)
       : Opcode(Opcode), VTs(VTList.VTs), Ops(Ops) {}
-  LLVM_ABI explicit SDNodeKey(const SDNode &N);
 
   SDNodeKey(const SDNodeKey &) = delete;
   SDNodeKey &operator=(const SDNodeKey &) = delete;
@@ -123,10 +119,18 @@ struct SDNodeKey {
   void AddPointer(const void *P) { Tail.AddPointer(P); }
 };
 
+/// The key of an existing node, whose SDUse operands are copied.  getKey
+/// returns it in place of KeyTy; it cannot be copied, so Ops stays valid.
+struct SDNodeOwnedKey : SDNodeKey {
+  SmallVector<SDValue, 8> OpStorage;
+
+  LLVM_ABI explicit SDNodeOwnedKey(const SDNode &N);
+};
+
 struct SDNodeKeyInfo {
   using KeyTy = SDNodeKey;
 
-  static KeyTy getKey(const SDNode &N) { return SDNodeKey(N); }
+  static SDNodeOwnedKey getKey(const SDNode &N) { return SDNodeOwnedKey(N); }
 
   static unsigned getHashValue(const KeyTy &Key) {
     unsigned H = detail::combineHashValue(

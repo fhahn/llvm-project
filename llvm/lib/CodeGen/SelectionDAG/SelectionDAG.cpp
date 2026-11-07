@@ -1001,8 +1001,8 @@ static void AddNodeIDCustom(FoldingSetNodeID &ID, const SDNode *N,
   }
 }
 
-SDNodeKey::SDNodeKey(const SDNode &N)
-    : Opcode(N.getOpcode()), VTs(N.getVTList().VTs),
+SDNodeOwnedKey::SDNodeOwnedKey(const SDNode &N)
+    : SDNodeKey(N.getOpcode(), N.getVTList(), {}),
       OpStorage(N.op_begin(), N.op_end()) {
   Ops = OpStorage;
   AddNodeIDCustom(Tail, &N, N.getOpcode());
