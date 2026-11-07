@@ -412,6 +412,10 @@ def : InstRW<[CyWriteVAccum, CyReadVAccum],
 def : InstRW<[CyWriteVAccum, CyReadVAccum],
              (instregex "SABAv","UABAv","SABALv","UABALv")>;
 
+// Dot products have a latency of 3, including through the accumulator.
+def : InstRW<[CyWriteV3], (instregex "^SDOT(lane)?v", "^UDOT(lane)?v",
+                                     "^USDOT(lane)?v", "^SUDOTlanev")>;
+
 def : InstRW<[CyWriteV3], (instregex "SQADDv","SQSUBv","UQADDv","UQSUBv")>;
 
 def : InstRW<[CyWriteV3], (instregex "SUQADDv","USQADDv")>;

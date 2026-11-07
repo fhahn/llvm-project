@@ -767,10 +767,10 @@
 # CHECK-NEXT:  1      2     0.33                        scvtf	v25.4h, v13.4h, #8
 # CHECK-NEXT:  1      2     0.33                        scvtf	v0.8h, v0.8h
 # CHECK-NEXT:  1      2     0.33                        scvtf	v4.8h, v8.8h, #10
-# CHECK-NEXT:  1      2     0.33                        sdot	v0.2s, v0.8b, v0.4b[2]
-# CHECK-NEXT:  1      2     0.33                        sdot	v0.2s, v0.8b, v0.8b
-# CHECK-NEXT:  1      2     0.33                        sdot	v0.4s, v0.16b, v0.16b
-# CHECK-NEXT:  1      2     0.33                        sdot	v0.4s, v0.16b, v0.4b[2]
+# CHECK-NEXT:  1      3     0.33                        sdot	v0.2s, v0.8b, v0.4b[2]
+# CHECK-NEXT:  1      3     0.33                        sdot	v0.2s, v0.8b, v0.8b
+# CHECK-NEXT:  1      3     0.33                        sdot	v0.4s, v0.16b, v0.16b
+# CHECK-NEXT:  1      3     0.33                        sdot	v0.4s, v0.16b, v0.4b[2]
 # CHECK-NEXT:  1      2     0.33                        shadd	v0.8b, v0.8b, v0.8b
 # CHECK-NEXT:  1      2     0.33                        shadd	v25.16b, v1.16b, v10.16b
 # CHECK-NEXT:  1      2     0.33                        shl	d7, d10, #12
@@ -1319,10 +1319,10 @@
 # CHECK-NEXT:  1      2     0.33                        ucvtf	v18.4h, v11.4h, #7
 # CHECK-NEXT:  1      2     0.33                        ucvtf	v0.8h, v0.8h
 # CHECK-NEXT:  1      2     0.33                        ucvtf	v22.8h, v20.8h, #10
-# CHECK-NEXT:  1      2     0.33                        udot	v0.2s, v0.8b, v0.4b[2]
-# CHECK-NEXT:  1      2     0.33                        udot	v0.2s, v0.8b, v0.8b
-# CHECK-NEXT:  1      2     0.33                        udot	v0.4s, v0.16b, v0.16b
-# CHECK-NEXT:  1      2     0.33                        udot	v0.4s, v0.16b, v0.4b[2]
+# CHECK-NEXT:  1      3     0.33                        udot	v0.2s, v0.8b, v0.4b[2]
+# CHECK-NEXT:  1      3     0.33                        udot	v0.2s, v0.8b, v0.8b
+# CHECK-NEXT:  1      3     0.33                        udot	v0.4s, v0.16b, v0.16b
+# CHECK-NEXT:  1      3     0.33                        udot	v0.4s, v0.16b, v0.4b[2]
 # CHECK-NEXT:  1      2     0.33                        uhadd	v0.16b, v0.16b, v0.16b
 # CHECK-NEXT:  1      2     0.33                        uhadd	v0.8h, v0.8h, v0.8h
 # CHECK-NEXT:  1      2     0.33                        uhsub	v12.4h, v16.4h, v28.4h
