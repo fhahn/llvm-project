@@ -2778,6 +2778,11 @@ static Constant *computePointerICmp(CmpPredicate Pred, Value *LHS, Value *RHS,
   if (CmpInst::isSigned(Pred))
     return nullptr;
 
+  // A load, argument or phi compared with null does not fold below: stripping
+  // leaves both operands as they are and no fold applies to a null operand.
+  if (isa<ConstantPointerNull>(RHS) && isa<LoadInst, Argument, PHINode>(LHS))
+    return nullptr;
+
   // We have to switch to a signed predicate to handle negative indices from
   // the base pointer.
   Pred = ICmpInst::getSignedPredicate(Pred);
