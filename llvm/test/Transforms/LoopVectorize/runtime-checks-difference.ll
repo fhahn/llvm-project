@@ -1195,3 +1195,148 @@ loop:
 exit:
   ret void
 }
+
+; Both pointers are read and written (in-place rotation of X[i] and X[i+s]).
+define void @read_modify_write_both_pointers(ptr %x, i64 %s, i64 %n, float %c, float %sn) {
+; CHECK-LABEL: define void @read_modify_write_both_pointers(
+; CHECK-SAME: ptr [[X:%.*]], i64 [[S:%.*]], i64 [[N:%.*]], float [[C:%.*]], float [[SN:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[S]], 2
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP0]]
+; CHECK-NEXT:    [[TMP2:%.*]] = shl i64 [[N]], 2
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[TMP2]], [[TMP0]]
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP3]]
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP2]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP1]], [[TMP5]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[X]], [[TMP4]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.1 = getelementptr inbounds float, ptr %x, i64 %iv
+  %iv.s = add nsw i64 %iv, %s
+  %gep.2 = getelementptr inbounds float, ptr %x, i64 %iv.s
+  %x1 = load float, ptr %gep.1, align 4
+  %x2 = load float, ptr %gep.2, align 4
+  %m1 = fmul float %sn, %x1
+  %m2 = fmul float %c, %x2
+  %r2 = fadd float %m2, %m1
+  store float %r2, ptr %gep.2, align 4
+  %m3 = fmul float %c, %x1
+  %m4 = fmul float %sn, %x2
+  %r1 = fsub float %m3, %m4
+  store float %r1, ptr %gep.1, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Same as above, but iterating backwards.
+define void @read_modify_write_both_pointers_reverse(ptr %x, i64 %s, i64 %n, float %c, float %sn) {
+; CHECK-LABEL: define void @read_modify_write_both_pointers_reverse(
+; CHECK-SAME: ptr [[X:%.*]], i64 [[S:%.*]], i64 [[N:%.*]], float [[C:%.*]], float [[SN:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add nsw i64 [[N]], -1
+; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.smin.i64(i64 [[TMP0]], i64 0)
+; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[N]], [[TMP1]]
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP2]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[S]], [[TMP1]]
+; CHECK-NEXT:    [[TMP4:%.*]] = shl i64 [[TMP3]], 2
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP4]]
+; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[N]], [[S]]
+; CHECK-NEXT:    [[TMP7:%.*]] = shl i64 [[TMP6]], 2
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP7]]
+; CHECK-NEXT:    [[TMP9:%.*]] = shl i64 [[TMP1]], 2
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP9]]
+; CHECK-NEXT:    [[TMP11:%.*]] = shl i64 [[N]], 2
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP11]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP5]], [[TMP12]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[TMP10]], [[TMP8]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ %n, %entry ], [ %iv.next, %loop ]
+  %iv.next = add nsw i64 %iv, -1
+  %gep.1 = getelementptr inbounds float, ptr %x, i64 %iv.next
+  %iv.s = add nsw i64 %iv.next, %s
+  %gep.2 = getelementptr inbounds float, ptr %x, i64 %iv.s
+  %x1 = load float, ptr %gep.1, align 4
+  %x2 = load float, ptr %gep.2, align 4
+  %m1 = fmul float %sn, %x1
+  %m2 = fmul float %c, %x2
+  %r2 = fadd float %m2, %m1
+  store float %r2, ptr %gep.2, align 4
+  %m3 = fmul float %c, %x1
+  %m4 = fmul float %sn, %x2
+  %r1 = fsub float %m3, %m4
+  store float %r1, ptr %gep.1, align 4
+  %ec = icmp sgt i64 %iv.next, 0
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; Both pointers are read and written, but one of them is also read with a wider
+; type than the step.
+define void @read_modify_write_both_pointers_wider_load(ptr %x, i64 %s, i64 %n) {
+; CHECK-LABEL: define void @read_modify_write_both_pointers_wider_load(
+; CHECK-SAME: ptr [[X:%.*]], i64 [[S:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[GEP_1:%.*]] = getelementptr inbounds i32, ptr [[X]], i64 [[IV]]
+; CHECK-NEXT:    [[IV_S:%.*]] = add nsw i64 [[IV]], [[S]]
+; CHECK-NEXT:    [[GEP_2:%.*]] = getelementptr inbounds i32, ptr [[X]], i64 [[IV_S]]
+; CHECK-NEXT:    [[X1:%.*]] = load i32, ptr [[GEP_1]], align 4
+; CHECK-NEXT:    [[X2_WIDE:%.*]] = load i64, ptr [[GEP_2]], align 4
+; CHECK-NEXT:    [[X2:%.*]] = trunc i64 [[X2_WIDE]] to i32
+; CHECK-NEXT:    [[R2:%.*]] = add i32 [[X1]], [[X2]]
+; CHECK-NEXT:    store i32 [[R2]], ptr [[GEP_2]], align 4
+; CHECK-NEXT:    [[R1:%.*]] = sub i32 [[X1]], [[X2]]
+; CHECK-NEXT:    store i32 [[R1]], ptr [[GEP_1]], align 4
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.1 = getelementptr inbounds i32, ptr %x, i64 %iv
+  %iv.s = add nsw i64 %iv, %s
+  %gep.2 = getelementptr inbounds i32, ptr %x, i64 %iv.s
+  %x1 = load i32, ptr %gep.1, align 4
+  %x2.wide = load i64, ptr %gep.2, align 4
+  %x2 = trunc i64 %x2.wide to i32
+  %r2 = add i32 %x1, %x2
+  store i32 %r2, ptr %gep.2, align 4
+  %r1 = sub i32 %x1, %x2
+  store i32 %r1, ptr %gep.1, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}

@@ -1,6 +1,5 @@
-; RUN: opt -passes='loop-vectorize' -force-vector-width=2 %s -S -debug 2>&1 | FileCheck %s
-
-; REQUIRES: asserts
+; RUN: opt -passes='print<access-info>' -disable-output %s 2>&1 | FileCheck --check-prefix=LAA %s
+; RUN: opt -passes='loop-vectorize' -force-vector-width=2 %s -S | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 
@@ -9,12 +8,10 @@ target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16
 ; addition of the size of the element type (a pointer) for the end bound.
 
 define void @test(i64 %arg, i32 %arg1, ptr %base) {
-; CHECK:      LAA: Adding RT check for range:
-; CHECK-NEXT:  Start: ((8 * (zext i32 (-1 + %arg1)<nsw> to i64))<nuw><nsw> + (8 * (1 smin %arg)) + (-8 * %arg) + %base)
-; CHECK-SAME:  End: (8 + (8 * (zext i32 (-1 + %arg1)<nsw> to i64))<nuw><nsw> + %base)
-; CHECK-NEXT: LAA: Adding RT check for range:
-; CHECK-NEXT:  Start: ((8 * (1 smin %arg)) + %base)
-; CHECK-SAME:  End: (8 + (8 * %arg) + %base)
+; LAA:      Group GRP0:
+; LAA-NEXT:   (Low: ((8 * (zext i32 (-1 + %arg1)<nsw> to i64))<nuw><nsw> + (8 * (1 smin %arg)) + (-8 * %arg) + %base) High: (8 + (8 * (zext i32 (-1 + %arg1)<nsw> to i64))<nuw><nsw> + %base))
+; LAA:      Group GRP1:
+; LAA-NEXT:   (Low: ((8 * (1 smin %arg)) + %base) High: (8 + (8 * %arg) + %base))
 
 ; CHECK: vector.body
 

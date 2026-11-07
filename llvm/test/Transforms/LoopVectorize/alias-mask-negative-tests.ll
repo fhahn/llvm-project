@@ -135,3 +135,73 @@ for.body:
 exit:
   ret void
 }
+
+; Both pointers are read and written, so dependences may exist in both
+; directions. Check we don't use an alias-mask, which only handles dependences
+; from source to sink.
+define void @read_modify_write_both_pointers(ptr %x, i64 %s, i64 %n) {
+; CHECK-LABEL: define void @read_modify_write_both_pointers(
+; CHECK-SAME: ptr [[X:%.*]], i64 [[S:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[S]], 2
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP0]]
+; CHECK-NEXT:    [[TMP2:%.*]] = shl i64 [[N]], 2
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[TMP2]], [[TMP0]]
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP3]]
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[X]], i64 [[TMP2]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP1]], [[TMP5]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[X]], [[TMP4]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[N_RND_UP:%.*]] = add i64 [[N]], 3
+; CHECK-NEXT:    [[TMP6:%.*]] = and i64 [[N_RND_UP]], 3
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N_RND_UP]], [[TMP6]]
+; CHECK-NEXT:    [[TRIP_COUNT_MINUS_1:%.*]] = sub i64 [[N]], 1
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TRIP_COUNT_MINUS_1]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp ule <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i32, ptr [[X]], i64 [[INDEX]]
+; CHECK-NEXT:    [[TMP9:%.*]] = add nsw i64 [[INDEX]], [[S]]
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i32, ptr [[X]], i64 [[TMP9]]
+; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <4 x i32> @llvm.masked.load.v4i32.p0(ptr align 4 [[TMP8]], <4 x i1> [[TMP7]], <4 x i32> poison), !alias.scope [[META11:![0-9]+]]
+; CHECK-NEXT:    [[WIDE_MASKED_LOAD3:%.*]] = call <4 x i32> @llvm.masked.load.v4i32.p0(ptr align 4 [[TMP10]], <4 x i1> [[TMP7]], <4 x i32> poison), !alias.scope [[META14:![0-9]+]], !noalias [[META11]]
+; CHECK-NEXT:    [[TMP11:%.*]] = add <4 x i32> [[WIDE_MASKED_LOAD]], [[WIDE_MASKED_LOAD3]]
+; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[TMP11]], ptr align 4 [[TMP10]], <4 x i1> [[TMP7]]), !alias.scope [[META14]], !noalias [[META11]]
+; CHECK-NEXT:    [[TMP12:%.*]] = sub <4 x i32> [[WIDE_MASKED_LOAD]], [[WIDE_MASKED_LOAD3]]
+; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[TMP12]], ptr align 4 [[TMP8]], <4 x i1> [[TMP7]]), !alias.scope [[META11]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br [[EXIT:label %.*]]
+; CHECK:       [[SCALAR_PH]]:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.1 = getelementptr inbounds i32, ptr %x, i64 %iv
+  %iv.s = add nsw i64 %iv, %s
+  %gep.2 = getelementptr inbounds i32, ptr %x, i64 %iv.s
+  %x1 = load i32, ptr %gep.1, align 4
+  %x2 = load i32, ptr %gep.2, align 4
+  %r2 = add i32 %x1, %x2
+  store i32 %r2, ptr %gep.2, align 4
+  %r1 = sub i32 %x1, %x2
+  store i32 %r1, ptr %gep.1, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
