@@ -309,6 +309,7 @@ public:
 
 class LLVM_ABI ReachingDefInfoWrapperPass : public MachineFunctionPass {
   ReachingDefInfo RDI;
+  MachineFunction *PendingMF = nullptr;
 
 public:
   static char ID;
@@ -320,8 +321,13 @@ public:
   bool runOnMachineFunction(MachineFunction &F) override;
   void releaseMemory() override { RDI.releaseMemory(); }
 
-  ReachingDefInfo &getRDI() { return RDI; }
-  const ReachingDefInfo &getRDI() const { return RDI; }
+  /// Computed on the first call rather than in runOnMachineFunction, as most
+  /// functions never query it. The result describes the function at that call.
+  ReachingDefInfo &getRDI() {
+    if (MachineFunction *MF = std::exchange(PendingMF, nullptr))
+      RDI.run(*MF);
+    return RDI;
+  }
 };
 
 } // namespace llvm
