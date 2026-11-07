@@ -38,6 +38,7 @@
 #define LLVM_ANALYSIS_ALIASANALYSIS_H
 
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/CaptureTracking.h"
 #include "llvm/Analysis/MemoryLocation.h"
@@ -55,14 +56,18 @@
 namespace llvm {
 
 class AtomicCmpXchgInst;
+class BasicAAResult;
 class BasicBlock;
 class CatchPadInst;
 class CatchReturnInst;
 class CycleInfo;
 class DominatorTree;
 class FenceInst;
+class GlobalsAAResult;
 class LoopInfo;
+class ScopedNoAliasAAResult;
 class TargetLibraryInfo;
+class TypeBasedAAResult;
 
 /// The possible results of an alias query.
 ///
@@ -336,7 +341,14 @@ public:
     // polymorphic pattern because we don't own AAResult. It should
     // ideally involve two pointers and no separate allocation.
     AAs.emplace_back(new Model<AAResultT>(AAResult, *this));
+    OnlyTagAndGlobalAAs &=
+        is_one_of<AAResultT, BasicAAResult, GlobalsAAResult,
+                  ScopedNoAliasAAResult, TypeBasedAAResult>::value;
   }
+
+  /// Returns true if, besides BasicAA, all registered AAs only use AA tags and
+  /// global-based objects, i.e. have no answer for other objects without tags.
+  bool hasOnlyTagAndGlobalAAs() const { return OnlyTagAndGlobalAAs; }
 
   /// Register a function analysis ID that the results aggregation depends on.
   ///
@@ -596,6 +608,9 @@ private:
 
   std::vector<AnalysisKey *> AADeps;
 
+  bool OnlyTagAndGlobalAAs = true;
+
+  friend class AAManager;
   friend class BatchAAResults;
 };
 

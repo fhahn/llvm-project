@@ -1113,6 +1113,16 @@ ModRefInfo BasicAAResult::getModRefInfo(const CallBase *Call1,
   return ModRefInfo::ModRef;
 }
 
+/// Returns true if \p V is its own underlying object and GlobalsAA has nothing
+/// to say about it: not a global, a direct load of one or an allocation call.
+static bool isObjectUnknownToGlobalsAA(const Value *V) {
+  if (auto *PN = dyn_cast<PHINode>(V))
+    return PN->getNumIncomingValues() != 1;
+  if (auto *LI = dyn_cast<LoadInst>(V))
+    return !isa<GlobalVariable>(LI->getPointerOperand());
+  return isa<Argument, AllocaInst, SelectInst>(V);
+}
+
 /// Provides a bunch of ad-hoc rules to disambiguate a GEP instruction against
 /// another pointer.
 ///
@@ -1123,10 +1133,27 @@ AliasResult BasicAAResult::aliasGEP(
     const GEPOperator *GEP1, LocationSize V1Size,
     const Value *V2, LocationSize V2Size,
     const Value *UnderlyingV1, const Value *UnderlyingV2, AAQueryInfo &AAQI) {
+  // Query the bases of the GEPs. They have no AA tags, so skip the other AAs if
+  // those can only use tags and globals and the bases are not based on a
+  // global.
+  auto AliasBases = [&](const Value *Base1, LocationSize Size1,
+                        const Value *Base2, LocationSize Size2) {
+    if (AAQI.AAR.hasOnlyTagAndGlobalAAs() &&
+        isObjectUnknownToGlobalsAA(Base1) &&
+        isObjectUnknownToGlobalsAA(Base2)) {
+      ++AAQI.Depth;
+      AliasResult R = aliasCheck(Base1, Size1, Base2, Size2, AAQI, nullptr);
+      --AAQI.Depth;
+      return R;
+    }
+    return AAQI.AAR.alias(MemoryLocation(Base1, Size1),
+                          MemoryLocation(Base2, Size2), AAQI);
+  };
+
   auto BaseObjectsAlias = [&]() {
     AliasResult BaseAlias =
-        AAQI.AAR.alias(MemoryLocation::getBeforeOrAfter(UnderlyingV1),
-                       MemoryLocation::getBeforeOrAfter(UnderlyingV2), AAQI);
+        AliasBases(UnderlyingV1, LocationSize::beforeOrAfterPointer(),
+                   UnderlyingV2, LocationSize::beforeOrAfterPointer());
     return BaseAlias == AliasResult::NoAlias ? AliasResult::NoAlias
                                              : AliasResult::MayAlias;
   };
@@ -1191,13 +1218,12 @@ AliasResult BasicAAResult::aliasGEP(
   // For GEPs with identical offsets, we can preserve the size and AAInfo
   // when performing the alias check on the underlying objects.
   if (DecompGEP1.Offset == 0 && DecompGEP1.VarIndices.empty())
-    return AAQI.AAR.alias(MemoryLocation(DecompGEP1.Base, V1Size),
-                          MemoryLocation(DecompGEP2.Base, V2Size), AAQI);
+    return AliasBases(DecompGEP1.Base, V1Size, DecompGEP2.Base, V2Size);
 
   // Do the base pointers alias?
   AliasResult BaseAlias =
-      AAQI.AAR.alias(MemoryLocation::getBeforeOrAfter(DecompGEP1.Base),
-                     MemoryLocation::getBeforeOrAfter(DecompGEP2.Base), AAQI);
+      AliasBases(DecompGEP1.Base, LocationSize::beforeOrAfterPointer(),
+                 DecompGEP2.Base, LocationSize::beforeOrAfterPointer());
 
   // If we get a No or May, then return it immediately, no amount of analysis
   // will improve this situation.
