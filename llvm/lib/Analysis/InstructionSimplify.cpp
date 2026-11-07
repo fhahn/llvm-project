@@ -2778,6 +2778,13 @@ static Constant *computePointerICmp(CmpPredicate Pred, Value *LHS, Value *RHS,
   if (CmpInst::isSigned(Pred))
     return nullptr;
 
+  // Skip the strip and underlying-object walks for a load, argument or phi
+  // compared with null: neither side strips and no fold below applies to such
+  // a pair. Not calls: they strip through returned arguments, and
+  // isAllocLikeFn below fills the callee's LibFunc cache.
+  if (isa<ConstantPointerNull>(RHS) && isa<LoadInst, Argument, PHINode>(LHS))
+    return nullptr;
+
   // We have to switch to a signed predicate to handle negative indices from
   // the base pointer.
   Pred = ICmpInst::getSignedPredicate(Pred);
