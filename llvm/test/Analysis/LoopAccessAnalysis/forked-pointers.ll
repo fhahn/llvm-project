@@ -398,7 +398,7 @@ latch:
 define dso_local void @forked_ptrs_same_base_different_offset(ptr nocapture readonly %Base, ptr nocapture %Dest, ptr nocapture readonly %Preds) {
 ; CHECK-LABEL: 'forked_ptrs_same_base_different_offset'
 ; CHECK-NEXT:    for.body:
-; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Check 0:
@@ -406,6 +406,11 @@ define dso_local void @forked_ptrs_same_base_different_offset(ptr nocapture read
 ; CHECK-NEXT:          %arrayidx5 = getelementptr inbounds float, ptr %Dest, i64 %indvars.iv
 ; CHECK-NEXT:        Against group GRP1:
 ; CHECK-NEXT:          %arrayidx = getelementptr inbounds i32, ptr %Preds, i64 %indvars.iv
+; CHECK-NEXT:      Check 1:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %arrayidx5 = getelementptr inbounds float, ptr %Dest, i64 %indvars.iv
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %arrayidx3 = getelementptr inbounds float, ptr %Base, i64 %idxprom213
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
 ; CHECK-NEXT:          (Low: %Dest High: (400 + %Dest))
@@ -413,7 +418,9 @@ define dso_local void @forked_ptrs_same_base_different_offset(ptr nocapture read
 ; CHECK-NEXT:        Group GRP1:
 ; CHECK-NEXT:          (Low: %Preds High: (400 + %Preds))
 ; CHECK-NEXT:            Member: {%Preds,+,4}<nuw><%for.body>
-; CHECK-NEXT:      Generated run-time checks are incomplete
+; CHECK-NEXT:        Group GRP2:
+; CHECK-NEXT:          (Low: %Base High: ((17179869184 umin (-1 + (-1 * (ptrtoaddr ptr %Base to i64)))) + %Base))
+; CHECK-NEXT:            Member: ((4 * (zext i32 %offset.0 to i64))<nuw><nsw> + %Base)<nuw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:

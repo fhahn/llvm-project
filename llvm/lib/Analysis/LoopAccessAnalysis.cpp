@@ -329,16 +329,21 @@ static bool isKnownNonDecreasingInLoop(const SCEV *S, const Loop *L,
 ///
 /// If the offset is provably monotonically non-decreasing the accessed range is
 /// bounded by the offset's value at the first iteration (via
-/// SplitIntoInitAndPostInc) and last iteration (via getSCEVAtScope). The
-/// returned range is half-open: \p EltSizeSCEV is added to the address of the
-/// last accessed element to form the end.
+/// SplitIntoInitAndPostInc) and last iteration (via getSCEVAtScope).
+/// Otherwise, the accessed range is bounded by the unsigned range of the
+/// offset. The returned range is half-open: \p EltSizeSCEV is added to the
+/// address of the last accessed element to form the end.
+///
+/// \p PtrExpr must be of the form Base + Offset with a loop-invariant Base and
+/// callers must ensure Base + Offset does not unsigned wrap for any accessed
+/// Offset (see isNonAffinePtrNoWrap).
 ///
 /// Returns {nullptr, nullptr} if no such bound can be formed.
 static std::pair<const SCEV *, const SCEV *>
-getNonAffineMonotonicBounds(const Loop *Lp, const SCEV *PtrExpr,
-                            const SCEV *EltSizeSCEV, ScalarEvolution *SE) {
+getNonAffineBounds(const Loop *Lp, const SCEV *PtrExpr, const SCEV *EltSizeSCEV,
+                   ScalarEvolution *SE) {
   const auto *PtrAdd = dyn_cast<SCEVAddExpr>(PtrExpr);
-  if (!PtrAdd || !PtrAdd->hasNoUnsignedWrap())
+  if (!PtrAdd)
     return {nullptr, nullptr};
 
   const SCEV *Base = *find_if(PtrAdd->operands(), [](const auto &Op) {
@@ -348,9 +353,28 @@ getNonAffineMonotonicBounds(const Loop *Lp, const SCEV *PtrExpr,
     return {nullptr, nullptr};
 
   const SCEV *Offset = SE->getMinusSCEV(PtrExpr, Base);
-  if (isa<SCEVCouldNotCompute>(Offset) ||
-      !isKnownNonDecreasingInLoop(Offset, Lp, *SE))
+  if (isa<SCEVCouldNotCompute>(Offset))
     return {nullptr, nullptr};
+
+  if (!isKnownNonDecreasingInLoop(Offset, Lp, *SE)) {
+    // Bound the offset by its unsigned range. Base + Offset does not wrap for
+    // any accessed offset, so Base + umin(Offset) does not wrap either. The
+    // upper bound of the range need not be reached by any access, so the end
+    // saturates at the highest address instead of wrapping.
+    const auto *EltSizeC = dyn_cast<SCEVConstant>(EltSizeSCEV);
+    ConstantRange OffRange = SE->getUnsignedRange(Offset);
+    if (!EltSizeC || OffRange.isFullSet())
+      return {nullptr, nullptr};
+    bool Overflow;
+    APInt OffEnd = OffRange.getUnsignedMax().uadd_ov(
+        EltSizeC->getAPInt().zextOrTrunc(OffRange.getBitWidth()), Overflow);
+    if (Overflow)
+      return {nullptr, nullptr};
+    const SCEV *MaxEndOff = SE->getNotSCEV(SE->getPtrToAddrExpr(Base));
+    return {SE->getAddExpr(Base, SE->getConstant(OffRange.getUnsignedMin())),
+            SE->getAddExpr(
+                Base, SE->getUMinExpr(SE->getConstant(OffEnd), MaxEndOff))};
+  }
 
   const SCEV *OffStart = SE->SplitIntoInitAndPostInc(Lp, Offset).first;
   const SCEV *OffEnd = SE->getSCEVAtScope(Offset, Lp->getParentLoop());
@@ -360,6 +384,33 @@ getNonAffineMonotonicBounds(const Loop *Lp, const SCEV *PtrExpr,
 
   return {SE->getAddExpr(Base, OffStart),
           SE->getAddExpr(Base, OffEnd, EltSizeSCEV)};
+}
+
+/// Return true if the non-affine pointer \p PtrExpr = Base + Offset, with Base
+/// its pointer operand, cannot unsigned wrap for any accessed Offset. This is
+/// the case if the add has NUW, or if \p Ptr is a chain of NUW GEPs from Base:
+/// SCEV drops the flags of the loop-invariant GEPs of the chain when folding
+/// them into a single add, because they only hold where the access executes.
+static bool isNonAffinePtrNoWrap(const SCEV *PtrExpr, Value *Ptr,
+                                 ScalarEvolution &SE) {
+  const auto *PtrAdd = dyn_cast<SCEVAddExpr>(PtrExpr);
+  if (!PtrAdd)
+    return false;
+  if (PtrAdd->hasNoUnsignedWrap())
+    return true;
+  if (!Ptr || SE.getSCEV(Ptr) != PtrExpr)
+    return false;
+  const SCEV *Base = *find_if(PtrAdd->operands(), [](const SCEV *Op) {
+    return Op->getType()->isPointerTy();
+  });
+  while (auto *GEP = dyn_cast<GEPOperator>(Ptr)) {
+    if (!GEP->hasNoUnsignedWrap())
+      return false;
+    Ptr = GEP->getPointerOperand();
+    if (SE.getSCEV(Ptr) == Base)
+      return true;
+  }
+  return false;
 }
 
 std::pair<const SCEV *, const SCEV *> llvm::getStartAndEndForAccess(
@@ -451,10 +502,9 @@ std::pair<const SCEV *, const SCEV *> llvm::getStartAndEndForAccess(
       ScEnd = SE->getAddExpr(SE->getUMaxExpr(Start, LastAddr), EltSizeSCEV);
     }
   } else {
-    // The pointer is loop-variant but not an affine AddRec. Try to form a
-    // tight bound for a monotonic offset (see getNonAffineMonotonicBounds).
-    std::tie(ScStart, ScEnd) =
-        getNonAffineMonotonicBounds(Lp, PtrExpr, EltSizeSCEV, SE);
+    // The pointer is loop-variant but not an affine AddRec. Try to bound its
+    // offset (see getNonAffineBounds).
+    std::tie(ScStart, ScEnd) = getNonAffineBounds(Lp, PtrExpr, EltSizeSCEV, SE);
     if (!ScStart)
       return {SE->getCouldNotCompute(), SE->getCouldNotCompute()};
   }
@@ -2150,8 +2200,9 @@ bool AccessAnalysis::createCheckForAccess(RuntimePointerChecking &RtCheck,
       const SCEV *EltSizeSCEV = SE->getStoreSizeOfExpr(
           DL.getIndexType(P.getPointer()->getType()), AccessTy);
       if (!Assume ||
-          !getNonAffineMonotonicBounds(TheLoop, P.getPointer(), EltSizeSCEV, SE)
-               .first)
+          !isNonAffinePtrNoWrap(P.getPointer(),
+                                RTCheckPtrs.size() == 1 ? Ptr : nullptr, *SE) ||
+          !getNonAffineBounds(TheLoop, P.getPointer(), EltSizeSCEV, SE).first)
         return false;
       continue;
     }
