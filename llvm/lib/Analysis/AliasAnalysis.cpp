@@ -60,8 +60,7 @@ STATISTIC(NumMustAlias, "Number of MustAlias results");
 
 AAResults::AAResults(const TargetLibraryInfo &TLI) : TLI(TLI) {}
 
-AAResults::AAResults(AAResults &&Arg)
-    : TLI(Arg.TLI), AAs(std::move(Arg.AAs)), AADeps(std::move(Arg.AADeps)) {}
+AAResults::AAResults(AAResults &&Arg) = default;
 
 AAResults::~AAResults() = default;
 
