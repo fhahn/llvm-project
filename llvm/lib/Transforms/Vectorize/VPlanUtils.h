@@ -278,8 +278,9 @@ void pullOutPermutations(VPlan &Plan, Match_t Perm, Builder Build) {
 } // namespace vputils
 
 /// Lightweight SCEV-to-VPlan expander. Converts SCEV expressions into
-/// VPInstructions and live-ins. Canonical IVs and non-affine SCEVAddRecExprs
-/// are wrapped in a VPExpandSCEVRecipe to be expanded to IR later. Expansions
+/// VPInstructions and live-ins. Canonical IVs, non-affine SCEVAddRecExprs and
+/// reuses of IR values that require dropping poison-generating flags are
+/// wrapped in a VPExpandSCEVRecipe to be expanded to IR later. Expansions
 /// are reused across calls to expand(), so the builder's insert point must
 /// only move to positions dominated by all earlier insert points.
 class VPSCEVExpander {
@@ -298,9 +299,10 @@ class VPSCEVExpander {
   DenseMap<PointerIntPair<const SCEV *, 1, bool>, VPValue *>
       InsertedExpressions;
 
-  /// Try to find a loop-invariant IR value in the plan's entry block whose
-  /// SCEV matches \p S. Returns the corresponding live-in VPValue, or nullptr
-  /// if none is found.
+  /// Try to find a loop-invariant IR value dominating the plan's entry block
+  /// whose SCEV matches \p S. Returns the corresponding live-in VPValue, or, if
+  /// reusing the value requires dropping poison-generating flags, an in-IR
+  /// VPExpandSCEVRecipe for \p S. Returns nullptr if none is found.
   VPValue *tryToReuseIRValue(const SCEV *S);
 
   /// Returns true if \p S can be expanded in IR, hoisted out of HoistOutOf.

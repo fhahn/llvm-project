@@ -4134,8 +4134,9 @@ protected:
 class VPExpandSCEVRecipe : public VPSingleDefRecipe {
   const SCEV *Expr;
 
-  /// Whether \p Expr must be expanded in IR, which hoists it out of the loops
-  /// it is invariant in, instead of as VPInstructions.
+  /// Whether Expr must be expanded in IR instead of as VPInstructions, e.g.
+  /// to hoist it out of the loops it is invariant in, or to reuse an IR value
+  /// when that requires dropping poison-generating flags.
   bool ExpandInIR;
 
 public:

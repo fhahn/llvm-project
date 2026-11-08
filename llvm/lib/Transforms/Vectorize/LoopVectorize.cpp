@@ -7443,14 +7443,16 @@ static void preparePlanForEpilogueVectorLoop(
   }
 
   // Re-use the SCEVs expanded for the main loop instead of expanding them
-  // again, which also lets simplifyLiveInsWithSCEV fold their users.
+  // again, which also lets simplifyLiveInsWithSCEV fold their users. SCEVs only
+  // the epilogue plan expands in IR, e.g. due to VF-dependent transforms, are
+  // expanded when executing it.
   // TODO: Remove once the epilogue plan uses the main plan's VPValues directly.
   for (VPExpandSCEVRecipe &ExpandR : make_early_inc_range(
            make_isa_range<VPExpandSCEVRecipe>(*Plan.getEntry()))) {
-    assert(ExpandedSCEVs.contains(ExpandR.getSCEV()) &&
-           "Epilogue plan needs a SCEV not expanded for the main loop");
-    VPValue *ExpandedVal =
-        Plan.getOrAddLiveIn(ExpandedSCEVs.lookup(ExpandR.getSCEV()));
+    Value *V = ExpandedSCEVs.lookup(ExpandR.getSCEV());
+    if (!V)
+      continue;
+    VPValue *ExpandedVal = Plan.getOrAddLiveIn(V);
     ExpandR.replaceAllUsesWith(ExpandedVal);
     if (Plan.getTripCount() == &ExpandR)
       Plan.resetTripCount(ExpandedVal);
