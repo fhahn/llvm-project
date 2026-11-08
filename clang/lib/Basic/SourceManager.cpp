@@ -1531,6 +1531,30 @@ PresumedLoc SourceManager::getPresumedLoc(SourceLocation Loc,
   return PresumedLoc(Filename.data(), FID, LineNo, ColNo, IncludeLoc);
 }
 
+const char *SourceManager::getPresumedFilename(SourceLocation Loc) const {
+  if (Loc.isInvalid())
+    return nullptr;
+  auto [FID, Offset] = getDecomposedExpansionLoc(Loc);
+  const SLocEntry *Entry = getSLocEntryForFile(FID);
+  if (!Entry)
+    return nullptr;
+
+  // Fail where getPresumedLoc() cannot compute the line and column.
+  const SrcMgr::FileInfo &FI = Entry->getFile();
+  const SrcMgr::ContentCache &C = FI.getContentCache();
+  auto Buffer = C.getBufferOrNone(Diag, getFileManager());
+  if (!Buffer || Offset > Buffer->getBufferSize())
+    return nullptr;
+
+  if (FI.hasLineDirectives())
+    if (const LineEntry *LE = LineTable->FindNearestLineEntry(FID, Offset))
+      if (LE->FilenameID != -1)
+        return LineTable->getFilename(LE->FilenameID).data();
+
+  return C.OrigEntry ? C.OrigEntry->getName().data()
+                     : Buffer->getBufferIdentifier().data();
+}
+
 /// Returns whether the PresumedLoc for a given SourceLocation is
 /// in the main file.
 ///
