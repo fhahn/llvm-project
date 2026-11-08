@@ -47,6 +47,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstddef>
 #include <cstring>
@@ -545,6 +546,36 @@ void Preprocessor::SuggestTypoedDirective(const Token &Tok,
   }
 }
 
+/// Horizontal whitespace and identifier, number and punctuator characters that
+/// cannot start a comment, literal, line splice, trigraph or code completion
+/// point. '^' is left out, as the raw lexer diagnoses '^^' in OpenCL.
+static constexpr std::array<bool, 256> IsPlainChar = [] {
+  std::array<bool, 256> Plain{};
+  for (const char *C = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                       "0123456789_{}[]()<>;:,.+-*%&|~!= \t\f\v";
+       *C; ++C)
+    Plain[static_cast<unsigned char>(*C)] = true;
+  return Plain;
+}();
+
+/// In an excluded block, skip the plain characters after a token of \p L, up
+/// to the newline or the last whitespace before another character. The raw
+/// lexer would discard their tokens, and none is at the start of a line.
+static void skipPlainRestOfLine(Lexer &L) {
+  // In keep-whitespace mode (-traditional-cpp), a token can end at the start of
+  // a line.
+  if (L.isKeepWhitespaceMode())
+    return;
+  const char *Start = L.getBufferLocation();
+  const char *P = Start;
+  while (IsPlainChar[static_cast<unsigned char>(*P)])
+    ++P;
+  if (!isVerticalWhitespace(*P))
+    while (P != Start && !isHorizontalWhitespace(P[-1]))
+      --P;
+  L.seek(L.getCurrentBufferOffset() + (P - Start), /*IsAtStartOfLine=*/false);
+}
+
 /// SkipExcludedConditionalBlock - We just read a \#if or related directive and
 /// decided that the subsequent tokens are in the \#if'd out portion of the
 /// file.  Lex the rest of the file, until we see an \#endif.  If
@@ -706,8 +737,10 @@ void Preprocessor::SkipExcludedConditionalBlock(SourceLocation HashTokenLoc,
         }
 
         // If this token is not a preprocessor directive, just skip it.
-        if (Tok.isNot(tok::hash) || !Tok.isAtStartOfLine())
+        if (Tok.isNot(tok::hash) || !Tok.isAtStartOfLine()) {
+          skipPlainRestOfLine(*CurLexer);
           continue;
+        }
 
         break;
       }
