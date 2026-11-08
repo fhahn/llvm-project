@@ -5900,6 +5900,92 @@ void VPlanTransforms::createPartialReductions(VPlan &Plan,
   }
 }
 
+/// Collect the loads in the vector loop region of \p Plan that should be
+/// scalarized because they are used to compute addresses, matching the legacy
+/// cost model. For each address computed in the loop region, collect the
+/// recipes it is computed from, without looking through phis. The loads among
+/// them are only collected if none of the collected recipes has a user in the
+/// loop region outside of address computations: otherwise the vector values are
+/// needed anyway, and computing the address scalar duplicates the work.
+static SmallPtrSet<VPValue *, 8> collectAddressOnlyLoads(VPlan &Plan) {
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  auto IsInLoop = [LoopRegion](const VPRecipeBase *R) {
+    return R->getParent()->getEnclosingLoopRegion() == LoopRegion;
+  };
+  auto IsPhiLike = [](const VPRecipeBase *R) {
+    return isa<VPHeaderPHIRecipe, VPBlendRecipe>(R) ||
+           match(R,
+                 m_CombineOr(m_VPInstruction<Instruction::PHI>(),
+                             m_VPInstruction<
+                                 VPInstruction::FirstOrderRecurrenceSplice>()));
+  };
+  // Returns the in-loop address computed by R, if R is a load or store.
+  auto GetAddr = [](VPRecipeBase &R) -> VPValue * {
+    VPValue *Addr;
+    if (match(&R, m_CombineOr(m_Unary<Instruction::Load>(m_VPValue(Addr)),
+                              m_Binary<Instruction::Store>(m_VPValue(),
+                                                           m_VPValue(Addr)))))
+      return Addr;
+    return nullptr;
+  };
+
+  SmallVector<SmallSetVector<VPSingleDefRecipe *, 8>> Slices;
+  SmallPtrSet<VPRecipeBase *, 8> AllAddrDefs;
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_deep(LoopRegion->getEntry()))) {
+    for (VPRecipeBase &R : *VPBB) {
+      VPValue *Addr = GetAddr(R);
+      auto *Root =
+          Addr ? dyn_cast_or_null<VPSingleDefRecipe>(Addr->getDefiningRecipe())
+               : nullptr;
+      if (!Root || !IsInLoop(Root))
+        continue;
+      SmallSetVector<VPSingleDefRecipe *, 8> Slice;
+      Slice.insert(Root);
+      for (unsigned Idx = 0; Idx != Slice.size(); ++Idx) {
+        VPSingleDefRecipe *Cur = Slice[Idx];
+        SmallVector<VPValue *> Ops;
+        if (auto *Blend = dyn_cast<VPBlendRecipe>(Cur)) {
+          for (unsigned I = 0, E = Blend->getNumIncomingValues(); I != E; ++I)
+            Ops.push_back(Blend->getIncomingValue(I));
+        } else if (auto *VPI = dyn_cast<VPInstruction>(Cur)) {
+          append_range(Ops, VPI->operandsWithoutMask());
+        } else {
+          append_range(Ops, Cur->operands());
+        }
+        for (VPValue *Op : Ops) {
+          auto *OpR =
+              dyn_cast_or_null<VPSingleDefRecipe>(Op->getDefiningRecipe());
+          if (OpR && IsInLoop(OpR) && !IsPhiLike(OpR))
+            Slice.insert(OpR);
+        }
+      }
+      AllAddrDefs.insert_range(Slice);
+      Slices.push_back(std::move(Slice));
+    }
+  }
+
+  auto IsAddrOnlyUse = [&](VPValue *V, VPUser *U) {
+    auto *UR = cast<VPRecipeBase>(U);
+    if (!IsInLoop(UR) || AllAddrDefs.contains(UR))
+      return true;
+    return GetAddr(*UR) == V &&
+           !match(UR, m_Binary<Instruction::Store>(m_Specific(V), m_VPValue()));
+  };
+  SmallPtrSet<VPValue *, 8> AddrOnlyLoads;
+  for (const auto &Slice : Slices) {
+    if (!all_of(Slice, [&](VPSingleDefRecipe *R) {
+          return all_of(R->users(),
+                        [&](VPUser *U) { return IsAddrOnlyUse(R, U); });
+        }))
+      continue;
+    for (VPSingleDefRecipe *R : Slice)
+      if (match(R, m_VPInstruction<Instruction::Load>()))
+        AddrOnlyLoads.insert(R);
+  }
+  return AddrOnlyLoads;
+}
+
 /// Try to replace the masked load \p VPI, which would otherwise be scalarized
 /// with predication, by an unmasked replicated load. Its address must be a GEP
 /// only used by \p VPI, with a live-in base pointer that is dereferenceable and
@@ -6052,12 +6138,11 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
       });
 
   if (!RecipeBuilder.prefersVectorizedAddressing()) {
+    SmallPtrSet<VPValue *, 8> AddrOnlyLoads = collectAddressOnlyLoads(Plan);
     VPlanTransforms::runPass(
         "makeVPlanMemOpDecision", ProcessSubset, Plan, [&](VPInstruction *VPI) {
           Instruction *I = VPI->getUnderlyingInstr();
-          bool IsLoad = VPI->getOpcode() == Instruction::Load;
-          if (RecipeBuilder.isPredicatedInst(I) || !IsLoad ||
-              !vputils::isUsedByLoadStoreAddress(VPI))
+          if (RecipeBuilder.isPredicatedInst(I) || !AddrOnlyLoads.contains(VPI))
             return false;
 
           // Scalarize loads used as addresses, matching the legacy CM. The load

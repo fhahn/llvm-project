@@ -290,14 +290,13 @@ define void @load_used_as_address_via_ptr_recurrence(ptr noalias %A, ptr noalias
 ; CHECK-NEXT:    [[VECTOR_RECUR_INIT:%.*]] = insertelement <2 x ptr> poison, ptr [[A]], i32 1
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VECTOR_RECUR:%.*]] = phi <2 x ptr> [ [[VECTOR_RECUR_INIT]], %[[VECTOR_PH]] ], [ [[TMP9:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[INDEX]], 1
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i64 [[TMP1]]
-; CHECK-NEXT:    [[TMP4:%.*]] = load i64, ptr [[TMP2]], align 8
-; CHECK-NEXT:    [[TMP5:%.*]] = load i64, ptr [[TMP3]], align 8
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i64>, ptr [[TMP3]], align 8
+; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x i64> [[WIDE_LOAD]], i64 0
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP4]]
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <2 x i64> [[WIDE_LOAD]], i64 1
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP5]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = insertelement <2 x ptr> poison, ptr [[TMP6]], i64 0
 ; CHECK-NEXT:    [[TMP9]] = insertelement <2 x ptr> [[TMP8]], ptr [[TMP7]], i64 1
@@ -308,9 +307,9 @@ define void @load_used_as_address_via_ptr_recurrence(ptr noalias %A, ptr noalias
 ; CHECK-NEXT:    [[TMP14:%.*]] = load i64, ptr [[TMP13]], align 8
 ; CHECK-NEXT:    [[TMP15:%.*]] = insertelement <2 x i64> poison, i64 [[TMP12]], i64 0
 ; CHECK-NEXT:    [[TMP16:%.*]] = insertelement <2 x i64> [[TMP15]], i64 [[TMP14]], i64 1
-; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[INDEX]]
+; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[TMP1]]
 ; CHECK-NEXT:    store <2 x i64> [[TMP16]], ptr [[TMP17]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP1]], 2
 ; CHECK-NEXT:    [[TMP18:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP18]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

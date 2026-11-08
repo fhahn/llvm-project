@@ -4406,18 +4406,47 @@ void LoopVectorizationCostModel::setCostBasedWideningDecision(ElementCount VF) {
           getWideningDecision(&I, VF) != CM_GatherScatter)
         AddrDefs.insert(PtrDef);
     }
+  SmallVector<Instruction *> AddrRoots(AddrDefs.begin(), AddrDefs.end());
 
   // Add all instructions used to generate the addresses.
-  SmallVector<Instruction *, 4> Worklist;
-  append_range(Worklist, AddrDefs);
-  while (!Worklist.empty()) {
-    Instruction *I = Worklist.pop_back_val();
-    for (auto &Op : I->operands())
-      if (auto *InstOp = dyn_cast<Instruction>(Op))
-        if (TheLoop->contains(InstOp) && !isa<PHINode>(InstOp) &&
-            AddrDefs.insert(InstOp))
-          Worklist.push_back(InstOp);
+  auto CollectOperands = [this](SmallSetVector<Instruction *, 8> &Defs) {
+    SmallVector<Instruction *, 4> Worklist(Defs.begin(), Defs.end());
+    while (!Worklist.empty()) {
+      Instruction *I = Worklist.pop_back_val();
+      for (auto &Op : I->operands())
+        if (auto *InstOp = dyn_cast<Instruction>(Op))
+          if (TheLoop->contains(InstOp) && !isa<PHINode>(InstOp) &&
+              Defs.insert(InstOp))
+            Worklist.push_back(InstOp);
+    }
+  };
+  CollectOperands(AddrDefs);
+
+  // Only keep the computation of an address scalar if it does not start from
+  // loads whose values are also used outside of address computations in the
+  // loop, directly or via other instructions computing the address. Otherwise
+  // they are needed as vectors anyway, and scalarizing them prevents widening
+  // the loads.
+  auto IsAddrUse = [&](Instruction *I, User *U) {
+    auto *UI = cast<Instruction>(U);
+    if (!TheLoop->contains(UI) || AddrDefs.contains(UI))
+      return true;
+    auto *SI = dyn_cast<StoreInst>(UI);
+    return getLoadStorePointerOperand(UI) == I &&
+           getWideningDecision(UI, VF) != CM_GatherScatter &&
+           (!SI || SI->getValueOperand() != I);
+  };
+  SmallPtrSet<Instruction *, 8> KeepScalar;
+  for (Instruction *Root : AddrRoots) {
+    SmallSetVector<Instruction *, 8> Slice;
+    Slice.insert(Root);
+    CollectOperands(Slice);
+    if (none_of(Slice, IsaPred<LoadInst>) || all_of(Slice, [&](Instruction *I) {
+          return all_of(I->users(), [&](User *U) { return IsAddrUse(I, U); });
+        }))
+      KeepScalar.insert_range(Slice);
   }
+  AddrDefs.remove_if([&](Instruction *I) { return !KeepScalar.contains(I); });
 
   auto UpdateMemOpUserCost = [this, VF](LoadInst *LI) {
     // If there are direct memory op users of the newly scalarized load,
