@@ -892,19 +892,66 @@ define double @fmin_olt_with_select_double_start_arg(ptr %src, double %start, i6
 ; CHECK-LABEL: define double @fmin_olt_with_select_double_start_arg(
 ; CHECK-SAME: ptr [[SRC:%.*]], double [[START:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = and i64 [[N]], 3
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP0]]
+; CHECK-NEXT:    [[TMP1:%.*]] = freeze double [[START]]
+; CHECK-NEXT:    [[TMP2:%.*]] = bitcast double [[TMP1]] to i64
+; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[TMP2]], -9223372036854775808
+; CHECK-NEXT:    [[TMP4:%.*]] = select i1 [[TMP3]], i64 0, i64 -9223372036854775808
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TMP4]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x double> poison, double [[START]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x double> [[BROADCAST_SPLATINSERT1]], <4 x double> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[MIN:%.*]] = phi double [ [[START]], %[[ENTRY]] ], [ [[MIN_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x double> [ [[BROADCAST_SPLAT2]], %[[VECTOR_PH]] ], [ [[TMP8:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds nuw double, ptr [[SRC]], i64 [[IV]]
-; CHECK-NEXT:    [[L:%.*]] = load double, ptr [[GEP_SRC]], align 8
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x double>, ptr [[GEP_SRC]], align 8
+; CHECK-NEXT:    [[TMP6:%.*]] = fcmp olt <4 x double> [[WIDE_LOAD]], [[VEC_PHI]]
+; CHECK-NEXT:    [[TMP7:%.*]] = freeze <4 x double> [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP8]] = select <4 x i1> [[TMP6]], <4 x double> [[TMP7]], <4 x double> [[VEC_PHI]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 4
+; CHECK-NEXT:    [[TMP9:%.*]] = fcmp uno <4 x double> [[TMP7]], [[TMP7]]
+; CHECK-NEXT:    [[TMP10:%.*]] = bitcast <4 x double> [[TMP7]] to <4 x i64>
+; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq <4 x i64> [[TMP10]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[TMP12:%.*]] = or <4 x i1> [[TMP9]], [[TMP11]]
+; CHECK-NEXT:    [[TMP13:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP12]])
+; CHECK-NEXT:    [[TMP14:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    [[TMP15:%.*]] = or i1 [[TMP13]], [[TMP14]]
+; CHECK-NEXT:    br i1 [[TMP15]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP29:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[TMP16:%.*]] = select i1 [[TMP13]], <4 x double> [[VEC_PHI]], <4 x double> [[TMP8]]
+; CHECK-NEXT:    [[TMP17:%.*]] = select i1 [[TMP13]], i64 [[IV]], i64 [[N_VEC]]
+; CHECK-NEXT:    [[TMP18:%.*]] = call double @llvm.vector.reduce.fmin.v4f64(<4 x double> [[TMP16]])
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <4 x double> poison, double [[TMP18]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <4 x double> [[BROADCAST_SPLATINSERT3]], <4 x double> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP19:%.*]] = fcmp uno <4 x double> [[BROADCAST_SPLAT4]], [[BROADCAST_SPLAT4]]
+; CHECK-NEXT:    [[TMP20:%.*]] = extractelement <4 x i1> [[TMP19]], i64 0
+; CHECK-NEXT:    [[TMP21:%.*]] = select i1 [[TMP20]], double [[START]], double [[TMP18]]
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    [[TMP22:%.*]] = xor i1 [[TMP13]], true
+; CHECK-NEXT:    [[TMP23:%.*]] = and i1 [[CMP_N]], [[TMP22]]
+; CHECK-NEXT:    br i1 [[TMP23]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP17]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi double [ [[TMP21]], %[[MIDDLE_BLOCK]] ], [ [[START]], %[[ENTRY]] ]
+; CHECK-NEXT:    br label %[[LOOP1:.*]]
+; CHECK:       [[LOOP1]]:
+; CHECK-NEXT:    [[IV1:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP1]] ]
+; CHECK-NEXT:    [[MIN:%.*]] = phi double [ [[BC_MERGE_RDX]], %[[SCALAR_PH]] ], [ [[MIN_NEXT:%.*]], %[[LOOP1]] ]
+; CHECK-NEXT:    [[GEP_SRC1:%.*]] = getelementptr inbounds nuw double, ptr [[SRC]], i64 [[IV1]]
+; CHECK-NEXT:    [[L:%.*]] = load double, ptr [[GEP_SRC1]], align 8
 ; CHECK-NEXT:    [[CMP:%.*]] = fcmp olt double [[L]], [[MIN]]
 ; CHECK-NEXT:    [[MIN_NEXT]] = select i1 [[CMP]], double [[L]], double [[MIN]]
-; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV1]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP1]], !llvm.loop [[LOOP30:![0-9]+]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[MIN_NEXT_LCSSA:%.*]] = phi double [ [[MIN_NEXT]], %[[LOOP]] ]
+; CHECK-NEXT:    [[MIN_NEXT_LCSSA:%.*]] = phi double [ [[MIN_NEXT]], %[[LOOP1]] ], [ [[TMP21]], %[[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    ret double [[MIN_NEXT_LCSSA]]
 ;
 entry:

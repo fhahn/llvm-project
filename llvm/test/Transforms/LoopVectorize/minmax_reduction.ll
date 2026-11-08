@@ -597,9 +597,14 @@ for.end:
 }
 
 
-; Don't turn this into a max reduction. The nnan flag is missing on select.
+; The nnan flag is missing on select. This is vectorized as a max reduction
+; that exits early on NaN inputs and zeros of the wrong sign, and selects the
+; start value on NaN results.
 ; CHECK-LABEL: @max_red_float_nans(
-; CHECK-NOT: <2 x float>
+; CHECK: fcmp uno <2 x float>
+; CHECK: icmp eq <2 x i32>
+; CHECK: call float @llvm.vector.reduce.fmax.v2f32
+; CHECK: fcmp uno <2 x float>
 
 define float @max_red_float_nans(float %max) {
 entry:
@@ -622,7 +627,10 @@ for.end:
 
 ; As above, with the nsz flag missing on select.
 ; CHECK-LABEL: @max_red_float_nsz(
-; CHECK-NOT: <2 x float>
+; CHECK: fcmp uno <2 x float>
+; CHECK: icmp eq <2 x i32>
+; CHECK: call float @llvm.vector.reduce.fmax.v2f32
+; CHECK: fcmp uno <2 x float>
 
 define float @max_red_float_nsz(float %max) {
 entry:

@@ -256,8 +256,9 @@ struct VPlanTransforms {
   /// reductions. If they do, try to update the vector loop to exit early if
   /// any input is NaN (or, for FMaxSelect/FMinSelect, a signed zero that may
   /// change the result) and resume executing in the scalar loop to handle them
-  /// there. Return false if this attempt was unsuccessful. A scalar \p MinVF
-  /// means \p Plan is only used for VF=1.
+  /// there. For FMaxSelect/FMinSelect with start values that may be NaN, NaN
+  /// results are replaced by the start value. Return false if this attempt was
+  /// unsuccessful. A scalar \p MinVF means \p Plan is only used for VF=1.
   static bool handleMaxMinNumReductions(VPlan &Plan, ElementCount MinVF);
 
   /// Check if \p Plan contains any FindLast reductions. If it does, try to

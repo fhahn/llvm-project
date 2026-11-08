@@ -2,25 +2,67 @@
 ; RUN: opt < %s -passes=loop-vectorize -force-vector-width=4 -S | FileCheck %s
 
 ; The function finds the smallest value from a float vector.
-; Check if vectorization is enabled by instruction flag `fcmp nnan`.
+; Check that it is vectorized with and without instruction flag `fcmp nnan`.
 
 define float @minloop(ptr nocapture readonly %arg) {
 ; CHECK-LABEL: @minloop(
 ; CHECK-NEXT:  top:
 ; CHECK-NEXT:    [[T:%.*]] = load float, ptr [[ARG:%.*]], align 4
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK:       vector.ph:
+; CHECK-NEXT:    [[TMP22:%.*]] = freeze float [[T]]
+; CHECK-NEXT:    [[TMP23:%.*]] = bitcast float [[TMP22]] to i32
+; CHECK-NEXT:    [[TMP24:%.*]] = icmp eq i32 [[TMP23]], -2147483648
+; CHECK-NEXT:    [[TMP25:%.*]] = select i1 [[TMP24]], i32 0, i32 -2147483648
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <4 x i32> poison, i32 [[TMP25]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT1:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT2]], <4 x i32> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x float> poison, float [[T]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT]], <4 x float> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
+; CHECK:       vector.body:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[LOOP]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x float> [ [[BROADCAST_SPLAT]], [[LOOP]] ], [ [[TMP4:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 1, [[INDEX]]
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr float, ptr [[ARG]], i64 [[TMP0]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP1]], align 4
+; CHECK-NEXT:    [[TMP2:%.*]] = fcmp nnan olt <4 x float> [[VEC_PHI]], [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP3:%.*]] = freeze <4 x float> [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP4]] = select <4 x i1> [[TMP2]], <4 x float> [[VEC_PHI]], <4 x float> [[TMP3]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP5:%.*]] = fcmp uno <4 x float> [[TMP3]], [[TMP3]]
+; CHECK-NEXT:    [[TMP26:%.*]] = bitcast <4 x float> [[TMP3]] to <4 x i32>
+; CHECK-NEXT:    [[TMP27:%.*]] = icmp eq <4 x i32> [[TMP26]], [[BROADCAST_SPLAT1]]
+; CHECK-NEXT:    [[TMP28:%.*]] = or <4 x i1> [[TMP5]], [[TMP27]]
+; CHECK-NEXT:    [[TMP6:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP28]])
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], 65536
+; CHECK-NEXT:    [[TMP8:%.*]] = or i1 [[TMP6]], [[TMP7]]
+; CHECK-NEXT:    br i1 [[TMP8]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK:       middle.block:
+; CHECK-NEXT:    [[TMP9:%.*]] = select i1 [[TMP6]], <4 x float> [[VEC_PHI]], <4 x float> [[TMP4]]
+; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP6]], i64 [[INDEX]], i64 65536
+; CHECK-NEXT:    [[TMP11:%.*]] = call float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[TMP9]])
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x float> poison, float [[TMP11]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT1]], <4 x float> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP15:%.*]] = add i64 1, [[TMP10]]
+; CHECK-NEXT:    [[TMP20:%.*]] = fcmp uno <4 x float> [[BROADCAST_SPLAT2]], [[BROADCAST_SPLAT2]]
+; CHECK-NEXT:    [[TMP21:%.*]] = extractelement <4 x i1> [[TMP20]], i64 0
+; CHECK-NEXT:    [[TMP16:%.*]] = select i1 [[TMP21]], float [[T]], float [[TMP11]]
+; CHECK-NEXT:    [[TMP18:%.*]] = xor i1 [[TMP6]], true
+; CHECK-NEXT:    br i1 [[TMP18]], label [[OUT:%.*]], label [[SCALAR_PH:%.*]]
+; CHECK:       scalar.ph:
+; CHECK-NEXT:    br label [[LOOP1:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[T1:%.*]] = phi i64 [ [[T7:%.*]], [[LOOP]] ], [ 1, [[TOP:%.*]] ]
-; CHECK-NEXT:    [[T2:%.*]] = phi float [ [[T6:%.*]], [[LOOP]] ], [ [[T]], [[TOP]] ]
+; CHECK-NEXT:    [[T1:%.*]] = phi i64 [ [[T7:%.*]], [[LOOP1]] ], [ [[TMP15]], [[SCALAR_PH]] ]
+; CHECK-NEXT:    [[T2:%.*]] = phi float [ [[T6:%.*]], [[LOOP1]] ], [ [[TMP16]], [[SCALAR_PH]] ]
 ; CHECK-NEXT:    [[T3:%.*]] = getelementptr float, ptr [[ARG]], i64 [[T1]]
 ; CHECK-NEXT:    [[T4:%.*]] = load float, ptr [[T3]], align 4
 ; CHECK-NEXT:    [[T5:%.*]] = fcmp nnan olt float [[T2]], [[T4]]
 ; CHECK-NEXT:    [[T6]] = select i1 [[T5]], float [[T2]], float [[T4]]
 ; CHECK-NEXT:    [[T7]] = add i64 [[T1]], 1
 ; CHECK-NEXT:    [[T8:%.*]] = icmp eq i64 [[T7]], 65537
-; CHECK-NEXT:    br i1 [[T8]], label [[OUT:%.*]], label [[LOOP]]
+; CHECK-NEXT:    br i1 [[T8]], label [[OUT]], label [[LOOP1]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       out:
-; CHECK-NEXT:    [[T6_LCSSA:%.*]] = phi float [ [[T6]], [[LOOP]] ]
+; CHECK-NEXT:    [[T6_LCSSA:%.*]] = phi float [ [[T6]], [[LOOP1]] ], [ [[TMP16]], [[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    ret float [[T6_LCSSA]]
 ;
 top:
@@ -49,18 +91,60 @@ define float @minloopattr(ptr nocapture readonly %arg) #0 {
 ; CHECK-NEXT:  top:
 ; CHECK-NEXT:    [[T:%.*]] = load float, ptr [[ARG:%.*]], align 4
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK:       vector.ph:
+; CHECK-NEXT:    [[TMP22:%.*]] = freeze float [[T]]
+; CHECK-NEXT:    [[TMP23:%.*]] = bitcast float [[TMP22]] to i32
+; CHECK-NEXT:    [[TMP24:%.*]] = icmp eq i32 [[TMP23]], -2147483648
+; CHECK-NEXT:    [[TMP25:%.*]] = select i1 [[TMP24]], i32 0, i32 -2147483648
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <4 x i32> poison, i32 [[TMP25]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT1:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT2]], <4 x i32> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x float> poison, float [[T]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT]], <4 x float> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
+; CHECK:       vector.body:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[LOOP]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x float> [ [[BROADCAST_SPLAT]], [[LOOP]] ], [ [[TMP4:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 1, [[INDEX]]
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr float, ptr [[ARG]], i64 [[TMP0]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP1]], align 4
+; CHECK-NEXT:    [[TMP2:%.*]] = fcmp olt <4 x float> [[VEC_PHI]], [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP3:%.*]] = freeze <4 x float> [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP4]] = select <4 x i1> [[TMP2]], <4 x float> [[VEC_PHI]], <4 x float> [[TMP3]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP5:%.*]] = fcmp uno <4 x float> [[TMP3]], [[TMP3]]
+; CHECK-NEXT:    [[TMP26:%.*]] = bitcast <4 x float> [[TMP3]] to <4 x i32>
+; CHECK-NEXT:    [[TMP27:%.*]] = icmp eq <4 x i32> [[TMP26]], [[BROADCAST_SPLAT1]]
+; CHECK-NEXT:    [[TMP28:%.*]] = or <4 x i1> [[TMP5]], [[TMP27]]
+; CHECK-NEXT:    [[TMP6:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP28]])
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], 65536
+; CHECK-NEXT:    [[TMP8:%.*]] = or i1 [[TMP6]], [[TMP7]]
+; CHECK-NEXT:    br i1 [[TMP8]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
+; CHECK:       middle.block:
+; CHECK-NEXT:    [[TMP9:%.*]] = select i1 [[TMP6]], <4 x float> [[VEC_PHI]], <4 x float> [[TMP4]]
+; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP6]], i64 [[INDEX]], i64 65536
+; CHECK-NEXT:    [[TMP11:%.*]] = call float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[TMP9]])
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x float> poison, float [[TMP11]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT1]], <4 x float> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP15:%.*]] = add i64 1, [[TMP10]]
+; CHECK-NEXT:    [[TMP20:%.*]] = fcmp uno <4 x float> [[BROADCAST_SPLAT2]], [[BROADCAST_SPLAT2]]
+; CHECK-NEXT:    [[TMP21:%.*]] = extractelement <4 x i1> [[TMP20]], i64 0
+; CHECK-NEXT:    [[TMP16:%.*]] = select i1 [[TMP21]], float [[T]], float [[TMP11]]
+; CHECK-NEXT:    [[TMP18:%.*]] = xor i1 [[TMP6]], true
+; CHECK-NEXT:    br i1 [[TMP18]], label [[OUT:%.*]], label [[SCALAR_PH:%.*]]
+; CHECK:       scalar.ph:
+; CHECK-NEXT:    br label [[LOOP1:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[T1:%.*]] = phi i64 [ [[T7:%.*]], [[LOOP]] ], [ 1, [[TOP:%.*]] ]
-; CHECK-NEXT:    [[T2:%.*]] = phi float [ [[T6:%.*]], [[LOOP]] ], [ [[T]], [[TOP]] ]
+; CHECK-NEXT:    [[T1:%.*]] = phi i64 [ [[T7:%.*]], [[LOOP1]] ], [ [[TMP15]], [[SCALAR_PH]] ]
+; CHECK-NEXT:    [[T2:%.*]] = phi float [ [[T6:%.*]], [[LOOP1]] ], [ [[TMP16]], [[SCALAR_PH]] ]
 ; CHECK-NEXT:    [[T3:%.*]] = getelementptr float, ptr [[ARG]], i64 [[T1]]
 ; CHECK-NEXT:    [[T4:%.*]] = load float, ptr [[T3]], align 4
 ; CHECK-NEXT:    [[T5:%.*]] = fcmp olt float [[T2]], [[T4]]
 ; CHECK-NEXT:    [[T6]] = select i1 [[T5]], float [[T2]], float [[T4]]
 ; CHECK-NEXT:    [[T7]] = add i64 [[T1]], 1
 ; CHECK-NEXT:    [[T8:%.*]] = icmp eq i64 [[T7]], 65537
-; CHECK-NEXT:    br i1 [[T8]], label [[OUT:%.*]], label [[LOOP]]
+; CHECK-NEXT:    br i1 [[T8]], label [[OUT]], label [[LOOP1]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       out:
-; CHECK-NEXT:    [[T6_LCSSA:%.*]] = phi float [ [[T6]], [[LOOP]] ]
+; CHECK-NEXT:    [[T6_LCSSA:%.*]] = phi float [ [[T6]], [[LOOP1]] ], [ [[TMP16]], [[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    ret float [[T6_LCSSA]]
 ;
 top:
@@ -82,25 +166,69 @@ out:
   ret float %t6
 }
 
-; Check if vectorization is prevented without the flag or attribute.
+; Without the flag or attribute, the loop is vectorized with checks for NaN
+; inputs and zero inputs of the wrong sign, and selects the start value on NaN
+; results.
 
 define float @minloopnovec(ptr nocapture readonly %arg) {
 ; CHECK-LABEL: @minloopnovec(
 ; CHECK-NEXT:  top:
 ; CHECK-NEXT:    [[T:%.*]] = load float, ptr [[ARG:%.*]], align 4
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK:       vector.ph:
+; CHECK-NEXT:    [[TMP22:%.*]] = freeze float [[T]]
+; CHECK-NEXT:    [[TMP23:%.*]] = bitcast float [[TMP22]] to i32
+; CHECK-NEXT:    [[TMP24:%.*]] = icmp eq i32 [[TMP23]], -2147483648
+; CHECK-NEXT:    [[TMP25:%.*]] = select i1 [[TMP24]], i32 0, i32 -2147483648
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <4 x i32> poison, i32 [[TMP25]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT1:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT2]], <4 x i32> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x float> poison, float [[T]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT]], <4 x float> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
+; CHECK:       vector.body:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[LOOP]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x float> [ [[BROADCAST_SPLAT]], [[LOOP]] ], [ [[TMP4:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 1, [[INDEX]]
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr float, ptr [[ARG]], i64 [[TMP0]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP1]], align 4
+; CHECK-NEXT:    [[TMP2:%.*]] = fcmp olt <4 x float> [[VEC_PHI]], [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP3:%.*]] = freeze <4 x float> [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP4]] = select <4 x i1> [[TMP2]], <4 x float> [[VEC_PHI]], <4 x float> [[TMP3]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP5:%.*]] = fcmp uno <4 x float> [[TMP3]], [[TMP3]]
+; CHECK-NEXT:    [[TMP26:%.*]] = bitcast <4 x float> [[TMP3]] to <4 x i32>
+; CHECK-NEXT:    [[TMP27:%.*]] = icmp eq <4 x i32> [[TMP26]], [[BROADCAST_SPLAT1]]
+; CHECK-NEXT:    [[TMP28:%.*]] = or <4 x i1> [[TMP5]], [[TMP27]]
+; CHECK-NEXT:    [[TMP6:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP28]])
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], 65536
+; CHECK-NEXT:    [[TMP8:%.*]] = or i1 [[TMP6]], [[TMP7]]
+; CHECK-NEXT:    br i1 [[TMP8]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
+; CHECK:       middle.block:
+; CHECK-NEXT:    [[TMP9:%.*]] = select i1 [[TMP6]], <4 x float> [[VEC_PHI]], <4 x float> [[TMP4]]
+; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP6]], i64 [[INDEX]], i64 65536
+; CHECK-NEXT:    [[TMP11:%.*]] = call float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[TMP9]])
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x float> poison, float [[TMP11]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT1]], <4 x float> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP15:%.*]] = add i64 1, [[TMP10]]
+; CHECK-NEXT:    [[TMP20:%.*]] = fcmp uno <4 x float> [[BROADCAST_SPLAT2]], [[BROADCAST_SPLAT2]]
+; CHECK-NEXT:    [[TMP21:%.*]] = extractelement <4 x i1> [[TMP20]], i64 0
+; CHECK-NEXT:    [[TMP16:%.*]] = select i1 [[TMP21]], float [[T]], float [[TMP11]]
+; CHECK-NEXT:    [[TMP18:%.*]] = xor i1 [[TMP6]], true
+; CHECK-NEXT:    br i1 [[TMP18]], label [[OUT:%.*]], label [[SCALAR_PH:%.*]]
+; CHECK:       scalar.ph:
+; CHECK-NEXT:    br label [[LOOP1:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[T1:%.*]] = phi i64 [ [[T7:%.*]], [[LOOP]] ], [ 1, [[TOP:%.*]] ]
-; CHECK-NEXT:    [[T2:%.*]] = phi float [ [[T6:%.*]], [[LOOP]] ], [ [[T]], [[TOP]] ]
+; CHECK-NEXT:    [[T1:%.*]] = phi i64 [ [[T7:%.*]], [[LOOP1]] ], [ [[TMP15]], [[SCALAR_PH]] ]
+; CHECK-NEXT:    [[T2:%.*]] = phi float [ [[T6:%.*]], [[LOOP1]] ], [ [[TMP16]], [[SCALAR_PH]] ]
 ; CHECK-NEXT:    [[T3:%.*]] = getelementptr float, ptr [[ARG]], i64 [[T1]]
 ; CHECK-NEXT:    [[T4:%.*]] = load float, ptr [[T3]], align 4
 ; CHECK-NEXT:    [[T5:%.*]] = fcmp olt float [[T2]], [[T4]]
 ; CHECK-NEXT:    [[T6]] = select i1 [[T5]], float [[T2]], float [[T4]]
 ; CHECK-NEXT:    [[T7]] = add i64 [[T1]], 1
 ; CHECK-NEXT:    [[T8:%.*]] = icmp eq i64 [[T7]], 65537
-; CHECK-NEXT:    br i1 [[T8]], label [[OUT:%.*]], label [[LOOP]]
+; CHECK-NEXT:    br i1 [[T8]], label [[OUT]], label [[LOOP1]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:       out:
-; CHECK-NEXT:    [[T6_LCSSA:%.*]] = phi float [ [[T6]], [[LOOP]] ]
+; CHECK-NEXT:    [[T6_LCSSA:%.*]] = phi float [ [[T6]], [[LOOP1]] ], [ [[TMP16]], [[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    ret float [[T6_LCSSA]]
 ;
 top:
@@ -122,25 +250,67 @@ out:
   ret float %t6
 }
 
-; This test is checking that we don't vectorize when only one of the required flags is set.
+; Function attributes are not used, so this is vectorized like @minloopnovec.
 
 define float @minloopmissingnsz(ptr nocapture readonly %arg) #1 {
 ; CHECK-LABEL: @minloopmissingnsz(
 ; CHECK-NEXT:  top:
 ; CHECK-NEXT:    [[T:%.*]] = load float, ptr [[ARG:%.*]], align 4
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK:       vector.ph:
+; CHECK-NEXT:    [[TMP22:%.*]] = freeze float [[T]]
+; CHECK-NEXT:    [[TMP23:%.*]] = bitcast float [[TMP22]] to i32
+; CHECK-NEXT:    [[TMP24:%.*]] = icmp eq i32 [[TMP23]], -2147483648
+; CHECK-NEXT:    [[TMP25:%.*]] = select i1 [[TMP24]], i32 0, i32 -2147483648
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <4 x i32> poison, i32 [[TMP25]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT1:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT2]], <4 x i32> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x float> poison, float [[T]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT]], <4 x float> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
+; CHECK:       vector.body:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[LOOP]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x float> [ [[BROADCAST_SPLAT]], [[LOOP]] ], [ [[TMP4:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 1, [[INDEX]]
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr float, ptr [[ARG]], i64 [[TMP0]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP1]], align 4
+; CHECK-NEXT:    [[TMP2:%.*]] = fcmp olt <4 x float> [[VEC_PHI]], [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP3:%.*]] = freeze <4 x float> [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP4]] = select <4 x i1> [[TMP2]], <4 x float> [[VEC_PHI]], <4 x float> [[TMP3]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP5:%.*]] = fcmp uno <4 x float> [[TMP3]], [[TMP3]]
+; CHECK-NEXT:    [[TMP26:%.*]] = bitcast <4 x float> [[TMP3]] to <4 x i32>
+; CHECK-NEXT:    [[TMP27:%.*]] = icmp eq <4 x i32> [[TMP26]], [[BROADCAST_SPLAT1]]
+; CHECK-NEXT:    [[TMP28:%.*]] = or <4 x i1> [[TMP5]], [[TMP27]]
+; CHECK-NEXT:    [[TMP6:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP28]])
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], 65536
+; CHECK-NEXT:    [[TMP8:%.*]] = or i1 [[TMP6]], [[TMP7]]
+; CHECK-NEXT:    br i1 [[TMP8]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
+; CHECK:       middle.block:
+; CHECK-NEXT:    [[TMP9:%.*]] = select i1 [[TMP6]], <4 x float> [[VEC_PHI]], <4 x float> [[TMP4]]
+; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP6]], i64 [[INDEX]], i64 65536
+; CHECK-NEXT:    [[TMP11:%.*]] = call float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[TMP9]])
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x float> poison, float [[TMP11]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT1]], <4 x float> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP15:%.*]] = add i64 1, [[TMP10]]
+; CHECK-NEXT:    [[TMP20:%.*]] = fcmp uno <4 x float> [[BROADCAST_SPLAT2]], [[BROADCAST_SPLAT2]]
+; CHECK-NEXT:    [[TMP21:%.*]] = extractelement <4 x i1> [[TMP20]], i64 0
+; CHECK-NEXT:    [[TMP16:%.*]] = select i1 [[TMP21]], float [[T]], float [[TMP11]]
+; CHECK-NEXT:    [[TMP18:%.*]] = xor i1 [[TMP6]], true
+; CHECK-NEXT:    br i1 [[TMP18]], label [[OUT:%.*]], label [[SCALAR_PH:%.*]]
+; CHECK:       scalar.ph:
+; CHECK-NEXT:    br label [[LOOP1:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[T1:%.*]] = phi i64 [ [[T7:%.*]], [[LOOP]] ], [ 1, [[TOP:%.*]] ]
-; CHECK-NEXT:    [[T2:%.*]] = phi float [ [[T6:%.*]], [[LOOP]] ], [ [[T]], [[TOP]] ]
+; CHECK-NEXT:    [[T1:%.*]] = phi i64 [ [[T7:%.*]], [[LOOP1]] ], [ [[TMP15]], [[SCALAR_PH]] ]
+; CHECK-NEXT:    [[T2:%.*]] = phi float [ [[T6:%.*]], [[LOOP1]] ], [ [[TMP16]], [[SCALAR_PH]] ]
 ; CHECK-NEXT:    [[T3:%.*]] = getelementptr float, ptr [[ARG]], i64 [[T1]]
 ; CHECK-NEXT:    [[T4:%.*]] = load float, ptr [[T3]], align 4
 ; CHECK-NEXT:    [[T5:%.*]] = fcmp olt float [[T2]], [[T4]]
 ; CHECK-NEXT:    [[T6]] = select i1 [[T5]], float [[T2]], float [[T4]]
 ; CHECK-NEXT:    [[T7]] = add i64 [[T1]], 1
 ; CHECK-NEXT:    [[T8:%.*]] = icmp eq i64 [[T7]], 65537
-; CHECK-NEXT:    br i1 [[T8]], label [[OUT:%.*]], label [[LOOP]]
+; CHECK-NEXT:    br i1 [[T8]], label [[OUT]], label [[LOOP1]], !llvm.loop [[LOOP9:![0-9]+]]
 ; CHECK:       out:
-; CHECK-NEXT:    [[T6_LCSSA:%.*]] = phi float [ [[T6]], [[LOOP]] ]
+; CHECK-NEXT:    [[T6_LCSSA:%.*]] = phi float [ [[T6]], [[LOOP1]] ], [ [[TMP16]], [[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    ret float [[T6_LCSSA]]
 ;
 top:

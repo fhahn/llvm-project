@@ -1905,10 +1905,13 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan,
       continue;
     }
 
-    // TODO: Support non-constant and NaN start values.
+    // With tail folding, lanes that are never active keep the start value. If
+    // it may be NaN, reducing all lanes may not match the scalar loop, e.g. for
+    // signaling NaNs.
+    // TODO: Support start values that may be NaN with tail folding.
     if (RecurrenceDescriptor::isFPMinMaxSelectRecurrenceKind(Kind)) {
       const ConstantFP *StartC = GetConstantFPStart(Cur);
-      if (!StartC || StartC->isNaN())
+      if (Plan.hasTailFolded() && (!StartC || StartC->isNaN()))
         return false;
     }
 
@@ -1961,6 +1964,7 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan,
   }
 
   VPBuilder LatchBuilder(LatchVPBB->getTerminator());
+  VPBuilder PHBuilder(Plan.getVectorPreheader());
   VPValue *AllNaNLanes = nullptr;
   SmallPtrSet<VPValue *, 2> RdxResults;
   for (const auto &[RedPhiR, MinOrMaxOp] : MinOrMaxNumReductionsToHandle) {
@@ -1970,18 +1974,28 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan,
             RedPhiR->getRecurrenceKind())) {
       // Without NaNs, select-based min/max can only pick a different value
       // than the scalar loop if zeros of both signs are combined. Exit on -0.0
-      // inputs, or on +0.0 inputs if the start value is -0.0.
+      // inputs, or on +0.0 inputs if the start value is -0.0. Freeze
+      // non-constant start values, as they feed the exit branch.
+      VPValue *Start = RedPhiR->getStartValue();
+      if (!GetConstantFPStart(RedPhiR))
+        Start = PHBuilder.createFreeze(Start);
       unsigned BitWidth = RedPhiR->getScalarType()->getScalarSizeInBits();
       auto *IntTy = IntegerType::get(Plan.getContext(), BitWidth);
       VPValue *NegZero = Plan.getConstantInt(APInt::getSignMask(BitWidth));
-      VPValue *ExitZero = GetConstantFPStart(RedPhiR)->isNegativeZeroValue()
-                              ? Plan.getZero(IntTy)
-                              : NegZero;
+      VPValue *StartBits = PHBuilder.createScalarCast(
+          Instruction::BitCast, Start, IntTy, DebugLoc::getUnknown());
+      VPValue *StartIsNegZero =
+          PHBuilder.createICmp(CmpInst::ICMP_EQ, StartBits, NegZero);
+      VPValue *ExitZero =
+          PHBuilder.createSelect(StartIsNegZero, Plan.getZero(IntTy), NegZero);
       VPValue *InputBits;
       if (MinVF.isScalar()) {
         InputBits = LatchBuilder.createScalarCast(
             Instruction::BitCast, MinOrMaxOp, IntTy, DebugLoc::getUnknown());
       } else {
+        // TODO: materializeBroadcasts does not cover values in the vector
+        // preheader.
+        ExitZero = PHBuilder.createNaryOp(VPInstruction::Broadcast, ExitZero);
         InputBits = LatchBuilder.createWidenCast(Instruction::BitCast,
                                                  MinOrMaxOp, IntTy);
       }
@@ -2014,6 +2028,22 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan,
       cast<VPRecipeWithIRFlags>(RdxResult->getOperand(0))
           ->dropPoisonGeneratingFlags();
       RdxResult->dropPoisonGeneratingFlags();
+
+      // If the start value may be NaN, comparisons with the phi are constant
+      // for non-NaN inputs, so either all lanes keep the start value or none
+      // does. In the former case the result is NaN; use the start value
+      // directly, as reducing the lanes may not preserve its NaN payload.
+      const ConstantFP *StartC = GetConstantFPStart(RedPhiR);
+      if (!StartC || StartC->isNaN()) {
+        VPBuilder Builder = VPBuilder::getToInsertAfter(RdxResult);
+        auto *IsNaN =
+            Builder.createFCmp(CmpInst::FCMP_UNO, RdxResult, RdxResult);
+        auto *Sel =
+            Builder.createSelect(IsNaN, RedPhiR->getStartValue(), RdxResult);
+        RdxResult->replaceUsesWithIf(
+            Sel, [IsNaN, Sel](VPUser *U) { return U != IsNaN && U != Sel; });
+        RdxResults.insert(Sel);
+      }
     }
 
     auto *NewSel = MiddleBuilder.createSelect(AnyNaNLane, RedPhiR,
