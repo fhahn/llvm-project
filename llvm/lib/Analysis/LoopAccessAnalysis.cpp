@@ -3728,6 +3728,21 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
 
   for (LoadInst *LD : Loads) {
     Value *Ptr = LD->getPointerOperand();
+    MemoryLocation Loc = MemoryLocation::get(LD);
+    // The TBAA metadata could have a control dependency on the predication
+    // condition, so we cannot rely on it when determining whether or not we
+    // need runtime pointer checks.
+    if (blockNeedsPredication(LD->getParent(), TheLoop, DT))
+      Loc.AATags.TBAA = nullptr;
+
+    // Loads from constant memory cannot conflict with any store in the loop,
+    // so they need neither dependence nor runtime checks.
+    if (AA->pointsToConstantMemory(Loc)) {
+      LLVM_DEBUG(dbgs() << "LAA: Skipping load from constant memory: " << *LD
+                        << "\n");
+      continue;
+    }
+
     // If we did *not* see this pointer before, insert it to the read list. If
     // we *did* see it before, then it is already in the read-write list. This
     // allows us to vectorize expressions such as A[i] += x; Because the address
@@ -3752,13 +3767,6 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
                            "load and uniform store to the same address!\n");
       HasLoadStoreDependenceInvolvingLoopInvariantAddress = true;
     }
-
-    MemoryLocation Loc = MemoryLocation::get(LD);
-    // The TBAA metadata could have a control dependency on the predication
-    // condition, so we cannot rely on it when determining whether or not we
-    // need runtime pointer checks.
-    if (blockNeedsPredication(LD->getParent(), TheLoop, DT))
-      Loc.AATags.TBAA = nullptr;
 
     // Expand forked pointers (i.e., a phi of multiple strided pointers) into
     // all alternatives.
