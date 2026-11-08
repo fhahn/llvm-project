@@ -4438,7 +4438,11 @@ canNarrowOps(ArrayRef<VPValue *> Ops, bool IsScalable,
 
   // The first member is narrowed in place using the other members' operands.
   // Bail out if a value is the first member of one list and also part of a
-  // different list.
+  // different list. If WideMember0 has been seen already, the checks below
+  // ensure Ops is the list it was seen in, which has been checked successfully
+  // already: failures of lists checked here abort the transform, as
+  // canNarrowLoad does not accept their first members.
+  bool AlreadyChecked = FirstMembersOf.contains(WideMember0);
   for (VPValue *V : Ops) {
     if (V->isDefinedOutsideLoopRegions())
       continue;
@@ -4447,6 +4451,9 @@ canNarrowOps(ArrayRef<VPValue *> Ops, bool IsScalable,
         !equal(It->second, Ops))
       return false;
   }
+
+  if (AlreadyChecked)
+    return true;
 
   for (unsigned Idx = 0; Idx != WideMember0->getNumOperands(); ++Idx) {
     SmallVector<VPValue *> OpsI;
@@ -4560,6 +4567,7 @@ static VPValue *narrowInterleaveGroupOp(ArrayRef<VPValue *> Members,
       WideMember0->setOperand(
           Idx, narrowInterleaveGroupOp(OpsI, NarrowedOps, Preheader));
     }
+    NarrowedOps.insert(V);
     return V;
   }
 

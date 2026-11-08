@@ -709,3 +709,144 @@ loop:
 exit:
   ret void
 }
+
+; Each member is computed by a deep chain of multiplies, using the previous
+; value of the chain as both operands. Make sure shared operand trees are not
+; re-walked when checking and narrowing the chains.
+define void @test_2xi64_deep_mul_chains(ptr noalias %data) {
+; VF2-LABEL: define void @test_2xi64_deep_mul_chains(
+; VF2-SAME: ptr noalias [[DATA:%.*]]) {
+; VF2-NEXT:  [[ENTRY:.*:]]
+; VF2-NEXT:    br label %[[VECTOR_PH:.*]]
+; VF2:       [[VECTOR_PH]]:
+; VF2-NEXT:    br label %[[VECTOR_BODY:.*]]
+; VF2:       [[VECTOR_BODY]]:
+; VF2-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; VF2-NEXT:    [[TMP0:%.*]] = shl nsw i64 [[INDEX]], 1
+; VF2-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i64, ptr [[DATA]], i64 [[TMP0]]
+; VF2-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i64>, ptr [[TMP1]], align 8
+; VF2-NEXT:    [[TMP2:%.*]] = mul <2 x i64> [[WIDE_LOAD]], [[WIDE_LOAD]]
+; VF2-NEXT:    [[TMP3:%.*]] = mul <2 x i64> [[TMP2]], [[TMP2]]
+; VF2-NEXT:    [[TMP4:%.*]] = mul <2 x i64> [[TMP3]], [[TMP3]]
+; VF2-NEXT:    [[TMP5:%.*]] = mul <2 x i64> [[TMP4]], [[TMP4]]
+; VF2-NEXT:    [[TMP6:%.*]] = mul <2 x i64> [[TMP5]], [[TMP5]]
+; VF2-NEXT:    [[TMP7:%.*]] = mul <2 x i64> [[TMP6]], [[TMP6]]
+; VF2-NEXT:    [[TMP8:%.*]] = mul <2 x i64> [[TMP7]], [[TMP7]]
+; VF2-NEXT:    [[TMP9:%.*]] = mul <2 x i64> [[TMP8]], [[TMP8]]
+; VF2-NEXT:    [[TMP10:%.*]] = mul <2 x i64> [[TMP9]], [[TMP9]]
+; VF2-NEXT:    [[TMP11:%.*]] = mul <2 x i64> [[TMP10]], [[TMP10]]
+; VF2-NEXT:    [[TMP12:%.*]] = mul <2 x i64> [[TMP11]], [[TMP11]]
+; VF2-NEXT:    [[TMP13:%.*]] = mul <2 x i64> [[TMP12]], [[TMP12]]
+; VF2-NEXT:    [[TMP14:%.*]] = mul <2 x i64> [[TMP13]], [[TMP13]]
+; VF2-NEXT:    [[TMP15:%.*]] = mul <2 x i64> [[TMP14]], [[TMP14]]
+; VF2-NEXT:    [[TMP16:%.*]] = mul <2 x i64> [[TMP15]], [[TMP15]]
+; VF2-NEXT:    [[TMP17:%.*]] = mul <2 x i64> [[TMP16]], [[TMP16]]
+; VF2-NEXT:    [[TMP18:%.*]] = mul <2 x i64> [[TMP17]], [[TMP17]]
+; VF2-NEXT:    [[TMP19:%.*]] = mul <2 x i64> [[TMP18]], [[TMP18]]
+; VF2-NEXT:    [[TMP20:%.*]] = mul <2 x i64> [[TMP19]], [[TMP19]]
+; VF2-NEXT:    [[TMP21:%.*]] = mul <2 x i64> [[TMP20]], [[TMP20]]
+; VF2-NEXT:    [[TMP22:%.*]] = mul <2 x i64> [[TMP21]], [[TMP21]]
+; VF2-NEXT:    [[TMP23:%.*]] = mul <2 x i64> [[TMP22]], [[TMP22]]
+; VF2-NEXT:    [[TMP24:%.*]] = mul <2 x i64> [[TMP23]], [[TMP23]]
+; VF2-NEXT:    [[TMP25:%.*]] = mul <2 x i64> [[TMP24]], [[TMP24]]
+; VF2-NEXT:    [[TMP26:%.*]] = mul <2 x i64> [[TMP25]], [[TMP25]]
+; VF2-NEXT:    [[TMP27:%.*]] = mul <2 x i64> [[TMP26]], [[TMP26]]
+; VF2-NEXT:    [[TMP28:%.*]] = mul <2 x i64> [[TMP27]], [[TMP27]]
+; VF2-NEXT:    [[TMP29:%.*]] = mul <2 x i64> [[TMP28]], [[TMP28]]
+; VF2-NEXT:    [[TMP30:%.*]] = mul <2 x i64> [[TMP29]], [[TMP29]]
+; VF2-NEXT:    [[TMP31:%.*]] = mul <2 x i64> [[TMP30]], [[TMP30]]
+; VF2-NEXT:    [[TMP32:%.*]] = mul <2 x i64> [[TMP31]], [[TMP31]]
+; VF2-NEXT:    [[TMP33:%.*]] = mul <2 x i64> [[TMP32]], [[TMP32]]
+; VF2-NEXT:    store <2 x i64> [[TMP33]], ptr [[TMP1]], align 8
+; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 1
+; VF2-NEXT:    [[TMP34:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
+; VF2-NEXT:    br i1 [[TMP34]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP14:![0-9]+]]
+; VF2:       [[MIDDLE_BLOCK]]:
+; VF2-NEXT:    br label %[[EXIT:.*]]
+; VF2:       [[EXIT]]:
+; VF2-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %idx.0 = shl nsw i64 %iv, 1
+  %data.0 = getelementptr inbounds i64, ptr %data, i64 %idx.0
+  %l.0 = load i64, ptr %data.0, align 8
+  %mul.0.1 = mul i64 %l.0, %l.0
+  %mul.0.2 = mul i64 %mul.0.1, %mul.0.1
+  %mul.0.3 = mul i64 %mul.0.2, %mul.0.2
+  %mul.0.4 = mul i64 %mul.0.3, %mul.0.3
+  %mul.0.5 = mul i64 %mul.0.4, %mul.0.4
+  %mul.0.6 = mul i64 %mul.0.5, %mul.0.5
+  %mul.0.7 = mul i64 %mul.0.6, %mul.0.6
+  %mul.0.8 = mul i64 %mul.0.7, %mul.0.7
+  %mul.0.9 = mul i64 %mul.0.8, %mul.0.8
+  %mul.0.10 = mul i64 %mul.0.9, %mul.0.9
+  %mul.0.11 = mul i64 %mul.0.10, %mul.0.10
+  %mul.0.12 = mul i64 %mul.0.11, %mul.0.11
+  %mul.0.13 = mul i64 %mul.0.12, %mul.0.12
+  %mul.0.14 = mul i64 %mul.0.13, %mul.0.13
+  %mul.0.15 = mul i64 %mul.0.14, %mul.0.14
+  %mul.0.16 = mul i64 %mul.0.15, %mul.0.15
+  %mul.0.17 = mul i64 %mul.0.16, %mul.0.16
+  %mul.0.18 = mul i64 %mul.0.17, %mul.0.17
+  %mul.0.19 = mul i64 %mul.0.18, %mul.0.18
+  %mul.0.20 = mul i64 %mul.0.19, %mul.0.19
+  %mul.0.21 = mul i64 %mul.0.20, %mul.0.20
+  %mul.0.22 = mul i64 %mul.0.21, %mul.0.21
+  %mul.0.23 = mul i64 %mul.0.22, %mul.0.22
+  %mul.0.24 = mul i64 %mul.0.23, %mul.0.23
+  %mul.0.25 = mul i64 %mul.0.24, %mul.0.24
+  %mul.0.26 = mul i64 %mul.0.25, %mul.0.25
+  %mul.0.27 = mul i64 %mul.0.26, %mul.0.26
+  %mul.0.28 = mul i64 %mul.0.27, %mul.0.27
+  %mul.0.29 = mul i64 %mul.0.28, %mul.0.28
+  %mul.0.30 = mul i64 %mul.0.29, %mul.0.29
+  %mul.0.31 = mul i64 %mul.0.30, %mul.0.30
+  %mul.0.32 = mul i64 %mul.0.31, %mul.0.31
+  store i64 %mul.0.32, ptr %data.0, align 8
+  %idx.1 = or disjoint i64 %idx.0, 1
+  %data.1 = getelementptr inbounds i64, ptr %data, i64 %idx.1
+  %l.1 = load i64, ptr %data.1, align 8
+  %mul.1.1 = mul i64 %l.1, %l.1
+  %mul.1.2 = mul i64 %mul.1.1, %mul.1.1
+  %mul.1.3 = mul i64 %mul.1.2, %mul.1.2
+  %mul.1.4 = mul i64 %mul.1.3, %mul.1.3
+  %mul.1.5 = mul i64 %mul.1.4, %mul.1.4
+  %mul.1.6 = mul i64 %mul.1.5, %mul.1.5
+  %mul.1.7 = mul i64 %mul.1.6, %mul.1.6
+  %mul.1.8 = mul i64 %mul.1.7, %mul.1.7
+  %mul.1.9 = mul i64 %mul.1.8, %mul.1.8
+  %mul.1.10 = mul i64 %mul.1.9, %mul.1.9
+  %mul.1.11 = mul i64 %mul.1.10, %mul.1.10
+  %mul.1.12 = mul i64 %mul.1.11, %mul.1.11
+  %mul.1.13 = mul i64 %mul.1.12, %mul.1.12
+  %mul.1.14 = mul i64 %mul.1.13, %mul.1.13
+  %mul.1.15 = mul i64 %mul.1.14, %mul.1.14
+  %mul.1.16 = mul i64 %mul.1.15, %mul.1.15
+  %mul.1.17 = mul i64 %mul.1.16, %mul.1.16
+  %mul.1.18 = mul i64 %mul.1.17, %mul.1.17
+  %mul.1.19 = mul i64 %mul.1.18, %mul.1.18
+  %mul.1.20 = mul i64 %mul.1.19, %mul.1.19
+  %mul.1.21 = mul i64 %mul.1.20, %mul.1.20
+  %mul.1.22 = mul i64 %mul.1.21, %mul.1.21
+  %mul.1.23 = mul i64 %mul.1.22, %mul.1.22
+  %mul.1.24 = mul i64 %mul.1.23, %mul.1.23
+  %mul.1.25 = mul i64 %mul.1.24, %mul.1.24
+  %mul.1.26 = mul i64 %mul.1.25, %mul.1.25
+  %mul.1.27 = mul i64 %mul.1.26, %mul.1.26
+  %mul.1.28 = mul i64 %mul.1.27, %mul.1.27
+  %mul.1.29 = mul i64 %mul.1.28, %mul.1.28
+  %mul.1.30 = mul i64 %mul.1.29, %mul.1.29
+  %mul.1.31 = mul i64 %mul.1.30, %mul.1.30
+  %mul.1.32 = mul i64 %mul.1.31, %mul.1.31
+  store i64 %mul.1.32, ptr %data.1, align 8
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 100
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
