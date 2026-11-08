@@ -509,4 +509,35 @@ leave:
   ret void
 }
 
+; The range of a select of two constants is the union of the constants, which
+; is tighter than its known bits. Used as a loop bound, this gives a tight
+; constant max backedge-taken count.
+define void @select_of_constants_bound(i1 %c) {
+; CHECK-LABEL: 'select_of_constants_bound'
+; CHECK-NEXT:  Classifying expressions for: @select_of_constants_bound
+; CHECK-NEXT:    %n = select i1 %c, i64 5, i64 2
+; CHECK-NEXT:    --> %n U: [0,8) S: [0,8)
+; CHECK-NEXT:    %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,7) S: [0,7) Exits: (-1 + (1 umax %n))<nsw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nuw nsw i64 %iv, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,8) S: [1,8) Exits: (1 umax %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @select_of_constants_bound
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (1 umax %n))<nsw>
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 6
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (1 umax %n))<nsw>
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %n = select i1 %c, i64 5, i64 2
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp ult i64 %iv.next, %n
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  ret void
+}
 
