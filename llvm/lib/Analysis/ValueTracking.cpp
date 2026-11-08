@@ -1318,6 +1318,57 @@ static KnownBits computeKnownBitsForHorizontalOperation(
       .intersectWith(ComputeForSingleOpFunc(I->getOperand(1), DemandedEltsRHS));
 }
 
+/// Compute known bits for an AArch64 NEON tbl/tbx with a constant mask. Each
+/// result lane is a byte of the concatenated table operands, or, for an
+/// out-of-range index, zero (tbl) or the corresponding lane of the fallback
+/// operand (tbx).
+static KnownBits computeKnownBitsForNeonTbl(const IntrinsicInst *II,
+                                            const APInt &DemandedElts,
+                                            bool IsTbx, const SimplifyQuery &Q,
+                                            unsigned Depth) {
+  unsigned BitWidth = II->getType()->getScalarSizeInBits();
+  auto *Mask = dyn_cast<Constant>(II->getArgOperand(II->arg_size() - 1));
+  if (!Mask)
+    return KnownBits(BitWidth);
+
+  unsigned FirstTable = IsTbx ? 1 : 0;
+  unsigned NumTables = II->arg_size() - 1 - FirstTable;
+  unsigned TableElts =
+      cast<FixedVectorType>(II->getArgOperand(FirstTable)->getType())
+          ->getNumElements();
+  SmallVector<APInt> DemandedTableElts(NumTables, APInt(TableElts, 0));
+  APInt DemandedFallbackElts(DemandedElts.getBitWidth(), 0);
+  bool HasZeroLane = false;
+  for (unsigned I : seq(DemandedElts.getBitWidth())) {
+    if (!DemandedElts[I])
+      continue;
+    auto *Idx = dyn_cast_or_null<ConstantInt>(Mask->getAggregateElement(I));
+    if (!Idx)
+      return KnownBits(BitWidth);
+    uint64_t Index = Idx->getZExtValue();
+    if (Index < NumTables * TableElts)
+      DemandedTableElts[Index / TableElts].setBit(Index % TableElts);
+    else if (IsTbx)
+      DemandedFallbackElts.setBit(I);
+    else
+      HasZeroLane = true;
+  }
+
+  KnownBits Known(BitWidth);
+  Known.setAllConflict();
+  if (HasZeroLane)
+    Known = Known.intersectWith(KnownBits::makeConstant(APInt(BitWidth, 0)));
+  if (!DemandedFallbackElts.isZero())
+    Known = Known.intersectWith(computeKnownBits(
+        II->getArgOperand(0), DemandedFallbackElts, Q, Depth + 1));
+  for (unsigned T : seq(NumTables))
+    if (!DemandedTableElts[T].isZero())
+      Known = Known.intersectWith(
+          computeKnownBits(II->getArgOperand(FirstTable + T),
+                           DemandedTableElts[T], Q, Depth + 1));
+  return Known;
+}
+
 // Public so this can be used in `SimplifyDemandedUseBits`.
 KnownBits llvm::analyzeKnownBitsFromAndXorOr(const Operator *I,
                                              const KnownBits &KnownLHS,
@@ -2348,6 +2399,20 @@ static void computeKnownBitsFromOperator(const Operator *I,
         Known &= Known2.anyextOrTrunc(BitWidth);
         break;
       }
+      case Intrinsic::aarch64_neon_tbl1:
+      case Intrinsic::aarch64_neon_tbl2:
+      case Intrinsic::aarch64_neon_tbl3:
+      case Intrinsic::aarch64_neon_tbl4:
+        Known = computeKnownBitsForNeonTbl(II, DemandedElts, /*IsTbx=*/false, Q,
+                                           Depth);
+        break;
+      case Intrinsic::aarch64_neon_tbx1:
+      case Intrinsic::aarch64_neon_tbx2:
+      case Intrinsic::aarch64_neon_tbx3:
+      case Intrinsic::aarch64_neon_tbx4:
+        Known = computeKnownBitsForNeonTbl(II, DemandedElts, /*IsTbx=*/true, Q,
+                                           Depth);
+        break;
       case Intrinsic::x86_sse42_crc32_64_64:
         Known.Zero.setBitsFrom(32);
         break;

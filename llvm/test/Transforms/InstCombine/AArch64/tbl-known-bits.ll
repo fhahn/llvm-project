@@ -13,8 +13,7 @@ define <8 x i16> @tbl2_zext_bytes(<16 x i8> %a, <16 x i8> %b) {
 ; CHECK-SAME: <16 x i8> [[A:%.*]], <16 x i8> [[B:%.*]]) {
 ; CHECK-NEXT:    [[T:%.*]] = call <16 x i8> @llvm.aarch64.neon.tbl2.v16i8(<16 x i8> [[A]], <16 x i8> [[B]], <16 x i8> <i8 3, i8 33, i8 7, i8 33, i8 11, i8 33, i8 15, i8 33, i8 19, i8 33, i8 23, i8 33, i8 27, i8 33, i8 31, i8 33>)
 ; CHECK-NEXT:    [[W:%.*]] = bitcast <16 x i8> [[T]] to <8 x i16>
-; CHECK-NEXT:    [[R:%.*]] = and <8 x i16> [[W]], splat (i16 255)
-; CHECK-NEXT:    ret <8 x i16> [[R]]
+; CHECK-NEXT:    ret <8 x i16> [[W]]
 ;
   %t = call <16 x i8> @llvm.aarch64.neon.tbl2.v16i8(<16 x i8> %a, <16 x i8> %b, <16 x i8> <i8 3, i8 33, i8 7, i8 33, i8 11, i8 33, i8 15, i8 33, i8 19, i8 33, i8 23, i8 33, i8 27, i8 33, i8 31, i8 33>)
   %w = bitcast <16 x i8> %t to <8 x i16>
@@ -28,9 +27,7 @@ define <8 x i16> @tbl2_zext_fp_roundtrip(<16 x i8> %a, <16 x i8> %b) {
 ; CHECK-SAME: <16 x i8> [[A:%.*]], <16 x i8> [[B:%.*]]) {
 ; CHECK-NEXT:    [[T:%.*]] = call <16 x i8> @llvm.aarch64.neon.tbl2.v16i8(<16 x i8> [[A]], <16 x i8> [[B]], <16 x i8> <i8 3, i8 33, i8 7, i8 33, i8 11, i8 33, i8 15, i8 33, i8 19, i8 33, i8 23, i8 33, i8 27, i8 33, i8 31, i8 33>)
 ; CHECK-NEXT:    [[W:%.*]] = bitcast <16 x i8> [[T]] to <8 x i16>
-; CHECK-NEXT:    [[F:%.*]] = uitofp <8 x i16> [[W]] to <8 x half>
-; CHECK-NEXT:    [[R:%.*]] = call <8 x i16> @llvm.fptoui.sat.v8i16.v8f16(<8 x half> [[F]])
-; CHECK-NEXT:    ret <8 x i16> [[R]]
+; CHECK-NEXT:    ret <8 x i16> [[W]]
 ;
   %t = call <16 x i8> @llvm.aarch64.neon.tbl2.v16i8(<16 x i8> %a, <16 x i8> %b, <16 x i8> <i8 3, i8 33, i8 7, i8 33, i8 11, i8 33, i8 15, i8 33, i8 19, i8 33, i8 23, i8 33, i8 27, i8 33, i8 31, i8 33>)
   %w = bitcast <16 x i8> %t to <8 x i16>
@@ -47,8 +44,7 @@ define <16 x i8> @tbl3_tables_known(<16 x i8> %x, <16 x i8> %y, <16 x i8> %z) {
 ; CHECK-NEXT:    [[B:%.*]] = and <16 x i8> [[Y]], splat (i8 7)
 ; CHECK-NEXT:    [[C:%.*]] = and <16 x i8> [[Z]], splat (i8 12)
 ; CHECK-NEXT:    [[T:%.*]] = call <16 x i8> @llvm.aarch64.neon.tbl3.v16i8(<16 x i8> [[A]], <16 x i8> [[B]], <16 x i8> [[C]], <16 x i8> <i8 0, i8 16, i8 32, i8 1, i8 17, i8 33, i8 2, i8 18, i8 34, i8 3, i8 19, i8 35, i8 4, i8 20, i8 36, i8 5>)
-; CHECK-NEXT:    [[R:%.*]] = and <16 x i8> [[T]], splat (i8 15)
-; CHECK-NEXT:    ret <16 x i8> [[R]]
+; CHECK-NEXT:    ret <16 x i8> [[T]]
 ;
   %a = and <16 x i8> %x, splat (i8 15)
   %b = and <16 x i8> %y, splat (i8 7)
@@ -67,8 +63,7 @@ define <16 x i8> @tbl3_only_selected_lanes(<16 x i8> %x, <16 x i8> %y, <16 x i8>
 ; CHECK-NEXT:    [[B:%.*]] = and <16 x i8> [[Y]], <i8 15, i8 15, i8 15, i8 15, i8 15, i8 15, i8 15, i8 15, i8 -1, i8 -1, i8 -1, i8 -1, i8 -1, i8 -1, i8 -1, i8 -1>
 ; CHECK-NEXT:    [[C:%.*]] = and <16 x i8> [[Z]], splat (i8 15)
 ; CHECK-NEXT:    [[T:%.*]] = call <16 x i8> @llvm.aarch64.neon.tbl3.v16i8(<16 x i8> [[A]], <16 x i8> [[B]], <16 x i8> [[C]], <16 x i8> <i8 0, i8 16, i8 32, i8 1, i8 17, i8 33, i8 2, i8 18, i8 34, i8 3, i8 19, i8 35, i8 4, i8 20, i8 36, i8 5>)
-; CHECK-NEXT:    [[R:%.*]] = and <16 x i8> [[T]], splat (i8 15)
-; CHECK-NEXT:    ret <16 x i8> [[R]]
+; CHECK-NEXT:    ret <16 x i8> [[T]]
 ;
   %a = and <16 x i8> %x, splat (i8 15)
   %b = and <16 x i8> %y, <i8 15, i8 15, i8 15, i8 15, i8 15, i8 15, i8 15, i8 15, i8 -1, i8 -1, i8 -1, i8 -1, i8 -1, i8 -1, i8 -1, i8 -1>
@@ -104,8 +99,7 @@ define <8 x i8> @tbl2_v8i8(<16 x i8> %x, <16 x i8> %y) {
 ; CHECK-NEXT:    [[A:%.*]] = and <16 x i8> [[X]], splat (i8 15)
 ; CHECK-NEXT:    [[B:%.*]] = and <16 x i8> [[Y]], splat (i8 15)
 ; CHECK-NEXT:    [[T:%.*]] = call <8 x i8> @llvm.aarch64.neon.tbl2.v8i8(<16 x i8> [[A]], <16 x i8> [[B]], <8 x i8> <i8 0, i8 16, i8 64, i8 1, i8 17, i8 -1, i8 2, i8 18>)
-; CHECK-NEXT:    [[R:%.*]] = and <8 x i8> [[T]], splat (i8 15)
-; CHECK-NEXT:    ret <8 x i8> [[R]]
+; CHECK-NEXT:    ret <8 x i8> [[T]]
 ;
   %a = and <16 x i8> %x, splat (i8 15)
   %b = and <16 x i8> %y, splat (i8 15)
@@ -122,8 +116,7 @@ define <16 x i8> @tbx2_fallback_known(<16 x i8> %f, <16 x i8> %x, <16 x i8> %y) 
 ; CHECK-NEXT:    [[A:%.*]] = and <16 x i8> [[X]], splat (i8 15)
 ; CHECK-NEXT:    [[B:%.*]] = and <16 x i8> [[Y]], splat (i8 15)
 ; CHECK-NEXT:    [[T:%.*]] = call <16 x i8> @llvm.aarch64.neon.tbx2.v16i8(<16 x i8> [[FB]], <16 x i8> [[A]], <16 x i8> [[B]], <16 x i8> <i8 0, i8 16, i8 32, i8 1, i8 17, i8 33, i8 2, i8 18, i8 34, i8 3, i8 19, i8 35, i8 4, i8 20, i8 36, i8 5>)
-; CHECK-NEXT:    [[R:%.*]] = and <16 x i8> [[T]], splat (i8 15)
-; CHECK-NEXT:    ret <16 x i8> [[R]]
+; CHECK-NEXT:    ret <16 x i8> [[T]]
 ;
   %fb = and <16 x i8> %f, splat (i8 15)
   %a = and <16 x i8> %x, splat (i8 15)
