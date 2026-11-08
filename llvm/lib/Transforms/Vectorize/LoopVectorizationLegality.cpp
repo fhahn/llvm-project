@@ -1044,8 +1044,10 @@ bool LoopVectorizationLegality::canVectorizeInstr(Instruction &I) {
     // non-IEEE-754 compliant SIMD units.
     // This applies to floating-point math operations and calls, not memory
     // operations, shuffles, or casts, as they don't change precision or
-    // semantics.
-  } else if (I.getType()->isFloatingPointTy() && (CI || I.isBinaryOp()) &&
+    // semantics. FP compares are included too, as they can observe e.g.
+    // denormal flushing.
+  } else if (((I.getType()->isFloatingPointTy() && (CI || I.isBinaryOp())) ||
+              isa<FCmpInst>(I)) &&
              !I.isFast()) {
     LLVM_DEBUG(dbgs() << "LV: Found FP op with unsafe algebra.\n");
     Hints->setPotentiallyUnsafe();
