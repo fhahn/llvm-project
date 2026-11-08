@@ -982,6 +982,12 @@ public:
 
   LLVM_ABI_FOR_TEST FastMathFlags getFastMathFlagsOrNone() const;
 
+  /// Set the nnan fast-math flag.
+  void setNoNaNs() {
+    assert(hasFastMathFlags() && "recipe doesn't have fast-math flags");
+    getFMFsRef().NoNaNs = true;
+  }
+
   bool hasNoUnsignedWrap() const {
     switch (OpType) {
     case OperationType::OverflowingBinOp:

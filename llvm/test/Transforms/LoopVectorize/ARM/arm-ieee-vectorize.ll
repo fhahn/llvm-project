@@ -175,7 +175,8 @@ for.end:
 
 ; FP max reduction without fast-math flags
 ; CHECK: Checking a loop in 'fmax_select_no_fmf'
-; CHECK: Found an unidentified PHI
+; CHECK: Loop passed LoopVectorizationLegality checks!
+; LINUX: Potentially unsafe FP op prevents vectorization
 define float @fmax_select_no_fmf(ptr noalias nocapture readonly %a, i32 %N) {
 entry:
   br label %for.body
@@ -197,7 +198,8 @@ for.end:
 
 ; FP max reduction with a fast compare, but no fast-math flags on the select
 ; CHECK: Checking a loop in 'fmax_select_fast_fcmp'
-; CHECK: Found an unidentified PHI
+; CHECK: Loop passed LoopVectorizationLegality checks!
+; LINUX: Potentially unsafe FP op prevents vectorization
 define float @fmax_select_fast_fcmp(ptr noalias nocapture readonly %a, i32 %N) {
 entry:
   br label %for.body
