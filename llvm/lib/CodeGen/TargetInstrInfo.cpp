@@ -1025,10 +1025,7 @@ void TargetInstrInfo::getAccumulatorChain(
   MachineBasicBlock &MBB = *CurrentInstr->getParent();
   const MachineRegisterInfo &MRI = MBB.getParent()->getRegInfo();
   unsigned AccumulatorOpcode = CurrentInstr->getOpcode();
-  std::optional<unsigned> ChainStartOpCode =
-      getAccumulationStartOpcode(AccumulatorOpcode);
-
-  if (!ChainStartOpCode.has_value())
+  if (!getAccumulationStartOpcode(AccumulatorOpcode))
     return;
 
   // Push the first accumulator result to the start of the chain.

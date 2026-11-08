@@ -494,6 +494,11 @@ public:
   unsigned
   getReduceOpcodeForAccumulator(unsigned int AccumulatorOpCode) const override;
 
+  Register buildAccumulatorIdentity(MachineBasicBlock &MBB,
+                                    MachineBasicBlock::iterator InsertPt,
+                                    const DebugLoc &DL,
+                                    unsigned AccumulatorOpcode) const override;
+
   /// When getMachineCombinerPatterns() finds patterns, this function
   /// generates the instructions that could replace the original code
   /// sequence

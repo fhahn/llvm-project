@@ -1372,7 +1372,8 @@ public:
   /// accumulation into one of its operand registers.
   virtual bool isAccumulationOpcode(unsigned Opcode) const { return false; }
 
-  /// Returns an opcode which defines the accumulator used by \P Opcode.
+  /// Returns an opcode which defines the accumulator used by \P Opcode, or 0
+  /// if there is none.
   virtual unsigned getAccumulationStartOpcode(unsigned Opcode) const {
     llvm_unreachable("Function not implemented for target!");
     return 0;
@@ -1383,6 +1384,15 @@ public:
   getReduceOpcodeForAccumulator(unsigned int AccumulatorOpCode) const {
     llvm_unreachable("Function not implemented for target!");
     return 0;
+  }
+
+  /// Insert an instruction before \p InsertPt that materializes the identity
+  /// of the reduction opcode for \p AccumulatorOpcode and return the defined
+  /// virtual register, or an invalid register if the target cannot.
+  virtual Register buildAccumulatorIdentity(
+      MachineBasicBlock &MBB, MachineBasicBlock::iterator InsertPt,
+      const DebugLoc &DL, unsigned AccumulatorOpcode) const {
+    return Register();
   }
 
   /// Reduces branches of the accumulator tree into a single register.

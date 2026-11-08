@@ -88,6 +88,7 @@ public:
 
 private:
   bool combineInstructions(MachineBasicBlock *);
+  bool splitLoopCarriedAccumulators(MachineBasicBlock *MBB);
   MachineInstr *getOperandDef(const MachineOperand &MO);
   bool isTransientMI(const MachineInstr *MI);
   unsigned getDepth(SmallVectorImpl<MachineInstr *> &InsInstrs,
@@ -706,6 +707,145 @@ bool MachineCombinerImpl::combineInstructions(MachineBasicBlock *MBB) {
   return Changed;
 }
 
+/// Split loop-carried accumulator chains in the single-block loop \p MBB whose
+/// latency exceeds the resource length of the loop body. A chain starts at a
+/// header PHI, threads through accumulations with the same opcode via their
+/// accumulator operand and feeds back into the PHI:
+///
+///   %acc = PHI [%init, %ph], [%a3, %loop]
+///   %a0 = ACC %acc, ...
+///   ...
+///   %a3 = ACC %a2, ...
+///
+/// Each iteration waits for the whole chain of the previous one. Distribute
+/// the accumulations round-robin over K PHIs, the additional ones starting at
+/// the reduction identity, where K is the smallest number of chains whose
+/// latency does not exceed the resource length. The partial results are added
+/// up in the exit block.
+bool MachineCombinerImpl::splitLoopCarriedAccumulators(MachineBasicBlock *MBB) {
+  if (!TSchedModel.hasInstrSchedModel())
+    return false;
+  MachineLoop *L = MLI->getLoopFor(MBB);
+  if (!L || L->getNumBlocks() != 1)
+    return false;
+  MachineBasicBlock *Preheader = L->getLoopPreheader();
+  MachineBasicBlock *Exit = L->getExitBlock();
+  // With MBB as its only predecessor, the exit block dominates all uses of the
+  // chain result outside the loop.
+  if (!Preheader || !Exit || Exit->pred_size() != 1 ||
+      llvm::shouldOptimizeForSize(MBB, PSI, MBFI))
+    return false;
+
+  if (!TraceEnsemble)
+    TraceEnsemble = Traces->getEnsemble(TII->getMachineCombinerTraceStrategy());
+  unsigned ResLen = TraceEnsemble->getTrace(MBB).getResourceLength();
+
+  bool Changed = false;
+  // Collect the PHIs first, to not visit the ones inserted below.
+  SmallVector<MachineInstr *> Phis(make_pointer_range(MBB->phis()));
+  for (MachineInstr *Phi : Phis) {
+    Register PhiReg = Phi->getOperand(0).getReg();
+    unsigned LoopIdx = Phi->getOperand(2).getMBB() == MBB ? 1 : 3;
+    Register LoopReg = Phi->getOperand(LoopIdx).getReg();
+
+    SmallVector<MachineInstr *> Chain;
+    Register Cur = PhiReg;
+    while (Cur != LoopReg && MRI->hasOneNonDBGUse(Cur)) {
+      MachineInstr &UseMI = *MRI->use_instr_nodbg_begin(Cur);
+      if (UseMI.getParent() != MBB ||
+          !TII->isAccumulationOpcode(UseMI.getOpcode()) ||
+          UseMI.getOperand(1).getReg() != Cur ||
+          (!Chain.empty() && UseMI.getOpcode() != Chain[0]->getOpcode()))
+        break;
+      Chain.push_back(&UseMI);
+      Cur = UseMI.getOperand(0).getReg();
+    }
+    if (Chain.size() < 2 || Cur != LoopReg)
+      continue;
+
+    // In the loop, the chain result may only feed the PHI. Outside, it is
+    // replaced by the sum of the partial results, which is computed after the
+    // PHIs of the exit block.
+    if (any_of(MRI->use_nodbg_instructions(LoopReg), [&](MachineInstr &MI) {
+          if (MI.getParent() == MBB)
+            return &MI != Phi;
+          return MI.isPHI() && MI.getParent() == Exit;
+        }))
+      continue;
+
+    // All accumulations have the same opcode, so the latency from one to the
+    // next is the same throughout the chain, including across the backedge.
+    unsigned Lat = TSchedModel.computeOperandLatency(Chain[0], 0, Chain[1], 1);
+    if (Chain.size() * Lat <= ResLen)
+      continue;
+    unsigned K = divideCeil(Chain.size(), std::max(1u, ResLen / Lat));
+    LLVM_DEBUG(dbgs() << "Splitting accumulator chain of " << Chain.size()
+                      << " with latency " << Chain.size() * Lat
+                      << " and resource length " << ResLen << " into " << K
+                      << "\n");
+
+    unsigned AccOpc = Chain[0]->getOpcode();
+    DebugLoc DL = Phi->getDebugLoc();
+    Register Identity = TII->buildAccumulatorIdentity(
+        *Preheader, Preheader->getFirstTerminator(), DL, AccOpc);
+    if (!Identity)
+      continue;
+
+    // Accumulation I continues chain I % K. Chain 0 continues in Phi, the
+    // others start at the identity in new PHIs.
+    const TargetRegisterClass *RC = MRI->getRegClass(PhiReg);
+    SmallVector<Register> PhiRegs = {PhiReg};
+    for (unsigned J = 1; J != K; ++J)
+      PhiRegs.push_back(MRI->createVirtualRegister(RC));
+    SmallVector<Register> Accs(PhiRegs);
+    for (auto [I, MI] : enumerate(Chain)) {
+      MI->getOperand(1).setReg(Accs[I % K]);
+      MI->getOperand(1).setIsKill(false);
+      Accs[I % K] = MI->getOperand(0).getReg();
+    }
+    Phi->getOperand(LoopIdx).setReg(Accs[0]);
+    for (unsigned J = 1; J != K; ++J)
+      BuildMI(*MBB, MBB->getFirstNonPHI(), DL, TII->get(TargetOpcode::PHI),
+              PhiRegs[J])
+          .addReg(Identity)
+          .addMBB(Preheader)
+          .addReg(Accs[J])
+          .addMBB(MBB);
+
+    // Replace the uses of the chain result outside the loop by the sum of the
+    // partial results, computed at the start of the exit block.
+    Register Sum = MRI->createVirtualRegister(RC);
+    for (MachineOperand &MO : make_early_inc_range(MRI->use_operands(LoopReg)))
+      if (MO.getParent()->getParent() != MBB)
+        MO.setReg(Sum);
+    unsigned ReduceOpc = TII->getReduceOpcodeForAccumulator(AccOpc);
+    MachineBasicBlock::iterator InsertPt =
+        Exit->SkipPHIsAndLabels(Exit->begin());
+    Register Partial = Accs[0];
+    for (unsigned J = 1; J != K; ++J) {
+      Register Dst = J + 1 == K ? Sum : MRI->createVirtualRegister(RC);
+      BuildMI(*Exit, InsertPt, DL, TII->get(ReduceOpc), Dst)
+          .addReg(Partial)
+          .addReg(Accs[J]);
+      Partial = Dst;
+    }
+
+    // The values of the chain are partial results now, so drop their remaining
+    // debug uses.
+    MRI->markUsesInDebugValueAsUndef(PhiReg);
+    for (MachineInstr *MI : Chain)
+      MRI->markUsesInDebugValueAsUndef(MI->getOperand(0).getReg());
+    Changed = true;
+  }
+
+  if (Changed) {
+    Traces->invalidate(Preheader);
+    Traces->invalidate(MBB);
+    Traces->invalidate(Exit);
+  }
+  return Changed;
+}
+
 bool MachineCombinerImpl::run(MachineFunction &MF, MachineLoopInfo *MLI,
                               MachineTraceMetrics *Traces,
                               ProfileSummaryInfo *PSI,
@@ -735,8 +875,10 @@ bool MachineCombinerImpl::run(MachineFunction &MF, MachineLoopInfo *MLI,
   bool Changed = false;
 
   // Try to combine instructions.
-  for (auto &MBB : MF)
+  for (auto &MBB : MF) {
+    Changed |= splitLoopCarriedAccumulators(&MBB);
     Changed |= combineInstructions(&MBB);
+  }
 
   return Changed;
 }

@@ -7,35 +7,43 @@
 define <4 x i32> @udot_chain(ptr %p, <4 x i32> %init, i32 %n) {
 ; M1-LABEL: udot_chain:
 ; M1:       ; %bb.0: ; %entry
+; M1-NEXT:    movi.2d v1, #0000000000000000
+; M1-NEXT:    movi.2d v2, #0000000000000000
+; M1-NEXT:    movi.2d v3, #0000000000000000
 ; M1-NEXT:  LBB0_1: ; %loop
 ; M1-NEXT:    ; =>This Inner Loop Header: Depth=1
-; M1-NEXT:    ldp q1, q2, [x0]
-; M1-NEXT:    ldp q3, q4, [x0, #32]
-; M1-NEXT:    udot.4s v0, v1, v1
-; M1-NEXT:    udot.4s v0, v2, v2
-; M1-NEXT:    udot.4s v0, v3, v3
+; M1-NEXT:    ldp q4, q5, [x0]
+; M1-NEXT:    ldp q6, q7, [x0, #32]
 ; M1-NEXT:    udot.4s v0, v4, v4
+; M1-NEXT:    udot.4s v1, v5, v5
+; M1-NEXT:    udot.4s v2, v6, v6
+; M1-NEXT:    udot.4s v3, v7, v7
 ; M1-NEXT:    add x0, x0, #64
 ; M1-NEXT:    subs w1, w1, #1
 ; M1-NEXT:    b.ne LBB0_1
 ; M1-NEXT:  ; %bb.2: ; %exit
+; M1-NEXT:    add.4s v0, v0, v1
+; M1-NEXT:    add.4s v1, v2, v3
+; M1-NEXT:    add.4s v0, v0, v1
 ; M1-NEXT:    ret
 ;
 ; V2-LABEL: udot_chain:
 ; V2:       // %bb.0: // %entry
+; V2-NEXT:    movi v1.2d, #0000000000000000
 ; V2-NEXT:    .p2align 5, , 16
 ; V2-NEXT:  .LBB0_1: // %loop
 ; V2-NEXT:    // =>This Inner Loop Header: Depth=1
-; V2-NEXT:    ldp q1, q2, [x0]
-; V2-NEXT:    ldp q3, q4, [x0, #32]
+; V2-NEXT:    ldp q2, q3, [x0]
+; V2-NEXT:    ldp q4, q5, [x0, #32]
 ; V2-NEXT:    add x0, x0, #64
 ; V2-NEXT:    subs w1, w1, #1
-; V2-NEXT:    udot v0.4s, v1.16b, v1.16b
+; V2-NEXT:    udot v1.4s, v3.16b, v3.16b
+; V2-NEXT:    udot v1.4s, v5.16b, v5.16b
 ; V2-NEXT:    udot v0.4s, v2.16b, v2.16b
-; V2-NEXT:    udot v0.4s, v3.16b, v3.16b
 ; V2-NEXT:    udot v0.4s, v4.16b, v4.16b
 ; V2-NEXT:    b.ne .LBB0_1
 ; V2-NEXT:  // %bb.2: // %exit
+; V2-NEXT:    add v0.4s, v0.4s, v1.4s
 ; V2-NEXT:    ret
 entry:
   br label %loop
@@ -70,23 +78,35 @@ define i32 @udot_two_chains(ptr %p, i32 %n) {
 ; M1:       ; %bb.0: ; %entry
 ; M1-NEXT:    movi.2d v0, #0000000000000000
 ; M1-NEXT:    movi.2d v1, #0000000000000000
+; M1-NEXT:    movi.2d v2, #0000000000000000
+; M1-NEXT:    movi.2d v4, #0000000000000000
+; M1-NEXT:    movi.2d v3, #0000000000000000
+; M1-NEXT:    movi.2d v5, #0000000000000000
+; M1-NEXT:    movi.2d v6, #0000000000000000
+; M1-NEXT:    movi.2d v7, #0000000000000000
 ; M1-NEXT:  LBB1_1: ; %loop
 ; M1-NEXT:    ; =>This Inner Loop Header: Depth=1
-; M1-NEXT:    ldp q2, q3, [x0]
-; M1-NEXT:    ldp q4, q5, [x0, #32]
-; M1-NEXT:    udot.4s v0, v2, v2
-; M1-NEXT:    udot.4s v1, v2, v3
-; M1-NEXT:    udot.4s v0, v3, v3
-; M1-NEXT:    udot.4s v1, v3, v4
-; M1-NEXT:    udot.4s v0, v4, v4
-; M1-NEXT:    udot.4s v1, v4, v5
-; M1-NEXT:    udot.4s v0, v5, v5
-; M1-NEXT:    udot.4s v1, v5, v2
+; M1-NEXT:    ldp q16, q17, [x0]
+; M1-NEXT:    ldp q18, q19, [x0, #32]
+; M1-NEXT:    udot.4s v0, v16, v16
+; M1-NEXT:    udot.4s v4, v16, v17
+; M1-NEXT:    udot.4s v1, v17, v17
+; M1-NEXT:    udot.4s v2, v17, v18
+; M1-NEXT:    udot.4s v3, v18, v18
+; M1-NEXT:    udot.4s v6, v18, v19
+; M1-NEXT:    udot.4s v5, v19, v19
+; M1-NEXT:    udot.4s v7, v19, v16
 ; M1-NEXT:    add x0, x0, #64
 ; M1-NEXT:    subs w1, w1, #1
 ; M1-NEXT:    b.ne LBB1_1
 ; M1-NEXT:  ; %bb.2: ; %exit
+; M1-NEXT:    add.4s v2, v4, v2
+; M1-NEXT:    add.4s v4, v6, v7
+; M1-NEXT:    add.4s v2, v2, v4
 ; M1-NEXT:    add.4s v0, v0, v1
+; M1-NEXT:    add.4s v1, v3, v5
+; M1-NEXT:    add.4s v0, v0, v1
+; M1-NEXT:    add.4s v0, v0, v2
 ; M1-NEXT:    addv.4s s0, v0
 ; M1-NEXT:    fmov w0, s0
 ; M1-NEXT:    ret
@@ -95,24 +115,28 @@ define i32 @udot_two_chains(ptr %p, i32 %n) {
 ; V2:       // %bb.0: // %entry
 ; V2-NEXT:    movi v0.2d, #0000000000000000
 ; V2-NEXT:    movi v1.2d, #0000000000000000
+; V2-NEXT:    movi v2.2d, #0000000000000000
+; V2-NEXT:    movi v3.2d, #0000000000000000
 ; V2-NEXT:    .p2align 5, , 16
 ; V2-NEXT:  .LBB1_1: // %loop
 ; V2-NEXT:    // =>This Inner Loop Header: Depth=1
-; V2-NEXT:    ldp q2, q3, [x0]
-; V2-NEXT:    ldp q4, q5, [x0, #32]
+; V2-NEXT:    ldp q4, q5, [x0]
+; V2-NEXT:    ldp q6, q7, [x0, #32]
 ; V2-NEXT:    add x0, x0, #64
 ; V2-NEXT:    subs w1, w1, #1
-; V2-NEXT:    udot v0.4s, v2.16b, v2.16b
-; V2-NEXT:    udot v1.4s, v2.16b, v3.16b
-; V2-NEXT:    udot v0.4s, v3.16b, v3.16b
-; V2-NEXT:    udot v1.4s, v3.16b, v4.16b
+; V2-NEXT:    udot v1.4s, v5.16b, v5.16b
+; V2-NEXT:    udot v1.4s, v7.16b, v7.16b
 ; V2-NEXT:    udot v0.4s, v4.16b, v4.16b
-; V2-NEXT:    udot v1.4s, v4.16b, v5.16b
-; V2-NEXT:    udot v0.4s, v5.16b, v5.16b
-; V2-NEXT:    udot v1.4s, v5.16b, v2.16b
+; V2-NEXT:    udot v3.4s, v4.16b, v5.16b
+; V2-NEXT:    udot v2.4s, v5.16b, v6.16b
+; V2-NEXT:    udot v0.4s, v6.16b, v6.16b
+; V2-NEXT:    udot v3.4s, v6.16b, v7.16b
+; V2-NEXT:    udot v2.4s, v7.16b, v4.16b
 ; V2-NEXT:    b.ne .LBB1_1
 ; V2-NEXT:  // %bb.2: // %exit
+; V2-NEXT:    add v2.4s, v3.4s, v2.4s
 ; V2-NEXT:    add v0.4s, v0.4s, v1.4s
+; V2-NEXT:    add v0.4s, v0.4s, v2.4s
 ; V2-NEXT:    addv s0, v0.4s
 ; V2-NEXT:    fmov w0, s0
 ; V2-NEXT:    ret

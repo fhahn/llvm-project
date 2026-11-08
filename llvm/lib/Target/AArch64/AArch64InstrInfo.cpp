@@ -7962,6 +7962,7 @@ bool AArch64InstrInfo::isAccumulationOpcode(unsigned Opcode) const {
   case AArch64::SABAv4i32:
   case AArch64::SABAv8i16:
   case AArch64::SABAv8i8:
+  case AArch64::UDOTv16i8:
     return true;
   }
 
@@ -7972,7 +7973,7 @@ unsigned AArch64InstrInfo::getAccumulationStartOpcode(
     unsigned AccumulationOpcode) const {
   switch (AccumulationOpcode) {
   default:
-    llvm_unreachable("Unsupported accumulation Opcode!");
+    return 0;
   case AArch64::UABALB_ZZZ_D:
     return AArch64::UABDLB_ZZZ_D;
   case AArch64::UABALB_ZZZ_H:
@@ -9214,6 +9215,7 @@ unsigned AArch64InstrInfo::getReduceOpcodeForAccumulator(
   case AArch64::UABALv4i32_v2i64:
     return AArch64::ADDv2i64;
   case AArch64::UABALv8i16_v4i32:
+  case AArch64::UDOTv16i8:
     return AArch64::ADDv4i32;
   case AArch64::UABALv8i8_v8i16:
   case AArch64::SABALv16i8_v8i16:
@@ -9233,6 +9235,19 @@ unsigned AArch64InstrInfo::getReduceOpcodeForAccumulator(
   default:
     llvm_unreachable("Unknown accumulator opcode");
   }
+}
+
+Register AArch64InstrInfo::buildAccumulatorIdentity(
+    MachineBasicBlock &MBB, MachineBasicBlock::iterator InsertPt,
+    const DebugLoc &DL, unsigned AccumulatorOpcode) const {
+  // All accumulations are reduced with integer adds, whose identity is zero.
+  unsigned ReduceOpc = getReduceOpcodeForAccumulator(AccumulatorOpcode);
+  const TargetRegisterClass *RC = getRegClass(get(ReduceOpc), 0);
+  if (!RC->hasSuperClassEq(&AArch64::FPR128RegClass))
+    return Register();
+  Register Reg = MBB.getParent()->getRegInfo().createVirtualRegister(RC);
+  BuildMI(MBB, InsertPt, DL, get(AArch64::MOVIv2d_ns), Reg).addImm(0);
+  return Reg;
 }
 
 /// When getMachineCombinerPatterns() finds potential patterns,
