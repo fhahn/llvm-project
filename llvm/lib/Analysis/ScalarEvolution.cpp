@@ -6869,6 +6869,12 @@ const ConstantRange &ScalarEvolution::getRangeRef(
       }
     }
 
+    // A select of two constants produces one of them.
+    const APInt *TrueC, *FalseC;
+    if (match(V, m_Select(m_Value(), m_APInt(TrueC), m_APInt(FalseC))))
+      ConservativeResult = ConservativeResult.intersectWith(
+          ConstantRange(*TrueC).unionWith(*FalseC), RangeType);
+
     // vscale can't be equal to zero
     if (const auto *II = dyn_cast<IntrinsicInst>(V))
       if (II->getIntrinsicID() == Intrinsic::vscale) {
