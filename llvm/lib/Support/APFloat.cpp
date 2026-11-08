@@ -1490,14 +1490,26 @@ lostFraction IEEEFloat::divideSignificand(const IEEEFloat &rhs) {
   }
 
   /* Long division.  */
-  for (bit = precision; bit; bit -= 1) {
-    if (APInt::tcCompare(dividend, divisor, partsCount) >= 0) {
-      APInt::tcSubtract(dividend, divisor, 0, partsCount);
-      APInt::tcSetBit(lhsSignificand, bit - 1);
-    }
+#if defined(__SIZEOF_INT128__) && !defined(_MSC_VER)
+  // On a single part, the loop computes (dividend << (precision - 1)) / divisor
+  // and leaves twice the remainder in dividend; use one 128-bit division. An
+  // invalid divisor normalizes to zero and keeps the loop. MSVC's runtime lacks
+  // __udivti3, even with clang-cl.
+  if (partsCount == 1 && divisor[0]) {
+    __uint128_t Numerator = __uint128_t(dividend[0]) << (precision - 1);
+    integerPart Quotient = integerPart(Numerator / divisor[0]);
+    lhsSignificand[0] = Quotient;
+    dividend[0] = (integerPart(Numerator) - Quotient * divisor[0]) << 1;
+  } else
+#endif
+    for (bit = precision; bit; bit -= 1) {
+      if (APInt::tcCompare(dividend, divisor, partsCount) >= 0) {
+        APInt::tcSubtract(dividend, divisor, 0, partsCount);
+        APInt::tcSetBit(lhsSignificand, bit - 1);
+      }
 
-    APInt::tcShiftLeft(dividend, partsCount, 1);
-  }
+      APInt::tcShiftLeft(dividend, partsCount, 1);
+    }
 
   /* Figure out the lost fraction.  */
   int cmp = APInt::tcCompare(dividend, divisor, partsCount);
