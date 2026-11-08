@@ -893,6 +893,11 @@ bool LoopVectorizationLegality::canVectorizeInstr(Instruction &I) {
     if (RecurrenceDescriptor::isReductionPHI(Phi, TheLoop, RedDes, DB, AC, DT,
                                              PSE.getSE())) {
       Requirements->addExactFPMathInst(RedDes.getExactFPMathInst());
+      // FMinSelect/FMaxSelect lower to min/max without fast-math flags, which
+      // may flush denormals.
+      if (RecurrenceDescriptor::isFPMinMaxSelectRecurrenceKind(
+              RedDes.getRecurrenceKind()))
+        Hints->setPotentiallyUnsafe();
       Reductions[Phi] = std::move(RedDes);
       assert((!RedDes.hasUsesOutsideReductionChain() ||
               RecurrenceDescriptor::isMinMaxRecurrenceKind(

@@ -6527,9 +6527,10 @@ LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan, VFRange &Range,
   if (!RUN_VPLAN_PASS(VPlanTransforms::handleMultiUseReductions, *Plan, ORE,
                       OrigLoop))
     return nullptr;
-  // Apply mandatory transformation to handle FP maxnum/minnum reduction with
-  // NaNs if possible, bail out otherwise.
-  if (!RUN_VPLAN_PASS(VPlanTransforms::handleMaxMinNumReductions, *Plan))
+  // Apply mandatory transformation to handle FP min/max reductions with NaNs or
+  // signed zeros if possible, bail out otherwise.
+  if (!RUN_VPLAN_PASS(VPlanTransforms::handleMaxMinNumReductions, *Plan,
+                      Range.Start))
     return nullptr;
 
   // Create whole-vector selects for find-last recurrences.
