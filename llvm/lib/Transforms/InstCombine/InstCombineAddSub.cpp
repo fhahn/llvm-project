@@ -2586,6 +2586,26 @@ Instruction *InstCombinerImpl::visitSub(BinaryOperator &I) {
     return Sub;
   }
 
+  // (C - X) - Phi --> (C - Phi) - X, if C - Phi simplifies for all incoming
+  // values, so it folds into the phi. This removes a sub from differences of
+  // consecutive values of a recurrence:
+  //   %prev = phi [ 0, %entry ], [ %cur, %loop ]
+  //   %cur = sub C, %x
+  //   %d = sub %cur, %prev
+  // -->
+  //   %prev = phi [ C, %entry ], [ %x, %loop ]
+  //   %d = sub %prev, %x
+  auto *PN = dyn_cast<PHINode>(Op1);
+  if (PN && PN->hasOneUse() &&
+      match(Op0, m_Sub(m_ImmConstant(C), m_Value(X))) &&
+      all_of(PN->operands(), [&](Use &U) {
+        Value *V = simplifySubInst(
+            C, U, /*IsNSW=*/false, /*IsNUW=*/false,
+            SQ.getWithInstruction(PN->getIncomingBlock(U)->getTerminator()));
+        return V && !match(V, m_ConstantExpr());
+      }))
+    return BinaryOperator::CreateSub(Builder.CreateSub(C, PN), X);
+
   // (X + C0) - (Y + C1) --> (X - Y) + (C0 - C1)
   {
     Constant *CX, *CY;

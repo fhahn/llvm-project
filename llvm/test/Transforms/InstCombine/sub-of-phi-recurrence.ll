@@ -12,11 +12,10 @@ define void @diff_of_consecutive(ptr %out, ptr %in, i64 %n) {
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[LOOP]] ]
-; CHECK-NEXT:    [[PREV:%.*]] = phi i16 [ 0, [[ENTRY]] ], [ [[CUR:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[PREV:%.*]] = phi i16 [ -32768, [[ENTRY]] ], [ [[X:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[GEP_IN:%.*]] = getelementptr inbounds nuw [2 x i8], ptr [[IN:%.*]], i64 [[IV]]
-; CHECK-NEXT:    [[X:%.*]] = load i16, ptr [[GEP_IN]], align 2
-; CHECK-NEXT:    [[CUR]] = sub i16 -32768, [[X]]
-; CHECK-NEXT:    [[D:%.*]] = sub i16 [[CUR]], [[PREV]]
+; CHECK-NEXT:    [[X]] = load i16, ptr [[GEP_IN]], align 2
+; CHECK-NEXT:    [[D:%.*]] = sub i16 [[PREV]], [[X]]
 ; CHECK-NEXT:    [[GEP_OUT:%.*]] = getelementptr inbounds nuw [2 x i8], ptr [[OUT:%.*]], i64 [[IV]]
 ; CHECK-NEXT:    store i16 [[D]], ptr [[GEP_OUT]], align 2
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
@@ -51,11 +50,10 @@ define void @diff_of_consecutive_nsw(ptr %out, ptr %in, i64 %n) {
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[LOOP]] ]
-; CHECK-NEXT:    [[PREV:%.*]] = phi i32 [ 7, [[ENTRY]] ], [ [[CUR:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[PREV:%.*]] = phi i32 [ 93, [[ENTRY]] ], [ [[X:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[GEP_IN:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[IN:%.*]], i64 [[IV]]
-; CHECK-NEXT:    [[X:%.*]] = load i32, ptr [[GEP_IN]], align 4
-; CHECK-NEXT:    [[CUR]] = sub nsw i32 100, [[X]]
-; CHECK-NEXT:    [[D:%.*]] = sub nsw i32 [[CUR]], [[PREV]]
+; CHECK-NEXT:    [[X]] = load i32, ptr [[GEP_IN]], align 4
+; CHECK-NEXT:    [[D:%.*]] = sub i32 [[PREV]], [[X]]
 ; CHECK-NEXT:    [[GEP_OUT:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[OUT:%.*]], i64 [[IV]]
 ; CHECK-NEXT:    store i32 [[D]], ptr [[GEP_OUT]], align 4
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
@@ -90,11 +88,10 @@ define void @diff_of_consecutive_vec(ptr %out, ptr %in, i64 %n) {
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[LOOP]] ]
-; CHECK-NEXT:    [[PREV:%.*]] = phi <2 x i16> [ zeroinitializer, [[ENTRY]] ], [ [[CUR:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[PREV:%.*]] = phi <2 x i16> [ <i16 10, i16 20>, [[ENTRY]] ], [ [[X:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[GEP_IN:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[IN:%.*]], i64 [[IV]]
-; CHECK-NEXT:    [[X:%.*]] = load <2 x i16>, ptr [[GEP_IN]], align 4
-; CHECK-NEXT:    [[CUR]] = sub <2 x i16> <i16 10, i16 20>, [[X]]
-; CHECK-NEXT:    [[D:%.*]] = sub <2 x i16> [[CUR]], [[PREV]]
+; CHECK-NEXT:    [[X]] = load <2 x i16>, ptr [[GEP_IN]], align 4
+; CHECK-NEXT:    [[D:%.*]] = sub <2 x i16> [[PREV]], [[X]]
 ; CHECK-NEXT:    [[GEP_OUT:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[OUT:%.*]], i64 [[IV]]
 ; CHECK-NEXT:    store <2 x i16> [[D]], ptr [[GEP_OUT]], align 4
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
