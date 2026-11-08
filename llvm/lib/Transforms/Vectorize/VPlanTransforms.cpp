@@ -5900,6 +5900,73 @@ void VPlanTransforms::createPartialReductions(VPlan &Plan,
   }
 }
 
+/// Try to replace the masked load \p VPI, which would otherwise be scalarized
+/// with predication, by an unmasked replicated load. Its address must be a GEP
+/// only used by \p VPI, with a live-in base pointer that is dereferenceable and
+/// sufficiently aligned for the loaded type, and with all constant indices
+/// zero. Masked-off lanes then access the base pointer, by selecting zero for
+/// all non-constant indices.
+static VPReplicateRecipe *tryToSpeculateMaskedLoad(VPInstruction *VPI,
+                                                   VPlan &Plan,
+                                                   VPCostContext &CostCtx,
+                                                   VPDominatorTree &VPDT) {
+  if (VPI->getOpcode() != Instruction::Load || !VPI->isMasked())
+    return nullptr;
+
+  auto *GEP = dyn_cast<VPInstruction>(VPI->getOperand(0));
+  if (!GEP || GEP->getOpcode() != Instruction::GetElementPtr ||
+      GEP->getNumUsers() != 1 ||
+      any_of(drop_begin(GEP->operands()), [](VPValue *Idx) {
+        return isa<VPIRValue>(Idx) && !match(Idx, m_ZeroInt());
+      }))
+    return nullptr;
+  auto *Base = dyn_cast<VPIRValue>(GEP->getOperand(0));
+  BasicBlock *Preheader = CostCtx.L->getLoopPreheader();
+  auto *LI = cast<LoadInst>(VPI->getUnderlyingInstr());
+  if (!Base || !Preheader || !LI->isSimple() ||
+      !isDereferenceableAndAlignedPointer(
+          Base->getValue(), VPI->getScalarType(), LI->getAlign(),
+          LI->getDataLayout(), Preheader->getTerminator()))
+    return nullptr;
+
+  // For each non-constant index, find the recipe to select zero for it in
+  // masked-off lanes. Extends of zero are zero, so select before single-use
+  // extends, on the narrower type. The mask must be available there.
+  VPValue *Mask = VPI->getMask();
+  VPRecipeBase *MaskDef = Mask->getDefiningRecipe();
+  SmallVector<std::pair<VPRecipeBase *, unsigned>> SelectPoints;
+  for (unsigned I = 1, E = GEP->getNumOperands(); I != E; ++I) {
+    VPRecipeBase *IdxUser = GEP;
+    unsigned OpIdx = I;
+    VPValue *Idx = GEP->getOperand(I);
+    if (isa<VPIRValue>(Idx))
+      continue;
+    while (match(Idx, m_ZExtOrSExt(m_VPValue())) && Idx->getNumUsers() == 1) {
+      IdxUser = Idx->getDefiningRecipe();
+      OpIdx = 0;
+      Idx = IdxUser->getOperand(0);
+    }
+    if (MaskDef && !VPDT.properlyDominates(MaskDef, IdxUser))
+      return nullptr;
+    SelectPoints.emplace_back(IdxUser, OpIdx);
+  }
+
+  for (auto [IdxUser, OpIdx] : SelectPoints) {
+    VPValue *Idx = IdxUser->getOperand(OpIdx);
+    VPBuilder Builder(IdxUser);
+    IdxUser->setOperand(OpIdx,
+                        Builder.createSelect(Mask, Idx,
+                                             Plan.getZero(Idx->getScalarType()),
+                                             GEP->getDebugLoc()));
+  }
+
+  // The loaded values of masked-off lanes are unused. Drop the metadata, as it
+  // may not hold for them.
+  return VPBuilder(VPI).insert(new VPReplicateRecipe(
+      LI, {GEP}, /*IsSingleScalar=*/false, /*Mask=*/nullptr, *VPI,
+      VPIRMetadata(), VPI->getDebugLoc()));
+}
+
 void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
                                                  VPRecipeBuilder &RecipeBuilder,
                                                  VPCostContext &CostCtx) {
@@ -6070,14 +6137,21 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         return ReplaceWith(VPI, StoreR);
       });
 
-  VPlanTransforms::runPass("delegateMemOpWideningToLegacyCM", ProcessSubset,
-                           Plan, [&](VPInstruction *VPI) {
-                             if (VPRecipeBase *Recipe =
-                                     RecipeBuilder.tryToWidenMemory(VPI, Range))
-                               return ReplaceWith(VPI, Recipe);
+  VPDominatorTree VPDT(Plan);
+  VPlanTransforms::runPass(
+      "delegateMemOpWideningToLegacyCM", ProcessSubset, Plan,
+      [&](VPInstruction *VPI) {
+        if (VPRecipeBase *Recipe = RecipeBuilder.tryToWidenMemory(VPI, Range))
+          return ReplaceWith(VPI, Recipe);
 
-                             return Scalarize(VPI);
-                           });
+        if (RecipeBuilder.isPredicatedInst(VPI->getUnderlyingInstr())) {
+          if (VPRecipeBase *Recipe =
+                  tryToSpeculateMaskedLoad(VPI, Plan, CostCtx, VPDT))
+            return ReplaceWith(VPI, Recipe);
+        }
+
+        return Scalarize(VPI);
+      });
 }
 
 void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {

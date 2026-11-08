@@ -17,8 +17,9 @@ define i8 @test_negative_off(i16 %len, ptr %test_base) {
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[PRED_LOAD_CONTINUE2:%.*]] ]
-; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <2 x i8> [ zeroinitializer, [[VECTOR_PH]] ], [ [[TMP18:%.*]], [[PRED_LOAD_CONTINUE2]] ]
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i16> [ <i16 -1000, i16 -999>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <2 x i8> [ zeroinitializer, [[VECTOR_PH]] ], [ [[TMP18:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[DOTCAST:%.*]] = trunc i32 [[INDEX]] to i16
 ; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i16 -1000, [[DOTCAST]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = add i16 [[OFFSET_IDX]], 1
@@ -28,25 +29,19 @@ define i8 @test_negative_off(i16 %len, ptr %test_base) {
 ; CHECK-NEXT:    [[TMP5:%.*]] = load i1, ptr [[TMP3]], align 1
 ; CHECK-NEXT:    [[TMP6:%.*]] = insertelement <2 x i1> poison, i1 [[TMP4]], i64 0
 ; CHECK-NEXT:    [[TMP7:%.*]] = insertelement <2 x i1> [[TMP6]], i1 [[TMP5]], i64 1
-; CHECK-NEXT:    br i1 [[TMP4]], label [[PRED_LOAD_IF:%.*]], label [[PRED_LOAD_CONTINUE:%.*]]
-; CHECK:       pred.load.if:
-; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr i8, ptr [[ALLOCA]], i16 [[OFFSET_IDX]]
-; CHECK-NEXT:    [[TMP10:%.*]] = load i8, ptr [[TMP9]], align 1
-; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <2 x i8> poison, i8 [[TMP10]], i64 0
-; CHECK-NEXT:    br label [[PRED_LOAD_CONTINUE]]
-; CHECK:       pred.load.continue:
-; CHECK-NEXT:    [[TMP12:%.*]] = phi <2 x i8> [ poison, [[VECTOR_BODY]] ], [ [[TMP11]], [[PRED_LOAD_IF]] ]
-; CHECK-NEXT:    br i1 [[TMP5]], label [[PRED_LOAD_IF1:%.*]], label [[PRED_LOAD_CONTINUE2]]
-; CHECK:       pred.load.if1:
-; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr i8, ptr [[ALLOCA]], i16 [[TMP1]]
+; CHECK-NEXT:    [[TMP9:%.*]] = select <2 x i1> [[TMP7]], <2 x i16> [[VEC_IND]], <2 x i16> zeroinitializer
+; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <2 x i16> [[TMP9]], i64 0
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr i8, ptr [[ALLOCA]], i16 [[TMP10]]
+; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <2 x i16> [[TMP9]], i64 1
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr i8, ptr [[ALLOCA]], i16 [[TMP12]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = load i8, ptr [[TMP14]], align 1
-; CHECK-NEXT:    [[TMP16:%.*]] = insertelement <2 x i8> [[TMP12]], i8 [[TMP15]], i64 1
-; CHECK-NEXT:    br label [[PRED_LOAD_CONTINUE2]]
-; CHECK:       pred.load.continue2:
-; CHECK-NEXT:    [[TMP17:%.*]] = phi <2 x i8> [ [[TMP12]], [[PRED_LOAD_CONTINUE]] ], [ [[TMP16]], [[PRED_LOAD_IF1]] ]
+; CHECK-NEXT:    [[TMP21:%.*]] = load i8, ptr [[TMP13]], align 1
+; CHECK-NEXT:    [[TMP16:%.*]] = insertelement <2 x i8> poison, i8 [[TMP15]], i64 0
+; CHECK-NEXT:    [[TMP17:%.*]] = insertelement <2 x i8> [[TMP16]], i8 [[TMP21]], i64 1
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP7]], <2 x i8> [[TMP17]], <2 x i8> zeroinitializer
 ; CHECK-NEXT:    [[TMP18]] = add <2 x i8> [[VEC_PHI]], [[PREDPHI]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i16> [[VEC_IND]], splat (i16 2)
 ; CHECK-NEXT:    [[TMP19:%.*]] = icmp eq i32 [[INDEX_NEXT]], 12
 ; CHECK-NEXT:    br i1 [[TMP19]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:

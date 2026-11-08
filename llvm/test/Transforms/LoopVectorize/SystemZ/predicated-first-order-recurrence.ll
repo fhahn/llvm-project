@@ -19,28 +19,19 @@ define void @func_21() {
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[PRED_STORE_CONTINUE4:%.*]] ]
 ; CHECK-NEXT:    [[VECTOR_RECUR:%.*]] = phi <2 x i32> [ <i32 poison, i32 0>, [[VECTOR_PH]] ], [ [[TMP12:%.*]], [[PRED_STORE_CONTINUE4]] ]
-; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i8> [ <i8 0, i8 1>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[PRED_STORE_CONTINUE4]] ]
-; CHECK-NEXT:    [[TMP2:%.*]] = icmp ule <2 x i8> [[VEC_IND]], splat (i8 4)
-; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[INDEX]], 1
-; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <2 x i1> [[TMP2]], i64 0
-; CHECK-NEXT:    br i1 [[TMP3]], label [[PRED_LOAD_IF:%.*]], label [[PRED_LOAD_CONTINUE:%.*]]
-; CHECK:       pred.load.if:
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [5 x i32], ptr @A, i64 0, i64 [[INDEX]]
-; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP4]], align 4
-; CHECK-NEXT:    [[TMP6:%.*]] = insertelement <2 x i32> poison, i32 [[TMP5]], i64 0
-; CHECK-NEXT:    br label [[PRED_LOAD_CONTINUE]]
-; CHECK:       pred.load.continue:
-; CHECK-NEXT:    [[TMP7:%.*]] = phi <2 x i32> [ poison, [[VECTOR_BODY]] ], [ [[TMP6]], [[PRED_LOAD_IF]] ]
-; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <2 x i1> [[TMP2]], i64 1
-; CHECK-NEXT:    br i1 [[TMP8]], label [[PRED_LOAD_IF1:%.*]], label [[PRED_LOAD_CONTINUE2:%.*]]
-; CHECK:       pred.load.if1:
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i64> [ <i64 0, i64 1>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[PRED_STORE_CONTINUE4]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = icmp ule <2 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[TMP4:%.*]] = select <2 x i1> [[TMP0]], <2 x i64> [[VEC_IND]], <2 x i64> zeroinitializer
+; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <2 x i64> [[TMP4]], i64 0
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [5 x i32], ptr @A, i64 0, i64 [[TMP2]]
+; CHECK-NEXT:    [[TMP1:%.*]] = extractelement <2 x i64> [[TMP4]], i64 1
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [5 x i32], ptr @A, i64 0, i64 [[TMP1]]
+; CHECK-NEXT:    [[TMP6:%.*]] = load i32, ptr [[TMP5]], align 4
 ; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr [[TMP9]], align 4
-; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <2 x i32> [[TMP7]], i32 [[TMP10]], i64 1
-; CHECK-NEXT:    br label [[PRED_LOAD_CONTINUE2]]
-; CHECK:       pred.load.continue2:
-; CHECK-NEXT:    [[TMP12]] = phi <2 x i32> [ [[TMP7]], [[PRED_LOAD_CONTINUE]] ], [ [[TMP11]], [[PRED_LOAD_IF1]] ]
+; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <2 x i32> poison, i32 [[TMP6]], i64 0
+; CHECK-NEXT:    [[TMP12]] = insertelement <2 x i32> [[TMP11]], i32 [[TMP10]], i64 1
 ; CHECK-NEXT:    [[TMP13:%.*]] = shufflevector <2 x i32> [[VECTOR_RECUR]], <2 x i32> [[TMP12]], <2 x i32> <i32 1, i32 2>
+; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <2 x i1> [[TMP0]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP3]], label [[PRED_STORE_IF:%.*]], label [[PRED_STORE_CONTINUE:%.*]]
 ; CHECK:       pred.store.if:
 ; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr inbounds [5 x i32], ptr @B, i64 0, i64 [[INDEX]]
@@ -48,15 +39,17 @@ define void @func_21() {
 ; CHECK-NEXT:    store i32 [[TMP16]], ptr [[TMP15]], align 4
 ; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE]]
 ; CHECK:       pred.store.continue:
+; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <2 x i1> [[TMP0]], i64 1
 ; CHECK-NEXT:    br i1 [[TMP8]], label [[PRED_STORE_IF3:%.*]], label [[PRED_STORE_CONTINUE4]]
-; CHECK:       pred.store.if3:
-; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [5 x i32], ptr @B, i64 0, i64 [[TMP1]]
+; CHECK:       pred.store.if1:
+; CHECK-NEXT:    [[TMP17:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [5 x i32], ptr @B, i64 0, i64 [[TMP17]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = extractelement <2 x i32> [[TMP13]], i64 1
 ; CHECK-NEXT:    store i32 [[TMP19]], ptr [[TMP18]], align 4
 ; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE4]]
-; CHECK:       pred.store.continue4:
+; CHECK:       pred.store.continue2:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <2 x i8> [[VEC_IND]], splat (i8 2)
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[VEC_IND]], splat (i64 2)
 ; CHECK-NEXT:    [[TMP20:%.*]] = icmp eq i64 [[INDEX_NEXT]], 6
 ; CHECK-NEXT:    br i1 [[TMP20]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:

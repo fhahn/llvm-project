@@ -10,25 +10,81 @@ target triple = "arm64-apple-macosx15.0.0"
 define void @conditional_lookup_table_load(ptr noalias %dst, ptr noalias %src, i64 %n) {
 ; CHECK-LABEL: @conditional_lookup_table_load(
 ; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N:%.*]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
+; CHECK:       vector.ph:
+; CHECK-NEXT:    [[TMP0:%.*]] = and i64 [[N]], 3
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP0]]
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
-; CHECK:       loop:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[LATCH:%.*]] ]
+; CHECK:       vector.body:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[IV]], 1
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[IV]], 2
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[IV]], 3
 ; CHECK-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds nuw i32, ptr [[SRC:%.*]], i64 [[IV]]
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw i32, ptr [[SRC]], i64 [[TMP1]]
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw i32, ptr [[SRC]], i64 [[TMP2]]
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw i32, ptr [[SRC]], i64 [[TMP3]]
 ; CHECK-NEXT:    [[IDX:%.*]] = load i32, ptr [[GEP_SRC]], align 4
-; CHECK-NEXT:    [[IN_RANGE:%.*]] = icmp ult i32 [[IDX]], 1024
+; CHECK-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP5]], align 4
+; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr [[TMP6]], align 4
+; CHECK-NEXT:    [[TMP11:%.*]] = load i32, ptr [[TMP7]], align 4
+; CHECK-NEXT:    [[TMP12:%.*]] = insertelement <4 x i32> poison, i32 [[IDX]], i64 0
+; CHECK-NEXT:    [[TMP13:%.*]] = insertelement <4 x i32> [[TMP12]], i32 [[TMP9]], i64 1
+; CHECK-NEXT:    [[TMP14:%.*]] = insertelement <4 x i32> [[TMP13]], i32 [[TMP10]], i64 2
+; CHECK-NEXT:    [[TMP15:%.*]] = insertelement <4 x i32> [[TMP14]], i32 [[TMP11]], i64 3
+; CHECK-NEXT:    [[TMP16:%.*]] = icmp ult <4 x i32> [[TMP15]], splat (i32 1024)
+; CHECK-NEXT:    [[TMP17:%.*]] = select <4 x i1> [[TMP16]], <4 x i32> [[TMP15]], <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP18:%.*]] = extractelement <4 x i32> [[TMP17]], i64 0
+; CHECK-NEXT:    [[TMP19:%.*]] = zext nneg i32 [[TMP18]] to i64
+; CHECK-NEXT:    [[TMP20:%.*]] = extractelement <4 x i32> [[TMP17]], i64 1
+; CHECK-NEXT:    [[TMP21:%.*]] = zext nneg i32 [[TMP20]] to i64
+; CHECK-NEXT:    [[TMP22:%.*]] = extractelement <4 x i32> [[TMP17]], i64 2
+; CHECK-NEXT:    [[TMP23:%.*]] = zext nneg i32 [[TMP22]] to i64
+; CHECK-NEXT:    [[TMP24:%.*]] = extractelement <4 x i32> [[TMP17]], i64 3
+; CHECK-NEXT:    [[TMP25:%.*]] = zext nneg i32 [[TMP24]] to i64
+; CHECK-NEXT:    [[TMP26:%.*]] = getelementptr inbounds nuw float, ptr @table, i64 [[TMP19]]
+; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr inbounds nuw float, ptr @table, i64 [[TMP21]]
+; CHECK-NEXT:    [[TMP28:%.*]] = getelementptr inbounds nuw float, ptr @table, i64 [[TMP23]]
+; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr inbounds nuw float, ptr @table, i64 [[TMP25]]
+; CHECK-NEXT:    [[TMP30:%.*]] = load float, ptr [[TMP26]], align 4
+; CHECK-NEXT:    [[TMP31:%.*]] = load float, ptr [[TMP27]], align 4
+; CHECK-NEXT:    [[TMP32:%.*]] = load float, ptr [[TMP28]], align 4
+; CHECK-NEXT:    [[TMP33:%.*]] = load float, ptr [[TMP29]], align 4
+; CHECK-NEXT:    [[TMP34:%.*]] = insertelement <4 x float> poison, float [[TMP30]], i64 0
+; CHECK-NEXT:    [[TMP35:%.*]] = insertelement <4 x float> [[TMP34]], float [[TMP31]], i64 1
+; CHECK-NEXT:    [[TMP36:%.*]] = insertelement <4 x float> [[TMP35]], float [[TMP32]], i64 2
+; CHECK-NEXT:    [[TMP37:%.*]] = insertelement <4 x float> [[TMP36]], float [[TMP33]], i64 3
+; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP16]], <4 x float> [[TMP37]], <4 x float> zeroinitializer
+; CHECK-NEXT:    [[TMP38:%.*]] = getelementptr inbounds nuw float, ptr [[DST:%.*]], i64 [[IV]]
+; CHECK-NEXT:    store <4 x float> [[PREDPHI]], ptr [[TMP38]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 4
+; CHECK-NEXT:    [[TMP39:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP39]], label [[MIDDLE_BLOCK:%.*]], label [[LOOP]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK:       middle.block:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
+; CHECK:       scalar.ph:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], [[MIDDLE_BLOCK]] ], [ 0, [[ENTRY:%.*]] ]
+; CHECK-NEXT:    br label [[LOOP1:%.*]]
+; CHECK:       loop:
+; CHECK-NEXT:    [[IV1:%.*]] = phi i64 [ [[BC_RESUME_VAL]], [[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], [[LATCH:%.*]] ]
+; CHECK-NEXT:    [[GEP_SRC1:%.*]] = getelementptr inbounds nuw i32, ptr [[SRC]], i64 [[IV1]]
+; CHECK-NEXT:    [[IDX1:%.*]] = load i32, ptr [[GEP_SRC1]], align 4
+; CHECK-NEXT:    [[IN_RANGE:%.*]] = icmp ult i32 [[IDX1]], 1024
 ; CHECK-NEXT:    br i1 [[IN_RANGE]], label [[THEN:%.*]], label [[LATCH]]
 ; CHECK:       then:
-; CHECK-NEXT:    [[IDX_EXT:%.*]] = zext nneg i32 [[IDX]] to i64
+; CHECK-NEXT:    [[IDX_EXT:%.*]] = zext nneg i32 [[IDX1]] to i64
 ; CHECK-NEXT:    [[GEP_TABLE:%.*]] = getelementptr inbounds nuw float, ptr @table, i64 [[IDX_EXT]]
 ; CHECK-NEXT:    [[T:%.*]] = load float, ptr [[GEP_TABLE]], align 4
 ; CHECK-NEXT:    br label [[LATCH]]
 ; CHECK:       latch:
-; CHECK-NEXT:    [[RES:%.*]] = phi float [ [[T]], [[THEN]] ], [ 0.000000e+00, [[LOOP]] ]
-; CHECK-NEXT:    [[GEP_DST:%.*]] = getelementptr inbounds nuw float, ptr [[DST:%.*]], i64 [[IV]]
+; CHECK-NEXT:    [[RES:%.*]] = phi float [ [[T]], [[THEN]] ], [ 0.000000e+00, [[LOOP1]] ]
+; CHECK-NEXT:    [[GEP_DST:%.*]] = getelementptr inbounds nuw float, ptr [[DST]], i64 [[IV1]]
 ; CHECK-NEXT:    store float [[RES]], ptr [[GEP_DST]], align 4
-; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
-; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N:%.*]]
-; CHECK-NEXT:    br i1 [[EC]], label [[EXIT:%.*]], label [[LOOP]]
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV1]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label [[EXIT]], label [[LOOP1]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    ret void
 ;
