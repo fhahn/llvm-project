@@ -9,15 +9,15 @@ define void @same_object_runtime_distance(ptr %X, i64 %n, i64 %s, float %c) {
 ; CHECK-LABEL: define void @same_object_runtime_distance(
 ; CHECK-SAME: ptr [[X:%.*]], i64 [[N:%.*]], i64 [[S:%.*]], float [[C:%.*]]) #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 16
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[S]], 2
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], 1
-; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP1]], 63
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP1]], 15
 ; CHECK-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[TMP2:%.*]] = and i64 [[N]], 15
+; CHECK-NEXT:    [[TMP2:%.*]] = and i64 [[N]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP2]]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x float> poison, float [[C]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT]], <4 x float> poison, <4 x i32> zeroinitializer
@@ -27,27 +27,12 @@ define void @same_object_runtime_distance(ptr %X, i64 %n, i64 %s, float %c) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds float, ptr [[X]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = add nsw i64 [[INDEX]], [[S]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds float, ptr [[X]], i64 [[TMP4]]
-; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds float, ptr [[TMP3]], i64 4
-; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds float, ptr [[TMP3]], i64 8
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds float, ptr [[TMP3]], i64 12
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP3]], align 4
-; CHECK-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x float>, ptr [[TMP6]], align 4
-; CHECK-NEXT:    [[WIDE_LOAD2:%.*]] = load <4 x float>, ptr [[TMP7]], align 4
-; CHECK-NEXT:    [[WIDE_LOAD3:%.*]] = load <4 x float>, ptr [[TMP8]], align 4
-; CHECK-NEXT:    [[TMP9:%.*]] = fmul <4 x float> [[WIDE_LOAD]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP10:%.*]] = fmul <4 x float> [[WIDE_LOAD1]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP11:%.*]] = fmul <4 x float> [[WIDE_LOAD2]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP12:%.*]] = fmul <4 x float> [[WIDE_LOAD3]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds float, ptr [[TMP5]], i64 4
-; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds float, ptr [[TMP5]], i64 8
-; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr inbounds float, ptr [[TMP5]], i64 12
-; CHECK-NEXT:    store <4 x float> [[TMP9]], ptr [[TMP5]], align 4
-; CHECK-NEXT:    store <4 x float> [[TMP10]], ptr [[TMP13]], align 4
-; CHECK-NEXT:    store <4 x float> [[TMP11]], ptr [[TMP14]], align 4
-; CHECK-NEXT:    store <4 x float> [[TMP12]], ptr [[TMP15]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
-; CHECK-NEXT:    [[TMP16:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP16]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK-NEXT:    [[TMP6:%.*]] = fmul <4 x float> [[WIDE_LOAD]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    store <4 x float> [[TMP6]], ptr [[TMP5]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ;
 entry:
@@ -76,23 +61,23 @@ define void @same_object_runtime_distance_2_stores(ptr %X, ptr %Y, i64 %n, i64 %
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[X7:%.*]] = ptrtoaddr ptr [[X]] to i64
 ; CHECK-NEXT:    [[Y6:%.*]] = ptrtoaddr ptr [[Y]] to i64
-; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 16
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 12
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[S]], 2
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[Y6]], [[X7]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], [[TMP0]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], 1
-; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP3]], 63
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP3]], 15
 ; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[TMP0]], 1
-; CHECK-NEXT:    [[DIFF_CHECK8:%.*]] = icmp ult i64 [[TMP4]], 63
+; CHECK-NEXT:    [[DIFF_CHECK8:%.*]] = icmp ult i64 [[TMP4]], 15
 ; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[DIFF_CHECK]], [[DIFF_CHECK8]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = sub i64 [[TMP1]], 1
-; CHECK-NEXT:    [[DIFF_CHECK9:%.*]] = icmp ult i64 [[TMP5]], 63
+; CHECK-NEXT:    [[DIFF_CHECK9:%.*]] = icmp ult i64 [[TMP5]], 15
 ; CHECK-NEXT:    [[CONFLICT_RDX10:%.*]] = or i1 [[CONFLICT_RDX]], [[DIFF_CHECK9]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX10]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[TMP6:%.*]] = and i64 [[N]], 15
+; CHECK-NEXT:    [[TMP6:%.*]] = and i64 [[N]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP6]]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x float> poison, float [[C]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT]], <4 x float> poison, <4 x i32> zeroinitializer
@@ -103,38 +88,14 @@ define void @same_object_runtime_distance_2_stores(ptr %X, ptr %Y, i64 %n, i64 %
 ; CHECK-NEXT:    [[TMP8:%.*]] = add nsw i64 [[INDEX]], [[S]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds float, ptr [[X]], i64 [[TMP8]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds float, ptr [[Y]], i64 [[INDEX]]
-; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds float, ptr [[TMP7]], i64 4
-; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds float, ptr [[TMP7]], i64 8
-; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds float, ptr [[TMP7]], i64 12
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP7]], align 4
-; CHECK-NEXT:    [[WIDE_LOAD11:%.*]] = load <4 x float>, ptr [[TMP11]], align 4
-; CHECK-NEXT:    [[WIDE_LOAD12:%.*]] = load <4 x float>, ptr [[TMP12]], align 4
-; CHECK-NEXT:    [[WIDE_LOAD13:%.*]] = load <4 x float>, ptr [[TMP13]], align 4
-; CHECK-NEXT:    [[TMP14:%.*]] = fmul <4 x float> [[WIDE_LOAD]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP15:%.*]] = fmul <4 x float> [[WIDE_LOAD11]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP16:%.*]] = fmul <4 x float> [[WIDE_LOAD12]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP17:%.*]] = fmul <4 x float> [[WIDE_LOAD13]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds float, ptr [[TMP9]], i64 4
-; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds float, ptr [[TMP9]], i64 8
-; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr inbounds float, ptr [[TMP9]], i64 12
-; CHECK-NEXT:    store <4 x float> [[TMP14]], ptr [[TMP9]], align 4
-; CHECK-NEXT:    store <4 x float> [[TMP15]], ptr [[TMP18]], align 4
-; CHECK-NEXT:    store <4 x float> [[TMP16]], ptr [[TMP19]], align 4
-; CHECK-NEXT:    store <4 x float> [[TMP17]], ptr [[TMP20]], align 4
-; CHECK-NEXT:    [[TMP21:%.*]] = fadd <4 x float> [[WIDE_LOAD]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP22:%.*]] = fadd <4 x float> [[WIDE_LOAD11]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP23:%.*]] = fadd <4 x float> [[WIDE_LOAD12]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP24:%.*]] = fadd <4 x float> [[WIDE_LOAD13]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP25:%.*]] = getelementptr inbounds float, ptr [[TMP10]], i64 4
-; CHECK-NEXT:    [[TMP26:%.*]] = getelementptr inbounds float, ptr [[TMP10]], i64 8
-; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr inbounds float, ptr [[TMP10]], i64 12
-; CHECK-NEXT:    store <4 x float> [[TMP21]], ptr [[TMP10]], align 4
-; CHECK-NEXT:    store <4 x float> [[TMP22]], ptr [[TMP25]], align 4
-; CHECK-NEXT:    store <4 x float> [[TMP23]], ptr [[TMP26]], align 4
-; CHECK-NEXT:    store <4 x float> [[TMP24]], ptr [[TMP27]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
-; CHECK-NEXT:    [[TMP28:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP28]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
+; CHECK-NEXT:    [[TMP11:%.*]] = fmul <4 x float> [[WIDE_LOAD]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    store <4 x float> [[TMP11]], ptr [[TMP9]], align 4
+; CHECK-NEXT:    [[TMP12:%.*]] = fadd <4 x float> [[WIDE_LOAD]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    store <4 x float> [[TMP12]], ptr [[TMP10]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ;
 entry:

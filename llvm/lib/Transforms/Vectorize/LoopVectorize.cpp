@@ -3310,6 +3310,23 @@ std::unique_ptr<VPlan> LoopVectorizationPlanner::selectBestEpiloguePlan(
   return Clone;
 }
 
+/// Returns true if \p RtPtrChecking has diff checks between accesses to the
+/// same object, with a distance that is not a compile-time constant.
+static bool hasSameObjectDiffChecks(const RuntimePointerChecking &RtPtrChecking,
+                                    ScalarEvolution &SE) {
+  std::optional<ArrayRef<PointerDiffInfo>> DiffChecks =
+      RtPtrChecking.getDiffChecks();
+  if (!DiffChecks)
+    return false;
+  return any_of(*DiffChecks, [&SE](const PointerDiffInfo &C) {
+    // The distance of accesses to the same object does not depend on the
+    // address of the object, i.e. the base addresses cancel out.
+    const SCEV *Dist = SE.getMinusSCEV(C.SinkStart, C.SrcStart);
+    return !isa<SCEVConstant>(Dist) &&
+           !SCEVExprContains(Dist, IsaPred<SCEVPtrToAddrExpr>);
+  });
+}
+
 unsigned
 LoopVectorizationPlanner::selectInterleaveCount(VPlan &Plan, ElementCount VF,
                                                 InstructionCost LoopCost) {
@@ -3587,6 +3604,19 @@ LoopVectorizationPlanner::selectInterleaveCount(VPlan &Plan, ElementCount VF,
   if (!ScalarInterleavingRequiresRuntimePointerCheck &&
       !ScalarInterleavingRequiresPredication &&
       LoopCost < Opts.small_loop_cost) {
+    // A diff check between accesses to the same object only passes if their
+    // runtime distance is at least VF * IC elements. Unlike distances between
+    // different objects, such distances are often small, so interleaving can
+    // make the vector loop run less often. Don't trade that for the modest
+    // gains of interleaving small loops.
+    if (VF.isVector() &&
+        hasSameObjectDiffChecks(*Legal->getRuntimePointerChecking(),
+                                *PSE.getSE())) {
+      LLVM_DEBUG(dbgs() << "LV: Not interleaving small loop to keep the "
+                           "distance required by diff checks low.\n");
+      return 1;
+    }
+
     // We assume that the cost overhead is 1 and we use the cost model
     // to estimate the cost of the loop and interleave until the cost of the
     // loop overhead is about 5% of the cost of the loop.
