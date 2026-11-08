@@ -396,8 +396,8 @@ bool Preprocessor::CheckMacroName(Token &MacroNameTok, MacroUse isDefineUndef,
   // Macro names with reserved identifiers are accepted if built-in or passed
   // through the command line (the later may be present if -dD was used to
   // generate the preprocessed file).
-  // NB: isInPredefinedFile() (via getPresumedLoc) is relatively expensive, so
-  // only run it for names that can actually warn.
+  // NB: isInPredefinedFile() is relatively expensive, so only run it for names
+  // that can actually warn.
   MacroDiag D = MD_NoWarn;
   if (isDefineUndef == MU_Define) {
     D = shouldWarnOnMacroDef(*this, II);
