@@ -261,6 +261,37 @@ static bool areLoadsReorderable(const LoadInst *Use,
   return !(SeqCstUse || MayClobberIsAcquire);
 }
 
+/// Return true if a load or store of exactly \p UseLoc that executes before
+/// \p UseInst in the same block shows that \p DefInst does not modify
+/// \p UseLoc. The earlier access accesses the same address whenever \p UseInst
+/// executes, so the facts implied by its metadata also hold for \p UseInst.
+/// This is limited to \p DefInst with scoped noalias metadata, e.g. from
+/// several inlined copies of a function with noalias arguments.
+template <typename AliasAnalysisType>
+static bool isNoModViaEarlierAccess(const Instruction *DefInst,
+                                    const MemoryLocation &UseLoc,
+                                    const Instruction *UseInst,
+                                    AliasAnalysisType &AA) {
+  if (!DefInst->hasMetadata(LLVMContext::MD_alias_scope) &&
+      !DefInst->hasMetadata(LLVMContext::MD_noalias))
+    return false;
+  if (!isa<LoadInst, StoreInst>(UseInst) ||
+      getLoadStorePointerOperand(UseInst) != UseLoc.Ptr)
+    return false;
+  for (const User *U : UseLoc.Ptr->users()) {
+    const auto *I = dyn_cast<Instruction>(U);
+    if (!I || !isa<LoadInst, StoreInst>(I) ||
+        I->getParent() != UseInst->getParent() || !I->comesBefore(UseInst))
+      continue;
+    MemoryLocation Loc = MemoryLocation::get(I);
+    if (Loc.Ptr == UseLoc.Ptr && Loc.Size == UseLoc.Size &&
+        Loc.AATags != UseLoc.AATags &&
+        !isModSet(AA.getModRefInfo(DefInst, Loc)))
+      return true;
+  }
+  return false;
+}
+
 template <typename AliasAnalysisType>
 static bool
 instructionClobbersQuery(const MemoryDef *MD, const MemoryLocation &UseLoc,
@@ -300,7 +331,8 @@ instructionClobbersQuery(const MemoryDef *MD, const MemoryLocation &UseLoc,
       return !areLoadsReorderable(UseLoad, DefLoad);
 
   ModRefInfo I = AA.getModRefInfo(DefInst, UseLoc);
-  return isModSet(I);
+  return isModSet(I) &&
+         !(UseInst && isNoModViaEarlierAccess(DefInst, UseLoc, UseInst, AA));
 }
 
 template <typename AliasAnalysisType>

@@ -2945,6 +2945,21 @@ bool llvm::removeUnreachableBlocks(Function &F, DomTreeUpdater *DTU,
   return Changed;
 }
 
+/// Return true if \p K and \p J are loads or stores of the same location and
+/// \p J executes whenever \p K does.
+static bool isSameAccessExecutedWith(const Instruction *K,
+                                     const Instruction *J) {
+  if (!isa<LoadInst, StoreInst>(K) || !isa<LoadInst, StoreInst>(J) ||
+      getLoadStorePointerOperand(K) != getLoadStorePointerOperand(J) ||
+      getLoadStoreType(K) != getLoadStoreType(J) ||
+      K->getParent() != J->getParent() || !K->comesBefore(J))
+    return false;
+  return all_of(make_range(K->getIterator(), J->getIterator()),
+                [](const Instruction &I) {
+                  return isGuaranteedToTransferExecutionToSuccessor(&I);
+                });
+}
+
 /// If AAOnly is set, only intersect alias analysis metadata and preserve other
 /// known metadata. Unknown metadata is always dropped.
 static void combineMetadata(Instruction *K, const Instruction *J,
@@ -2976,6 +2991,13 @@ static void combineMetadata(Instruction *K, const Instruction *J,
           K->setMetadata(Kind, MDNode::getMostGenericAliasScope(JMD, KMD));
         break;
       case LLVMContext::MD_noalias:
+        // If J accesses the same location as K whenever K executes, J's
+        // noalias facts also hold for K.
+        if (DoesKMove)
+          K->setMetadata(Kind, MDNode::intersect(JMD, KMD));
+        else if (JMD && JMD != KMD && isSameAccessExecutedWith(K, J))
+          K->setMetadata(Kind, MDNode::concatenate(KMD, JMD));
+        break;
       case LLVMContext::MD_mem_parallel_loop_access:
         if (DoesKMove)
           K->setMetadata(Kind, MDNode::intersect(JMD, KMD));

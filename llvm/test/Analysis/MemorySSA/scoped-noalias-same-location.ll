@@ -9,7 +9,7 @@ define float @earlier_access(ptr %p, ptr %q) {
 ; CHECK-NEXT:  %l0 = load float, ptr %p
 ; CHECK:       1 = MemoryDef(liveOnEntry)
 ; CHECK-NEXT:  store i8 0, ptr %q
-; CHECK:       MemoryUse(1)
+; CHECK:       MemoryUse(liveOnEntry)
 ; CHECK-NEXT:  %l1 = load float, ptr %p
 ;
   %l0 = load float, ptr %p, align 4, !noalias !0

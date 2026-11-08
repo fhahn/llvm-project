@@ -10,25 +10,24 @@ define void @two_copies(ptr %dst, ptr %m, ptr %src, i64 %n) {
 ; CHECK-LABEL: define void @two_copies(
 ; CHECK-SAME: ptr [[DST:%.*]], ptr [[M:%.*]], ptr [[SRC:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[M0:%.*]] = load float, ptr [[M]], align 4, !noalias [[META0:![0-9]+]]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    [[D0:%.*]] = getelementptr inbounds i8, ptr [[DST]], i64 [[IV]]
 ; CHECK-NEXT:    [[S_GEP:%.*]] = getelementptr inbounds float, ptr [[SRC]], i64 [[IV]]
 ; CHECK-NEXT:    [[S:%.*]] = load float, ptr [[S_GEP]], align 4
-; CHECK-NEXT:    call void @llvm.experimental.noalias.scope.decl(metadata [[META0:![0-9]+]])
-; CHECK-NEXT:    [[M0:%.*]] = load float, ptr [[M]], align 4, !noalias [[META0]]
+; CHECK-NEXT:    call void @llvm.experimental.noalias.scope.decl(metadata [[META4:![0-9]+]])
 ; CHECK-NEXT:    [[MUL0:%.*]] = fmul float [[S]], [[M0]]
 ; CHECK-NEXT:    [[C0:%.*]] = fptoui float [[MUL0]] to i8
-; CHECK-NEXT:    store i8 [[C0]], ptr [[D0]], align 1, !alias.scope [[META0]]
+; CHECK-NEXT:    store i8 [[C0]], ptr [[D0]], align 1, !alias.scope [[META4]]
 ; CHECK-NEXT:    [[D1:%.*]] = getelementptr inbounds i8, ptr [[D0]], i64 1
-; CHECK-NEXT:    call void @llvm.experimental.noalias.scope.decl(metadata [[META3:![0-9]+]])
-; CHECK-NEXT:    [[M1:%.*]] = load float, ptr [[M]], align 4, !noalias [[META3]]
+; CHECK-NEXT:    call void @llvm.experimental.noalias.scope.decl(metadata [[META5:![0-9]+]])
 ; CHECK-NEXT:    [[S1_GEP:%.*]] = getelementptr inbounds i8, ptr [[S_GEP]], i64 4
 ; CHECK-NEXT:    [[S1:%.*]] = load float, ptr [[S1_GEP]], align 4
-; CHECK-NEXT:    [[MUL1:%.*]] = fmul float [[S1]], [[M1]]
+; CHECK-NEXT:    [[MUL1:%.*]] = fmul float [[S1]], [[M0]]
 ; CHECK-NEXT:    [[C1:%.*]] = fptoui float [[MUL1]] to i8
-; CHECK-NEXT:    store i8 [[C1]], ptr [[D1]], align 1, !alias.scope [[META3]]
+; CHECK-NEXT:    store i8 [[C1]], ptr [[D1]], align 1, !alias.scope [[META5]]
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 2
 ; CHECK-NEXT:    [[EC:%.*]] = icmp ult i64 [[IV_NEXT]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP]], label %[[EXIT:.*]]
@@ -77,21 +76,21 @@ define void @two_copies_conditional(ptr %dst, ptr %m, ptr %src, i64 %n, i1 %c) {
 ; CHECK-NEXT:    [[D0:%.*]] = getelementptr inbounds i8, ptr [[DST]], i64 [[IV]]
 ; CHECK-NEXT:    [[S_GEP:%.*]] = getelementptr inbounds float, ptr [[SRC]], i64 [[IV]]
 ; CHECK-NEXT:    [[S:%.*]] = load float, ptr [[S_GEP]], align 4
-; CHECK-NEXT:    call void @llvm.experimental.noalias.scope.decl(metadata [[META0]])
-; CHECK-NEXT:    [[M0:%.*]] = load float, ptr [[M]], align 4, !noalias [[META0]]
+; CHECK-NEXT:    call void @llvm.experimental.noalias.scope.decl(metadata [[META4]])
+; CHECK-NEXT:    [[M0:%.*]] = load float, ptr [[M]], align 4, !noalias [[META4]]
 ; CHECK-NEXT:    [[MUL0:%.*]] = fmul float [[S]], [[M0]]
 ; CHECK-NEXT:    [[C0:%.*]] = fptoui float [[MUL0]] to i8
-; CHECK-NEXT:    store i8 [[C0]], ptr [[D0]], align 1, !alias.scope [[META0]]
+; CHECK-NEXT:    store i8 [[C0]], ptr [[D0]], align 1, !alias.scope [[META4]]
 ; CHECK-NEXT:    [[D1:%.*]] = getelementptr inbounds i8, ptr [[D0]], i64 1
-; CHECK-NEXT:    call void @llvm.experimental.noalias.scope.decl(metadata [[META3]])
+; CHECK-NEXT:    call void @llvm.experimental.noalias.scope.decl(metadata [[META5]])
 ; CHECK-NEXT:    br i1 [[C]], label %[[THEN:.*]], label %[[LATCH]]
 ; CHECK:       [[THEN]]:
-; CHECK-NEXT:    [[M1:%.*]] = load float, ptr [[M]], align 4, !noalias [[META3]]
+; CHECK-NEXT:    [[M1:%.*]] = load float, ptr [[M]], align 4, !noalias [[META5]]
 ; CHECK-NEXT:    [[C1:%.*]] = fptoui float [[M1]] to i8
-; CHECK-NEXT:    store i8 [[C1]], ptr [[D1]], align 1, !alias.scope [[META3]]
+; CHECK-NEXT:    store i8 [[C1]], ptr [[D1]], align 1, !alias.scope [[META5]]
 ; CHECK-NEXT:    br label %[[LATCH]]
 ; CHECK:       [[LATCH]]:
-; CHECK-NEXT:    store i8 0, ptr [[D1]], align 1, !alias.scope [[META3]]
+; CHECK-NEXT:    store i8 0, ptr [[D1]], align 1, !alias.scope [[META5]]
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 2
 ; CHECK-NEXT:    [[EC:%.*]] = icmp ult i64 [[IV_NEXT]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP]], label %[[EXIT:.*]]
@@ -139,9 +138,10 @@ declare void @llvm.experimental.noalias.scope.decl(metadata)
 !3 = !{!4}
 !4 = distinct !{!4, !2, !"scope1"}
 ;.
-; CHECK: [[META0]] = !{[[META1:![0-9]+]]}
+; CHECK: [[META0]] = !{[[META1:![0-9]+]], [[META3:![0-9]+]]}
 ; CHECK: [[META1]] = distinct !{[[META1]], [[META2:![0-9]+]], !"scope0"}
 ; CHECK: [[META2]] = distinct !{[[META2]], i1 false, !"domain"}
-; CHECK: [[META3]] = !{[[META4:![0-9]+]]}
-; CHECK: [[META4]] = distinct !{[[META4]], [[META2]], !"scope1"}
+; CHECK: [[META3]] = distinct !{[[META3]], [[META2]], !"scope1"}
+; CHECK: [[META4]] = !{[[META1]]}
+; CHECK: [[META5]] = !{[[META3]]}
 ;.

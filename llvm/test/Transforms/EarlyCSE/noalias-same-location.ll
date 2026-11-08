@@ -9,10 +9,9 @@ define float @cse_across_store(ptr %p, ptr %q0, ptr %q1) {
 ; CHECK-LABEL: define float @cse_across_store(
 ; CHECK-SAME: ptr [[P:%.*]], ptr [[Q0:%.*]], ptr [[Q1:%.*]]) {
 ; CHECK-NEXT:    [[L0:%.*]] = load float, ptr [[P]], align 4, !noalias [[META0:![0-9]+]]
-; CHECK-NEXT:    store i8 0, ptr [[Q0]], align 1, !alias.scope [[META0]]
-; CHECK-NEXT:    [[L1:%.*]] = load float, ptr [[P]], align 4, !noalias [[META3:![0-9]+]]
-; CHECK-NEXT:    store i8 0, ptr [[Q1]], align 1, !alias.scope [[META3]]
-; CHECK-NEXT:    [[R:%.*]] = fadd float [[L0]], [[L1]]
+; CHECK-NEXT:    store i8 0, ptr [[Q0]], align 1, !alias.scope [[META4:![0-9]+]]
+; CHECK-NEXT:    store i8 0, ptr [[Q1]], align 1, !alias.scope [[META5:![0-9]+]]
+; CHECK-NEXT:    [[R:%.*]] = fadd float [[L0]], [[L0]]
 ; CHECK-NEXT:    ret float [[R]]
 ;
   %l0 = load float, ptr %p, align 4, !noalias !0
@@ -31,12 +30,11 @@ define float @cse_across_store_may_not_return(ptr %p, ptr %q0, ptr %q1) {
 ;
 ; CHECK-LABEL: define float @cse_across_store_may_not_return(
 ; CHECK-SAME: ptr [[P:%.*]], ptr [[Q0:%.*]], ptr [[Q1:%.*]]) {
-; CHECK-NEXT:    [[L0:%.*]] = load float, ptr [[P]], align 4, !noalias [[META0]]
-; CHECK-NEXT:    store i8 0, ptr [[Q0]], align 1, !alias.scope [[META0]]
+; CHECK-NEXT:    [[L0:%.*]] = load float, ptr [[P]], align 4, !noalias [[META4]]
+; CHECK-NEXT:    store i8 0, ptr [[Q0]], align 1, !alias.scope [[META4]]
 ; CHECK-NEXT:    call void @may_not_return()
-; CHECK-NEXT:    [[L1:%.*]] = load float, ptr [[P]], align 4, !noalias [[META3]]
-; CHECK-NEXT:    store i8 0, ptr [[Q1]], align 1, !alias.scope [[META3]]
-; CHECK-NEXT:    [[R:%.*]] = fadd float [[L0]], [[L1]]
+; CHECK-NEXT:    store i8 0, ptr [[Q1]], align 1, !alias.scope [[META5]]
+; CHECK-NEXT:    [[R:%.*]] = fadd float [[L0]], [[L0]]
 ; CHECK-NEXT:    ret float [[R]]
 ;
   %l0 = load float, ptr %p, align 4, !noalias !0
@@ -53,7 +51,7 @@ define float @cse_conditional_later_load(ptr %p, i1 %c) {
 ; CHECK-LABEL: define float @cse_conditional_later_load(
 ; CHECK-SAME: ptr [[P:%.*]], i1 [[C:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[L0:%.*]] = load float, ptr [[P]], align 4, !noalias [[META0]]
+; CHECK-NEXT:    [[L0:%.*]] = load float, ptr [[P]], align 4, !noalias [[META4]]
 ; CHECK-NEXT:    br i1 [[C]], label %[[THEN:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[THEN]]:
 ; CHECK-NEXT:    br label %[[EXIT]]
@@ -82,9 +80,9 @@ define float @no_cse_across_store(ptr %p, ptr %q0, ptr %q1) {
 ;
 ; CHECK-LABEL: define float @no_cse_across_store(
 ; CHECK-SAME: ptr [[P:%.*]], ptr [[Q0:%.*]], ptr [[Q1:%.*]]) {
-; CHECK-NEXT:    [[L0:%.*]] = load float, ptr [[P]], align 4, !noalias [[META3]]
-; CHECK-NEXT:    store i8 0, ptr [[Q0]], align 1, !alias.scope [[META0]]
-; CHECK-NEXT:    [[L1:%.*]] = load float, ptr [[P]], align 4, !noalias [[META3]]
+; CHECK-NEXT:    [[L0:%.*]] = load float, ptr [[P]], align 4, !noalias [[META5]]
+; CHECK-NEXT:    store i8 0, ptr [[Q0]], align 1, !alias.scope [[META4]]
+; CHECK-NEXT:    [[L1:%.*]] = load float, ptr [[P]], align 4, !noalias [[META5]]
 ; CHECK-NEXT:    [[R:%.*]] = fadd float [[L0]], [[L1]]
 ; CHECK-NEXT:    ret float [[R]]
 ;
@@ -101,9 +99,10 @@ define float @no_cse_across_store(ptr %p, ptr %q0, ptr %q1) {
 !3 = !{!4}
 !4 = distinct !{!4, !2, !"scope1"}
 ;.
-; CHECK: [[META0]] = !{[[META1:![0-9]+]]}
+; CHECK: [[META0]] = !{[[META1:![0-9]+]], [[META3:![0-9]+]]}
 ; CHECK: [[META1]] = distinct !{[[META1]], [[META2:![0-9]+]], !"scope0"}
 ; CHECK: [[META2]] = distinct !{[[META2]], i1 false, !"domain"}
-; CHECK: [[META3]] = !{[[META4:![0-9]+]]}
-; CHECK: [[META4]] = distinct !{[[META4]], [[META2]], !"scope1"}
+; CHECK: [[META3]] = distinct !{[[META3]], [[META2]], !"scope1"}
+; CHECK: [[META4]] = !{[[META1]]}
+; CHECK: [[META5]] = !{[[META3]]}
 ;.
