@@ -1263,8 +1263,7 @@ define float @fmax_fmin_with_select_same_load(ptr %src, i64 %n) {
 ; CHECK-NEXT:    [[TMP7:%.*]] = fcmp uno <4 x float> [[TMP3]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = bitcast <4 x float> [[TMP3]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP17:%.*]] = icmp eq <4 x i32> [[TMP16]], splat (i32 -2147483648)
-; CHECK-NEXT:    [[TMP19:%.*]] = or <4 x i1> [[TMP7]], [[TMP17]]
-; CHECK-NEXT:    [[TMP18:%.*]] = or <4 x i1> [[TMP19]], [[TMP19]]
+; CHECK-NEXT:    [[TMP18:%.*]] = or <4 x i1> [[TMP7]], [[TMP17]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP18]])
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = or i1 [[TMP8]], [[TMP9]]

@@ -1193,6 +1193,10 @@ static VPValue *simplifyLogicalRecipe(VPlan &Plan, VPSingleDefRecipe *Def) {
   if (match(Def, m_c_BinaryOr(m_VPValue(X), m_ZeroInt())))
     return X;
 
+  // X | X -> X
+  if (match(Def, m_BinaryOr(m_VPValue(X), m_Deferred(X))))
+    return X;
+
   // X | !X -> AllOnes
   if (match(Def, m_c_BinaryOr(m_VPValue(X), m_Not(m_Deferred(X)))))
     return Plan.getAllOnesValue(Def->getScalarType());
