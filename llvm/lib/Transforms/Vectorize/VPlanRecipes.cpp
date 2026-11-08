@@ -4296,13 +4296,14 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
     bool IsLoad = UI->getOpcode() == Instruction::Load;
     const VPValue *PtrOp = getOperand(!IsLoad);
     const SCEV *PtrSCEV = getAddressAccessSCEV(PtrOp, Ctx.PSE, Ctx.L);
-    if (isa_and_nonnull<SCEVCouldNotCompute>(PtrSCEV)) {
-      // Don't fall back to the legacy cost model for single-scalar accesses.
-      // PtrSCEV won't be used.
-      if (!isSingleScalar())
-        break;
+    const VPRecipeBase *PtrR = PtrOp->getDefiningRecipe();
+    bool HasScalarAddrs = isSingleScalar() ||
+                          (PtrR && vputils::doesGeneratePerAllLanes(PtrR) &&
+                           !isa_and_nonnull<SCEVAddRecExpr>(PtrSCEV));
+    if (HasScalarAddrs)
       PtrSCEV = nullptr;
-    }
+    if (isa_and_nonnull<SCEVCouldNotCompute>(PtrSCEV))
+      break;
 
     Type *ValTy = (IsLoad ? this : getOperand(0))->getScalarType();
     Type *ScalarPtrTy = PtrOp->getScalarType();
@@ -4316,7 +4317,7 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
         UI->getOpcode(), ValTy, Alignment, AS, Ctx.CostKind, OpInfo,
         UsedByLoadStoreAddress ? UI : nullptr);
 
-    Type *PtrTy = isSingleScalar() ? ScalarPtrTy : toVectorTy(ScalarPtrTy, VF);
+    Type *PtrTy = HasScalarAddrs ? ScalarPtrTy : toVectorTy(ScalarPtrTy, VF);
     InstructionCost ScalarCost =
         ScalarMemOpCost +
         Ctx.TTI.getAddressComputationCost(
