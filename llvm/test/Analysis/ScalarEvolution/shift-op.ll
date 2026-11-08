@@ -343,8 +343,8 @@ define void @test_udiv(i32 %init) {
 ; CHECK-LABEL: 'test_udiv'
 ; CHECK-NEXT:  Determining loop execution counts for: @test_udiv
 ; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
-; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
-; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 10
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 10
 ;
  entry:
   br label %loop
@@ -365,8 +365,8 @@ define void @test_udiv_range(ptr %init.ptr) {
 ; CHECK-LABEL: 'test_udiv_range'
 ; CHECK-NEXT:  Determining loop execution counts for: @test_udiv_range
 ; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
-; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
-; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 5
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 5
 ;
  entry:
   %init = load i32, ptr %init.ptr, !range !0
@@ -388,8 +388,8 @@ define void @test_sdiv(i32 %init) {
 ; CHECK-LABEL: 'test_sdiv'
 ; CHECK-NEXT:  Determining loop execution counts for: @test_sdiv
 ; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
-; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
-; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 32
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 32
 ;
  entry:
   br label %loop
@@ -409,8 +409,8 @@ define void @test_sdiv_range(ptr %init.ptr) {
 ; CHECK-LABEL: 'test_sdiv_range'
 ; CHECK-NEXT:  Determining loop execution counts for: @test_sdiv_range
 ; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
-; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
-; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 13
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 13
 ;
  entry:
   %init = load i32, ptr %init.ptr, !range !1
@@ -453,8 +453,8 @@ define void @test_udiv_i128(i128 %init) {
 ; CHECK-LABEL: 'test_udiv_i128'
 ; CHECK-NEXT:  Determining loop execution counts for: @test_udiv_i128
 ; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
-; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
-; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i128 43
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i128 43
 ;
  entry:
   br label %loop

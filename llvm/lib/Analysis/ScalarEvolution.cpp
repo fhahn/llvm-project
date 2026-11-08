@@ -9466,29 +9466,21 @@ ScalarEvolution::ExitLimit ScalarEvolution::computeShiftCompareExitLimit(
   if (!Predecessor)
     return getCouldNotCompute();
 
-  // Return true if V is of the form "LHS `shift_op` <positive constant>".
-  // Return LHS in OutLHS, shift_op in OutOpCode, and the shift amount in
-  // OutShiftAmt.
-  auto MatchPositiveShift = [](Value *V, Value *&OutLHS,
-                               Instruction::BinaryOps &OutOpCode,
-                               unsigned &OutShiftAmt) {
+  // Return true if V is of the form "LHS `op` <constant>", where op is a shift
+  // by a positive amount or a division by at least 2. Return LHS in OutLHS, op
+  // in OutOpCode, and the constant in OutC.
+  auto MatchShiftOrDiv = [](Value *V, Value *&OutLHS,
+                            Instruction::BinaryOps &OutOpCode,
+                            const APInt *&OutC) {
     using namespace PatternMatch;
 
-    ConstantInt *ShiftAmt;
-    if (match(V, m_LShr(m_Value(OutLHS), m_ConstantInt(ShiftAmt))))
-      OutOpCode = Instruction::LShr;
-    else if (match(V, m_AShr(m_Value(OutLHS), m_ConstantInt(ShiftAmt))))
-      OutOpCode = Instruction::AShr;
-    else if (match(V, m_Shl(m_Value(OutLHS), m_ConstantInt(ShiftAmt))))
-      OutOpCode = Instruction::Shl;
-    else
+    if (!match(V, m_BinOp(m_Value(OutLHS), m_APInt(OutC))))
       return false;
-
-    uint64_t Amt = ShiftAmt->getValue().getLimitedValue();
-    if (Amt == 0 || Amt >= OutLHS->getType()->getScalarSizeInBits())
-      return false;
-    OutShiftAmt = Amt;
-    return true;
+    OutOpCode = cast<BinaryOperator>(V)->getOpcode();
+    if (Instruction::isShift(OutOpCode))
+      return !OutC->isZero() && OutC->ult(OutC->getBitWidth());
+    return (OutOpCode == Instruction::UDiv || OutOpCode == Instruction::SDiv) &&
+           OutC->sge(2);
   };
 
   // Recognize a "shift recurrence" either of the form %iv or of %iv.shifted in
@@ -9498,17 +9490,17 @@ ScalarEvolution::ExitLimit ScalarEvolution::computeShiftCompareExitLimit(
   //   %iv.shifted = lshr i32 %iv, <positive constant>
   //
   // Return true on a successful match.  Return the corresponding PHI node (%iv
-  // above) in PNOut, the opcode of the shift operation in OpCodeOut, and the
-  // shift amount in ShiftAmtOut.
+  // above) in PNOut, the opcode of the operation in OpCodeOut, and its constant
+  // operand in COut.
   auto MatchShiftRecurrence = [&](Value *V, PHINode *&PNOut,
                                   Instruction::BinaryOps &OpCodeOut,
-                                  unsigned &ShiftAmtOut) {
+                                  const APInt *&COut) {
     std::optional<Instruction::BinaryOps> PostShiftOpCode;
 
     {
       Instruction::BinaryOps OpC;
       Value *V;
-      unsigned Amt;
+      const APInt *C;
 
       // If we encounter a shift instruction, "peel off" the shift operation,
       // and remember that we did so.  Later when we inspect %iv's backedge
@@ -9519,7 +9511,7 @@ ScalarEvolution::ExitLimit ScalarEvolution::computeShiftCompareExitLimit(
       // instruction as the one feeding into the PHI's backedge value.  We only
       // really care about it being the same *kind* of shift instruction --
       // that's all that is required for our later inferences to hold.
-      if (MatchPositiveShift(LHS, V, OpC, Amt)) {
+      if (MatchShiftOrDiv(LHS, V, OpC, C)) {
         PostShiftOpCode = OpC;
         LHS = V;
       }
@@ -9533,9 +9525,8 @@ ScalarEvolution::ExitLimit ScalarEvolution::computeShiftCompareExitLimit(
     Value *OpLHS;
 
     return
-        // The backedge value for the PHI node must be a shift by a positive
-        // amount
-        MatchPositiveShift(BEValue, OpLHS, OpCodeOut, ShiftAmtOut) &&
+        // The backedge value for the PHI node must be a shift or division
+        MatchShiftOrDiv(BEValue, OpLHS, OpCodeOut, COut) &&
 
         // of the PHI node itself
         OpLHS == PNOut &&
@@ -9547,8 +9538,8 @@ ScalarEvolution::ExitLimit ScalarEvolution::computeShiftCompareExitLimit(
 
   PHINode *PN;
   Instruction::BinaryOps OpCode;
-  unsigned ShiftAmt;
-  if (!MatchShiftRecurrence(LHS, PN, OpCode, ShiftAmt))
+  const APInt *C;
+  if (!MatchShiftRecurrence(LHS, PN, OpCode, C))
     return getCouldNotCompute();
 
   const DataLayout &DL = getDataLayout();
@@ -9583,8 +9574,10 @@ ScalarEvolution::ExitLimit ScalarEvolution::computeShiftCompareExitLimit(
   }
   case Instruction::LShr:
   case Instruction::Shl:
-    // Both {K,lshr,<positive-constant>} and {K,shl,<positive-constant>}
-    // stabilize to 0 in at most bitwidth(K) iterations.
+  case Instruction::UDiv:
+  case Instruction::SDiv:
+    // {K,lshr,<positive-constant>}, {K,shl,<positive-constant>} and divisions
+    // by a constant >= 2 stabilize to 0 in at most bitwidth(K) iterations.
     StableValue = ConstantInt::get(cast<IntegerType>(RHS->getType()), 0);
     break;
   }
@@ -9600,18 +9593,34 @@ ScalarEvolution::ExitLimit ScalarEvolution::computeShiftCompareExitLimit(
 
     // For right-shift recurrences (lshr/ashr with non-negative start), we can
     // compute a tighter max backedge-taken count from the range of the start
-    // value. After k shifts of ShiftAmt, value = start >> (k * ShiftAmt).
-    // The value reaches 0 (the stable value) when k * ShiftAmt >=
-    // activeBits(start), so max BTC = ceil(activeBits(maxStart) / ShiftAmt).
+    // value. After k shifts by C, value = start >> (k * C). The value reaches
+    // 0 (the stable value) when k * C >= activeBits(start), so max BTC =
+    // ceil(activeBits(maxStart) / C).
     if (OpCode == Instruction::LShr || OpCode == Instruction::AShr) {
       Value *StartValue = PN->getIncomingValueForBlock(Predecessor);
       const SCEV *StartSCEV = getSCEV(StartValue);
       APInt MaxStart = getUnsignedRangeMax(StartSCEV);
       if (MaxStart.isStrictlyPositive()) {
         unsigned ActiveBits = MaxStart.getActiveBits();
-        unsigned RangeBTC = divideCeil(ActiveBits, ShiftAmt);
+        unsigned RangeBTC = divideCeil(ActiveBits, C->getZExtValue());
         MaxBTC = std::min(MaxBTC, RangeBTC);
       }
+    }
+
+    // Each division divides the magnitude by at least C, so count the
+    // divisions it takes to bring the largest start magnitude to 0. Counting
+    // is quadratic in the bitwidth, so for types wider than 64 bits use that
+    // each division shifts out at least log2(C) bits instead.
+    if (OpCode == Instruction::UDiv || OpCode == Instruction::SDiv) {
+      const SCEV *Start = getSCEV(PN->getIncomingValueForBlock(Predecessor));
+      APInt MaxMag = OpCode == Instruction::UDiv
+                         ? getUnsignedRangeMax(Start)
+                         : getSignedRange(Start).abs().getUnsignedMax();
+      if (BitWidth > 64)
+        MaxBTC = divideCeil(MaxMag.getActiveBits(), C->logBase2());
+      else
+        for (MaxBTC = 0; !MaxMag.isZero(); ++MaxBTC)
+          MaxMag = MaxMag.udiv(*C);
     }
 
     const SCEV *UpperBound =

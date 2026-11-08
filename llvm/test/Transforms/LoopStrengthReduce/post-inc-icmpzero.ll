@@ -35,7 +35,7 @@ define void @_Z15IntegerToStringjjR7Vector2(i32 %i, i32 %radix, ptr nocapture %r
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ugt i32 [[I_ADDR_0]], 9
 ; CHECK-NEXT:    [[SCEVGEP5]] = getelementptr i8, ptr [[LSR_IV4]], i64 -2
 ; CHECK-NEXT:    [[SCEVGEP9]] = getelementptr i8, ptr [[LSR_IV8]], i64 -2
-; CHECK-NEXT:    [[LSR_IV_NEXT11]] = add i64 [[LSR_IV10]], 1
+; CHECK-NEXT:    [[LSR_IV_NEXT11]] = add nsw i64 [[LSR_IV10]], 1
 ; CHECK-NEXT:    br i1 [[TMP0]], label [[DO_BODY]], label [[DO_END:%.*]]
 ; CHECK:       do.end:
 ; CHECK-NEXT:    [[SCEVGEP9_LCSSA:%.*]] = phi ptr [ [[SCEVGEP9]], [[DO_BODY]] ]
