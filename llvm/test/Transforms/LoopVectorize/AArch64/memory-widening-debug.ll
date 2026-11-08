@@ -149,24 +149,24 @@ for.end:
 
 define void @reverse_load_scatter(ptr noalias %src, ptr noalias %dst, i64 %n) {
 ; FIXED-LABEL: 'reverse_load_scatter'
-; FIXED:  LV: Memory widening: calculating best strategy for %val = load i64, ptr %src.ptr, align 8
+; FIXED:  LV: Memory widening: calculating best strategy for %val = load ptr, ptr %src.ptr, align 8
 ; FIXED:  LV: Memory widening: can be widened normally with cost 4
-; FIXED:  LV: Setting widening decision to Widen_Reverse for VF 4 and instruction: %val = load i64, ptr %src.ptr, align 8
-; FIXED:  LV: Memory widening: calculating best strategy for store i64 %val, ptr %dst.ptr, align 8
+; FIXED:  LV: Setting widening decision to Widen_Reverse for VF 4 and instruction: %val = load ptr, ptr %src.ptr, align 8
+; FIXED:  LV: Memory widening: calculating best strategy for store i64 %iv.dec, ptr %val, align 8
 ; FIXED:  LV: Memory widening: InterleaveCost = Invalid, GatherScatterCost = Invalid, ScalarizationCost = 60
-; FIXED:  LV: Setting widening decision to Scalarize for VF 4 and instruction: store i64 %val, ptr %dst.ptr, align 8
-; FIXED:  LV: Memory widening: updating decision for load %val = load i64, ptr %src.ptr, align 8
-; FIXED:  LV: Setting widening decision to Scalarize for VF 4 and instruction: %val = load i64, ptr %src.ptr, align 8
-; FIXED:  LV: Memory widening: updating decision for load user store i64 %val, ptr %dst.ptr, align 8
-; FIXED:  LV: Setting widening decision to Scalarize for VF 4 and instruction: store i64 %val, ptr %dst.ptr, align 8
+; FIXED:  LV: Setting widening decision to Scalarize for VF 4 and instruction: store i64 %iv.dec, ptr %val, align 8
+; FIXED:  LV: Memory widening: updating decision for load %val = load ptr, ptr %src.ptr, align 8
+; FIXED:  LV: Setting widening decision to Scalarize for VF 4 and instruction: %val = load ptr, ptr %src.ptr, align 8
+; FIXED:  LV: Memory widening: updating decision for load user store i64 %iv.dec, ptr %val, align 8
+; FIXED:  LV: Setting widening decision to Scalarize for VF 4 and instruction: store i64 %iv.dec, ptr %val, align 8
 ;
 ; SVE-LABEL: 'reverse_load_scatter'
-; SVE:  LV: Memory widening: calculating best strategy for %val = load i64, ptr %src.ptr, align 8
+; SVE:  LV: Memory widening: calculating best strategy for %val = load ptr, ptr %src.ptr, align 8
 ; SVE:  LV: Memory widening: can be widened normally with cost 2
-; SVE:  LV: Setting widening decision to Widen_Reverse for VF vscale x 2 and instruction: %val = load i64, ptr %src.ptr, align 8
-; SVE:  LV: Memory widening: calculating best strategy for store i64 %val, ptr %dst.ptr, align 8
+; SVE:  LV: Setting widening decision to Widen_Reverse for VF vscale x 2 and instruction: %val = load ptr, ptr %src.ptr, align 8
+; SVE:  LV: Memory widening: calculating best strategy for store i64 %iv.dec, ptr %val, align 8
 ; SVE:  LV: Memory widening: InterleaveCost = Invalid, GatherScatterCost = 21, ScalarizationCost = Invalid
-; SVE:  LV: Setting widening decision to GatherScatter for VF vscale x 2 and instruction: store i64 %val, ptr %dst.ptr, align 8
+; SVE:  LV: Setting widening decision to GatherScatter for VF vscale x 2 and instruction: store i64 %iv.dec, ptr %val, align 8
 ;
 entry:
   br label %loop
@@ -174,9 +174,8 @@ entry:
 loop:
   %iv.dec = phi i64 [ %n, %entry ], [ %iv.dec.next, %loop ]
   %src.ptr = getelementptr inbounds i64, ptr %src, i64 %iv.dec
-  %val = load i64, ptr %src.ptr, align 8
-  %dst.ptr = getelementptr inbounds i64, ptr %dst, i64 %val
-  store i64 %val, ptr %dst.ptr, align 8
+  %val = load ptr, ptr %src.ptr, align 8
+  store i64 %iv.dec, ptr %val, align 8
   %iv.dec.next = add i64 %iv.dec, -1
   %done = icmp eq i64 %iv.dec.next, 0
   br i1 %done, label %exit, label %loop
