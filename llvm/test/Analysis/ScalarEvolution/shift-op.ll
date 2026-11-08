@@ -338,6 +338,137 @@ define void @test_gpu_reduction(ptr %blockdim.ptr) {
   ret void
 }
 
+; Dividing by 10 reaches 0 after at most 10 steps, as in digit-counting loops.
+define void @test_udiv(i32 %init) {
+; CHECK-LABEL: 'test_udiv'
+; CHECK-NEXT:  Determining loop execution counts for: @test_udiv
+; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
+;
+ entry:
+  br label %loop
+
+ loop:
+  %iv = phi i32 [ %init, %entry ], [ %iv.div, %loop ]
+  %iv.div = udiv i32 %iv, 10
+  %exit.cond = icmp eq i32 %iv.div, 0
+  br i1 %exit.cond, label %leave, label %loop
+
+ leave:
+  ret void
+}
+
+; The range of the start bounds the number of divisions: 49999 reaches 0
+; after 5 divisions by 10.
+define void @test_udiv_range(ptr %init.ptr) {
+; CHECK-LABEL: 'test_udiv_range'
+; CHECK-NEXT:  Determining loop execution counts for: @test_udiv_range
+; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
+;
+ entry:
+  %init = load i32, ptr %init.ptr, !range !0
+  br label %loop
+
+ loop:
+  %iv = phi i32 [ %init, %entry ], [ %iv.div, %loop ]
+  %iv.div = udiv i32 %iv, 10
+  %exit.cond = icmp eq i32 %iv, 0
+  br i1 %exit.cond, label %leave, label %loop
+
+ leave:
+  ret void
+}
+
+; Signed division by 2 truncates towards 0, so the magnitude of any start
+; reaches 0 after at most 32 steps.
+define void @test_sdiv(i32 %init) {
+; CHECK-LABEL: 'test_sdiv'
+; CHECK-NEXT:  Determining loop execution counts for: @test_sdiv
+; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
+;
+ entry:
+  br label %loop
+
+ loop:
+  %iv = phi i32 [ %init, %entry ], [ %iv.div, %loop ]
+  %iv.div = sdiv i32 %iv, 2
+  %exit.cond = icmp eq i32 %iv.div, 0
+  br i1 %exit.cond, label %leave, label %loop
+
+ leave:
+  ret void
+}
+
+; The largest magnitude in [-5000, -2] reaches 0 after 13 divisions by 2.
+define void @test_sdiv_range(ptr %init.ptr) {
+; CHECK-LABEL: 'test_sdiv_range'
+; CHECK-NEXT:  Determining loop execution counts for: @test_sdiv_range
+; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
+;
+ entry:
+  %init = load i32, ptr %init.ptr, !range !1
+  br label %loop
+
+ loop:
+  %iv = phi i32 [ %init, %entry ], [ %iv.div, %loop ]
+  %iv.div = sdiv i32 %iv, 2
+  %exit.cond = icmp eq i32 %iv, 0
+  br i1 %exit.cond, label %leave, label %loop
+
+ leave:
+  ret void
+}
+
+; Dividing by 1 does not change %iv, so the loop may be infinite.
+define void @test_udiv_by_one(i32 %init) {
+; CHECK-LABEL: 'test_udiv_by_one'
+; CHECK-NEXT:  Determining loop execution counts for: @test_udiv_by_one
+; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
+;
+ entry:
+  br label %loop
+
+ loop:
+  %iv = phi i32 [ %init, %entry ], [ %iv.div, %loop ]
+  %iv.div = udiv i32 %iv, 1
+  %exit.cond = icmp eq i32 %iv.div, 0
+  br i1 %exit.cond, label %leave, label %loop
+
+ leave:
+  ret void
+}
+
+; Dividing an i128 by 10 shifts out at least 3 bits, so it reaches 0 after at
+; most 43 steps.
+define void @test_udiv_i128(i128 %init) {
+; CHECK-LABEL: 'test_udiv_i128'
+; CHECK-NEXT:  Determining loop execution counts for: @test_udiv_i128
+; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
+;
+ entry:
+  br label %loop
+
+ loop:
+  %iv = phi i128 [ %init, %entry ], [ %iv.div, %loop ]
+  %iv.div = udiv i128 %iv, 10
+  %exit.cond = icmp eq i128 %iv, 0
+  br i1 %exit.cond, label %leave, label %loop
+
+ leave:
+  ret void
+}
+
 !0 = !{i32 0, i32 50000}
 !1 = !{i32 -5000, i32 -1}
 !2 = !{i32 1, i32 1025}
