@@ -355,6 +355,68 @@ entry:
   ret i64 %0
 }
 
+; IndVars makes %j.neg invariant in the inner loop and hoists it to the
+; preheader of the outer loop, where it is also invariant. The extra
+; SimpleLoopUnswitch run requested by IndVars for the outer loop unswitches it,
+; so the check is performed once before the loop nest.
+define i8 @nested_loop_exit_invariant_in_outer_loop(ptr %p, i64 %n, i64 %m, i64 %start) {
+; CHECK-LABEL: define range(i8 0, 2) i8 @nested_loop_exit_invariant_in_outer_loop(
+; CHECK-SAME: ptr [[P:%.*]], i64 [[N:%.*]], i64 [[M:%.*]], i64 [[START:%.*]]) local_unnamed_addr {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[J_NEG:%.*]] = icmp slt i64 [[START]], 0
+; CHECK-NEXT:    [[SMAX:%.*]] = tail call i64 @llvm.smax.i64(i64 [[N]], i64 1)
+; CHECK-NEXT:    br i1 [[J_NEG]], label [[COMMON_RET:%.*]], label [[OUTER_HEADER:%.*]]
+; CHECK:       outer.header:
+; CHECK-NEXT:    [[I:%.*]] = phi i64 [ [[I_NEXT:%.*]], [[OUTER_LATCH:%.*]] ], [ 0, [[ENTRY:%.*]] ]
+; CHECK-NEXT:    br label [[INNER_HEADER:%.*]]
+; CHECK:       inner.header:
+; CHECK-NEXT:    [[J:%.*]] = phi i64 [ [[START]], [[OUTER_HEADER]] ], [ [[J_NEXT:%.*]], [[INNER_HEADER]] ]
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 [[J]]
+; CHECK-NEXT:    tail call void @use(ptr [[GEP]])
+; CHECK-NEXT:    [[J_NEXT]] = add nuw nsw i64 [[J]], 1
+; CHECK-NEXT:    [[INNER_EC:%.*]] = icmp slt i64 [[J_NEXT]], [[M]]
+; CHECK-NEXT:    br i1 [[INNER_EC]], label [[INNER_HEADER]], label [[OUTER_LATCH]]
+; CHECK:       outer.latch:
+; CHECK-NEXT:    [[I_NEXT]] = add nuw nsw i64 [[I]], 1
+; CHECK-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[I_NEXT]], [[SMAX]]
+; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label [[COMMON_RET]], label [[OUTER_HEADER]]
+; CHECK:       common.ret:
+; CHECK-NEXT:    [[COMMON_RET_OP:%.*]] = phi i8 [ 1, [[ENTRY]] ], [ 0, [[OUTER_LATCH]] ]
+; CHECK-NEXT:    ret i8 [[COMMON_RET_OP]]
+;
+entry:
+  br label %outer.header
+
+outer.header:
+  %i = phi i64 [ 0, %entry ], [ %i.next, %outer.latch ]
+  br label %inner.header
+
+inner.header:
+  %j = phi i64 [ %start, %outer.header ], [ %j.next, %inner.latch ]
+  %j.neg = icmp slt i64 %j, 0
+  br i1 %j.neg, label %early.exit, label %inner.latch
+
+inner.latch:
+  %gep = getelementptr inbounds i8, ptr %p, i64 %j
+  call void @use(ptr %gep)
+  %j.next = add nsw i64 %j, 1
+  %inner.ec = icmp slt i64 %j.next, %m
+  br i1 %inner.ec, label %inner.header, label %outer.latch
+
+outer.latch:
+  %i.next = add nsw i64 %i, 1
+  %outer.ec = icmp slt i64 %i.next, %n
+  br i1 %outer.ec, label %outer.header, label %exit
+
+exit:
+  ret i8 0
+
+early.exit:
+  ret i8 1
+}
+
+declare void @use(ptr)
+
 declare void @llvm.lifetime.start.p0(ptr nocapture)
 
 declare void @llvm.trap()
