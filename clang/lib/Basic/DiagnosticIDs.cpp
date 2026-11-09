@@ -561,6 +561,11 @@ diag::Severity DiagnosticIDs::getDiagnosticListHighestSeverity(
         (IsCustomDiag || getDiagClass(DiagID) != CLASS_REMARK))
       Result = diag::Severity::Warning;
 
+    // Without -pedantic, nothing below upgrades an ignored diagnostic.
+    if (Result == diag::Severity::Ignored &&
+        State->ExtBehavior == diag::Severity::Ignored)
+      return Result;
+
     // Ignore -pedantic diagnostics inside __extension__ blocks.
     // (The diagnostics controlled by -pedantic are the extension diagnostics
     // that are not enabled by default.)
