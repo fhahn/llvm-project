@@ -3331,6 +3331,18 @@ public:
       return ScalarCalls * ScalarCost + ScalarizationCost;
     }
 
+    // Without nnan, FMINNUM/FMAXNUM are lowered to a libcall, which may not be
+    // available for the type (e.g. fmaxl for fp128 on Darwin).
+    // TODO: The legalizer could expand them without a libcall instead.
+    if ((ISD == ISD::FMINNUM || ISD == ISD::FMAXNUM) && !FMF.noNaNs()) {
+      EVT VT = TLI->getValueType(DL, RetTy);
+      RTLIB::Libcall LC =
+          ISD == ISD::FMINNUM ? RTLIB::getFMIN(VT) : RTLIB::getFMAX(VT);
+      if (LC != RTLIB::UNKNOWN_LIBCALL &&
+          TLI->getLibcallImpl(LC) == RTLIB::Unsupported)
+        return InstructionCost::getInvalid();
+    }
+
     // This is going to be turned into a library call, make it expensive.
     return SingleCallCost;
   }

@@ -5,11 +5,17 @@
 ; Darwin has no fminl/fmaxl for fp128.
 
 define void @minnum_fp128() {
-; CHECK-LABEL: 'minnum_fp128'
-; CHECK-NEXT:  Cost Model: Found costs of RThru:10 CodeSize:1 Lat:10 SizeLat:10 for: %1 = call fp128 @llvm.minnum.f128(fp128 poison, fp128 poison)
-; CHECK-NEXT:  Cost Model: Found costs of RThru:10 CodeSize:1 Lat:10 SizeLat:10 for: %2 = call nnan fp128 @llvm.minnum.f128(fp128 poison, fp128 poison)
-; CHECK-NEXT:  Cost Model: Found costs of RThru:20 CodeSize:2 Lat:20 SizeLat:20 for: %3 = call <2 x fp128> @llvm.minnum.v2f128(<2 x fp128> poison, <2 x fp128> poison)
-; CHECK-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
+; CHECK-LINUX-LABEL: 'minnum_fp128'
+; CHECK-LINUX-NEXT:  Cost Model: Found costs of RThru:10 CodeSize:1 Lat:10 SizeLat:10 for: %1 = call fp128 @llvm.minnum.f128(fp128 poison, fp128 poison)
+; CHECK-LINUX-NEXT:  Cost Model: Found costs of RThru:10 CodeSize:1 Lat:10 SizeLat:10 for: %2 = call nnan fp128 @llvm.minnum.f128(fp128 poison, fp128 poison)
+; CHECK-LINUX-NEXT:  Cost Model: Found costs of RThru:20 CodeSize:2 Lat:20 SizeLat:20 for: %3 = call <2 x fp128> @llvm.minnum.v2f128(<2 x fp128> poison, <2 x fp128> poison)
+; CHECK-LINUX-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
+;
+; CHECK-DARWIN-LABEL: 'minnum_fp128'
+; CHECK-DARWIN-NEXT:  Cost Model: Found costs of Invalid for: %1 = call fp128 @llvm.minnum.f128(fp128 poison, fp128 poison)
+; CHECK-DARWIN-NEXT:  Cost Model: Found costs of RThru:10 CodeSize:1 Lat:10 SizeLat:10 for: %2 = call nnan fp128 @llvm.minnum.f128(fp128 poison, fp128 poison)
+; CHECK-DARWIN-NEXT:  Cost Model: Found costs of Invalid for: %3 = call <2 x fp128> @llvm.minnum.v2f128(<2 x fp128> poison, <2 x fp128> poison)
+; CHECK-DARWIN-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
 ;
   %1 = call fp128 @llvm.minnum.f128(fp128 poison, fp128 poison)
   %2 = call nnan fp128 @llvm.minnum.f128(fp128 poison, fp128 poison)
@@ -18,11 +24,17 @@ define void @minnum_fp128() {
 }
 
 define void @maxnum_fp128() {
-; CHECK-LABEL: 'maxnum_fp128'
-; CHECK-NEXT:  Cost Model: Found costs of RThru:10 CodeSize:1 Lat:10 SizeLat:10 for: %1 = call fp128 @llvm.maxnum.f128(fp128 poison, fp128 poison)
-; CHECK-NEXT:  Cost Model: Found costs of RThru:10 CodeSize:1 Lat:10 SizeLat:10 for: %2 = call nnan fp128 @llvm.maxnum.f128(fp128 poison, fp128 poison)
-; CHECK-NEXT:  Cost Model: Found costs of RThru:20 CodeSize:2 Lat:20 SizeLat:20 for: %3 = call <2 x fp128> @llvm.maxnum.v2f128(<2 x fp128> poison, <2 x fp128> poison)
-; CHECK-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
+; CHECK-LINUX-LABEL: 'maxnum_fp128'
+; CHECK-LINUX-NEXT:  Cost Model: Found costs of RThru:10 CodeSize:1 Lat:10 SizeLat:10 for: %1 = call fp128 @llvm.maxnum.f128(fp128 poison, fp128 poison)
+; CHECK-LINUX-NEXT:  Cost Model: Found costs of RThru:10 CodeSize:1 Lat:10 SizeLat:10 for: %2 = call nnan fp128 @llvm.maxnum.f128(fp128 poison, fp128 poison)
+; CHECK-LINUX-NEXT:  Cost Model: Found costs of RThru:20 CodeSize:2 Lat:20 SizeLat:20 for: %3 = call <2 x fp128> @llvm.maxnum.v2f128(<2 x fp128> poison, <2 x fp128> poison)
+; CHECK-LINUX-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
+;
+; CHECK-DARWIN-LABEL: 'maxnum_fp128'
+; CHECK-DARWIN-NEXT:  Cost Model: Found costs of Invalid for: %1 = call fp128 @llvm.maxnum.f128(fp128 poison, fp128 poison)
+; CHECK-DARWIN-NEXT:  Cost Model: Found costs of RThru:10 CodeSize:1 Lat:10 SizeLat:10 for: %2 = call nnan fp128 @llvm.maxnum.f128(fp128 poison, fp128 poison)
+; CHECK-DARWIN-NEXT:  Cost Model: Found costs of Invalid for: %3 = call <2 x fp128> @llvm.maxnum.v2f128(<2 x fp128> poison, <2 x fp128> poison)
+; CHECK-DARWIN-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
 ;
   %1 = call fp128 @llvm.maxnum.f128(fp128 poison, fp128 poison)
   %2 = call nnan fp128 @llvm.maxnum.f128(fp128 poison, fp128 poison)
@@ -31,11 +43,17 @@ define void @maxnum_fp128() {
 }
 
 define void @reduce_fmin_fp128() {
-; CHECK-LABEL: 'reduce_fmin_fp128'
-; CHECK-NEXT:  Cost Model: Found costs of RThru:12 CodeSize:3 Lat:12 SizeLat:12 for: %1 = call fp128 @llvm.vector.reduce.fmin.v2f128(<2 x fp128> poison)
-; CHECK-NEXT:  Cost Model: Found costs of RThru:12 CodeSize:3 Lat:12 SizeLat:12 for: %2 = call nnan fp128 @llvm.vector.reduce.fmin.v2f128(<2 x fp128> poison)
-; CHECK-NEXT:  Cost Model: Found costs of RThru:32 CodeSize:5 Lat:32 SizeLat:32 for: %3 = call fp128 @llvm.vector.reduce.fmin.v4f128(<4 x fp128> poison)
-; CHECK-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
+; CHECK-LINUX-LABEL: 'reduce_fmin_fp128'
+; CHECK-LINUX-NEXT:  Cost Model: Found costs of RThru:12 CodeSize:3 Lat:12 SizeLat:12 for: %1 = call fp128 @llvm.vector.reduce.fmin.v2f128(<2 x fp128> poison)
+; CHECK-LINUX-NEXT:  Cost Model: Found costs of RThru:12 CodeSize:3 Lat:12 SizeLat:12 for: %2 = call nnan fp128 @llvm.vector.reduce.fmin.v2f128(<2 x fp128> poison)
+; CHECK-LINUX-NEXT:  Cost Model: Found costs of RThru:32 CodeSize:5 Lat:32 SizeLat:32 for: %3 = call fp128 @llvm.vector.reduce.fmin.v4f128(<4 x fp128> poison)
+; CHECK-LINUX-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
+;
+; CHECK-DARWIN-LABEL: 'reduce_fmin_fp128'
+; CHECK-DARWIN-NEXT:  Cost Model: Found costs of Invalid for: %1 = call fp128 @llvm.vector.reduce.fmin.v2f128(<2 x fp128> poison)
+; CHECK-DARWIN-NEXT:  Cost Model: Found costs of RThru:12 CodeSize:3 Lat:12 SizeLat:12 for: %2 = call nnan fp128 @llvm.vector.reduce.fmin.v2f128(<2 x fp128> poison)
+; CHECK-DARWIN-NEXT:  Cost Model: Found costs of Invalid for: %3 = call fp128 @llvm.vector.reduce.fmin.v4f128(<4 x fp128> poison)
+; CHECK-DARWIN-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
 ;
   %1 = call fp128 @llvm.vector.reduce.fmin.v2f128(<2 x fp128> poison)
   %2 = call nnan fp128 @llvm.vector.reduce.fmin.v2f128(<2 x fp128> poison)
@@ -44,11 +62,17 @@ define void @reduce_fmin_fp128() {
 }
 
 define void @reduce_fmax_fp128() {
-; CHECK-LABEL: 'reduce_fmax_fp128'
-; CHECK-NEXT:  Cost Model: Found costs of RThru:12 CodeSize:3 Lat:12 SizeLat:12 for: %1 = call fp128 @llvm.vector.reduce.fmax.v2f128(<2 x fp128> poison)
-; CHECK-NEXT:  Cost Model: Found costs of RThru:12 CodeSize:3 Lat:12 SizeLat:12 for: %2 = call nnan fp128 @llvm.vector.reduce.fmax.v2f128(<2 x fp128> poison)
-; CHECK-NEXT:  Cost Model: Found costs of RThru:32 CodeSize:5 Lat:32 SizeLat:32 for: %3 = call fp128 @llvm.vector.reduce.fmax.v4f128(<4 x fp128> poison)
-; CHECK-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
+; CHECK-LINUX-LABEL: 'reduce_fmax_fp128'
+; CHECK-LINUX-NEXT:  Cost Model: Found costs of RThru:12 CodeSize:3 Lat:12 SizeLat:12 for: %1 = call fp128 @llvm.vector.reduce.fmax.v2f128(<2 x fp128> poison)
+; CHECK-LINUX-NEXT:  Cost Model: Found costs of RThru:12 CodeSize:3 Lat:12 SizeLat:12 for: %2 = call nnan fp128 @llvm.vector.reduce.fmax.v2f128(<2 x fp128> poison)
+; CHECK-LINUX-NEXT:  Cost Model: Found costs of RThru:32 CodeSize:5 Lat:32 SizeLat:32 for: %3 = call fp128 @llvm.vector.reduce.fmax.v4f128(<4 x fp128> poison)
+; CHECK-LINUX-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
+;
+; CHECK-DARWIN-LABEL: 'reduce_fmax_fp128'
+; CHECK-DARWIN-NEXT:  Cost Model: Found costs of Invalid for: %1 = call fp128 @llvm.vector.reduce.fmax.v2f128(<2 x fp128> poison)
+; CHECK-DARWIN-NEXT:  Cost Model: Found costs of RThru:12 CodeSize:3 Lat:12 SizeLat:12 for: %2 = call nnan fp128 @llvm.vector.reduce.fmax.v2f128(<2 x fp128> poison)
+; CHECK-DARWIN-NEXT:  Cost Model: Found costs of Invalid for: %3 = call fp128 @llvm.vector.reduce.fmax.v4f128(<4 x fp128> poison)
+; CHECK-DARWIN-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
 ;
   %1 = call fp128 @llvm.vector.reduce.fmax.v2f128(<2 x fp128> poison)
   %2 = call nnan fp128 @llvm.vector.reduce.fmax.v2f128(<2 x fp128> poison)
@@ -56,5 +80,4 @@ define void @reduce_fmax_fp128() {
   ret void
 }
 ;; NOTE: These prefixes are unused and the list is autogenerated. Do not add tests below this line:
-; CHECK-DARWIN: {{.*}}
-; CHECK-LINUX: {{.*}}
+; CHECK: {{.*}}

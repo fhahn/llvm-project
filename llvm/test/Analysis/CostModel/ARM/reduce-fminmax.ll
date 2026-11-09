@@ -16,7 +16,7 @@ define void @fmin_strict() {
 ; CHECK-V8-NEXT:  Cost Model: Found costs of 3 for: %fmin_v8f32 = call float @llvm.vector.reduce.fmin.v8f32(<8 x float> undef)
 ; CHECK-V8-NEXT:  Cost Model: Found costs of 1 for: %fmin_v2f64 = call double @llvm.vector.reduce.fmin.v2f64(<2 x double> undef)
 ; CHECK-V8-NEXT:  Cost Model: Found costs of 9 for: %fmin_v4f64 = call double @llvm.vector.reduce.fmin.v4f64(<4 x double> undef)
-; CHECK-V8-NEXT:  Cost Model: Found costs of RThru:94 CodeSize:67 Lat:94 SizeLat:94 for: %fmin_v4f128 = call fp128 @llvm.vector.reduce.fmin.v4f128(<4 x fp128> undef)
+; CHECK-V8-NEXT:  Cost Model: Found costs of Invalid for: %fmin_v4f128 = call fp128 @llvm.vector.reduce.fmin.v4f128(<4 x fp128> undef)
 ; CHECK-V8-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
 ;
 ; CHECK-MVEFP-LABEL: 'fmin_strict'
@@ -29,7 +29,7 @@ define void @fmin_strict() {
 ; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:5 CodeSize:4 Lat:5 SizeLat:5 for: %fmin_v8f32 = call float @llvm.vector.reduce.fmin.v8f32(<8 x float> undef)
 ; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:35 CodeSize:13 Lat:35 SizeLat:35 for: %fmin_v2f64 = call double @llvm.vector.reduce.fmin.v2f64(<2 x double> undef)
 ; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:69 CodeSize:25 Lat:69 SizeLat:69 for: %fmin_v4f64 = call double @llvm.vector.reduce.fmin.v4f64(<4 x double> undef)
-; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:118 CodeSize:67 Lat:118 SizeLat:118 for: %fmin_v4f128 = call fp128 @llvm.vector.reduce.fmin.v4f128(<4 x fp128> undef)
+; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:Invalid CodeSize:Invalid Lat:Invalid SizeLat:Invalid for: %fmin_v4f128 = call fp128 @llvm.vector.reduce.fmin.v4f128(<4 x fp128> undef)
 ; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
 ;
 ; CHECK-MVEI-LABEL: 'fmin_strict'
@@ -42,7 +42,7 @@ define void @fmin_strict() {
 ; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:205 CodeSize:73 Lat:205 SizeLat:205 for: %fmin_v8f32 = call float @llvm.vector.reduce.fmin.v8f32(<8 x float> undef)
 ; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:35 CodeSize:13 Lat:35 SizeLat:35 for: %fmin_v2f64 = call double @llvm.vector.reduce.fmin.v2f64(<2 x double> undef)
 ; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:69 CodeSize:25 Lat:69 SizeLat:69 for: %fmin_v4f64 = call double @llvm.vector.reduce.fmin.v4f64(<4 x double> undef)
-; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:118 CodeSize:67 Lat:118 SizeLat:118 for: %fmin_v4f128 = call fp128 @llvm.vector.reduce.fmin.v4f128(<4 x fp128> undef)
+; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:Invalid CodeSize:Invalid Lat:Invalid SizeLat:Invalid for: %fmin_v4f128 = call fp128 @llvm.vector.reduce.fmin.v4f128(<4 x fp128> undef)
 ; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
 ;
   %fmin_v2f16 = call half @llvm.vector.reduce.fmin.v2f16(<2 x half> undef)
@@ -70,7 +70,7 @@ define void @fmin_unordered() {
 ; CHECK-V8-NEXT:  Cost Model: Found costs of 3 for: %fmin_v8f32 = call reassoc float @llvm.vector.reduce.fmin.v8f32(<8 x float> undef)
 ; CHECK-V8-NEXT:  Cost Model: Found costs of 1 for: %fmin_v2f64 = call reassoc double @llvm.vector.reduce.fmin.v2f64(<2 x double> undef)
 ; CHECK-V8-NEXT:  Cost Model: Found costs of 9 for: %fmin_v4f64 = call reassoc double @llvm.vector.reduce.fmin.v4f64(<4 x double> undef)
-; CHECK-V8-NEXT:  Cost Model: Found costs of RThru:94 CodeSize:67 Lat:94 SizeLat:94 for: %fmin_v4f128 = call reassoc fp128 @llvm.vector.reduce.fmin.v4f128(<4 x fp128> undef)
+; CHECK-V8-NEXT:  Cost Model: Found costs of Invalid for: %fmin_v4f128 = call reassoc fp128 @llvm.vector.reduce.fmin.v4f128(<4 x fp128> undef)
 ; CHECK-V8-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
 ;
 ; CHECK-MVEFP-LABEL: 'fmin_unordered'
@@ -83,7 +83,7 @@ define void @fmin_unordered() {
 ; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:5 CodeSize:4 Lat:5 SizeLat:5 for: %fmin_v8f32 = call reassoc float @llvm.vector.reduce.fmin.v8f32(<8 x float> undef)
 ; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:35 CodeSize:13 Lat:35 SizeLat:35 for: %fmin_v2f64 = call reassoc double @llvm.vector.reduce.fmin.v2f64(<2 x double> undef)
 ; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:69 CodeSize:25 Lat:69 SizeLat:69 for: %fmin_v4f64 = call reassoc double @llvm.vector.reduce.fmin.v4f64(<4 x double> undef)
-; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:118 CodeSize:67 Lat:118 SizeLat:118 for: %fmin_v4f128 = call reassoc fp128 @llvm.vector.reduce.fmin.v4f128(<4 x fp128> undef)
+; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:Invalid CodeSize:Invalid Lat:Invalid SizeLat:Invalid for: %fmin_v4f128 = call reassoc fp128 @llvm.vector.reduce.fmin.v4f128(<4 x fp128> undef)
 ; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
 ;
 ; CHECK-MVEI-LABEL: 'fmin_unordered'
@@ -96,7 +96,7 @@ define void @fmin_unordered() {
 ; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:205 CodeSize:73 Lat:205 SizeLat:205 for: %fmin_v8f32 = call reassoc float @llvm.vector.reduce.fmin.v8f32(<8 x float> undef)
 ; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:35 CodeSize:13 Lat:35 SizeLat:35 for: %fmin_v2f64 = call reassoc double @llvm.vector.reduce.fmin.v2f64(<2 x double> undef)
 ; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:69 CodeSize:25 Lat:69 SizeLat:69 for: %fmin_v4f64 = call reassoc double @llvm.vector.reduce.fmin.v4f64(<4 x double> undef)
-; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:118 CodeSize:67 Lat:118 SizeLat:118 for: %fmin_v4f128 = call reassoc fp128 @llvm.vector.reduce.fmin.v4f128(<4 x fp128> undef)
+; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:Invalid CodeSize:Invalid Lat:Invalid SizeLat:Invalid for: %fmin_v4f128 = call reassoc fp128 @llvm.vector.reduce.fmin.v4f128(<4 x fp128> undef)
 ; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
 ;
   %fmin_v2f16 = call reassoc half @llvm.vector.reduce.fmin.v2f16(<2 x half> undef)
@@ -123,7 +123,7 @@ define void @fmax_strict() {
 ; CHECK-V8-NEXT:  Cost Model: Found costs of 3 for: %fmax_v8f32 = call float @llvm.vector.reduce.fmax.v8f32(<8 x float> undef)
 ; CHECK-V8-NEXT:  Cost Model: Found costs of 1 for: %fmax_v2f64 = call double @llvm.vector.reduce.fmax.v2f64(<2 x double> undef)
 ; CHECK-V8-NEXT:  Cost Model: Found costs of 9 for: %fmax_v4f64 = call double @llvm.vector.reduce.fmax.v4f64(<4 x double> undef)
-; CHECK-V8-NEXT:  Cost Model: Found costs of RThru:94 CodeSize:67 Lat:94 SizeLat:94 for: %fmax_v4f128 = call fp128 @llvm.vector.reduce.fmax.v4f128(<4 x fp128> undef)
+; CHECK-V8-NEXT:  Cost Model: Found costs of Invalid for: %fmax_v4f128 = call fp128 @llvm.vector.reduce.fmax.v4f128(<4 x fp128> undef)
 ; CHECK-V8-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
 ;
 ; CHECK-MVEFP-LABEL: 'fmax_strict'
@@ -136,7 +136,7 @@ define void @fmax_strict() {
 ; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:5 CodeSize:4 Lat:5 SizeLat:5 for: %fmax_v8f32 = call float @llvm.vector.reduce.fmax.v8f32(<8 x float> undef)
 ; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:35 CodeSize:13 Lat:35 SizeLat:35 for: %fmax_v2f64 = call double @llvm.vector.reduce.fmax.v2f64(<2 x double> undef)
 ; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:69 CodeSize:25 Lat:69 SizeLat:69 for: %fmax_v4f64 = call double @llvm.vector.reduce.fmax.v4f64(<4 x double> undef)
-; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:118 CodeSize:67 Lat:118 SizeLat:118 for: %fmax_v4f128 = call fp128 @llvm.vector.reduce.fmax.v4f128(<4 x fp128> undef)
+; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:Invalid CodeSize:Invalid Lat:Invalid SizeLat:Invalid for: %fmax_v4f128 = call fp128 @llvm.vector.reduce.fmax.v4f128(<4 x fp128> undef)
 ; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
 ;
 ; CHECK-MVEI-LABEL: 'fmax_strict'
@@ -149,7 +149,7 @@ define void @fmax_strict() {
 ; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:205 CodeSize:73 Lat:205 SizeLat:205 for: %fmax_v8f32 = call float @llvm.vector.reduce.fmax.v8f32(<8 x float> undef)
 ; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:35 CodeSize:13 Lat:35 SizeLat:35 for: %fmax_v2f64 = call double @llvm.vector.reduce.fmax.v2f64(<2 x double> undef)
 ; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:69 CodeSize:25 Lat:69 SizeLat:69 for: %fmax_v4f64 = call double @llvm.vector.reduce.fmax.v4f64(<4 x double> undef)
-; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:118 CodeSize:67 Lat:118 SizeLat:118 for: %fmax_v4f128 = call fp128 @llvm.vector.reduce.fmax.v4f128(<4 x fp128> undef)
+; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:Invalid CodeSize:Invalid Lat:Invalid SizeLat:Invalid for: %fmax_v4f128 = call fp128 @llvm.vector.reduce.fmax.v4f128(<4 x fp128> undef)
 ; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
 ;
   %fmax_v2f16 = call half @llvm.vector.reduce.fmax.v2f16(<2 x half> undef)
@@ -177,7 +177,7 @@ define void @fmax_unordered() {
 ; CHECK-V8-NEXT:  Cost Model: Found costs of 3 for: %fmax_v8f32 = call reassoc float @llvm.vector.reduce.fmax.v8f32(<8 x float> undef)
 ; CHECK-V8-NEXT:  Cost Model: Found costs of 1 for: %fmax_v2f64 = call reassoc double @llvm.vector.reduce.fmax.v2f64(<2 x double> undef)
 ; CHECK-V8-NEXT:  Cost Model: Found costs of 9 for: %fmax_v4f64 = call reassoc double @llvm.vector.reduce.fmax.v4f64(<4 x double> undef)
-; CHECK-V8-NEXT:  Cost Model: Found costs of RThru:94 CodeSize:67 Lat:94 SizeLat:94 for: %fmax_v4f128 = call reassoc fp128 @llvm.vector.reduce.fmax.v4f128(<4 x fp128> undef)
+; CHECK-V8-NEXT:  Cost Model: Found costs of Invalid for: %fmax_v4f128 = call reassoc fp128 @llvm.vector.reduce.fmax.v4f128(<4 x fp128> undef)
 ; CHECK-V8-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
 ;
 ; CHECK-MVEFP-LABEL: 'fmax_unordered'
@@ -190,7 +190,7 @@ define void @fmax_unordered() {
 ; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:5 CodeSize:4 Lat:5 SizeLat:5 for: %fmax_v8f32 = call reassoc float @llvm.vector.reduce.fmax.v8f32(<8 x float> undef)
 ; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:35 CodeSize:13 Lat:35 SizeLat:35 for: %fmax_v2f64 = call reassoc double @llvm.vector.reduce.fmax.v2f64(<2 x double> undef)
 ; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:69 CodeSize:25 Lat:69 SizeLat:69 for: %fmax_v4f64 = call reassoc double @llvm.vector.reduce.fmax.v4f64(<4 x double> undef)
-; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:118 CodeSize:67 Lat:118 SizeLat:118 for: %fmax_v4f128 = call reassoc fp128 @llvm.vector.reduce.fmax.v4f128(<4 x fp128> undef)
+; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:Invalid CodeSize:Invalid Lat:Invalid SizeLat:Invalid for: %fmax_v4f128 = call reassoc fp128 @llvm.vector.reduce.fmax.v4f128(<4 x fp128> undef)
 ; CHECK-MVEFP-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
 ;
 ; CHECK-MVEI-LABEL: 'fmax_unordered'
@@ -203,7 +203,7 @@ define void @fmax_unordered() {
 ; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:205 CodeSize:73 Lat:205 SizeLat:205 for: %fmax_v8f32 = call reassoc float @llvm.vector.reduce.fmax.v8f32(<8 x float> undef)
 ; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:35 CodeSize:13 Lat:35 SizeLat:35 for: %fmax_v2f64 = call reassoc double @llvm.vector.reduce.fmax.v2f64(<2 x double> undef)
 ; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:69 CodeSize:25 Lat:69 SizeLat:69 for: %fmax_v4f64 = call reassoc double @llvm.vector.reduce.fmax.v4f64(<4 x double> undef)
-; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:118 CodeSize:67 Lat:118 SizeLat:118 for: %fmax_v4f128 = call reassoc fp128 @llvm.vector.reduce.fmax.v4f128(<4 x fp128> undef)
+; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:Invalid CodeSize:Invalid Lat:Invalid SizeLat:Invalid for: %fmax_v4f128 = call reassoc fp128 @llvm.vector.reduce.fmax.v4f128(<4 x fp128> undef)
 ; CHECK-MVEI-NEXT:  Cost Model: Found costs of RThru:0 CodeSize:1 Lat:1 SizeLat:1 for: ret void
 ;
   %fmax_v2f16 = call reassoc half @llvm.vector.reduce.fmax.v2f16(<2 x half> undef)
