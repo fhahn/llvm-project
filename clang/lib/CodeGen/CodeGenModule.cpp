@@ -3665,14 +3665,18 @@ void CodeGenModule::setNonAliasAttributes(GlobalDecl GD,
       if (GetCPUAndFeaturesAttributes(GD, Attrs)) {
         // We know that GetCPUAndFeaturesAttributes will always have the
         // newest set, since it has the newest possible FunctionDecl, so the
-        // new ones should replace the old.
-        llvm::AttributeMask RemoveAttrs;
-        RemoveAttrs.addAttribute("target-cpu");
-        RemoveAttrs.addAttribute("target-features");
-        RemoveAttrs.addAttribute("fmv-features");
-        RemoveAttrs.addAttribute("tune-cpu");
-        F->removeFnAttrs(RemoveAttrs);
-        F->addFnAttrs(Attrs);
+        // new ones should replace the old. Usually they are the same.
+        static constexpr StringRef Kinds[] = {"target-cpu", "target-features",
+                                              "fmv-features", "tune-cpu"};
+        if (llvm::any_of(Kinds, [&](StringRef Kind) {
+              return F->getFnAttribute(Kind) != Attrs.getAttribute(Kind);
+            })) {
+          llvm::AttributeMask RemoveAttrs;
+          for (StringRef Kind : Kinds)
+            RemoveAttrs.addAttribute(Kind);
+          F->removeFnAttrs(RemoveAttrs);
+          F->addFnAttrs(Attrs);
+        }
       }
     }
 
