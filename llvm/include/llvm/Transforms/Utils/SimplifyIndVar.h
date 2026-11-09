@@ -22,8 +22,11 @@ namespace llvm {
 
 class Type;
 class WeakTrackingVH;
+template <typename T> class ArrayRef;
 template <typename T> class SmallVectorImpl;
 class CastInst;
+class Instruction;
+class SCEV;
 class DominatorTree;
 class Loop;
 class LoopInfo;
@@ -46,6 +49,12 @@ public:
 
   const DominatorTree *getDomTree() const { return DT; }
   virtual void visitCast(CastInst *Cast) = 0;
+
+  /// Return the terminator of the preheader of the outermost loop (starting at
+  /// \p L, which must have a preheader) in which all of \p Exprs are invariant
+  /// and can be safely expanded.
+  static Instruction *findOutermostInvariantInsertPt(
+      Loop *L, ArrayRef<const SCEV *> Exprs, SCEVExpander &Rewriter);
 };
 
 /// simplifyUsersOfIV - Simplify instructions that use this induction variable

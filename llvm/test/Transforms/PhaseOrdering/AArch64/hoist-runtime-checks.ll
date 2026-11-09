@@ -355,31 +355,31 @@ entry:
   ret i64 %0
 }
 
-; IndVars makes %j.neg invariant in the inner loop. It is also invariant in the
-; outer loop.
+; Make sure %j.neg, made invariant by IndVars, is unswitched out of the loop
+; nest.
 define i8 @nested_loop_exit_invariant_in_outer_loop(ptr %p, i64 %n, i64 %m, i64 %start) {
 ; CHECK-LABEL: define range(i8 0, 2) i8 @nested_loop_exit_invariant_in_outer_loop(
 ; CHECK-SAME: ptr [[P:%.*]], i64 [[N:%.*]], i64 [[M:%.*]], i64 [[START:%.*]]) local_unnamed_addr {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[SMAX:%.*]] = tail call i64 @llvm.smax.i64(i64 [[N]], i64 1)
 ; CHECK-NEXT:    [[J_NEG:%.*]] = icmp slt i64 [[START]], 0
-; CHECK-NEXT:    br label [[INNER_HEADER:%.*]]
+; CHECK-NEXT:    [[SMAX:%.*]] = tail call i64 @llvm.smax.i64(i64 [[N]], i64 1)
+; CHECK-NEXT:    br i1 [[J_NEG]], label [[COMMON_RET:%.*]], label [[OUTER_HEADER:%.*]]
 ; CHECK:       outer.header:
-; CHECK-NEXT:    [[I:%.*]] = phi i64 [ 0, [[ENTRY:%.*]] ], [ [[I_NEXT:%.*]], [[OUTER_LATCH:%.*]] ]
-; CHECK-NEXT:    br i1 [[J_NEG]], label [[COMMON_RET:%.*]], label [[INNER_HEADER1:%.*]]
+; CHECK-NEXT:    [[I:%.*]] = phi i64 [ [[I_NEXT:%.*]], [[OUTER_LATCH:%.*]] ], [ 0, [[ENTRY:%.*]] ]
+; CHECK-NEXT:    br label [[INNER_HEADER:%.*]]
 ; CHECK:       inner.header:
-; CHECK-NEXT:    [[J:%.*]] = phi i64 [ [[J_NEXT:%.*]], [[INNER_HEADER1]] ], [ [[START]], [[INNER_HEADER]] ]
+; CHECK-NEXT:    [[J:%.*]] = phi i64 [ [[START]], [[OUTER_HEADER]] ], [ [[J_NEXT:%.*]], [[INNER_HEADER]] ]
 ; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 [[J]]
 ; CHECK-NEXT:    tail call void @use(ptr [[GEP]])
 ; CHECK-NEXT:    [[J_NEXT]] = add nuw nsw i64 [[J]], 1
 ; CHECK-NEXT:    [[INNER_EC:%.*]] = icmp slt i64 [[J_NEXT]], [[M]]
-; CHECK-NEXT:    br i1 [[INNER_EC]], label [[INNER_HEADER1]], label [[OUTER_LATCH]]
+; CHECK-NEXT:    br i1 [[INNER_EC]], label [[INNER_HEADER]], label [[OUTER_LATCH]]
 ; CHECK:       outer.latch:
 ; CHECK-NEXT:    [[I_NEXT]] = add nuw nsw i64 [[I]], 1
 ; CHECK-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[I_NEXT]], [[SMAX]]
-; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label [[COMMON_RET]], label [[INNER_HEADER]]
+; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label [[COMMON_RET]], label [[OUTER_HEADER]]
 ; CHECK:       common.ret:
-; CHECK-NEXT:    [[COMMON_RET_OP:%.*]] = phi i8 [ 1, [[INNER_HEADER]] ], [ 0, [[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[COMMON_RET_OP:%.*]] = phi i8 [ 1, [[ENTRY]] ], [ 0, [[OUTER_LATCH]] ]
 ; CHECK-NEXT:    ret i8 [[COMMON_RET_OP]]
 ;
 entry:
