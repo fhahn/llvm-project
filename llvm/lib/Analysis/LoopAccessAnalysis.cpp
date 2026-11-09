@@ -2214,34 +2214,16 @@ bool AccessAnalysis::createCheckForAccess(RuntimePointerChecking &RtCheck,
 }
 
 /// Put \p Members, the accesses of a class erased from \p DepCands, back into
-/// DepCands as sub-classes, so that accesses of the same sub-class need no
-/// runtime checks against each other.
-///
-/// \p UnknownDepPtrPairs tell us which accesses must be in separate classes.
-///
-/// We assume that the dependency checker has already looked at
-/// every pair of accesses within a class. Every pair of elements should
-/// either NoDep, a recorded safe dependence or Unknown.
-///
-/// Only the pairs with unknown dependences need runtime checks.
-/// Thus, splitting the class along the unknown dependencies is sound.
-///
-/// For example, two rows of an RGB image, r0 = img and r1 = img + S:
+/// DepCands as runs of AddRecs at most a step apart, without unknown
+/// dependences in \p UnknownDepPtrPairs between them. Accesses of a run need no
+/// checks against each other and are checked as one group. For example, for
+/// two rows of an RGB image, r0 = img and r1 = img + S:
 ///
 ///   r0[3*x] = ..;  r0[3*x+1] = ..;  r0[3*x+2] = ..;
 ///   r1[3*x] = ..;  r1[3*x+1] = ..;  r1[3*x+2] = ..;
 ///
-/// Distances within a row are constant and not a multiple of the step, so
-/// those pairs are NoDep. Distances across rows depend on S, so those pairs
-/// are unknown:
-///
-///                r0[3x]  r0[3x+1]  r0[3x+2]
-///     r1[3x]       ?        ?         ?
-///     r1[3x+1]     ?        ?         ?
-///     r1[3x+2]     ?        ?         ?
-///
-/// Instead of six classes checked pairwise, we get one class per row, and
-/// grouping turns them into a single check between the rows.
+/// all pairs across rows are unknown, and each row becomes a run, so a single
+/// check between the rows replaces nine.
 static void
 splitClass(MemoryDepChecker::DepCandidates &DepCands,
            iterator_range<MemoryDepChecker::DepCandidates::member_iterator>
@@ -2249,43 +2231,23 @@ splitClass(MemoryDepChecker::DepCandidates &DepCands,
            const DenseSet<std::pair<const Value *, const Value *>>
                &UnknownDepPtrPairs,
            PredicatedScalarEvolution &PSE, const Loop *L) {
-  // The main idea is to split the class into runs of interleaved pointers
-  // without unknown dependences between them.
-  //
-  // We could've just split the class using the given unknown dependencies
-  // between its elements, but that can potentially introduce overly
-  // conservative checks that always fail. For example, in
-  //
-  //   a[i + off] = a[i] + a[i + 9000]
-  //
-  // the reads have no unknown dependence between them, but merged into one
-  // range, they cover a[i + off] for any off in [0, 9000]. Meaning that in
-  // this case keeping a[i] and a[i + 9000] in separate classes allows us
-  // to generate more precise runtime checks.
-  //
-  // Grouping pointer runs into separate classes allows us to keep the
-  // number of runtime checks under control for the most widespread cases
-  // and avoid generating checks against too wide of a range.
-
-  // Only pointers with the same constant step, whose starts differ by a
-  // constant, are at constant distances from each other, so only they can form
-  // a run. It also means that unknown dependences, which come from distances
-  // that are not constant, are mostly between different buckets.
+  // Only AddRecs with the same step, whose starts differ by a constant, are at
+  // constant distances from each other.
   struct Bucket {
     const SCEV *Start;
     const SCEVConstant *Step;
-    SmallVector<std::pair<APInt, MemoryDepChecker::MemAccessInfo>, 4> Members;
+    SmallVector<std::pair<APInt, MemoryDepChecker::MemAccessInfo>> Members;
   };
-  SmallVector<Bucket, 4> Buckets;
+  SmallVector<Bucket> Buckets;
   ScalarEvolution &SE = *PSE.getSE();
   for (MemoryDepChecker::MemAccessInfo Access : Members) {
     const SCEV *Start;
     const SCEVConstant *Step;
+    // We can't tell where the range of such a pointer lies, so it gets a
+    // sub-class of its own.
     if (!match(PSE.getSCEV(Access.getPointer()),
                m_scev_AffineAddRec(m_SCEV(Start), m_SCEVConstant(Step),
                                    m_SpecificLoop(L)))) {
-      // We can't tell where the range of such a pointer lies, so it gets a
-      // sub-class of its own, as if we removed the whole class.
       DepCands.insert(Access);
       continue;
     }
@@ -2308,20 +2270,15 @@ splitClass(MemoryDepChecker::DepCandidates &DepCands,
     const APInt *PrevOffset = nullptr;
     for (const auto &[Offset, Access] : B.Members) {
       Value *Ptr = Access.getPointer();
-      const bool HasUnknownDepInRun = any_of(RunPtrs, [&](Value *Other) {
-        return UnknownDepPtrPairs.contains({Ptr, Other});
-      });
-      // Assuming more than one iteration, if a pointer starts at most a step
-      // after the previous one, it starts within the range of the previous
-      // one. So the ranges of a run cover one region without gaps, and an
-      // access of another sub-class can't fit between them without overlapping
-      // one of them. E.g. a[3i] and a[3i + 2] over i32 (8 <= 12 bytes) stay in
-      // one run, while a[i] and a[i + 9000] (36000 > 4 bytes) don't.
-      //
-      // We also start a new run before a pointer with an unknown dependence on
-      // a pointer of the run, as those need a runtime check against each other.
+      // With more than one iteration, a pointer at most a step after the
+      // previous one starts within its range, so the ranges of a run leave no
+      // gap for an access of another sub-class, e.g. a[i] and a[i + 9000] in
+      // a[i + off] = a[i] + a[i + 9000]. Also start a new run before a pointer
+      // with an unknown dependence on the run.
       if (!PrevOffset || (Offset - *PrevOffset).ugt(Step) ||
-          HasUnknownDepInRun) {
+          any_of(RunPtrs, [&](Value *Other) {
+            return UnknownDepPtrPairs.contains({Ptr, Other});
+          })) {
         RunLeader = Access;
         RunPtrs.clear();
       }
@@ -2359,8 +2316,6 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
       }
       MemAccessInfo Src = DepChecker.getAccess(Dep.Source);
       MemAccessInfo Dst = DepChecker.getAccess(Dep.Destination);
-      assert(Src.getPointer() != Dst.getPointer() &&
-             "Unknown dependence between accesses through the same pointer");
       RtCheck.UnknownDepPtrPairs.insert({Src.getPointer(), Dst.getPointer()});
       RtCheck.UnknownDepPtrPairs.insert({Dst.getPointer(), Src.getPointer()});
       // Both accesses are in the same class, which may already have been
