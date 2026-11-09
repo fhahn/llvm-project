@@ -495,6 +495,16 @@ void LookupResult::resolveKind() {
     return;
   }
 
+  // A declaration found twice, e.g. on the scope chain and again in its
+  // namespace, resolves like the declaration alone.
+  if (N == 2 && Decls[0].getDecl() == Decls[1].getDecl() &&
+      Decls[0].getAccess() == Decls[1].getAccess() &&
+      ResultKind != LookupResultKind::Ambiguous) {
+    Decls.truncate(1);
+    N = 1;
+    ResultKind = LookupResultKind::Found;
+  }
+
   // If there's a single decl, we need to examine it to decide what
   // kind of lookup this is.
   if (N == 1) {
