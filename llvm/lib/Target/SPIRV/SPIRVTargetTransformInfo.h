@@ -63,6 +63,15 @@ public:
 
   bool allowVectorElementIndexingUsingGEP() const override { return false; }
 
+  InstructionCost
+  getIntrinsicInstrCost(const IntrinsicCostAttributes &ICA,
+                        TTI::TargetCostKind CostKind) const override {
+    // minnum/maxnum are lowered natively, not via SelectionDAG legalization.
+    if (ICA.getID() == Intrinsic::minnum || ICA.getID() == Intrinsic::maxnum)
+      return TTI::TCC_Basic;
+    return BaseT::getIntrinsicInstrCost(ICA, CostKind);
+  }
+
   bool isLegalMaskedGather(Type *DataType, Align Alignment) const override;
   bool isLegalMaskedScatter(Type *DataType, Align Alignment) const override;
 

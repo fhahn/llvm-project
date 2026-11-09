@@ -3,8 +3,8 @@
 
 define void @minnum() {
 ; CHECK-LABEL: 'minnum'
-; CHECK-NEXT:  Cost Model: Found costs of RThru:10 CodeSize:1 Lat:10 SizeLat:10 for: %f32 = call float @llvm.minnum.f32(float poison, float poison)
-; CHECK-NEXT:  Cost Model: Found costs of RThru:10 CodeSize:1 Lat:10 SizeLat:10 for: %f64 = call double @llvm.minnum.f64(double poison, double poison)
+; CHECK-NEXT:  Cost Model: Found costs of 1 for: %f32 = call float @llvm.minnum.f32(float poison, float poison)
+; CHECK-NEXT:  Cost Model: Found costs of 1 for: %f64 = call double @llvm.minnum.f64(double poison, double poison)
 ; CHECK-NEXT:  Cost Model: Found costs of 1 for: ret void
 ;
   %f32 = call float @llvm.minnum.f32(float poison, float poison)
@@ -14,8 +14,8 @@ define void @minnum() {
 
 define void @maxnum() {
 ; CHECK-LABEL: 'maxnum'
-; CHECK-NEXT:  Cost Model: Found costs of RThru:10 CodeSize:1 Lat:10 SizeLat:10 for: %f32 = call float @llvm.maxnum.f32(float poison, float poison)
-; CHECK-NEXT:  Cost Model: Found costs of RThru:10 CodeSize:1 Lat:10 SizeLat:10 for: %f64 = call double @llvm.maxnum.f64(double poison, double poison)
+; CHECK-NEXT:  Cost Model: Found costs of 1 for: %f32 = call float @llvm.maxnum.f32(float poison, float poison)
+; CHECK-NEXT:  Cost Model: Found costs of 1 for: %f64 = call double @llvm.maxnum.f64(double poison, double poison)
 ; CHECK-NEXT:  Cost Model: Found costs of 1 for: ret void
 ;
   %f32 = call float @llvm.maxnum.f32(float poison, float poison)

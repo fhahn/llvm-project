@@ -54,6 +54,15 @@ public:
                                               int OpdIdx) const override;
   unsigned getMinimumLookupTableEntryBitWidth() const override;
 
+  InstructionCost
+  getIntrinsicInstrCost(const IntrinsicCostAttributes &ICA,
+                        TTI::TargetCostKind CostKind) const override {
+    // minnum/maxnum are lowered natively, not via SelectionDAG legalization.
+    if (ICA.getID() == Intrinsic::minnum || ICA.getID() == Intrinsic::maxnum)
+      return TTI::TCC_Basic;
+    return BaseT::getIntrinsicInstrCost(ICA, CostKind);
+  }
+
   InstructionCost getPartialReductionCost(
       unsigned Opcode, Type *InputTypeA, Type *InputTypeB, Type *AccumType,
       ElementCount VF, TTI::PartialReductionExtendKind OpAExtend,
