@@ -38,10 +38,6 @@ define float @fmax_ogt_with_select(ptr %src, i64 %n) {
 ; CHECK-NEXT:    [[TMP15]] = select <4 x i1> [[TMP7]], <4 x float> [[TMP11]], <4 x float> [[VEC_PHI2]]
 ; CHECK-NEXT:    [[TMP16]] = select <4 x i1> [[TMP8]], <4 x float> [[TMP12]], <4 x float> [[VEC_PHI3]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 16
-; CHECK-NEXT:    [[TMP17:%.*]] = fcmp uno <4 x float> [[TMP9]], [[TMP9]]
-; CHECK-NEXT:    [[TMP29:%.*]] = fcmp uno <4 x float> [[TMP10]], [[TMP10]]
-; CHECK-NEXT:    [[TMP36:%.*]] = fcmp uno <4 x float> [[TMP11]], [[TMP11]]
-; CHECK-NEXT:    [[TMP37:%.*]] = fcmp uno <4 x float> [[TMP12]], [[TMP12]]
 ; CHECK-NEXT:    [[TMP38:%.*]] = bitcast <4 x float> [[TMP9]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP39:%.*]] = bitcast <4 x float> [[TMP10]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP40:%.*]] = bitcast <4 x float> [[TMP11]] to <4 x i32>
@@ -50,13 +46,9 @@ define float @fmax_ogt_with_select(ptr %src, i64 %n) {
 ; CHECK-NEXT:    [[TMP42:%.*]] = icmp eq <4 x i32> [[TMP39]], splat (i32 -2147483648)
 ; CHECK-NEXT:    [[TMP43:%.*]] = icmp eq <4 x i32> [[TMP40]], splat (i32 -2147483648)
 ; CHECK-NEXT:    [[TMP44:%.*]] = icmp eq <4 x i32> [[TMP41]], splat (i32 -2147483648)
-; CHECK-NEXT:    [[TMP19:%.*]] = or <4 x i1> [[TMP17]], [[TMP18]]
-; CHECK-NEXT:    [[TMP30:%.*]] = or <4 x i1> [[TMP29]], [[TMP42]]
+; CHECK-NEXT:    [[TMP36:%.*]] = or <4 x i1> [[TMP18]], [[TMP42]]
 ; CHECK-NEXT:    [[TMP31:%.*]] = or <4 x i1> [[TMP36]], [[TMP43]]
-; CHECK-NEXT:    [[TMP32:%.*]] = or <4 x i1> [[TMP37]], [[TMP44]]
-; CHECK-NEXT:    [[TMP33:%.*]] = or <4 x i1> [[TMP19]], [[TMP30]]
-; CHECK-NEXT:    [[TMP45:%.*]] = or <4 x i1> [[TMP33]], [[TMP31]]
-; CHECK-NEXT:    [[TMP46:%.*]] = or <4 x i1> [[TMP45]], [[TMP32]]
+; CHECK-NEXT:    [[TMP46:%.*]] = or <4 x i1> [[TMP31]], [[TMP44]]
 ; CHECK-NEXT:    [[TMP20:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP46]])
 ; CHECK-NEXT:    [[TMP21:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP22:%.*]] = or i1 [[TMP20]], [[TMP21]]

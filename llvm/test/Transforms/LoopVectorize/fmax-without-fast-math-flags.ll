@@ -20,11 +20,9 @@ define float @fmax_ogt_with_select_1(ptr %src, i64 %n) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = freeze <4 x float> [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP4]] = select <4 x i1> [[TMP2]], <4 x float> [[TMP3]], <4 x float> [[VEC_PHI]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 4
-; CHECK-NEXT:    [[TMP5:%.*]] = fcmp uno <4 x float> [[TMP3]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = bitcast <4 x float> [[TMP3]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq <4 x i32> [[TMP12]], splat (i32 -2147483648)
-; CHECK-NEXT:    [[TMP14:%.*]] = or <4 x i1> [[TMP5]], [[TMP13]]
-; CHECK-NEXT:    [[TMP6:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP14]])
+; CHECK-NEXT:    [[TMP6:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP13]])
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = or i1 [[TMP6]], [[TMP7]]
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP0:![0-9]+]]
@@ -233,11 +231,9 @@ define float @fmax_olt_with_select_2(ptr %src, i64 %n) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = freeze <4 x float> [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP4]] = select <4 x i1> [[TMP2]], <4 x float> [[TMP3]], <4 x float> [[VEC_PHI]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 4
-; CHECK-NEXT:    [[TMP5:%.*]] = fcmp uno <4 x float> [[TMP3]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = bitcast <4 x float> [[TMP3]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq <4 x i32> [[TMP12]], splat (i32 -2147483648)
-; CHECK-NEXT:    [[TMP14:%.*]] = or <4 x i1> [[TMP5]], [[TMP13]]
-; CHECK-NEXT:    [[TMP6:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP14]])
+; CHECK-NEXT:    [[TMP6:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP13]])
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = or i1 [[TMP6]], [[TMP7]]
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP8:![0-9]+]]
@@ -312,11 +308,9 @@ define float @fmax_ogt_with_select_store_result(ptr %src, ptr %dst, i64 %n) {
 ; CHECK-NEXT:    [[TMP6:%.*]] = freeze <4 x float> [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP7]] = select <4 x i1> [[TMP5]], <4 x float> [[TMP6]], <4 x float> [[VEC_PHI]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 4
-; CHECK-NEXT:    [[TMP8:%.*]] = fcmp uno <4 x float> [[TMP6]], [[TMP6]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = bitcast <4 x float> [[TMP6]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP16:%.*]] = icmp eq <4 x i32> [[TMP15]], splat (i32 -2147483648)
-; CHECK-NEXT:    [[TMP17:%.*]] = or <4 x i1> [[TMP8]], [[TMP16]]
-; CHECK-NEXT:    [[TMP9:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP17]])
+; CHECK-NEXT:    [[TMP9:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP16]])
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP9]], [[TMP10]]
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP13:![0-9]+]]
@@ -871,11 +865,9 @@ define float @fmax_ult_with_select_1(ptr %src, i64 %n) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = freeze <4 x float> [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP4]] = select <4 x i1> [[TMP2]], <4 x float> [[VEC_PHI]], <4 x float> [[TMP3]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; CHECK-NEXT:    [[TMP5:%.*]] = fcmp uno <4 x float> [[TMP3]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = bitcast <4 x float> [[TMP3]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq <4 x i32> [[TMP6]], splat (i32 -2147483648)
-; CHECK-NEXT:    [[TMP8:%.*]] = or <4 x i1> [[TMP5]], [[TMP7]]
-; CHECK-NEXT:    [[TMP9:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP8]])
+; CHECK-NEXT:    [[TMP9:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP7]])
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP9]], [[TMP10]]
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP51:![0-9]+]]
@@ -942,11 +934,9 @@ define float @fmax_oge_with_select_1(ptr %src, i64 %n) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = freeze <4 x float> [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP4]] = select <4 x i1> [[TMP2]], <4 x float> [[TMP3]], <4 x float> [[VEC_PHI]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 4
-; CHECK-NEXT:    [[TMP5:%.*]] = fcmp uno <4 x float> [[TMP3]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = bitcast <4 x float> [[TMP3]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq <4 x i32> [[TMP12]], splat (i32 -2147483648)
-; CHECK-NEXT:    [[TMP14:%.*]] = or <4 x i1> [[TMP5]], [[TMP13]]
-; CHECK-NEXT:    [[TMP6:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP14]])
+; CHECK-NEXT:    [[TMP6:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP13]])
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = or i1 [[TMP6]], [[TMP7]]
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP27:![0-9]+]]
@@ -1420,12 +1410,10 @@ define float @fmax_with_select_and_fmaxnum(ptr %src.0, ptr %src.1, i64 %n) {
 ; CHECK-NEXT:    [[TMP6:%.*]] = freeze <4 x float> [[WIDE_LOAD2]]
 ; CHECK-NEXT:    [[TMP7]] = call <4 x float> @llvm.maxnum.v4f32(<4 x float> [[VEC_PHI1]], <4 x float> [[TMP6]])
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 4
-; CHECK-NEXT:    [[TMP17:%.*]] = fcmp uno <4 x float> [[TMP3]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = bitcast <4 x float> [[TMP3]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP19:%.*]] = icmp eq <4 x i32> [[TMP18]], splat (i32 -2147483648)
-; CHECK-NEXT:    [[TMP20:%.*]] = or <4 x i1> [[TMP17]], [[TMP19]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = fcmp uno <4 x float> [[TMP6]], [[TMP6]]
-; CHECK-NEXT:    [[TMP8:%.*]] = or <4 x i1> [[TMP20]], [[TMP21]]
+; CHECK-NEXT:    [[TMP8:%.*]] = or <4 x i1> [[TMP19]], [[TMP21]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP8]])
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP9]], [[TMP10]]
@@ -1547,11 +1535,9 @@ define float @fmax_ogt_with_select_nan_start(ptr %src, i64 %n) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = freeze <4 x float> [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP4]] = select <4 x i1> [[TMP2]], <4 x float> [[TMP3]], <4 x float> [[VEC_PHI]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 4
-; CHECK-NEXT:    [[TMP5:%.*]] = fcmp uno <4 x float> [[TMP3]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = bitcast <4 x float> [[TMP3]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq <4 x i32> [[TMP6]], splat (i32 -2147483648)
-; CHECK-NEXT:    [[TMP8:%.*]] = or <4 x i1> [[TMP5]], [[TMP7]]
-; CHECK-NEXT:    [[TMP9:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP8]])
+; CHECK-NEXT:    [[TMP9:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP7]])
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP9]], [[TMP10]]
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP45:![0-9]+]]

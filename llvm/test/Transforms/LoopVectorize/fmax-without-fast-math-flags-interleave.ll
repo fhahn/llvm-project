@@ -26,15 +26,11 @@ define float @fmax_ogt_with_select(ptr %src, i64 %n) {
 ; CHECK-NEXT:    [[TMP7]] = select <4 x i1> [[TMP3]], <4 x float> [[TMP5]], <4 x float> [[VEC_PHI]]
 ; CHECK-NEXT:    [[TMP8]] = select <4 x i1> [[TMP4]], <4 x float> [[TMP6]], <4 x float> [[VEC_PHI1]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 8
-; CHECK-NEXT:    [[TMP17:%.*]] = fcmp uno <4 x float> [[TMP5]], [[TMP5]]
-; CHECK-NEXT:    [[TMP18:%.*]] = fcmp uno <4 x float> [[TMP6]], [[TMP6]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = bitcast <4 x float> [[TMP5]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP20:%.*]] = bitcast <4 x float> [[TMP6]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP21:%.*]] = icmp eq <4 x i32> [[TMP19]], splat (i32 -2147483648)
 ; CHECK-NEXT:    [[TMP24:%.*]] = icmp eq <4 x i32> [[TMP20]], splat (i32 -2147483648)
-; CHECK-NEXT:    [[TMP25:%.*]] = or <4 x i1> [[TMP17]], [[TMP21]]
-; CHECK-NEXT:    [[TMP26:%.*]] = or <4 x i1> [[TMP18]], [[TMP24]]
-; CHECK-NEXT:    [[TMP9:%.*]] = or <4 x i1> [[TMP25]], [[TMP26]]
+; CHECK-NEXT:    [[TMP9:%.*]] = or <4 x i1> [[TMP21]], [[TMP24]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP9]])
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = or i1 [[TMP10]], [[TMP11]]
@@ -439,15 +435,11 @@ define float @fmax_ogt_with_select_vf1(ptr %src, i64 %n) {
 ; CHECK-NEXT:    [[TMP10]] = select i1 [[CMP]], float [[TMP8]], float [[MAX]]
 ; CHECK-NEXT:    [[TMP11]] = select i1 [[TMP7]], float [[TMP9]], float [[VEC_PHI1]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 2
-; CHECK-NEXT:    [[TMP12:%.*]] = fcmp uno float [[TMP8]], [[TMP8]]
-; CHECK-NEXT:    [[TMP13:%.*]] = fcmp uno float [[TMP9]], [[TMP9]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = bitcast float [[TMP8]] to i32
 ; CHECK-NEXT:    [[TMP15:%.*]] = bitcast float [[TMP9]] to i32
 ; CHECK-NEXT:    [[TMP16:%.*]] = icmp eq i32 [[TMP14]], -2147483648
 ; CHECK-NEXT:    [[TMP17:%.*]] = icmp eq i32 [[TMP15]], -2147483648
-; CHECK-NEXT:    [[TMP18:%.*]] = or i1 [[TMP12]], [[TMP16]]
-; CHECK-NEXT:    [[TMP19:%.*]] = or i1 [[TMP13]], [[TMP17]]
-; CHECK-NEXT:    [[TMP20:%.*]] = or i1 [[TMP18]], [[TMP19]]
+; CHECK-NEXT:    [[TMP20:%.*]] = or i1 [[TMP16]], [[TMP17]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP22:%.*]] = or i1 [[TMP20]], [[TMP21]]
 ; CHECK-NEXT:    br i1 [[TMP22]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP10:![0-9]+]]

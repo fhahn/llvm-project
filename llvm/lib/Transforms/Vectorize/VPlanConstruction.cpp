@@ -1977,8 +1977,18 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan,
     FastMathFlags FMF = RedPhiR->getFastMathFlagsOrNone();
     assert(!(IsSelectKind && FMF.noNaNs() && FMF.noSignedZeros()) &&
            "select-based min/max with nnan and nsz should be FMin/FMax");
+    // A NaN input makes the compare false for ordered and true for unordered
+    // predicates. If that keeps the phi, neither lanes nor the scalar loop
+    // select NaN inputs and the NaN exit is not needed either.
+    CmpPredicate Pred;
+    VPValue *TrueVal, *FalseVal;
+    bool KeepsPhiOnNaN =
+        match(RedPhiR->getBackedgeValue(),
+              m_Select(m_Cmp(Pred, m_VPValue(), m_VPValue()),
+                       m_VPValue(TrueVal), m_VPValue(FalseVal))) &&
+        (CmpInst::isOrdered(Pred) ? FalseVal : TrueVal) == RedPhiR;
     VPValue *RedNaNLanes = nullptr;
-    if (!IsSelectKind || !FMF.noNaNs())
+    if (!IsSelectKind || !(FMF.noNaNs() || KeepsPhiOnNaN))
       RedNaNLanes =
           LatchBuilder.createFCmp(CmpInst::FCMP_UNO, MinOrMaxOp, MinOrMaxOp);
     if (IsSelectKind && !FMF.noSignedZeros()) {
@@ -2014,12 +2024,16 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan,
       RedNaNLanes = RedNaNLanes ? LatchBuilder.createOr(RedNaNLanes, IsExitZero)
                                 : IsExitZero;
     }
-    AllNaNLanes = AllNaNLanes ? LatchBuilder.createOr(AllNaNLanes, RedNaNLanes)
-                              : RedNaNLanes;
+    if (RedNaNLanes)
+      AllNaNLanes = AllNaNLanes
+                        ? LatchBuilder.createOr(AllNaNLanes, RedNaNLanes)
+                        : RedNaNLanes;
   }
 
   VPValue *AnyNaNLane =
-      LatchBuilder.createNaryOp(VPInstruction::AnyOf, {AllNaNLanes});
+      AllNaNLanes
+          ? LatchBuilder.createNaryOp(VPInstruction::AnyOf, {AllNaNLanes})
+          : nullptr;
   VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
   VPBuilder MiddleBuilder(MiddleVPBB->begin());
   for (const auto &[RedPhiR, _] : MinOrMaxNumReductionsToHandle) {
@@ -2057,12 +2071,17 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan,
       }
     }
 
-    auto *NewSel = MiddleBuilder.createSelect(AnyNaNLane, RedPhiR,
-                                              RdxResult->getOperand(0));
-    RdxResult->setOperand(0, NewSel);
+    if (AnyNaNLane) {
+      auto *NewSel = MiddleBuilder.createSelect(AnyNaNLane, RedPhiR,
+                                                RdxResult->getOperand(0));
+      RdxResult->setOperand(0, NewSel);
+    }
     assert(!RdxResults.contains(RdxResult) && "RdxResult already used");
     RdxResults.insert(RdxResult);
   }
+
+  if (!AnyNaNLane)
+    return true;
 
   auto *LatchExitingBranch = LatchVPBB->getTerminator();
   assert(match(LatchExitingBranch, m_BranchOnCount(m_VPValue(), m_VPValue())) &&

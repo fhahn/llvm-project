@@ -598,10 +598,10 @@ for.end:
 
 
 ; The nnan flag is missing on select. This is vectorized as a max reduction
-; that exits early on NaN inputs and zeros of the wrong sign, and selects the
-; start value on NaN results.
+; that exits early on zeros of the wrong sign, and selects the start value on
+; NaN results. NaN inputs are never selected, so there is no exit on them.
 ; CHECK-LABEL: @max_red_float_nans(
-; CHECK: fcmp uno <2 x float>
+; CHECK-NOT: fcmp uno <2 x float>
 ; CHECK: icmp eq <2 x i32>
 ; CHECK: call float @llvm.vector.reduce.fmax.v2f32
 ; CHECK: fcmp uno float
