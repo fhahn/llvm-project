@@ -100,7 +100,7 @@ static bool bitTrackingDCE(Function &F, DemandedBits &DB) {
     // If the instruction has side effects and no non-dbg uses,
     // skip it. This way we avoid computing known bits on an instruction
     // that will not help us.
-    if (I.mayHaveSideEffects() && I.use_empty())
+    if (I.use_empty() && I.mayHaveSideEffects())
       continue;
 
     // Remove instructions that are dead, either because they were not reached
