@@ -5444,7 +5444,9 @@ LoopVectorizationPlanner::computeBestVF() {
     return {VectorizationFactor(FirstPlan.getSingleVF(), 0, 0), &FirstPlan};
   }
 
-  if (hasPlanWithVF(UserVF) && hasForcedEpilogueVF() && VPlans.size() == 2) {
+  // If UserVF was ignored, the regular plans may still include it, but the
+  // first plan is for the scalar VF.
+  if (FirstPlan.hasVF(UserVF) && hasForcedEpilogueVF() && VPlans.size() == 2) {
     assert(VPlans[0]->getSingleVF() == UserVF &&
            "expected second plan to be for the forced UserVF");
     assert(VPlans[1]->getSingleVF() == EpilogueVectorizationForceVF &&
