@@ -2855,6 +2855,10 @@ void LoopVectorizationPlanner::emitInvalidCostRemarks(
           Name = CalledFn->getName();
         }
         OS << " call to " << Name;
+      } else if (Opcode == VPInstruction::ComputeReductionResult) {
+        OS << " call to "
+           << Intrinsic::getBaseName(getReductionIntrinsicID(
+                  cast<VPInstruction>(R)->getRecurKind()));
       } else
         OS << " " << Instruction::getOpcodeName(Opcode);
       reportVectorizationInfo(OutString, "InvalidCost", ORE, OrigLoop, nullptr,

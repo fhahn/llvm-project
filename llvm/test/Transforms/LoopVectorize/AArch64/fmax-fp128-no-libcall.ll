@@ -7,245 +7,76 @@
 ; nnan.
 
 define fp128 @fmaxnum_fp128(ptr %src, i64 %n) {
-; DEFAULT-LABEL: define fp128 @fmaxnum_fp128(
-; DEFAULT-SAME: ptr [[SRC:%.*]], i64 [[N:%.*]]) {
-; DEFAULT-NEXT:  [[ENTRY:.*]]:
-; DEFAULT-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
-; DEFAULT-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
-; DEFAULT:       [[VECTOR_PH]]:
-; DEFAULT-NEXT:    [[TMP0:%.*]] = and i64 [[N]], 3
-; DEFAULT-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP0]]
-; DEFAULT-NEXT:    br label %[[VECTOR_BODY:.*]]
-; DEFAULT:       [[VECTOR_BODY]]:
-; DEFAULT-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; DEFAULT-NEXT:    [[VEC_PHI:%.*]] = phi fp128 [ 0.000000e+00, %[[VECTOR_PH]] ], [ [[TMP16:%.*]], %[[VECTOR_BODY]] ]
-; DEFAULT-NEXT:    [[VEC_PHI1:%.*]] = phi fp128 [ 0.000000e+00, %[[VECTOR_PH]] ], [ [[TMP17:%.*]], %[[VECTOR_BODY]] ]
-; DEFAULT-NEXT:    [[VEC_PHI2:%.*]] = phi fp128 [ 0.000000e+00, %[[VECTOR_PH]] ], [ [[TMP18:%.*]], %[[VECTOR_BODY]] ]
-; DEFAULT-NEXT:    [[VEC_PHI3:%.*]] = phi fp128 [ 0.000000e+00, %[[VECTOR_PH]] ], [ [[TMP19:%.*]], %[[VECTOR_BODY]] ]
-; DEFAULT-NEXT:    [[TMP1:%.*]] = add i64 [[INDEX]], 1
-; DEFAULT-NEXT:    [[TMP2:%.*]] = add i64 [[INDEX]], 2
-; DEFAULT-NEXT:    [[TMP3:%.*]] = add i64 [[INDEX]], 3
-; DEFAULT-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw fp128, ptr [[SRC]], i64 [[INDEX]]
-; DEFAULT-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw fp128, ptr [[SRC]], i64 [[TMP1]]
-; DEFAULT-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw fp128, ptr [[SRC]], i64 [[TMP2]]
-; DEFAULT-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw fp128, ptr [[SRC]], i64 [[TMP3]]
-; DEFAULT-NEXT:    [[TMP8:%.*]] = load fp128, ptr [[TMP4]], align 16
-; DEFAULT-NEXT:    [[TMP9:%.*]] = load fp128, ptr [[TMP5]], align 16
-; DEFAULT-NEXT:    [[TMP10:%.*]] = load fp128, ptr [[TMP6]], align 16
-; DEFAULT-NEXT:    [[TMP11:%.*]] = load fp128, ptr [[TMP7]], align 16
-; DEFAULT-NEXT:    [[TMP12:%.*]] = freeze fp128 [[TMP8]]
-; DEFAULT-NEXT:    [[TMP13:%.*]] = freeze fp128 [[TMP9]]
-; DEFAULT-NEXT:    [[TMP14:%.*]] = freeze fp128 [[TMP10]]
-; DEFAULT-NEXT:    [[TMP15:%.*]] = freeze fp128 [[TMP11]]
-; DEFAULT-NEXT:    [[TMP16]] = call fp128 @llvm.maxnum.f128(fp128 [[VEC_PHI]], fp128 [[TMP12]])
-; DEFAULT-NEXT:    [[TMP17]] = call fp128 @llvm.maxnum.f128(fp128 [[VEC_PHI1]], fp128 [[TMP13]])
-; DEFAULT-NEXT:    [[TMP18]] = call fp128 @llvm.maxnum.f128(fp128 [[VEC_PHI2]], fp128 [[TMP14]])
-; DEFAULT-NEXT:    [[TMP19]] = call fp128 @llvm.maxnum.f128(fp128 [[VEC_PHI3]], fp128 [[TMP15]])
-; DEFAULT-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; DEFAULT-NEXT:    [[TMP20:%.*]] = fcmp uno fp128 [[TMP12]], [[TMP13]]
-; DEFAULT-NEXT:    [[TMP21:%.*]] = fcmp uno fp128 [[TMP14]], [[TMP15]]
-; DEFAULT-NEXT:    [[TMP22:%.*]] = or i1 [[TMP20]], [[TMP21]]
-; DEFAULT-NEXT:    [[TMP23:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; DEFAULT-NEXT:    [[TMP24:%.*]] = or i1 [[TMP22]], [[TMP23]]
-; DEFAULT-NEXT:    br i1 [[TMP24]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
-; DEFAULT:       [[MIDDLE_BLOCK]]:
-; DEFAULT-NEXT:    [[TMP25:%.*]] = select i1 [[TMP22]], fp128 [[VEC_PHI]], fp128 [[TMP16]]
-; DEFAULT-NEXT:    [[TMP26:%.*]] = select i1 [[TMP22]], fp128 [[VEC_PHI1]], fp128 [[TMP17]]
-; DEFAULT-NEXT:    [[TMP27:%.*]] = select i1 [[TMP22]], fp128 [[VEC_PHI2]], fp128 [[TMP18]]
-; DEFAULT-NEXT:    [[TMP28:%.*]] = select i1 [[TMP22]], fp128 [[VEC_PHI3]], fp128 [[TMP19]]
-; DEFAULT-NEXT:    [[TMP29:%.*]] = select i1 [[TMP22]], i64 [[INDEX]], i64 [[N_VEC]]
-; DEFAULT-NEXT:    [[RDX_MINMAX:%.*]] = call fp128 @llvm.maxnum.f128(fp128 [[TMP25]], fp128 [[TMP26]])
-; DEFAULT-NEXT:    [[RDX_MINMAX4:%.*]] = call fp128 @llvm.maxnum.f128(fp128 [[RDX_MINMAX]], fp128 [[TMP27]])
-; DEFAULT-NEXT:    [[RDX_MINMAX5:%.*]] = call fp128 @llvm.maxnum.f128(fp128 [[RDX_MINMAX4]], fp128 [[TMP28]])
-; DEFAULT-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
-; DEFAULT-NEXT:    [[TMP30:%.*]] = xor i1 [[TMP22]], true
-; DEFAULT-NEXT:    [[TMP31:%.*]] = and i1 [[CMP_N]], [[TMP30]]
-; DEFAULT-NEXT:    br i1 [[TMP31]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
-; DEFAULT:       [[SCALAR_PH]]:
-; DEFAULT-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP29]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
-; DEFAULT-NEXT:    [[BC_MERGE_RDX:%.*]] = phi fp128 [ [[RDX_MINMAX5]], %[[MIDDLE_BLOCK]] ], [ 0.000000e+00, %[[ENTRY]] ]
-; DEFAULT-NEXT:    br label %[[LOOP:.*]]
-; DEFAULT:       [[LOOP]]:
-; DEFAULT-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; DEFAULT-NEXT:    [[MAX:%.*]] = phi fp128 [ [[BC_MERGE_RDX]], %[[SCALAR_PH]] ], [ [[MAX_NEXT:%.*]], %[[LOOP]] ]
-; DEFAULT-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds nuw fp128, ptr [[SRC]], i64 [[IV]]
-; DEFAULT-NEXT:    [[L:%.*]] = load fp128, ptr [[GEP_SRC]], align 16
-; DEFAULT-NEXT:    [[MAX_NEXT]] = call fp128 @llvm.maxnum.f128(fp128 [[MAX]], fp128 [[L]])
-; DEFAULT-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
-; DEFAULT-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
-; DEFAULT-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP3:![0-9]+]]
-; DEFAULT:       [[EXIT]]:
-; DEFAULT-NEXT:    [[MAX_NEXT_LCSSA:%.*]] = phi fp128 [ [[MAX_NEXT]], %[[LOOP]] ], [ [[RDX_MINMAX5]], %[[MIDDLE_BLOCK]] ]
-; DEFAULT-NEXT:    ret fp128 [[MAX_NEXT_LCSSA]]
-;
-; FORCED-VF-LABEL: define fp128 @fmaxnum_fp128(
-; FORCED-VF-SAME: ptr [[SRC:%.*]], i64 [[N:%.*]]) {
-; FORCED-VF-NEXT:  [[ENTRY:.*]]:
-; FORCED-VF-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 8
-; FORCED-VF-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
-; FORCED-VF:       [[VECTOR_PH]]:
-; FORCED-VF-NEXT:    [[TMP0:%.*]] = and i64 [[N]], 7
-; FORCED-VF-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP0]]
-; FORCED-VF-NEXT:    br label %[[VECTOR_BODY:.*]]
-; FORCED-VF:       [[VECTOR_BODY]]:
-; FORCED-VF-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; FORCED-VF-NEXT:    [[VEC_PHI:%.*]] = phi <2 x fp128> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP16:%.*]], %[[VECTOR_BODY]] ]
-; FORCED-VF-NEXT:    [[VEC_PHI1:%.*]] = phi <2 x fp128> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP24:%.*]], %[[VECTOR_BODY]] ]
-; FORCED-VF-NEXT:    [[VEC_PHI2:%.*]] = phi <2 x fp128> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP32:%.*]], %[[VECTOR_BODY]] ]
-; FORCED-VF-NEXT:    [[VEC_PHI3:%.*]] = phi <2 x fp128> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP40:%.*]], %[[VECTOR_BODY]] ]
-; FORCED-VF-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw fp128, ptr [[SRC]], i64 [[INDEX]]
-; FORCED-VF-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP1]], i64 32
-; FORCED-VF-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP1]], i64 64
-; FORCED-VF-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP1]], i64 96
-; FORCED-VF-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x fp128>, ptr [[TMP1]], align 16
-; FORCED-VF-NEXT:    [[WIDE_LOAD4:%.*]] = load <2 x fp128>, ptr [[TMP2]], align 16
-; FORCED-VF-NEXT:    [[WIDE_LOAD5:%.*]] = load <2 x fp128>, ptr [[TMP3]], align 16
-; FORCED-VF-NEXT:    [[WIDE_LOAD6:%.*]] = load <2 x fp128>, ptr [[TMP4]], align 16
-; FORCED-VF-NEXT:    [[TMP5:%.*]] = freeze <2 x fp128> [[WIDE_LOAD]]
-; FORCED-VF-NEXT:    [[TMP6:%.*]] = freeze <2 x fp128> [[WIDE_LOAD4]]
-; FORCED-VF-NEXT:    [[TMP7:%.*]] = freeze <2 x fp128> [[WIDE_LOAD5]]
-; FORCED-VF-NEXT:    [[TMP8:%.*]] = freeze <2 x fp128> [[WIDE_LOAD6]]
-; FORCED-VF-NEXT:    [[TMP9:%.*]] = extractelement <2 x fp128> [[VEC_PHI]], i64 0
-; FORCED-VF-NEXT:    [[TMP10:%.*]] = extractelement <2 x fp128> [[TMP5]], i64 0
-; FORCED-VF-NEXT:    [[TMP11:%.*]] = call fp128 @llvm.maxnum.f128(fp128 [[TMP9]], fp128 [[TMP10]])
-; FORCED-VF-NEXT:    [[TMP12:%.*]] = extractelement <2 x fp128> [[VEC_PHI]], i64 1
-; FORCED-VF-NEXT:    [[TMP13:%.*]] = extractelement <2 x fp128> [[TMP5]], i64 1
-; FORCED-VF-NEXT:    [[TMP14:%.*]] = call fp128 @llvm.maxnum.f128(fp128 [[TMP12]], fp128 [[TMP13]])
-; FORCED-VF-NEXT:    [[TMP15:%.*]] = insertelement <2 x fp128> poison, fp128 [[TMP11]], i64 0
-; FORCED-VF-NEXT:    [[TMP16]] = insertelement <2 x fp128> [[TMP15]], fp128 [[TMP14]], i64 1
-; FORCED-VF-NEXT:    [[TMP17:%.*]] = extractelement <2 x fp128> [[VEC_PHI1]], i64 0
-; FORCED-VF-NEXT:    [[TMP18:%.*]] = extractelement <2 x fp128> [[TMP6]], i64 0
-; FORCED-VF-NEXT:    [[TMP19:%.*]] = call fp128 @llvm.maxnum.f128(fp128 [[TMP17]], fp128 [[TMP18]])
-; FORCED-VF-NEXT:    [[TMP20:%.*]] = extractelement <2 x fp128> [[VEC_PHI1]], i64 1
-; FORCED-VF-NEXT:    [[TMP21:%.*]] = extractelement <2 x fp128> [[TMP6]], i64 1
-; FORCED-VF-NEXT:    [[TMP22:%.*]] = call fp128 @llvm.maxnum.f128(fp128 [[TMP20]], fp128 [[TMP21]])
-; FORCED-VF-NEXT:    [[TMP23:%.*]] = insertelement <2 x fp128> poison, fp128 [[TMP19]], i64 0
-; FORCED-VF-NEXT:    [[TMP24]] = insertelement <2 x fp128> [[TMP23]], fp128 [[TMP22]], i64 1
-; FORCED-VF-NEXT:    [[TMP25:%.*]] = extractelement <2 x fp128> [[VEC_PHI2]], i64 0
-; FORCED-VF-NEXT:    [[TMP26:%.*]] = extractelement <2 x fp128> [[TMP7]], i64 0
-; FORCED-VF-NEXT:    [[TMP27:%.*]] = call fp128 @llvm.maxnum.f128(fp128 [[TMP25]], fp128 [[TMP26]])
-; FORCED-VF-NEXT:    [[TMP28:%.*]] = extractelement <2 x fp128> [[VEC_PHI2]], i64 1
-; FORCED-VF-NEXT:    [[TMP29:%.*]] = extractelement <2 x fp128> [[TMP7]], i64 1
-; FORCED-VF-NEXT:    [[TMP30:%.*]] = call fp128 @llvm.maxnum.f128(fp128 [[TMP28]], fp128 [[TMP29]])
-; FORCED-VF-NEXT:    [[TMP31:%.*]] = insertelement <2 x fp128> poison, fp128 [[TMP27]], i64 0
-; FORCED-VF-NEXT:    [[TMP32]] = insertelement <2 x fp128> [[TMP31]], fp128 [[TMP30]], i64 1
-; FORCED-VF-NEXT:    [[TMP33:%.*]] = extractelement <2 x fp128> [[VEC_PHI3]], i64 0
-; FORCED-VF-NEXT:    [[TMP34:%.*]] = extractelement <2 x fp128> [[TMP8]], i64 0
-; FORCED-VF-NEXT:    [[TMP35:%.*]] = call fp128 @llvm.maxnum.f128(fp128 [[TMP33]], fp128 [[TMP34]])
-; FORCED-VF-NEXT:    [[TMP36:%.*]] = extractelement <2 x fp128> [[VEC_PHI3]], i64 1
-; FORCED-VF-NEXT:    [[TMP37:%.*]] = extractelement <2 x fp128> [[TMP8]], i64 1
-; FORCED-VF-NEXT:    [[TMP38:%.*]] = call fp128 @llvm.maxnum.f128(fp128 [[TMP36]], fp128 [[TMP37]])
-; FORCED-VF-NEXT:    [[TMP39:%.*]] = insertelement <2 x fp128> poison, fp128 [[TMP35]], i64 0
-; FORCED-VF-NEXT:    [[TMP40]] = insertelement <2 x fp128> [[TMP39]], fp128 [[TMP38]], i64 1
-; FORCED-VF-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
-; FORCED-VF-NEXT:    [[TMP41:%.*]] = fcmp uno <2 x fp128> [[TMP5]], [[TMP6]]
-; FORCED-VF-NEXT:    [[TMP42:%.*]] = fcmp uno <2 x fp128> [[TMP7]], [[TMP8]]
-; FORCED-VF-NEXT:    [[TMP43:%.*]] = or <2 x i1> [[TMP41]], [[TMP42]]
-; FORCED-VF-NEXT:    [[TMP44:%.*]] = call i1 @llvm.vector.reduce.or.v2i1(<2 x i1> [[TMP43]])
-; FORCED-VF-NEXT:    [[TMP45:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; FORCED-VF-NEXT:    [[TMP46:%.*]] = or i1 [[TMP44]], [[TMP45]]
-; FORCED-VF-NEXT:    br i1 [[TMP46]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
-; FORCED-VF:       [[MIDDLE_BLOCK]]:
-; FORCED-VF-NEXT:    [[TMP47:%.*]] = select i1 [[TMP44]], <2 x fp128> [[VEC_PHI]], <2 x fp128> [[TMP16]]
-; FORCED-VF-NEXT:    [[TMP48:%.*]] = select i1 [[TMP44]], <2 x fp128> [[VEC_PHI1]], <2 x fp128> [[TMP24]]
-; FORCED-VF-NEXT:    [[TMP49:%.*]] = select i1 [[TMP44]], <2 x fp128> [[VEC_PHI2]], <2 x fp128> [[TMP32]]
-; FORCED-VF-NEXT:    [[TMP50:%.*]] = select i1 [[TMP44]], <2 x fp128> [[VEC_PHI3]], <2 x fp128> [[TMP40]]
-; FORCED-VF-NEXT:    [[TMP51:%.*]] = select i1 [[TMP44]], i64 [[INDEX]], i64 [[N_VEC]]
-; FORCED-VF-NEXT:    [[RDX_MINMAX:%.*]] = call <2 x fp128> @llvm.maxnum.v2f128(<2 x fp128> [[TMP47]], <2 x fp128> [[TMP48]])
-; FORCED-VF-NEXT:    [[RDX_MINMAX7:%.*]] = call <2 x fp128> @llvm.maxnum.v2f128(<2 x fp128> [[RDX_MINMAX]], <2 x fp128> [[TMP49]])
-; FORCED-VF-NEXT:    [[RDX_MINMAX8:%.*]] = call <2 x fp128> @llvm.maxnum.v2f128(<2 x fp128> [[RDX_MINMAX7]], <2 x fp128> [[TMP50]])
-; FORCED-VF-NEXT:    [[TMP52:%.*]] = call fp128 @llvm.vector.reduce.fmax.v2f128(<2 x fp128> [[RDX_MINMAX8]])
-; FORCED-VF-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
-; FORCED-VF-NEXT:    [[TMP53:%.*]] = xor i1 [[TMP44]], true
-; FORCED-VF-NEXT:    [[TMP54:%.*]] = and i1 [[CMP_N]], [[TMP53]]
-; FORCED-VF-NEXT:    br i1 [[TMP54]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
-; FORCED-VF:       [[SCALAR_PH]]:
-; FORCED-VF-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP51]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
-; FORCED-VF-NEXT:    [[BC_MERGE_RDX:%.*]] = phi fp128 [ [[TMP52]], %[[MIDDLE_BLOCK]] ], [ 0.000000e+00, %[[ENTRY]] ]
-; FORCED-VF-NEXT:    br label %[[LOOP:.*]]
-; FORCED-VF:       [[LOOP]]:
-; FORCED-VF-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; FORCED-VF-NEXT:    [[MAX:%.*]] = phi fp128 [ [[BC_MERGE_RDX]], %[[SCALAR_PH]] ], [ [[MAX_NEXT:%.*]], %[[LOOP]] ]
-; FORCED-VF-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds nuw fp128, ptr [[SRC]], i64 [[IV]]
-; FORCED-VF-NEXT:    [[L:%.*]] = load fp128, ptr [[GEP_SRC]], align 16
-; FORCED-VF-NEXT:    [[MAX_NEXT]] = call fp128 @llvm.maxnum.f128(fp128 [[MAX]], fp128 [[L]])
-; FORCED-VF-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
-; FORCED-VF-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
-; FORCED-VF-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP3:![0-9]+]]
-; FORCED-VF:       [[EXIT]]:
-; FORCED-VF-NEXT:    [[MAX_NEXT_LCSSA:%.*]] = phi fp128 [ [[MAX_NEXT]], %[[LOOP]] ], [ [[TMP52]], %[[MIDDLE_BLOCK]] ]
-; FORCED-VF-NEXT:    ret fp128 [[MAX_NEXT_LCSSA]]
-;
-; FORCED-IC-LABEL: define fp128 @fmaxnum_fp128(
-; FORCED-IC-SAME: ptr [[SRC:%.*]], i64 [[N:%.*]]) {
-; FORCED-IC-NEXT:  [[ENTRY:.*]]:
-; FORCED-IC-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
-; FORCED-IC-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
-; FORCED-IC:       [[VECTOR_PH]]:
-; FORCED-IC-NEXT:    [[TMP0:%.*]] = and i64 [[N]], 3
-; FORCED-IC-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP0]]
-; FORCED-IC-NEXT:    br label %[[VECTOR_BODY:.*]]
-; FORCED-IC:       [[VECTOR_BODY]]:
-; FORCED-IC-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; FORCED-IC-NEXT:    [[VEC_PHI:%.*]] = phi fp128 [ 0.000000e+00, %[[VECTOR_PH]] ], [ [[TMP16:%.*]], %[[VECTOR_BODY]] ]
-; FORCED-IC-NEXT:    [[VEC_PHI1:%.*]] = phi fp128 [ 0.000000e+00, %[[VECTOR_PH]] ], [ [[TMP17:%.*]], %[[VECTOR_BODY]] ]
-; FORCED-IC-NEXT:    [[VEC_PHI2:%.*]] = phi fp128 [ 0.000000e+00, %[[VECTOR_PH]] ], [ [[TMP18:%.*]], %[[VECTOR_BODY]] ]
-; FORCED-IC-NEXT:    [[VEC_PHI3:%.*]] = phi fp128 [ 0.000000e+00, %[[VECTOR_PH]] ], [ [[TMP19:%.*]], %[[VECTOR_BODY]] ]
-; FORCED-IC-NEXT:    [[TMP1:%.*]] = add i64 [[INDEX]], 1
-; FORCED-IC-NEXT:    [[TMP2:%.*]] = add i64 [[INDEX]], 2
-; FORCED-IC-NEXT:    [[TMP3:%.*]] = add i64 [[INDEX]], 3
-; FORCED-IC-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw fp128, ptr [[SRC]], i64 [[INDEX]]
-; FORCED-IC-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw fp128, ptr [[SRC]], i64 [[TMP1]]
-; FORCED-IC-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw fp128, ptr [[SRC]], i64 [[TMP2]]
-; FORCED-IC-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw fp128, ptr [[SRC]], i64 [[TMP3]]
-; FORCED-IC-NEXT:    [[TMP8:%.*]] = load fp128, ptr [[TMP4]], align 16
-; FORCED-IC-NEXT:    [[TMP9:%.*]] = load fp128, ptr [[TMP5]], align 16
-; FORCED-IC-NEXT:    [[TMP10:%.*]] = load fp128, ptr [[TMP6]], align 16
-; FORCED-IC-NEXT:    [[TMP11:%.*]] = load fp128, ptr [[TMP7]], align 16
-; FORCED-IC-NEXT:    [[TMP12:%.*]] = freeze fp128 [[TMP8]]
-; FORCED-IC-NEXT:    [[TMP13:%.*]] = freeze fp128 [[TMP9]]
-; FORCED-IC-NEXT:    [[TMP14:%.*]] = freeze fp128 [[TMP10]]
-; FORCED-IC-NEXT:    [[TMP15:%.*]] = freeze fp128 [[TMP11]]
-; FORCED-IC-NEXT:    [[TMP16]] = call fp128 @llvm.maxnum.f128(fp128 [[VEC_PHI]], fp128 [[TMP12]])
-; FORCED-IC-NEXT:    [[TMP17]] = call fp128 @llvm.maxnum.f128(fp128 [[VEC_PHI1]], fp128 [[TMP13]])
-; FORCED-IC-NEXT:    [[TMP18]] = call fp128 @llvm.maxnum.f128(fp128 [[VEC_PHI2]], fp128 [[TMP14]])
-; FORCED-IC-NEXT:    [[TMP19]] = call fp128 @llvm.maxnum.f128(fp128 [[VEC_PHI3]], fp128 [[TMP15]])
-; FORCED-IC-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; FORCED-IC-NEXT:    [[TMP20:%.*]] = fcmp uno fp128 [[TMP12]], [[TMP13]]
-; FORCED-IC-NEXT:    [[TMP21:%.*]] = fcmp uno fp128 [[TMP14]], [[TMP15]]
-; FORCED-IC-NEXT:    [[TMP22:%.*]] = or i1 [[TMP20]], [[TMP21]]
-; FORCED-IC-NEXT:    [[TMP23:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; FORCED-IC-NEXT:    [[TMP24:%.*]] = or i1 [[TMP22]], [[TMP23]]
-; FORCED-IC-NEXT:    br i1 [[TMP24]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
-; FORCED-IC:       [[MIDDLE_BLOCK]]:
-; FORCED-IC-NEXT:    [[TMP25:%.*]] = select i1 [[TMP22]], fp128 [[VEC_PHI]], fp128 [[TMP16]]
-; FORCED-IC-NEXT:    [[TMP26:%.*]] = select i1 [[TMP22]], fp128 [[VEC_PHI1]], fp128 [[TMP17]]
-; FORCED-IC-NEXT:    [[TMP27:%.*]] = select i1 [[TMP22]], fp128 [[VEC_PHI2]], fp128 [[TMP18]]
-; FORCED-IC-NEXT:    [[TMP28:%.*]] = select i1 [[TMP22]], fp128 [[VEC_PHI3]], fp128 [[TMP19]]
-; FORCED-IC-NEXT:    [[TMP29:%.*]] = select i1 [[TMP22]], i64 [[INDEX]], i64 [[N_VEC]]
-; FORCED-IC-NEXT:    [[RDX_MINMAX:%.*]] = call fp128 @llvm.maxnum.f128(fp128 [[TMP25]], fp128 [[TMP26]])
-; FORCED-IC-NEXT:    [[RDX_MINMAX4:%.*]] = call fp128 @llvm.maxnum.f128(fp128 [[RDX_MINMAX]], fp128 [[TMP27]])
-; FORCED-IC-NEXT:    [[RDX_MINMAX5:%.*]] = call fp128 @llvm.maxnum.f128(fp128 [[RDX_MINMAX4]], fp128 [[TMP28]])
-; FORCED-IC-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
-; FORCED-IC-NEXT:    [[TMP30:%.*]] = xor i1 [[TMP22]], true
-; FORCED-IC-NEXT:    [[TMP31:%.*]] = and i1 [[CMP_N]], [[TMP30]]
-; FORCED-IC-NEXT:    br i1 [[TMP31]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
-; FORCED-IC:       [[SCALAR_PH]]:
-; FORCED-IC-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP29]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
-; FORCED-IC-NEXT:    [[BC_MERGE_RDX:%.*]] = phi fp128 [ [[RDX_MINMAX5]], %[[MIDDLE_BLOCK]] ], [ 0.000000e+00, %[[ENTRY]] ]
-; FORCED-IC-NEXT:    br label %[[LOOP:.*]]
-; FORCED-IC:       [[LOOP]]:
-; FORCED-IC-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; FORCED-IC-NEXT:    [[MAX:%.*]] = phi fp128 [ [[BC_MERGE_RDX]], %[[SCALAR_PH]] ], [ [[MAX_NEXT:%.*]], %[[LOOP]] ]
-; FORCED-IC-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds nuw fp128, ptr [[SRC]], i64 [[IV]]
-; FORCED-IC-NEXT:    [[L:%.*]] = load fp128, ptr [[GEP_SRC]], align 16
-; FORCED-IC-NEXT:    [[MAX_NEXT]] = call fp128 @llvm.maxnum.f128(fp128 [[MAX]], fp128 [[L]])
-; FORCED-IC-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
-; FORCED-IC-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
-; FORCED-IC-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP3:![0-9]+]]
-; FORCED-IC:       [[EXIT]]:
-; FORCED-IC-NEXT:    [[MAX_NEXT_LCSSA:%.*]] = phi fp128 [ [[MAX_NEXT]], %[[LOOP]] ], [ [[RDX_MINMAX5]], %[[MIDDLE_BLOCK]] ]
-; FORCED-IC-NEXT:    ret fp128 [[MAX_NEXT_LCSSA]]
+; CHECK-LABEL: define fp128 @fmaxnum_fp128(
+; CHECK-SAME: ptr [[SRC:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = and i64 [[N]], 3
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP0]]
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi fp128 [ 0.000000e+00, %[[VECTOR_PH]] ], [ [[TMP16:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI1:%.*]] = phi fp128 [ 0.000000e+00, %[[VECTOR_PH]] ], [ [[TMP17:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI2:%.*]] = phi fp128 [ 0.000000e+00, %[[VECTOR_PH]] ], [ [[TMP18:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI3:%.*]] = phi fp128 [ 0.000000e+00, %[[VECTOR_PH]] ], [ [[TMP19:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[INDEX]], 2
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[INDEX]], 3
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw fp128, ptr [[SRC]], i64 [[INDEX]]
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw fp128, ptr [[SRC]], i64 [[TMP1]]
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw fp128, ptr [[SRC]], i64 [[TMP2]]
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw fp128, ptr [[SRC]], i64 [[TMP3]]
+; CHECK-NEXT:    [[TMP8:%.*]] = load fp128, ptr [[TMP4]], align 16
+; CHECK-NEXT:    [[TMP9:%.*]] = load fp128, ptr [[TMP5]], align 16
+; CHECK-NEXT:    [[TMP10:%.*]] = load fp128, ptr [[TMP6]], align 16
+; CHECK-NEXT:    [[TMP11:%.*]] = load fp128, ptr [[TMP7]], align 16
+; CHECK-NEXT:    [[TMP12:%.*]] = freeze fp128 [[TMP8]]
+; CHECK-NEXT:    [[TMP13:%.*]] = freeze fp128 [[TMP9]]
+; CHECK-NEXT:    [[TMP14:%.*]] = freeze fp128 [[TMP10]]
+; CHECK-NEXT:    [[TMP15:%.*]] = freeze fp128 [[TMP11]]
+; CHECK-NEXT:    [[TMP16]] = call fp128 @llvm.maxnum.f128(fp128 [[VEC_PHI]], fp128 [[TMP12]])
+; CHECK-NEXT:    [[TMP17]] = call fp128 @llvm.maxnum.f128(fp128 [[VEC_PHI1]], fp128 [[TMP13]])
+; CHECK-NEXT:    [[TMP18]] = call fp128 @llvm.maxnum.f128(fp128 [[VEC_PHI2]], fp128 [[TMP14]])
+; CHECK-NEXT:    [[TMP19]] = call fp128 @llvm.maxnum.f128(fp128 [[VEC_PHI3]], fp128 [[TMP15]])
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP20:%.*]] = fcmp uno fp128 [[TMP12]], [[TMP13]]
+; CHECK-NEXT:    [[TMP21:%.*]] = fcmp uno fp128 [[TMP14]], [[TMP15]]
+; CHECK-NEXT:    [[TMP22:%.*]] = or i1 [[TMP20]], [[TMP21]]
+; CHECK-NEXT:    [[TMP23:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    [[TMP24:%.*]] = or i1 [[TMP22]], [[TMP23]]
+; CHECK-NEXT:    br i1 [[TMP24]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[TMP25:%.*]] = select i1 [[TMP22]], fp128 [[VEC_PHI]], fp128 [[TMP16]]
+; CHECK-NEXT:    [[TMP26:%.*]] = select i1 [[TMP22]], fp128 [[VEC_PHI1]], fp128 [[TMP17]]
+; CHECK-NEXT:    [[TMP27:%.*]] = select i1 [[TMP22]], fp128 [[VEC_PHI2]], fp128 [[TMP18]]
+; CHECK-NEXT:    [[TMP28:%.*]] = select i1 [[TMP22]], fp128 [[VEC_PHI3]], fp128 [[TMP19]]
+; CHECK-NEXT:    [[TMP29:%.*]] = select i1 [[TMP22]], i64 [[INDEX]], i64 [[N_VEC]]
+; CHECK-NEXT:    [[RDX_MINMAX:%.*]] = call fp128 @llvm.maxnum.f128(fp128 [[TMP25]], fp128 [[TMP26]])
+; CHECK-NEXT:    [[RDX_MINMAX4:%.*]] = call fp128 @llvm.maxnum.f128(fp128 [[RDX_MINMAX]], fp128 [[TMP27]])
+; CHECK-NEXT:    [[RDX_MINMAX5:%.*]] = call fp128 @llvm.maxnum.f128(fp128 [[RDX_MINMAX4]], fp128 [[TMP28]])
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    [[TMP30:%.*]] = xor i1 [[TMP22]], true
+; CHECK-NEXT:    [[TMP31:%.*]] = and i1 [[CMP_N]], [[TMP30]]
+; CHECK-NEXT:    br i1 [[TMP31]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP29]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi fp128 [ [[RDX_MINMAX5]], %[[MIDDLE_BLOCK]] ], [ 0.000000e+00, %[[ENTRY]] ]
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[MAX:%.*]] = phi fp128 [ [[BC_MERGE_RDX]], %[[SCALAR_PH]] ], [ [[MAX_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds nuw fp128, ptr [[SRC]], i64 [[IV]]
+; CHECK-NEXT:    [[L:%.*]] = load fp128, ptr [[GEP_SRC]], align 16
+; CHECK-NEXT:    [[MAX_NEXT]] = call fp128 @llvm.maxnum.f128(fp128 [[MAX]], fp128 [[L]])
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP3:![0-9]+]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    [[MAX_NEXT_LCSSA:%.*]] = phi fp128 [ [[MAX_NEXT]], %[[LOOP]] ], [ [[RDX_MINMAX5]], %[[MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    ret fp128 [[MAX_NEXT_LCSSA]]
 ;
 entry:
   br label %loop
@@ -300,3 +131,7 @@ loop:
 exit:
   ret fp128 %max.next
 }
+;; NOTE: These prefixes are unused and the list is autogenerated. Do not add tests below this line:
+; DEFAULT: {{.*}}
+; FORCED-IC: {{.*}}
+; FORCED-VF: {{.*}}

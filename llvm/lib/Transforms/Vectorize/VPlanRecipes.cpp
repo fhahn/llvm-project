@@ -1515,6 +1515,18 @@ InstructionCost VPInstruction::computeCost(ElementCount VF,
     return Ctx.TTI.getArithmeticReductionCost(
         Instruction::Or, cast<VectorType>(VecTy), std::nullopt, Ctx.CostKind);
   }
+  case VPInstruction::ComputeReductionResult: {
+    // TODO: Compute cost for other reduction kinds.
+    RecurKind RK = getRecurKind();
+    if (!RecurrenceDescriptor::isMinMaxRecurrenceKind(RK) || VF.isScalar() ||
+        isReductionInLoop())
+      return 0;
+    // Cost the reduction of the lanes as emitted; it may not be lowerable.
+    return Ctx.TTI.getMinMaxReductionCost(
+        getMinMaxReductionIntrinsicOp(getReductionIntrinsicID(RK)),
+        cast<VectorType>(toVectorTy(getScalarType(), VF)),
+        getFastMathFlagsOrNone(), Ctx.CostKind);
+  }
   case VPInstruction::FirstActiveLane: {
     Type *Ty = this->getScalarType();
     Type *ScalarTy = getOperand(0)->getScalarType();
