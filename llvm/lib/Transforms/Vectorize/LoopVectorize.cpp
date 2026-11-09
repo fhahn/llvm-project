@@ -7774,6 +7774,27 @@ bool LoopVectorizePass::processLoop(Loop *L) {
   // Override IC if user provided an interleave count.
   IC = UserIC > 0 ? UserIC : IC;
 
+  // Combining the unrolled parts of reductions may not be possible, e.g. for
+  // min/max reductions without libcalls.
+  if (InterleaveLoop) {
+    using namespace VPlanPatternMatch;
+    VPCostContext CostCtx(*TLI, *BestPlanPtr, LVP.getCostModel(), Config);
+    CostCtx.UF = IC;
+    if (any_of(*BestPlanPtr->getMiddleBlock(), [&](VPRecipeBase &R) {
+          return match(&R, m_VPInstruction<
+                               VPInstruction::ComputeReductionResult>()) &&
+                 !R.cost(VF.Width, CostCtx).isValid();
+        })) {
+      LLVM_DEBUG(dbgs() << "LV: Not interleaving due to invalid cost of "
+                           "combining reduction parts.\n");
+      IntDiagMsg = {"InvalidReductionCostPreventsInterleaving",
+                    "Unable to interleave due to invalid cost of combining "
+                    "reduction parts."};
+      InterleaveLoop = false;
+      IC = 1;
+    }
+  }
+
   if (LVP.getCostModel().maskPartialAliasing()) {
     LLVM_DEBUG(
         dbgs()

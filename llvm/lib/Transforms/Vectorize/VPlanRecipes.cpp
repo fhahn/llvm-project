@@ -1518,14 +1518,25 @@ InstructionCost VPInstruction::computeCost(ElementCount VF,
   case VPInstruction::ComputeReductionResult: {
     // TODO: Compute cost for other reduction kinds.
     RecurKind RK = getRecurKind();
-    if (!RecurrenceDescriptor::isMinMaxRecurrenceKind(RK) || VF.isScalar() ||
-        isReductionInLoop())
+    if (!RecurrenceDescriptor::isMinMaxRecurrenceKind(RK))
       return 0;
-    // Cost the reduction of the lanes as emitted; it may not be lowerable.
-    return Ctx.TTI.getMinMaxReductionCost(
-        getMinMaxReductionIntrinsicOp(getReductionIntrinsicID(RK)),
-        cast<VectorType>(toVectorTy(getScalarType(), VF)),
-        getFastMathFlagsOrNone(), Ctx.CostKind);
+    // Cost combining the unrolled parts and reducing the lanes, either of which
+    // may not be lowerable. The ops differ for FMinimumNum/FMaximumNum.
+    FastMathFlags FMF = getFastMathFlagsOrNone();
+    Type *PartTy = VF.isVector() && !isReductionInLoop()
+                       ? toVectorTy(getScalarType(), VF)
+                       : getScalarType();
+    InstructionCost Cost = 0;
+    if (Ctx.UF > 1) {
+      IntrinsicCostAttributes Attrs(getMinMaxReductionIntrinsicOp(RK), PartTy,
+                                    {PartTy, PartTy}, FMF);
+      Cost = (Ctx.UF - 1) * Ctx.TTI.getIntrinsicInstrCost(Attrs, Ctx.CostKind);
+    }
+    if (auto *VecTy = dyn_cast<VectorType>(PartTy))
+      Cost += Ctx.TTI.getMinMaxReductionCost(
+          getMinMaxReductionIntrinsicOp(getReductionIntrinsicID(RK)), VecTy,
+          FMF, Ctx.CostKind);
+    return Cost;
   }
   case VPInstruction::FirstActiveLane: {
     Type *Ty = this->getScalarType();

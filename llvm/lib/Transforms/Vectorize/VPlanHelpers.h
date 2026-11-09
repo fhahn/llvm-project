@@ -314,6 +314,10 @@ struct VPCostContext {
   PredicatedScalarEvolution &PSE;
   const Loop *L;
 
+  /// Unroll factor to cost combining the unrolled parts of reductions for,
+  /// before unrolling. Only used by ComputeReductionResult so far.
+  unsigned UF = 1;
+
   /// Number of predicated stores in the VPlan, computed on demand.
   std::optional<unsigned> NumPredStores;
 
