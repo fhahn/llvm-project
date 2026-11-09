@@ -1551,11 +1551,9 @@ define float @fmax_ugt_with_select_nnan_nan_start(ptr %src, i64 %n) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = freeze <4 x float> [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP4]] = select <4 x i1> [[TMP2]], <4 x float> [[TMP3]], <4 x float> [[VEC_PHI]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 4
-; CHECK-NEXT:    [[TMP5:%.*]] = fcmp uno <4 x float> [[TMP3]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = bitcast <4 x float> [[TMP3]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq <4 x i32> [[TMP6]], splat (i32 -2147483648)
-; CHECK-NEXT:    [[TMP8:%.*]] = or <4 x i1> [[TMP5]], [[TMP7]]
-; CHECK-NEXT:    [[TMP9:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP8]])
+; CHECK-NEXT:    [[TMP9:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP7]])
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP9]], [[TMP10]]
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP49:![0-9]+]]
@@ -1626,11 +1624,9 @@ define float @fmax_ugt_with_select_nnan(ptr %src, i64 %n) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = freeze <4 x float> [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP4]] = select <4 x i1> [[TMP2]], <4 x float> [[TMP3]], <4 x float> [[VEC_PHI]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; CHECK-NEXT:    [[TMP5:%.*]] = fcmp uno <4 x float> [[TMP3]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = bitcast <4 x float> [[TMP3]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq <4 x i32> [[TMP6]], splat (i32 -2147483648)
-; CHECK-NEXT:    [[TMP8:%.*]] = or <4 x i1> [[TMP5]], [[TMP7]]
-; CHECK-NEXT:    [[TMP9:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP8]])
+; CHECK-NEXT:    [[TMP9:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP7]])
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP9]], [[TMP10]]
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP43:![0-9]+]]

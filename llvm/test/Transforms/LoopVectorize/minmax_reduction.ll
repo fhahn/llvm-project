@@ -625,9 +625,10 @@ for.end:
   ret float %max.red.0
 }
 
-; As above, with the nsz flag missing on select.
+; As above, with the nsz flag missing on select. Selecting a NaN input makes the
+; result poison, so only exit early on zeros of the wrong sign.
 ; CHECK-LABEL: @max_red_float_nsz(
-; CHECK: fcmp uno <2 x float>
+; CHECK-NOT: fcmp uno <2 x float>
 ; CHECK: icmp eq <2 x i32>
 ; CHECK: call float @llvm.vector.reduce.fmax.v2f32
 ; CHECK: fcmp uno float

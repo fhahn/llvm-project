@@ -1968,10 +1968,20 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan,
   VPValue *AllNaNLanes = nullptr;
   SmallPtrSet<VPValue *, 2> RdxResults;
   for (const auto &[RedPhiR, MinOrMaxOp] : MinOrMaxNumReductionsToHandle) {
-    VPValue *RedNaNLanes =
-        LatchBuilder.createFCmp(CmpInst::FCMP_UNO, MinOrMaxOp, MinOrMaxOp);
-    if (RecurrenceDescriptor::isFPMinMaxSelectRecurrenceKind(
-            RedPhiR->getRecurrenceKind())) {
+    bool IsSelectKind = RecurrenceDescriptor::isFPMinMaxSelectRecurrenceKind(
+        RedPhiR->getRecurrenceKind());
+    // With nnan on the select, selecting a NaN makes the scalar result poison,
+    // and lanes only select a NaN if the scalar loop does. With nsz on the
+    // select, the sign of a zero result is insignificant. Skip the
+    // corresponding exits.
+    FastMathFlags FMF = RedPhiR->getFastMathFlagsOrNone();
+    assert(!(IsSelectKind && FMF.noNaNs() && FMF.noSignedZeros()) &&
+           "select-based min/max with nnan and nsz should be FMin/FMax");
+    VPValue *RedNaNLanes = nullptr;
+    if (!IsSelectKind || !FMF.noNaNs())
+      RedNaNLanes =
+          LatchBuilder.createFCmp(CmpInst::FCMP_UNO, MinOrMaxOp, MinOrMaxOp);
+    if (IsSelectKind && !FMF.noSignedZeros()) {
       // Without NaNs, select-based min/max can only pick a different value
       // than the scalar loop if zeros of both signs are combined. Exit on -0.0
       // inputs, or on +0.0 inputs if the start value is -0.0. Freeze
@@ -2001,7 +2011,8 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan,
       }
       VPValue *IsExitZero =
           LatchBuilder.createICmp(CmpInst::ICMP_EQ, InputBits, ExitZero);
-      RedNaNLanes = LatchBuilder.createOr(RedNaNLanes, IsExitZero);
+      RedNaNLanes = RedNaNLanes ? LatchBuilder.createOr(RedNaNLanes, IsExitZero)
+                                : IsExitZero;
     }
     AllNaNLanes = AllNaNLanes ? LatchBuilder.createOr(AllNaNLanes, RedNaNLanes)
                               : RedNaNLanes;

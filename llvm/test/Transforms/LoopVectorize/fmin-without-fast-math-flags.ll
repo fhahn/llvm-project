@@ -980,12 +980,6 @@ define float @fmin_olt_with_select_nsz_start_arg(ptr %src, float %start, i64 %n)
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = and i64 [[N]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP0]]
-; CHECK-NEXT:    [[TMP1:%.*]] = freeze float [[START]]
-; CHECK-NEXT:    [[TMP2:%.*]] = bitcast float [[TMP1]] to i32
-; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i32 [[TMP2]], -2147483648
-; CHECK-NEXT:    [[TMP4:%.*]] = select i1 [[TMP3]], i32 0, i32 -2147483648
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[TMP4]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x float> poison, float [[START]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT1]], <4 x float> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
@@ -999,10 +993,7 @@ define float @fmin_olt_with_select_nsz_start_arg(ptr %src, float %start, i64 %n)
 ; CHECK-NEXT:    [[TMP8]] = select nsz <4 x i1> [[TMP6]], <4 x float> [[TMP7]], <4 x float> [[VEC_PHI]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP9:%.*]] = fcmp uno <4 x float> [[TMP7]], [[TMP7]]
-; CHECK-NEXT:    [[TMP10:%.*]] = bitcast <4 x float> [[TMP7]] to <4 x i32>
-; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq <4 x i32> [[TMP10]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP12:%.*]] = or <4 x i1> [[TMP9]], [[TMP11]]
-; CHECK-NEXT:    [[TMP13:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP12]])
+; CHECK-NEXT:    [[TMP13:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP9]])
 ; CHECK-NEXT:    [[TMP14:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = or i1 [[TMP13]], [[TMP14]]
 ; CHECK-NEXT:    br i1 [[TMP15]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP31:![0-9]+]]
