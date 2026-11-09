@@ -1572,9 +1572,14 @@ bool RuntimePointerChecking::needsChecking(unsigned I, unsigned J) const {
   if (PointerI.AliasSetId != PointerJ.AliasSetId)
     return false;
 
-  return !UnknownDepCands.isEquivalent(
-             {PointerI.PointerValue, PointerI.IsWritePtr},
-             {PointerJ.PointerValue, PointerJ.IsWritePtr}) ||
+  // isEquivalent also holds for equal accesses not in UnknownDepCands, e.g.
+  // the arms of a forked pointer, so check membership first.
+  MemoryDepChecker::MemAccessInfo AccI(PointerI.PointerValue,
+                                       PointerI.IsWritePtr);
+  MemoryDepChecker::MemAccessInfo AccJ(PointerJ.PointerValue,
+                                       PointerJ.IsWritePtr);
+  return !UnknownDepCands.contains(AccI) ||
+         !UnknownDepCands.isEquivalent(AccI, AccJ) ||
          UnknownDepPtrPairs.contains(
              {PointerI.PointerValue, PointerJ.PointerValue});
 }
