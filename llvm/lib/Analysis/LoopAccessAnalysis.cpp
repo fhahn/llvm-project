@@ -2228,7 +2228,6 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
     // Remove the equivalence classes containing them from DepCands. Within
     // such a class, only pairs with an unknown dependence need checking. The
     // other pairs are independent or have a safe dependence.
-    bool CheckAllPairs = false;
     for (const auto &Dep : *Deps) {
       if (Dep.Type != MemoryDepChecker::Dependence::Unknown) {
         assert(MemoryDepChecker::Dependence::isSafeForVectorization(Dep.Type) ==
@@ -2240,20 +2239,14 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
       MemAccessInfo Dst = DepChecker.getAccess(Dep.Destination);
       RtCheck.UnknownDepPtrPairs.insert({Src.getPointer(), Dst.getPointer()});
       RtCheck.UnknownDepPtrPairs.insert({Dst.getPointer(), Src.getPointer()});
-      for (MemAccessInfo A : {Src, Dst}) {
-        if (!DepCands.contains(A)) {
-          // Accesses through non-header phis are checked via their incoming
-          // pointers, so their pairs cannot be matched. Check all pairs then.
-          CheckAllPairs |= !RtCheck.UnknownDepCands.contains(A);
-          continue;
-        }
-        for (MemAccessInfo M : DepCands.members(A))
-          RtCheck.UnknownDepCands.unionSets(A, M);
-        DepCands.eraseClass(A);
-      }
+      // Both accesses are in the same class, which may already have been
+      // erased for an earlier dependence.
+      assert((!DepCands.contains(Src) || DepCands.isEquivalent(Src, Dst)) &&
+             "Dependences must be between accesses in the same class");
+      for (MemAccessInfo M : DepCands.members(Src))
+        RtCheck.UnknownDepCands.unionSets(Src, M);
+      DepCands.eraseClass(Src);
     }
-    if (CheckAllPairs)
-      RtCheck.UnknownDepCands = {};
   } else {
     CheckDeps.clear();
     DepCands = {};
