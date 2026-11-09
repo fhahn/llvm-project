@@ -518,21 +518,19 @@ bool DemandedBits::isUseDead(Use *U) {
   if (!(*U)->getType()->isIntOrIntVectorTy())
     return false;
 
-  // Uses by always-live instructions are never dead.
+  // Uses by always-live instructions are never dead. Only check that for uses
+  // that look dead, as isAlwaysLive is more expensive than the lookups.
   auto *UserI = cast<Instruction>(U->getUser());
-  if (isAlwaysLive(UserI))
-    return false;
-
   performAnalysis();
   if (DeadUses.count(U))
-    return true;
+    return !isAlwaysLive(UserI);
 
   // If no output bits are demanded, no input bits are demanded and the use
   // is dead. These uses might not be explicitly present in the DeadUses map.
   if (UserI->getType()->isIntOrIntVectorTy()) {
     auto Found = AliveBits.find(UserI);
     if (Found != AliveBits.end() && Found->second.isZero())
-      return true;
+      return !isAlwaysLive(UserI);
   }
 
   return false;
