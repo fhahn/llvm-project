@@ -92,8 +92,8 @@ private:
 
   TableId NextValueId = 1;
 
-  SmallDenseMap<SDValue, TableId, 8> ValueToIdMap;
-  SmallDenseMap<TableId, SDValue, 8> IdToValueMap;
+  SmallDenseMap<SDValue, TableId, 64> ValueToIdMap;
+  SmallDenseMap<TableId, SDValue, 64> IdToValueMap;
 
   /// For integer nodes that are below legal width, this map indicates what
   /// promoted value to use.
