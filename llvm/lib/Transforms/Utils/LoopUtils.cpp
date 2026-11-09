@@ -1106,7 +1106,7 @@ bool llvm::hasIterationCountInvariantInParent(Loop *InnerLoop,
   return true;
 }
 
-constexpr Intrinsic::ID llvm::getReductionIntrinsicID(RecurKind RK) {
+Intrinsic::ID llvm::getReductionIntrinsicID(RecurKind RK) {
   switch (RK) {
   default:
     llvm_unreachable("Unexpected recurrence kind");

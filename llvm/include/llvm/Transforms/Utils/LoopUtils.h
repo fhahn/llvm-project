@@ -484,7 +484,7 @@ LLVM_ABI bool canHoistLoad(LoadInst &LI, const SinkAndHoistDependencies &Deps,
 
 /// Returns the llvm.vector.reduce intrinsic that corresponds to the recurrence
 /// kind.
-LLVM_ABI constexpr Intrinsic::ID getReductionIntrinsicID(RecurKind RK);
+LLVM_ABI Intrinsic::ID getReductionIntrinsicID(RecurKind RK);
 /// Returns the llvm.vector.reduce min/max intrinsic that corresponds to the
 /// intrinsic op.
 LLVM_ABI Intrinsic::ID getMinMaxReductionIntrinsicID(Intrinsic::ID IID);
