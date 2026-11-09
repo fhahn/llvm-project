@@ -10,6 +10,7 @@
 define void @global_base(ptr %out, ptr %in, i64 %n) {
 ; CHECK-LABEL: @global_base(
 ; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[TAB_OFF:%.*]] = getelementptr i8, ptr @tab, i64 -256
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[LOOP]] ]
@@ -17,8 +18,7 @@ define void @global_base(ptr %out, ptr %in, i64 %n) {
 ; CHECK-NEXT:    [[V:%.*]] = load i32, ptr [[GEP_IN]], align 4
 ; CHECK-NEXT:    [[PROMOTED:%.*]] = zext i32 [[V]] to i64
 ; CHECK-NEXT:    [[TMP0:%.*]] = and i64 [[PROMOTED]], 255
-; CHECK-NEXT:    [[GEP_TAB:%.*]] = getelementptr [2 x i8], ptr @tab, i64 [[TMP0]]
-; CHECK-NEXT:    [[GEP_TAB_OFF:%.*]] = getelementptr i8, ptr [[GEP_TAB]], i64 -256
+; CHECK-NEXT:    [[GEP_TAB_OFF:%.*]] = getelementptr [2 x i8], ptr [[TAB_OFF]], i64 [[TMP0]]
 ; CHECK-NEXT:    [[T:%.*]] = load i16, ptr [[GEP_TAB_OFF]], align 2
 ; CHECK-NEXT:    [[GEP_OUT:%.*]] = getelementptr inbounds i16, ptr [[OUT:%.*]], i64 [[IV]]
 ; CHECK-NEXT:    store i16 [[T]], ptr [[GEP_OUT]], align 2
@@ -53,13 +53,13 @@ exit:
 define void @arg_base(ptr %out, ptr %in, ptr %tab, i64 %n) {
 ; CHECK-LABEL: @arg_base(
 ; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[TAB_OFF:%.*]] = getelementptr i8, ptr [[TAB:%.*]], i64 512
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[GEP_IN:%.*]] = getelementptr inbounds i64, ptr [[IN:%.*]], i64 [[IV]]
 ; CHECK-NEXT:    [[IDX:%.*]] = load i64, ptr [[GEP_IN]], align 8
-; CHECK-NEXT:    [[GEP_TAB:%.*]] = getelementptr i32, ptr [[TAB:%.*]], i64 [[IDX]]
-; CHECK-NEXT:    [[GEP_TAB_OFF:%.*]] = getelementptr i8, ptr [[GEP_TAB]], i64 512
+; CHECK-NEXT:    [[GEP_TAB_OFF:%.*]] = getelementptr i32, ptr [[TAB_OFF]], i64 [[IDX]]
 ; CHECK-NEXT:    [[T:%.*]] = load i32, ptr [[GEP_TAB_OFF]], align 4
 ; CHECK-NEXT:    [[GEP_OUT:%.*]] = getelementptr inbounds i32, ptr [[OUT:%.*]], i64 [[IV]]
 ; CHECK-NEXT:    store i32 [[T]], ptr [[GEP_OUT]], align 4
@@ -93,13 +93,13 @@ exit:
 define void @load_and_store(ptr %in, ptr %tab, i64 %n) {
 ; CHECK-LABEL: @load_and_store(
 ; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[TAB_OFF:%.*]] = getelementptr i8, ptr [[TAB:%.*]], i64 -1
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[GEP_IN:%.*]] = getelementptr inbounds i64, ptr [[IN:%.*]], i64 [[IV]]
 ; CHECK-NEXT:    [[IDX:%.*]] = load i64, ptr [[GEP_IN]], align 8
-; CHECK-NEXT:    [[GEP_TAB:%.*]] = getelementptr i8, ptr [[TAB:%.*]], i64 [[IDX]]
-; CHECK-NEXT:    [[GEP_TAB_OFF:%.*]] = getelementptr i8, ptr [[GEP_TAB]], i64 -1
+; CHECK-NEXT:    [[GEP_TAB_OFF:%.*]] = getelementptr i8, ptr [[TAB_OFF]], i64 [[IDX]]
 ; CHECK-NEXT:    [[T:%.*]] = load i8, ptr [[GEP_TAB_OFF]], align 1
 ; CHECK-NEXT:    [[T_INC:%.*]] = add i8 [[T]], 1
 ; CHECK-NEXT:    store i8 [[T_INC]], ptr [[GEP_TAB_OFF]], align 1

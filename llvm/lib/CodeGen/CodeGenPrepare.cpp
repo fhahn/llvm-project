@@ -287,6 +287,8 @@ private:
   bool optimizeInst(Instruction *I, ModifyDT &ModifiedDT);
   bool optimizeMemoryInst(Instruction *MemoryInst, Value *Addr, Type *AccessTy,
                           unsigned AddrSpace);
+  bool hoistAddrOffsetToPreheader(Instruction *MemoryInst, Value *Addr,
+                                  Type *AccessTy, unsigned AddrSpace);
   bool optimizeGatherScatterInst(Instruction *MemoryInst, Value *Ptr);
   bool optimizeMulWithOverflow(Instruction *I, bool IsSigned,
                                ModifyDT &ModifiedDT);
@@ -5675,6 +5677,76 @@ static BasicBlock::iterator findInsertPos(Value *Addr, Instruction *MemoryInst,
   return Earliest->getIterator();
 }
 
+/// If \p Addr is (gep (gep Base, Index), Offset) in a loop with a
+/// loop-invariant Base, and the target can fold Base + Scale * Index, but not
+/// Base + Scale * Index + Offset, into an addressing mode, rewrite \p Addr to
+/// (gep (gep Base, Offset), Index) and hoist (gep Base, Offset) to the loop
+/// preheader. This removes the separate computation of Base + Scale * Index
+/// from the loop, so the inner GEP must not have other users.
+bool CodeGenPrepare::hoistAddrOffsetToPreheader(Instruction *MemoryInst,
+                                                Value *Addr, Type *AccessTy,
+                                                unsigned AddrSpace) {
+  auto *OffsetGEP = dyn_cast<GetElementPtrInst>(Addr);
+  if (!OffsetGEP)
+    return false;
+  auto *IndexGEP = dyn_cast<GetElementPtrInst>(OffsetGEP->getPointerOperand());
+  if (!IndexGEP || !IndexGEP->hasOneUse() || IndexGEP->getNumIndices() != 1)
+    return false;
+
+  Loop *L = LI->getLoopFor(MemoryInst->getParent());
+  if (!L || !L->getLoopPreheader())
+    return false;
+  Value *Base = IndexGEP->getPointerOperand();
+  Value *Index = IndexGEP->getOperand(1);
+  if (!L->isLoopInvariant(Base) || L->isLoopInvariant(Index))
+    return false;
+  // Addresses based on induction variables are formed by LSR, which already
+  // decided how to fold offsets.
+  auto *IndexPhi = dyn_cast<PHINode>(Index);
+  if (IndexPhi && IndexPhi->getParent() == L->getHeader())
+    return false;
+  // Base + Offset should replace Base in the loop, instead of adding another
+  // live register.
+  if (!isa<Constant>(Base) && any_of(Base->users(), [&](User *U) {
+        return U != IndexGEP && L->contains(cast<Instruction>(U));
+      }))
+    return false;
+
+  APInt Offset(DL->getIndexTypeSizeInBits(Addr->getType()), 0);
+  TypeSize Stride = DL->getTypeAllocSize(IndexGEP->getSourceElementType());
+  if (!OffsetGEP->accumulateConstantOffset(*DL, Offset) || Offset.isZero() ||
+      Offset.getSignificantBits() > 64 || Stride.isScalable())
+    return false;
+
+  TargetLowering::AddrMode AM;
+  AM.HasBaseReg = true;
+  AM.Scale = Stride.getFixedValue();
+  AM.BaseOffs = Offset.getSExtValue();
+  if (TLI->isLegalAddressingMode(*DL, AM, AccessTy, AddrSpace))
+    return false;
+  AM.BaseOffs = 0;
+  if (!TLI->isLegalAddressingMode(*DL, AM, AccessTy, AddrSpace))
+    return false;
+
+  // Create instructions directly, so that a constant Base is not folded into a
+  // constant expression that would be materialized in the loop again.
+  Instruction *NewBase = GetElementPtrInst::Create(
+      Type::getInt8Ty(Addr->getContext()), Base,
+      ConstantInt::get(Addr->getContext(), Offset), Base->getName() + ".off",
+      L->getLoopPreheader()->getTerminator()->getIterator());
+  Instruction *NewAddr =
+      GetElementPtrInst::Create(IndexGEP->getSourceElementType(), NewBase,
+                                Index, "", OffsetGEP->getIterator());
+  NewAddr->takeName(OffsetGEP);
+  OffsetGEP->replaceAllUsesWith(NewAddr);
+  resetIteratorIfInvalidatedWhileCalling(CurInstIterator->getParent(), [&]() {
+    RecursivelyDeleteTriviallyDeadInstructions(
+        OffsetGEP, TLInfo, nullptr,
+        [&](Value *V) { removeAllAssertingVHReferences(V); });
+  });
+  return true;
+}
+
 /// Sink addressing mode computation immediate before MemoryInst if doing so
 /// can be done without increasing register pressure.  The need for the
 /// register pressure constraint means this can end up being an all or nothing
@@ -5696,6 +5768,9 @@ static BasicBlock::iterator findInsertPos(Value *Addr, Instruction *MemoryInst,
 /// addressing mode computation from the fast path entirely.).
 bool CodeGenPrepare::optimizeMemoryInst(Instruction *MemoryInst, Value *Addr,
                                         Type *AccessTy, unsigned AddrSpace) {
+  if (hoistAddrOffsetToPreheader(MemoryInst, Addr, AccessTy, AddrSpace))
+    return true;
+
   Value *Repl = Addr;
 
   // Try to collapse single-value PHI nodes.  This is necessary to undo
