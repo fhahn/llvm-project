@@ -56,8 +56,8 @@ define i64 @test(i64 %p1, i64 %p2, i64 %p3, i64 %p4) {
 ; CHECK-PWR9-NEXT:    .cfi_offset v30, -320
 ; CHECK-PWR9-NEXT:    .cfi_offset v31, -304
 ; CHECK-PWR9-NEXT:    std r14, 240(r1) # 8-byte Folded Spill
-; CHECK-PWR9-NEXT:    std r15, 248(r1) # 8-byte Folded Spill
 ; CHECK-PWR9-NEXT:    stxv v20, 48(r1) # 16-byte Folded Spill
+; CHECK-PWR9-NEXT:    std r15, 248(r1) # 8-byte Folded Spill
 ; CHECK-PWR9-NEXT:    stxv v21, 64(r1) # 16-byte Folded Spill
 ; CHECK-PWR9-NEXT:    std r16, 256(r1) # 8-byte Folded Spill
 ; CHECK-PWR9-NEXT:    stxv v22, 80(r1) # 16-byte Folded Spill
@@ -110,9 +110,9 @@ define i64 @test(i64 %p1, i64 %p2, i64 %p3, i64 %p4) {
 ; CHECK-PWR9-NEXT:    #NO_APP
 ; CHECK-PWR9-NEXT:    ld r3, 40(r1) # 8-byte Folded Reload
 ; CHECK-PWR9-NEXT:    ld r4, 32(r1) # 8-byte Folded Reload
+; CHECK-PWR9-NEXT:    add r3, r4, r3
 ; CHECK-PWR9-NEXT:    lxv v31, 224(r1) # 16-byte Folded Reload
 ; CHECK-PWR9-NEXT:    lxv v30, 208(r1) # 16-byte Folded Reload
-; CHECK-PWR9-NEXT:    add r3, r4, r3
 ; CHECK-PWR9-NEXT:    lxv v29, 192(r1) # 16-byte Folded Reload
 ; CHECK-PWR9-NEXT:    lxv v28, 176(r1) # 16-byte Folded Reload
 ; CHECK-PWR9-NEXT:    lxv v27, 160(r1) # 16-byte Folded Reload
@@ -127,8 +127,8 @@ define i64 @test(i64 %p1, i64 %p2, i64 %p3, i64 %p4) {
 ; CHECK-PWR9-NEXT:    lfd f30, 512(r1) # 8-byte Folded Reload
 ; CHECK-PWR9-NEXT:    lfd f29, 504(r1) # 8-byte Folded Reload
 ; CHECK-PWR9-NEXT:    lfd f28, 496(r1) # 8-byte Folded Reload
-; CHECK-PWR9-NEXT:    lfd f27, 488(r1) # 8-byte Folded Reload
 ; CHECK-PWR9-NEXT:    ld r31, 376(r1) # 8-byte Folded Reload
+; CHECK-PWR9-NEXT:    lfd f27, 488(r1) # 8-byte Folded Reload
 ; CHECK-PWR9-NEXT:    ld r30, 368(r1) # 8-byte Folded Reload
 ; CHECK-PWR9-NEXT:    ld r29, 360(r1) # 8-byte Folded Reload
 ; CHECK-PWR9-NEXT:    ld r28, 352(r1) # 8-byte Folded Reload

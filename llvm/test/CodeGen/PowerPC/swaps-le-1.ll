@@ -225,7 +225,6 @@ define void @foo() {
 ; NOOPTSWAP-P9-NEXT:    addis 5, 2, .LC1@toc@ha
 ; NOOPTSWAP-P9-NEXT:    addis 6, 2, .LC2@toc@ha
 ; NOOPTSWAP-P9-NEXT:    addis 7, 2, .LC3@toc@ha
-; NOOPTSWAP-P9-NEXT:    std 30, -16(1) # 8-byte Folded Spill
 ; NOOPTSWAP-P9-NEXT:    ld 4, .LC0@toc@l(4)
 ; NOOPTSWAP-P9-NEXT:    li 3, 256
 ; NOOPTSWAP-P9-NEXT:    ld 5, .LC1@toc@l(5)
@@ -240,35 +239,35 @@ define void @foo() {
 ; NOOPTSWAP-P9-NEXT:  .LBB0_1: # %vector.body
 ; NOOPTSWAP-P9-NEXT:    #
 ; NOOPTSWAP-P9-NEXT:    lxvd2x 0, 4, 3
-; NOOPTSWAP-P9-NEXT:    lxvd2x 1, 5, 3
-; NOOPTSWAP-P9-NEXT:    lxvd2x 2, 6, 3
-; NOOPTSWAP-P9-NEXT:    add 12, 5, 3
 ; NOOPTSWAP-P9-NEXT:    add 11, 4, 3
-; NOOPTSWAP-P9-NEXT:    add 30, 6, 3
-; NOOPTSWAP-P9-NEXT:    lxvd2x 3, 11, 8
+; NOOPTSWAP-P9-NEXT:    add 12, 5, 3
 ; NOOPTSWAP-P9-NEXT:    xxswapd 34, 0
-; NOOPTSWAP-P9-NEXT:    xxswapd 35, 1
-; NOOPTSWAP-P9-NEXT:    lxvd2x 0, 12, 8
-; NOOPTSWAP-P9-NEXT:    xxswapd 36, 2
-; NOOPTSWAP-P9-NEXT:    lxvd2x 1, 11, 9
+; NOOPTSWAP-P9-NEXT:    lxvd2x 0, 5, 3
+; NOOPTSWAP-P9-NEXT:    xxswapd 35, 0
+; NOOPTSWAP-P9-NEXT:    lxvd2x 0, 6, 3
+; NOOPTSWAP-P9-NEXT:    xxswapd 36, 0
+; NOOPTSWAP-P9-NEXT:    lxvd2x 0, 11, 8
 ; NOOPTSWAP-P9-NEXT:    vadduwm 2, 3, 2
-; NOOPTSWAP-P9-NEXT:    xxswapd 35, 3
 ; NOOPTSWAP-P9-NEXT:    vmuluwm 2, 2, 4
+; NOOPTSWAP-P9-NEXT:    xxswapd 37, 0
+; NOOPTSWAP-P9-NEXT:    lxvd2x 0, 12, 8
+; NOOPTSWAP-P9-NEXT:    xxswapd 35, 0
+; NOOPTSWAP-P9-NEXT:    lxvd2x 0, 11, 9
+; NOOPTSWAP-P9-NEXT:    vadduwm 3, 3, 5
 ; NOOPTSWAP-P9-NEXT:    xxswapd 36, 0
 ; NOOPTSWAP-P9-NEXT:    lxvd2x 0, 12, 9
-; NOOPTSWAP-P9-NEXT:    vadduwm 3, 4, 3
-; NOOPTSWAP-P9-NEXT:    xxswapd 36, 1
-; NOOPTSWAP-P9-NEXT:    lxvd2x 1, 12, 10
 ; NOOPTSWAP-P9-NEXT:    xxswapd 37, 0
 ; NOOPTSWAP-P9-NEXT:    lxvd2x 0, 11, 10
-; NOOPTSWAP-P9-NEXT:    add 11, 7, 3
+; NOOPTSWAP-P9-NEXT:    add 11, 6, 3
 ; NOOPTSWAP-P9-NEXT:    vadduwm 4, 5, 4
-; NOOPTSWAP-P9-NEXT:    xxswapd 32, 1
-; NOOPTSWAP-P9-NEXT:    xxswapd 37, 0
-; NOOPTSWAP-P9-NEXT:    lxvd2x 0, 30, 8
-; NOOPTSWAP-P9-NEXT:    vadduwm 5, 0, 5
 ; NOOPTSWAP-P9-NEXT:    xxswapd 32, 0
-; NOOPTSWAP-P9-NEXT:    lxvd2x 0, 30, 9
+; NOOPTSWAP-P9-NEXT:    lxvd2x 0, 12, 10
+; NOOPTSWAP-P9-NEXT:    add 12, 7, 3
+; NOOPTSWAP-P9-NEXT:    xxswapd 37, 0
+; NOOPTSWAP-P9-NEXT:    lxvd2x 0, 11, 8
+; NOOPTSWAP-P9-NEXT:    vadduwm 5, 5, 0
+; NOOPTSWAP-P9-NEXT:    xxswapd 32, 0
+; NOOPTSWAP-P9-NEXT:    lxvd2x 0, 11, 9
 ; NOOPTSWAP-P9-NEXT:    vmuluwm 3, 3, 0
 ; NOOPTSWAP-P9-NEXT:    xxswapd 32, 0
 ; NOOPTSWAP-P9-NEXT:    xxswapd 0, 34
@@ -276,17 +275,16 @@ define void @foo() {
 ; NOOPTSWAP-P9-NEXT:    stxvd2x 0, 7, 3
 ; NOOPTSWAP-P9-NEXT:    addi 3, 3, 64
 ; NOOPTSWAP-P9-NEXT:    xxswapd 1, 35
-; NOOPTSWAP-P9-NEXT:    stxvd2x 1, 11, 8
+; NOOPTSWAP-P9-NEXT:    stxvd2x 1, 12, 8
 ; NOOPTSWAP-P9-NEXT:    xxswapd 0, 36
-; NOOPTSWAP-P9-NEXT:    stxvd2x 0, 11, 9
-; NOOPTSWAP-P9-NEXT:    lxvd2x 0, 30, 10
+; NOOPTSWAP-P9-NEXT:    stxvd2x 0, 12, 9
+; NOOPTSWAP-P9-NEXT:    lxvd2x 0, 11, 10
 ; NOOPTSWAP-P9-NEXT:    xxswapd 34, 0
 ; NOOPTSWAP-P9-NEXT:    vmuluwm 2, 5, 2
 ; NOOPTSWAP-P9-NEXT:    xxswapd 0, 34
-; NOOPTSWAP-P9-NEXT:    stxvd2x 0, 11, 10
+; NOOPTSWAP-P9-NEXT:    stxvd2x 0, 12, 10
 ; NOOPTSWAP-P9-NEXT:    bdnz .LBB0_1
 ; NOOPTSWAP-P9-NEXT:  # %bb.2: # %for.end
-; NOOPTSWAP-P9-NEXT:    ld 30, -16(1) # 8-byte Folded Reload
 ; NOOPTSWAP-P9-NEXT:    blr
 entry:
   br label %vector.body

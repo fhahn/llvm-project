@@ -226,6 +226,7 @@ define b231 @test_bitinsert_b231_var(b231 %base, i32 %val, i32 %off) {
 ; CHECK-NEXT:    clrldi 7, 7, 32
 ; CHECK-NEXT:    li 0, 0
 ; CHECK-NEXT:    rldic 29, 9, 0, 32
+; CHECK-NEXT:    rldic 9, 9, 0, 25
 ; CHECK-NEXT:    std 28, -32(1) # 8-byte Folded Spill
 ; CHECK-NEXT:    rlwinm 28, 8, 29, 27, 28
 ; CHECK-NEXT:    std 24, -64(1) # 8-byte Folded Spill
@@ -238,11 +239,10 @@ define b231 @test_bitinsert_b231_var(b231 %base, i32 %val, i32 %off) {
 ; CHECK-NEXT:    stxvw4x 0, 30, 12
 ; CHECK-NEXT:    stxvw4x 0, 0, 11
 ; CHECK-NEXT:    clrlwi 8, 8, 26
-; CHECK-NEXT:    mr 10, 28
 ; CHECK-NEXT:    stxvw4x 0, 0, 30
 ; CHECK-NEXT:    std 0, -176(1)
+; CHECK-NEXT:    mr 10, 28
 ; CHECK-NEXT:    subfic 27, 8, 64
-; CHECK-NEXT:    rldic 9, 9, 0, 25
 ; CHECK-NEXT:    std 7, -168(1)
 ; CHECK-NEXT:    std 0, -112(1)
 ; CHECK-NEXT:    std 29, -104(1)
@@ -253,11 +253,11 @@ define b231 @test_bitinsert_b231_var(b231 %base, i32 %val, i32 %off) {
 ; CHECK-NEXT:    ld 30, 16(10)
 ; CHECK-NEXT:    srd 26, 0, 27
 ; CHECK-NEXT:    sld 25, 12, 8
+; CHECK-NEXT:    srd 24, 30, 27
+; CHECK-NEXT:    sld 30, 30, 8
 ; CHECK-NEXT:    ld 29, 8(10)
 ; CHECK-NEXT:    ld 10, 24(10)
 ; CHECK-NEXT:    ld 28, 24(28)
-; CHECK-NEXT:    srd 24, 30, 27
-; CHECK-NEXT:    sld 30, 30, 8
 ; CHECK-NEXT:    sld 7, 7, 8
 ; CHECK-NEXT:    or 26, 25, 26
 ; CHECK-NEXT:    srd 12, 12, 27
@@ -579,6 +579,7 @@ define b231 @test_bitinsert_val_b123_into_b231_var(b231 %base, b123 %val, i32 %o
 ; CHECK-NEXT:    rldic 28, 10, 0, 5
 ; CHECK-NEXT:    std 27, -40(1) # 8-byte Folded Spill
 ; CHECK-NEXT:    rlwinm 27, 9, 29, 27, 28
+; CHECK-NEXT:    clrlwi 9, 9, 26
 ; CHECK-NEXT:    std 24, -64(1) # 8-byte Folded Spill
 ; CHECK-NEXT:    std 25, -56(1) # 8-byte Folded Spill
 ; CHECK-NEXT:    std 26, -48(1) # 8-byte Folded Spill
@@ -587,7 +588,6 @@ define b231 @test_bitinsert_val_b123_into_b231_var(b231 %base, b123 %val, i32 %o
 ; CHECK-NEXT:    stxvw4x 0, 30, 11
 ; CHECK-NEXT:    stxvw4x 0, 30, 0
 ; CHECK-NEXT:    stxvw4x 0, 0, 12
-; CHECK-NEXT:    clrlwi 9, 9, 26
 ; CHECK-NEXT:    mr 11, 27
 ; CHECK-NEXT:    stxvw4x 0, 0, 30
 ; CHECK-NEXT:    std 8, -168(1)
@@ -603,12 +603,12 @@ define b231 @test_bitinsert_val_b123_into_b231_var(b231 %base, b123 %val, i32 %o
 ; CHECK-NEXT:    ld 29, 8(11)
 ; CHECK-NEXT:    srd 26, 0, 28
 ; CHECK-NEXT:    sld 25, 8, 9
-; CHECK-NEXT:    ld 11, 24(11)
-; CHECK-NEXT:    ld 27, 24(27)
 ; CHECK-NEXT:    srd 24, 30, 28
 ; CHECK-NEXT:    sld 30, 30, 9
 ; CHECK-NEXT:    sld 0, 0, 9
 ; CHECK-NEXT:    sld 7, 7, 9
+; CHECK-NEXT:    ld 11, 24(11)
+; CHECK-NEXT:    ld 27, 24(27)
 ; CHECK-NEXT:    or 26, 25, 26
 ; CHECK-NEXT:    srd 8, 8, 28
 ; CHECK-NEXT:    or 7, 7, 8

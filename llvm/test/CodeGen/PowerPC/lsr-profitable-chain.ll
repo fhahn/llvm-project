@@ -61,9 +61,9 @@ define void @foo(ptr readonly %0, ptr %1, i64 %2, i64 %3, i64 %4, i64 %5, i64 %6
 ; CHECK-NEXT:  .LBB0_5: # Parent Loop BB0_3 Depth=1
 ; CHECK-NEXT:    # => This Inner Loop Header: Depth=2
 ; CHECK-NEXT:    lfd 0, 0(26)
-; CHECK-NEXT:    lfd 1, 0(23)
 ; CHECK-NEXT:    add 6, 6, 10
 ; CHECK-NEXT:    cmpd 6, 27
+; CHECK-NEXT:    lfd 1, 0(23)
 ; CHECK-NEXT:    xsadddp 0, 0, 1
 ; CHECK-NEXT:    lfd 1, 8(23)
 ; CHECK-NEXT:    xsadddp 0, 0, 1

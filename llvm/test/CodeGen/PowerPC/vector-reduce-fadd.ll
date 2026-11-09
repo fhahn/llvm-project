@@ -564,45 +564,45 @@ define dso_local float @v16f32(<16 x float> %a) local_unnamed_addr #0 {
 ; PWR9LE-LABEL: v16f32:
 ; PWR9LE:       # %bb.0: # %entry
 ; PWR9LE-NEXT:    xxsldwi vs0, v2, v2, 3
-; PWR9LE-NEXT:    xxswapd vs1, v2
+; PWR9LE-NEXT:    xscvspdpn f2, v2
+; PWR9LE-NEXT:    xscvspdpn f3, v3
+; PWR9LE-NEXT:    xscvspdpn f4, v4
 ; PWR9LE-NEXT:    xscvspdpn f0, vs0
+; PWR9LE-NEXT:    xxswapd vs1, v2
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
 ; PWR9LE-NEXT:    xsaddsp f0, f0, f1
 ; PWR9LE-NEXT:    xxsldwi vs1, v2, v2, 1
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
 ; PWR9LE-NEXT:    xsaddsp f0, f0, f1
-; PWR9LE-NEXT:    xscvspdpn f1, v2
-; PWR9LE-NEXT:    xsaddsp f0, f0, f1
+; PWR9LE-NEXT:    xsaddsp f0, f0, f2
 ; PWR9LE-NEXT:    xxsldwi vs1, v3, v3, 3
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
 ; PWR9LE-NEXT:    xsaddsp f0, f0, f1
-; PWR9LE-NEXT:    xxswapd vs1, v3
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
-; PWR9LE-NEXT:    xsaddsp f0, f0, f1
+; PWR9LE-NEXT:    xxswapd vs2, v3
+; PWR9LE-NEXT:    xscvspdpn f2, vs2
+; PWR9LE-NEXT:    xsaddsp f0, f0, f2
 ; PWR9LE-NEXT:    xxsldwi vs1, v3, v3, 1
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
 ; PWR9LE-NEXT:    xsaddsp f0, f0, f1
-; PWR9LE-NEXT:    xscvspdpn f1, v3
-; PWR9LE-NEXT:    xsaddsp f0, f0, f1
-; PWR9LE-NEXT:    xxsldwi vs1, v4, v4, 3
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
-; PWR9LE-NEXT:    xsaddsp f0, f0, f1
+; PWR9LE-NEXT:    xsaddsp f0, f0, f3
+; PWR9LE-NEXT:    xxsldwi vs2, v4, v4, 3
+; PWR9LE-NEXT:    xscvspdpn f2, vs2
+; PWR9LE-NEXT:    xsaddsp f0, f0, f2
 ; PWR9LE-NEXT:    xxswapd vs1, v4
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
 ; PWR9LE-NEXT:    xsaddsp f0, f0, f1
-; PWR9LE-NEXT:    xxsldwi vs1, v4, v4, 1
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
-; PWR9LE-NEXT:    xsaddsp f0, f0, f1
-; PWR9LE-NEXT:    xscvspdpn f1, v4
-; PWR9LE-NEXT:    xsaddsp f0, f0, f1
-; PWR9LE-NEXT:    xxsldwi vs1, v5, v5, 3
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
-; PWR9LE-NEXT:    xsaddsp f0, f0, f1
+; PWR9LE-NEXT:    xxsldwi vs3, v4, v4, 1
+; PWR9LE-NEXT:    xscvspdpn f3, vs3
+; PWR9LE-NEXT:    xsaddsp f0, f0, f3
+; PWR9LE-NEXT:    xsaddsp f0, f0, f4
+; PWR9LE-NEXT:    xxsldwi vs2, v5, v5, 3
+; PWR9LE-NEXT:    xscvspdpn f2, vs2
+; PWR9LE-NEXT:    xsaddsp f0, f0, f2
 ; PWR9LE-NEXT:    xxswapd vs1, v5
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
 ; PWR9LE-NEXT:    xsaddsp f0, f0, f1
-; PWR9LE-NEXT:    xxsldwi vs1, v5, v5, 1
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
+; PWR9LE-NEXT:    xxsldwi vs3, v5, v5, 1
+; PWR9LE-NEXT:    xscvspdpn f1, vs3
 ; PWR9LE-NEXT:    xsaddsp f0, f0, f1
 ; PWR9LE-NEXT:    xscvspdpn f1, v5
 ; PWR9LE-NEXT:    xsaddsp f1, f0, f1
@@ -610,48 +610,48 @@ define dso_local float @v16f32(<16 x float> %a) local_unnamed_addr #0 {
 ;
 ; PWR9BE-LABEL: v16f32:
 ; PWR9BE:       # %bb.0: # %entry
-; PWR9BE-NEXT:    xxsldwi vs1, v2, v2, 1
-; PWR9BE-NEXT:    xscvspdpn f0, v2
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
-; PWR9BE-NEXT:    xsaddsp f0, f0, f1
+; PWR9BE-NEXT:    xxsldwi vs0, v2, v2, 1
+; PWR9BE-NEXT:    xscvspdpn f1, v2
+; PWR9BE-NEXT:    xscvspdpn f4, v4
+; PWR9BE-NEXT:    xscvspdpn f0, vs0
+; PWR9BE-NEXT:    xsaddsp f0, f1, f0
 ; PWR9BE-NEXT:    xxswapd vs1, v2
 ; PWR9BE-NEXT:    xscvspdpn f1, vs1
 ; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v2, v2, 3
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
-; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xscvspdpn f1, v3
-; PWR9BE-NEXT:    xsaddsp f0, f0, f1
+; PWR9BE-NEXT:    xxsldwi vs2, v2, v2, 3
+; PWR9BE-NEXT:    xscvspdpn f2, vs2
+; PWR9BE-NEXT:    xsaddsp f0, f0, f2
+; PWR9BE-NEXT:    xscvspdpn f2, v3
+; PWR9BE-NEXT:    xsaddsp f0, f0, f2
 ; PWR9BE-NEXT:    xxsldwi vs1, v3, v3, 1
 ; PWR9BE-NEXT:    xscvspdpn f1, vs1
 ; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xxswapd vs1, v3
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
-; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v3, v3, 3
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
-; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xscvspdpn f1, v4
-; PWR9BE-NEXT:    xsaddsp f0, f0, f1
+; PWR9BE-NEXT:    xxswapd vs2, v3
+; PWR9BE-NEXT:    xscvspdpn f2, vs2
+; PWR9BE-NEXT:    xsaddsp f0, f0, f2
+; PWR9BE-NEXT:    xxsldwi vs3, v3, v3, 3
+; PWR9BE-NEXT:    xscvspdpn f3, vs3
+; PWR9BE-NEXT:    xsaddsp f0, f0, f3
+; PWR9BE-NEXT:    xsaddsp f0, f0, f4
 ; PWR9BE-NEXT:    xxsldwi vs1, v4, v4, 1
 ; PWR9BE-NEXT:    xscvspdpn f1, vs1
 ; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xxswapd vs1, v4
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
-; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v4, v4, 3
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
-; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xscvspdpn f1, v5
-; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v5, v5, 1
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
-; PWR9BE-NEXT:    xsaddsp f0, f0, f1
+; PWR9BE-NEXT:    xxswapd vs2, v4
+; PWR9BE-NEXT:    xscvspdpn f2, vs2
+; PWR9BE-NEXT:    xsaddsp f0, f0, f2
+; PWR9BE-NEXT:    xxsldwi vs3, v4, v4, 3
+; PWR9BE-NEXT:    xscvspdpn f3, vs3
+; PWR9BE-NEXT:    xsaddsp f0, f0, f3
+; PWR9BE-NEXT:    xscvspdpn f3, v5
+; PWR9BE-NEXT:    xsaddsp f0, f0, f3
+; PWR9BE-NEXT:    xxsldwi vs4, v5, v5, 1
+; PWR9BE-NEXT:    xscvspdpn f3, vs4
+; PWR9BE-NEXT:    xsaddsp f0, f0, f3
 ; PWR9BE-NEXT:    xxswapd vs1, v5
 ; PWR9BE-NEXT:    xscvspdpn f1, vs1
 ; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v5, v5, 3
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
+; PWR9BE-NEXT:    xxsldwi vs2, v5, v5, 3
+; PWR9BE-NEXT:    xscvspdpn f1, vs2
 ; PWR9BE-NEXT:    xsaddsp f1, f0, f1
 ; PWR9BE-NEXT:    blr
 ;
@@ -757,6 +757,9 @@ define dso_local float @v16f32_b(<16 x float> %a, float %b) local_unnamed_addr #
 ; PWR9LE-LABEL: v16f32_b:
 ; PWR9LE:       # %bb.0: # %entry
 ; PWR9LE-NEXT:    xxsldwi vs0, v2, v2, 3
+; PWR9LE-NEXT:    xscvspdpn f2, v2
+; PWR9LE-NEXT:    xscvspdpn f3, v3
+; PWR9LE-NEXT:    xscvspdpn f4, v4
 ; PWR9LE-NEXT:    xscvspdpn f0, vs0
 ; PWR9LE-NEXT:    xsaddsp f0, f1, f0
 ; PWR9LE-NEXT:    xxswapd vs1, v2
@@ -765,38 +768,35 @@ define dso_local float @v16f32_b(<16 x float> %a, float %b) local_unnamed_addr #
 ; PWR9LE-NEXT:    xxsldwi vs1, v2, v2, 1
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
 ; PWR9LE-NEXT:    xsaddsp f0, f0, f1
-; PWR9LE-NEXT:    xscvspdpn f1, v2
-; PWR9LE-NEXT:    xsaddsp f0, f0, f1
+; PWR9LE-NEXT:    xsaddsp f0, f0, f2
 ; PWR9LE-NEXT:    xxsldwi vs1, v3, v3, 3
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
 ; PWR9LE-NEXT:    xsaddsp f0, f0, f1
-; PWR9LE-NEXT:    xxswapd vs1, v3
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
-; PWR9LE-NEXT:    xsaddsp f0, f0, f1
+; PWR9LE-NEXT:    xxswapd vs2, v3
+; PWR9LE-NEXT:    xscvspdpn f2, vs2
+; PWR9LE-NEXT:    xsaddsp f0, f0, f2
 ; PWR9LE-NEXT:    xxsldwi vs1, v3, v3, 1
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
 ; PWR9LE-NEXT:    xsaddsp f0, f0, f1
-; PWR9LE-NEXT:    xscvspdpn f1, v3
-; PWR9LE-NEXT:    xsaddsp f0, f0, f1
-; PWR9LE-NEXT:    xxsldwi vs1, v4, v4, 3
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
-; PWR9LE-NEXT:    xsaddsp f0, f0, f1
+; PWR9LE-NEXT:    xsaddsp f0, f0, f3
+; PWR9LE-NEXT:    xxsldwi vs2, v4, v4, 3
+; PWR9LE-NEXT:    xscvspdpn f2, vs2
+; PWR9LE-NEXT:    xsaddsp f0, f0, f2
 ; PWR9LE-NEXT:    xxswapd vs1, v4
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
 ; PWR9LE-NEXT:    xsaddsp f0, f0, f1
-; PWR9LE-NEXT:    xxsldwi vs1, v4, v4, 1
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
-; PWR9LE-NEXT:    xsaddsp f0, f0, f1
-; PWR9LE-NEXT:    xscvspdpn f1, v4
-; PWR9LE-NEXT:    xsaddsp f0, f0, f1
-; PWR9LE-NEXT:    xxsldwi vs1, v5, v5, 3
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
-; PWR9LE-NEXT:    xsaddsp f0, f0, f1
+; PWR9LE-NEXT:    xxsldwi vs3, v4, v4, 1
+; PWR9LE-NEXT:    xscvspdpn f3, vs3
+; PWR9LE-NEXT:    xsaddsp f0, f0, f3
+; PWR9LE-NEXT:    xsaddsp f0, f0, f4
+; PWR9LE-NEXT:    xxsldwi vs2, v5, v5, 3
+; PWR9LE-NEXT:    xscvspdpn f2, vs2
+; PWR9LE-NEXT:    xsaddsp f0, f0, f2
 ; PWR9LE-NEXT:    xxswapd vs1, v5
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
 ; PWR9LE-NEXT:    xsaddsp f0, f0, f1
-; PWR9LE-NEXT:    xxsldwi vs1, v5, v5, 1
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
+; PWR9LE-NEXT:    xxsldwi vs3, v5, v5, 1
+; PWR9LE-NEXT:    xscvspdpn f1, vs3
 ; PWR9LE-NEXT:    xsaddsp f0, f0, f1
 ; PWR9LE-NEXT:    xscvspdpn f1, v5
 ; PWR9LE-NEXT:    xsaddsp f1, f0, f1
@@ -805,48 +805,48 @@ define dso_local float @v16f32_b(<16 x float> %a, float %b) local_unnamed_addr #
 ; PWR9BE-LABEL: v16f32_b:
 ; PWR9BE:       # %bb.0: # %entry
 ; PWR9BE-NEXT:    xscvspdpn f0, v2
+; PWR9BE-NEXT:    xxsldwi vs2, v2, v2, 3
+; PWR9BE-NEXT:    xscvspdpn f4, v4
 ; PWR9BE-NEXT:    xsaddsp f0, f1, f0
+; PWR9BE-NEXT:    xscvspdpn f2, vs2
 ; PWR9BE-NEXT:    xxsldwi vs1, v2, v2, 1
 ; PWR9BE-NEXT:    xscvspdpn f1, vs1
 ; PWR9BE-NEXT:    xsaddsp f0, f0, f1
 ; PWR9BE-NEXT:    xxswapd vs1, v2
 ; PWR9BE-NEXT:    xscvspdpn f1, vs1
 ; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v2, v2, 3
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
-; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xscvspdpn f1, v3
-; PWR9BE-NEXT:    xsaddsp f0, f0, f1
+; PWR9BE-NEXT:    xsaddsp f0, f0, f2
+; PWR9BE-NEXT:    xscvspdpn f2, v3
+; PWR9BE-NEXT:    xsaddsp f0, f0, f2
 ; PWR9BE-NEXT:    xxsldwi vs1, v3, v3, 1
 ; PWR9BE-NEXT:    xscvspdpn f1, vs1
 ; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xxswapd vs1, v3
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
-; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v3, v3, 3
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
-; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xscvspdpn f1, v4
-; PWR9BE-NEXT:    xsaddsp f0, f0, f1
+; PWR9BE-NEXT:    xxswapd vs2, v3
+; PWR9BE-NEXT:    xscvspdpn f2, vs2
+; PWR9BE-NEXT:    xsaddsp f0, f0, f2
+; PWR9BE-NEXT:    xxsldwi vs3, v3, v3, 3
+; PWR9BE-NEXT:    xscvspdpn f3, vs3
+; PWR9BE-NEXT:    xsaddsp f0, f0, f3
+; PWR9BE-NEXT:    xsaddsp f0, f0, f4
 ; PWR9BE-NEXT:    xxsldwi vs1, v4, v4, 1
 ; PWR9BE-NEXT:    xscvspdpn f1, vs1
 ; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xxswapd vs1, v4
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
-; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v4, v4, 3
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
-; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xscvspdpn f1, v5
-; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v5, v5, 1
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
-; PWR9BE-NEXT:    xsaddsp f0, f0, f1
+; PWR9BE-NEXT:    xxswapd vs2, v4
+; PWR9BE-NEXT:    xscvspdpn f2, vs2
+; PWR9BE-NEXT:    xsaddsp f0, f0, f2
+; PWR9BE-NEXT:    xxsldwi vs3, v4, v4, 3
+; PWR9BE-NEXT:    xscvspdpn f3, vs3
+; PWR9BE-NEXT:    xsaddsp f0, f0, f3
+; PWR9BE-NEXT:    xscvspdpn f3, v5
+; PWR9BE-NEXT:    xsaddsp f0, f0, f3
+; PWR9BE-NEXT:    xxsldwi vs4, v5, v5, 1
+; PWR9BE-NEXT:    xscvspdpn f3, vs4
+; PWR9BE-NEXT:    xsaddsp f0, f0, f3
 ; PWR9BE-NEXT:    xxswapd vs1, v5
 ; PWR9BE-NEXT:    xscvspdpn f1, vs1
 ; PWR9BE-NEXT:    xsaddsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v5, v5, 3
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
+; PWR9BE-NEXT:    xxsldwi vs2, v5, v5, 3
+; PWR9BE-NEXT:    xscvspdpn f1, vs2
 ; PWR9BE-NEXT:    xsaddsp f1, f0, f1
 ; PWR9BE-NEXT:    blr
 ;
@@ -1696,112 +1696,112 @@ entry:
 define dso_local double @v32f64(<32 x double> %a) local_unnamed_addr #0 {
 ; PWR9LE-LABEL: v32f64:
 ; PWR9LE:       # %bb.0: # %entry
-; PWR9LE-NEXT:    xxswapd vs4, v2
-; PWR9LE-NEXT:    xxswapd vs5, v3
-; PWR9LE-NEXT:    lxv vs3, 224(r1)
-; PWR9LE-NEXT:    lxv vs2, 240(r1)
-; PWR9LE-NEXT:    lxv vs1, 256(r1)
-; PWR9LE-NEXT:    lxv vs0, 272(r1)
-; PWR9LE-NEXT:    xsadddp f4, f4, v2
-; PWR9LE-NEXT:    xsadddp f4, f4, f5
-; PWR9LE-NEXT:    xxswapd vs5, v4
-; PWR9LE-NEXT:    xsadddp f4, f4, v3
-; PWR9LE-NEXT:    xsadddp f4, f4, f5
-; PWR9LE-NEXT:    xxswapd vs5, v5
-; PWR9LE-NEXT:    xsadddp f4, f4, v4
-; PWR9LE-NEXT:    xsadddp f4, f4, f5
-; PWR9LE-NEXT:    xxswapd vs5, v6
-; PWR9LE-NEXT:    xsadddp f4, f4, v5
-; PWR9LE-NEXT:    xsadddp f4, f4, f5
+; PWR9LE-NEXT:    xxswapd vs0, v2
+; PWR9LE-NEXT:    xsadddp f0, f0, v2
+; PWR9LE-NEXT:    xxswapd vs1, v3
+; PWR9LE-NEXT:    xsadddp f0, f0, f1
+; PWR9LE-NEXT:    xsadddp f0, f0, v3
+; PWR9LE-NEXT:    xxswapd vs2, v4
+; PWR9LE-NEXT:    xsadddp f0, f0, f2
+; PWR9LE-NEXT:    xsadddp f0, f0, v4
+; PWR9LE-NEXT:    xxswapd vs3, v5
+; PWR9LE-NEXT:    xsadddp f0, f0, f3
+; PWR9LE-NEXT:    xsadddp f0, f0, v5
+; PWR9LE-NEXT:    xxswapd vs4, v6
+; PWR9LE-NEXT:    xsadddp f0, f0, f4
+; PWR9LE-NEXT:    lxv vs4, 224(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v6
 ; PWR9LE-NEXT:    xxswapd vs5, v7
-; PWR9LE-NEXT:    xsadddp f4, f4, v6
-; PWR9LE-NEXT:    xsadddp f4, f4, f5
-; PWR9LE-NEXT:    xxswapd vs5, v8
-; PWR9LE-NEXT:    xsadddp f4, f4, v7
-; PWR9LE-NEXT:    xsadddp f4, f4, f5
-; PWR9LE-NEXT:    xxswapd vs5, v9
-; PWR9LE-NEXT:    xsadddp f4, f4, v8
-; PWR9LE-NEXT:    xsadddp f4, f4, f5
-; PWR9LE-NEXT:    xxswapd vs5, v10
-; PWR9LE-NEXT:    xsadddp f4, f4, v9
-; PWR9LE-NEXT:    xsadddp f4, f4, f5
-; PWR9LE-NEXT:    xxswapd vs5, v11
-; PWR9LE-NEXT:    xsadddp f4, f4, v10
-; PWR9LE-NEXT:    xsadddp f4, f4, f5
-; PWR9LE-NEXT:    xxswapd vs5, v12
-; PWR9LE-NEXT:    xsadddp f4, f4, v11
-; PWR9LE-NEXT:    xsadddp f4, f4, f5
-; PWR9LE-NEXT:    xxswapd vs5, v13
-; PWR9LE-NEXT:    xsadddp f4, f4, v12
-; PWR9LE-NEXT:    xsadddp f4, f4, f5
-; PWR9LE-NEXT:    xxswapd vs5, vs3
-; PWR9LE-NEXT:    xsadddp f4, f4, v13
-; PWR9LE-NEXT:    xsadddp f4, f4, f5
-; PWR9LE-NEXT:    xsadddp f3, f4, f3
-; PWR9LE-NEXT:    xxswapd vs4, vs2
-; PWR9LE-NEXT:    xsadddp f3, f3, f4
-; PWR9LE-NEXT:    xsadddp f2, f3, f2
-; PWR9LE-NEXT:    xxswapd vs3, vs1
-; PWR9LE-NEXT:    xsadddp f2, f2, f3
-; PWR9LE-NEXT:    xsadddp f1, f2, f1
-; PWR9LE-NEXT:    xxswapd vs2, vs0
-; PWR9LE-NEXT:    xsadddp f1, f1, f2
-; PWR9LE-NEXT:    xsadddp f1, f1, f0
+; PWR9LE-NEXT:    xsadddp f0, f0, f5
+; PWR9LE-NEXT:    lxv vs5, 240(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v7
+; PWR9LE-NEXT:    xxswapd vs1, v8
+; PWR9LE-NEXT:    xsadddp f0, f0, f1
+; PWR9LE-NEXT:    lxv vs1, 256(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v8
+; PWR9LE-NEXT:    xxswapd vs6, v9
+; PWR9LE-NEXT:    xsadddp f0, f0, f6
+; PWR9LE-NEXT:    lxv vs6, 272(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v9
+; PWR9LE-NEXT:    xxswapd vs2, v10
+; PWR9LE-NEXT:    xsadddp f0, f0, f2
+; PWR9LE-NEXT:    xsadddp f0, f0, v10
+; PWR9LE-NEXT:    xxswapd vs7, v11
+; PWR9LE-NEXT:    xsadddp f0, f0, f7
+; PWR9LE-NEXT:    xsadddp f0, f0, v11
+; PWR9LE-NEXT:    xxswapd vs3, v12
+; PWR9LE-NEXT:    xsadddp f0, f0, f3
+; PWR9LE-NEXT:    xsadddp f0, f0, v12
+; PWR9LE-NEXT:    xxswapd vs8, v13
+; PWR9LE-NEXT:    xsadddp f0, f0, f8
+; PWR9LE-NEXT:    xsadddp f0, f0, v13
+; PWR9LE-NEXT:    xxswapd vs9, vs4
+; PWR9LE-NEXT:    xsadddp f0, f0, f9
+; PWR9LE-NEXT:    xsadddp f0, f0, f4
+; PWR9LE-NEXT:    xxswapd vs10, vs5
+; PWR9LE-NEXT:    xsadddp f0, f0, f10
+; PWR9LE-NEXT:    xsadddp f0, f0, f5
+; PWR9LE-NEXT:    xxswapd vs11, vs1
+; PWR9LE-NEXT:    xsadddp f0, f0, f11
+; PWR9LE-NEXT:    xsadddp f0, f0, f1
+; PWR9LE-NEXT:    xxswapd vs12, vs6
+; PWR9LE-NEXT:    xsadddp f0, f0, f12
+; PWR9LE-NEXT:    xsadddp f1, f0, f6
 ; PWR9LE-NEXT:    blr
 ;
 ; PWR9BE-LABEL: v32f64:
 ; PWR9BE:       # %bb.0: # %entry
-; PWR9BE-NEXT:    xxswapd vs4, v2
-; PWR9BE-NEXT:    xxswapd vs5, v3
-; PWR9BE-NEXT:    lxv vs3, 240(r1)
-; PWR9BE-NEXT:    lxv vs2, 256(r1)
-; PWR9BE-NEXT:    lxv vs1, 272(r1)
-; PWR9BE-NEXT:    lxv vs0, 288(r1)
-; PWR9BE-NEXT:    xsadddp f4, v2, f4
-; PWR9BE-NEXT:    xsadddp f4, f4, v3
-; PWR9BE-NEXT:    xsadddp f4, f4, f5
-; PWR9BE-NEXT:    xxswapd vs5, v4
-; PWR9BE-NEXT:    xsadddp f4, f4, v4
-; PWR9BE-NEXT:    xsadddp f4, f4, f5
-; PWR9BE-NEXT:    xxswapd vs5, v5
-; PWR9BE-NEXT:    xsadddp f4, f4, v5
-; PWR9BE-NEXT:    xsadddp f4, f4, f5
-; PWR9BE-NEXT:    xxswapd vs5, v6
-; PWR9BE-NEXT:    xsadddp f4, f4, v6
-; PWR9BE-NEXT:    xsadddp f4, f4, f5
+; PWR9BE-NEXT:    xxswapd vs0, v2
+; PWR9BE-NEXT:    xsadddp f0, v2, f0
+; PWR9BE-NEXT:    xsadddp f0, f0, v3
+; PWR9BE-NEXT:    xxswapd vs1, v3
+; PWR9BE-NEXT:    xsadddp f0, f0, f1
+; PWR9BE-NEXT:    xsadddp f0, f0, v4
+; PWR9BE-NEXT:    xxswapd vs2, v4
+; PWR9BE-NEXT:    xsadddp f0, f0, f2
+; PWR9BE-NEXT:    xsadddp f0, f0, v5
+; PWR9BE-NEXT:    xxswapd vs3, v5
+; PWR9BE-NEXT:    xsadddp f0, f0, f3
+; PWR9BE-NEXT:    xsadddp f0, f0, v6
+; PWR9BE-NEXT:    xxswapd vs4, v6
+; PWR9BE-NEXT:    xsadddp f0, f0, f4
+; PWR9BE-NEXT:    lxv vs4, 240(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v7
 ; PWR9BE-NEXT:    xxswapd vs5, v7
-; PWR9BE-NEXT:    xsadddp f4, f4, v7
-; PWR9BE-NEXT:    xsadddp f4, f4, f5
-; PWR9BE-NEXT:    xxswapd vs5, v8
-; PWR9BE-NEXT:    xsadddp f4, f4, v8
-; PWR9BE-NEXT:    xsadddp f4, f4, f5
-; PWR9BE-NEXT:    xxswapd vs5, v9
-; PWR9BE-NEXT:    xsadddp f4, f4, v9
-; PWR9BE-NEXT:    xsadddp f4, f4, f5
-; PWR9BE-NEXT:    xxswapd vs5, v10
-; PWR9BE-NEXT:    xsadddp f4, f4, v10
-; PWR9BE-NEXT:    xsadddp f4, f4, f5
-; PWR9BE-NEXT:    xxswapd vs5, v11
-; PWR9BE-NEXT:    xsadddp f4, f4, v11
-; PWR9BE-NEXT:    xsadddp f4, f4, f5
-; PWR9BE-NEXT:    xxswapd vs5, v12
-; PWR9BE-NEXT:    xsadddp f4, f4, v12
-; PWR9BE-NEXT:    xsadddp f4, f4, f5
-; PWR9BE-NEXT:    xxswapd vs5, v13
-; PWR9BE-NEXT:    xsadddp f4, f4, v13
-; PWR9BE-NEXT:    xsadddp f4, f4, f5
-; PWR9BE-NEXT:    xsadddp f4, f4, f3
-; PWR9BE-NEXT:    xxswapd vs3, vs3
-; PWR9BE-NEXT:    xsadddp f3, f4, f3
-; PWR9BE-NEXT:    xsadddp f3, f3, f2
-; PWR9BE-NEXT:    xxswapd vs2, vs2
-; PWR9BE-NEXT:    xsadddp f2, f3, f2
-; PWR9BE-NEXT:    xsadddp f2, f2, f1
-; PWR9BE-NEXT:    xxswapd vs1, vs1
-; PWR9BE-NEXT:    xsadddp f1, f2, f1
-; PWR9BE-NEXT:    xsadddp f1, f1, f0
-; PWR9BE-NEXT:    xxswapd vs0, vs0
-; PWR9BE-NEXT:    xsadddp f1, f1, f0
+; PWR9BE-NEXT:    xsadddp f0, f0, f5
+; PWR9BE-NEXT:    lxv vs5, 256(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v8
+; PWR9BE-NEXT:    xxswapd vs6, v8
+; PWR9BE-NEXT:    xsadddp f0, f0, f6
+; PWR9BE-NEXT:    lxv vs6, 272(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v9
+; PWR9BE-NEXT:    xxswapd vs1, v9
+; PWR9BE-NEXT:    xsadddp f0, f0, f1
+; PWR9BE-NEXT:    lxv vs1, 288(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v10
+; PWR9BE-NEXT:    xxswapd vs7, v10
+; PWR9BE-NEXT:    xsadddp f0, f0, f7
+; PWR9BE-NEXT:    xsadddp f0, f0, v11
+; PWR9BE-NEXT:    xxswapd vs2, v11
+; PWR9BE-NEXT:    xsadddp f0, f0, f2
+; PWR9BE-NEXT:    xsadddp f0, f0, v12
+; PWR9BE-NEXT:    xxswapd vs8, v12
+; PWR9BE-NEXT:    xsadddp f0, f0, f8
+; PWR9BE-NEXT:    xsadddp f0, f0, v13
+; PWR9BE-NEXT:    xxswapd vs3, v13
+; PWR9BE-NEXT:    xsadddp f0, f0, f3
+; PWR9BE-NEXT:    xsadddp f0, f0, f4
+; PWR9BE-NEXT:    xxswapd vs9, vs4
+; PWR9BE-NEXT:    xsadddp f0, f0, f9
+; PWR9BE-NEXT:    xsadddp f0, f0, f5
+; PWR9BE-NEXT:    xxswapd vs10, vs5
+; PWR9BE-NEXT:    xsadddp f0, f0, f10
+; PWR9BE-NEXT:    xsadddp f0, f0, f6
+; PWR9BE-NEXT:    xxswapd vs11, vs6
+; PWR9BE-NEXT:    xsadddp f0, f0, f11
+; PWR9BE-NEXT:    xsadddp f0, f0, f1
+; PWR9BE-NEXT:    xxswapd vs12, vs1
+; PWR9BE-NEXT:    xsadddp f1, f0, f12
 ; PWR9BE-NEXT:    blr
 ;
 ; PWR10LE-LABEL: v32f64:
@@ -1921,114 +1921,114 @@ entry:
 define dso_local double @v32f64_b(<32 x double> %a, double %b) local_unnamed_addr #0 {
 ; PWR9LE-LABEL: v32f64_b:
 ; PWR9LE:       # %bb.0: # %entry
-; PWR9LE-NEXT:    xxswapd vs5, v2
-; PWR9LE-NEXT:    lxv vs4, 224(r1)
-; PWR9LE-NEXT:    lxv vs3, 240(r1)
-; PWR9LE-NEXT:    lxv vs2, 256(r1)
-; PWR9LE-NEXT:    lxv vs0, 272(r1)
-; PWR9LE-NEXT:    xsadddp f1, f1, f5
-; PWR9LE-NEXT:    xxswapd vs5, v3
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xsadddp f1, f1, f5
-; PWR9LE-NEXT:    xxswapd vs5, v4
-; PWR9LE-NEXT:    xsadddp f1, f1, v3
-; PWR9LE-NEXT:    xsadddp f1, f1, f5
-; PWR9LE-NEXT:    xxswapd vs5, v5
-; PWR9LE-NEXT:    xsadddp f1, f1, v4
-; PWR9LE-NEXT:    xsadddp f1, f1, f5
+; PWR9LE-NEXT:    xxswapd vs0, v2
+; PWR9LE-NEXT:    xsadddp f0, f1, f0
+; PWR9LE-NEXT:    xsadddp f0, f0, v2
+; PWR9LE-NEXT:    xxswapd vs2, v3
+; PWR9LE-NEXT:    xsadddp f0, f0, f2
+; PWR9LE-NEXT:    xsadddp f0, f0, v3
+; PWR9LE-NEXT:    xxswapd vs3, v4
+; PWR9LE-NEXT:    xsadddp f0, f0, f3
+; PWR9LE-NEXT:    xsadddp f0, f0, v4
+; PWR9LE-NEXT:    xxswapd vs4, v5
+; PWR9LE-NEXT:    xsadddp f0, f0, f4
+; PWR9LE-NEXT:    xsadddp f0, f0, v5
 ; PWR9LE-NEXT:    xxswapd vs5, v6
-; PWR9LE-NEXT:    xsadddp f1, f1, v5
-; PWR9LE-NEXT:    xsadddp f1, f1, f5
-; PWR9LE-NEXT:    xxswapd vs5, v7
-; PWR9LE-NEXT:    xsadddp f1, f1, v6
-; PWR9LE-NEXT:    xsadddp f1, f1, f5
-; PWR9LE-NEXT:    xxswapd vs5, v8
-; PWR9LE-NEXT:    xsadddp f1, f1, v7
-; PWR9LE-NEXT:    xsadddp f1, f1, f5
-; PWR9LE-NEXT:    xxswapd vs5, v9
-; PWR9LE-NEXT:    xsadddp f1, f1, v8
-; PWR9LE-NEXT:    xsadddp f1, f1, f5
-; PWR9LE-NEXT:    xxswapd vs5, v10
-; PWR9LE-NEXT:    xsadddp f1, f1, v9
-; PWR9LE-NEXT:    xsadddp f1, f1, f5
-; PWR9LE-NEXT:    xxswapd vs5, v11
-; PWR9LE-NEXT:    xsadddp f1, f1, v10
-; PWR9LE-NEXT:    xsadddp f1, f1, f5
-; PWR9LE-NEXT:    xxswapd vs5, v12
-; PWR9LE-NEXT:    xsadddp f1, f1, v11
-; PWR9LE-NEXT:    xsadddp f1, f1, f5
-; PWR9LE-NEXT:    xxswapd vs5, v13
-; PWR9LE-NEXT:    xsadddp f1, f1, v12
-; PWR9LE-NEXT:    xsadddp f1, f1, f5
-; PWR9LE-NEXT:    xxswapd vs5, vs4
-; PWR9LE-NEXT:    xsadddp f1, f1, v13
-; PWR9LE-NEXT:    xsadddp f1, f1, f5
-; PWR9LE-NEXT:    xsadddp f1, f1, f4
-; PWR9LE-NEXT:    xxswapd vs4, vs3
-; PWR9LE-NEXT:    xsadddp f1, f1, f4
-; PWR9LE-NEXT:    xsadddp f1, f1, f3
-; PWR9LE-NEXT:    xxswapd vs3, vs2
-; PWR9LE-NEXT:    xsadddp f1, f1, f3
-; PWR9LE-NEXT:    xsadddp f1, f1, f2
-; PWR9LE-NEXT:    xxswapd vs2, vs0
-; PWR9LE-NEXT:    xsadddp f1, f1, f2
-; PWR9LE-NEXT:    xsadddp f1, f1, f0
+; PWR9LE-NEXT:    xsadddp f0, f0, f5
+; PWR9LE-NEXT:    lxv vs5, 224(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v6
+; PWR9LE-NEXT:    xxswapd vs1, v7
+; PWR9LE-NEXT:    xsadddp f0, f0, f1
+; PWR9LE-NEXT:    lxv vs1, 240(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v7
+; PWR9LE-NEXT:    xxswapd vs6, v8
+; PWR9LE-NEXT:    xsadddp f0, f0, f6
+; PWR9LE-NEXT:    lxv vs6, 256(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v8
+; PWR9LE-NEXT:    xxswapd vs2, v9
+; PWR9LE-NEXT:    xsadddp f0, f0, f2
+; PWR9LE-NEXT:    lxv vs2, 272(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v9
+; PWR9LE-NEXT:    xxswapd vs7, v10
+; PWR9LE-NEXT:    xsadddp f0, f0, f7
+; PWR9LE-NEXT:    xsadddp f0, f0, v10
+; PWR9LE-NEXT:    xxswapd vs3, v11
+; PWR9LE-NEXT:    xsadddp f0, f0, f3
+; PWR9LE-NEXT:    xsadddp f0, f0, v11
+; PWR9LE-NEXT:    xxswapd vs8, v12
+; PWR9LE-NEXT:    xsadddp f0, f0, f8
+; PWR9LE-NEXT:    xsadddp f0, f0, v12
+; PWR9LE-NEXT:    xxswapd vs4, v13
+; PWR9LE-NEXT:    xsadddp f0, f0, f4
+; PWR9LE-NEXT:    xsadddp f0, f0, v13
+; PWR9LE-NEXT:    xxswapd vs9, vs5
+; PWR9LE-NEXT:    xsadddp f0, f0, f9
+; PWR9LE-NEXT:    xsadddp f0, f0, f5
+; PWR9LE-NEXT:    xxswapd vs10, vs1
+; PWR9LE-NEXT:    xsadddp f0, f0, f10
+; PWR9LE-NEXT:    xsadddp f0, f0, f1
+; PWR9LE-NEXT:    xxswapd vs11, vs6
+; PWR9LE-NEXT:    xsadddp f0, f0, f11
+; PWR9LE-NEXT:    xsadddp f0, f0, f6
+; PWR9LE-NEXT:    xxswapd vs12, vs2
+; PWR9LE-NEXT:    xsadddp f0, f0, f12
+; PWR9LE-NEXT:    xsadddp f1, f0, f2
 ; PWR9LE-NEXT:    blr
 ;
 ; PWR9BE-LABEL: v32f64_b:
 ; PWR9BE:       # %bb.0: # %entry
 ; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd vs5, v2
-; PWR9BE-NEXT:    lxv vs4, 240(r1)
-; PWR9BE-NEXT:    lxv vs3, 256(r1)
-; PWR9BE-NEXT:    lxv vs2, 272(r1)
-; PWR9BE-NEXT:    lxv vs0, 288(r1)
-; PWR9BE-NEXT:    xsadddp f1, f1, f5
-; PWR9BE-NEXT:    xxswapd vs5, v3
-; PWR9BE-NEXT:    xsadddp f1, f1, v3
-; PWR9BE-NEXT:    xsadddp f1, f1, f5
-; PWR9BE-NEXT:    xxswapd vs5, v4
-; PWR9BE-NEXT:    xsadddp f1, f1, v4
-; PWR9BE-NEXT:    xsadddp f1, f1, f5
-; PWR9BE-NEXT:    xxswapd vs5, v5
-; PWR9BE-NEXT:    xsadddp f1, f1, v5
-; PWR9BE-NEXT:    xsadddp f1, f1, f5
+; PWR9BE-NEXT:    xxswapd vs0, v2
+; PWR9BE-NEXT:    xsadddp f0, f1, f0
+; PWR9BE-NEXT:    xsadddp f0, f0, v3
+; PWR9BE-NEXT:    xxswapd vs2, v3
+; PWR9BE-NEXT:    xsadddp f0, f0, f2
+; PWR9BE-NEXT:    xsadddp f0, f0, v4
+; PWR9BE-NEXT:    xxswapd vs3, v4
+; PWR9BE-NEXT:    xsadddp f0, f0, f3
+; PWR9BE-NEXT:    xsadddp f0, f0, v5
+; PWR9BE-NEXT:    xxswapd vs4, v5
+; PWR9BE-NEXT:    xsadddp f0, f0, f4
+; PWR9BE-NEXT:    xsadddp f0, f0, v6
 ; PWR9BE-NEXT:    xxswapd vs5, v6
-; PWR9BE-NEXT:    xsadddp f1, f1, v6
-; PWR9BE-NEXT:    xsadddp f1, f1, f5
-; PWR9BE-NEXT:    xxswapd vs5, v7
-; PWR9BE-NEXT:    xsadddp f1, f1, v7
-; PWR9BE-NEXT:    xsadddp f1, f1, f5
-; PWR9BE-NEXT:    xxswapd vs5, v8
-; PWR9BE-NEXT:    xsadddp f1, f1, v8
-; PWR9BE-NEXT:    xsadddp f1, f1, f5
-; PWR9BE-NEXT:    xxswapd vs5, v9
-; PWR9BE-NEXT:    xsadddp f1, f1, v9
-; PWR9BE-NEXT:    xsadddp f1, f1, f5
-; PWR9BE-NEXT:    xxswapd vs5, v10
-; PWR9BE-NEXT:    xsadddp f1, f1, v10
-; PWR9BE-NEXT:    xsadddp f1, f1, f5
-; PWR9BE-NEXT:    xxswapd vs5, v11
-; PWR9BE-NEXT:    xsadddp f1, f1, v11
-; PWR9BE-NEXT:    xsadddp f1, f1, f5
-; PWR9BE-NEXT:    xxswapd vs5, v12
-; PWR9BE-NEXT:    xsadddp f1, f1, v12
-; PWR9BE-NEXT:    xsadddp f1, f1, f5
-; PWR9BE-NEXT:    xxswapd vs5, v13
-; PWR9BE-NEXT:    xsadddp f1, f1, v13
-; PWR9BE-NEXT:    xsadddp f1, f1, f5
-; PWR9BE-NEXT:    xsadddp f1, f1, f4
-; PWR9BE-NEXT:    xxswapd vs4, vs4
-; PWR9BE-NEXT:    xsadddp f1, f1, f4
-; PWR9BE-NEXT:    xsadddp f1, f1, f3
-; PWR9BE-NEXT:    xxswapd vs3, vs3
-; PWR9BE-NEXT:    xsadddp f1, f1, f3
-; PWR9BE-NEXT:    xsadddp f1, f1, f2
-; PWR9BE-NEXT:    xxswapd vs2, vs2
-; PWR9BE-NEXT:    xsadddp f1, f1, f2
-; PWR9BE-NEXT:    xsadddp f1, f1, f0
-; PWR9BE-NEXT:    xxswapd vs0, vs0
-; PWR9BE-NEXT:    xsadddp f1, f1, f0
+; PWR9BE-NEXT:    xsadddp f0, f0, f5
+; PWR9BE-NEXT:    lxv vs5, 240(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v7
+; PWR9BE-NEXT:    xxswapd vs1, v7
+; PWR9BE-NEXT:    xsadddp f0, f0, f1
+; PWR9BE-NEXT:    lxv vs1, 256(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v8
+; PWR9BE-NEXT:    xxswapd vs6, v8
+; PWR9BE-NEXT:    xsadddp f0, f0, f6
+; PWR9BE-NEXT:    lxv vs6, 272(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v9
+; PWR9BE-NEXT:    xxswapd vs2, v9
+; PWR9BE-NEXT:    xsadddp f0, f0, f2
+; PWR9BE-NEXT:    lxv vs2, 288(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v10
+; PWR9BE-NEXT:    xxswapd vs7, v10
+; PWR9BE-NEXT:    xsadddp f0, f0, f7
+; PWR9BE-NEXT:    xsadddp f0, f0, v11
+; PWR9BE-NEXT:    xxswapd vs3, v11
+; PWR9BE-NEXT:    xsadddp f0, f0, f3
+; PWR9BE-NEXT:    xsadddp f0, f0, v12
+; PWR9BE-NEXT:    xxswapd vs8, v12
+; PWR9BE-NEXT:    xsadddp f0, f0, f8
+; PWR9BE-NEXT:    xsadddp f0, f0, v13
+; PWR9BE-NEXT:    xxswapd vs4, v13
+; PWR9BE-NEXT:    xsadddp f0, f0, f4
+; PWR9BE-NEXT:    xsadddp f0, f0, f5
+; PWR9BE-NEXT:    xxswapd vs9, vs5
+; PWR9BE-NEXT:    xsadddp f0, f0, f9
+; PWR9BE-NEXT:    xsadddp f0, f0, f1
+; PWR9BE-NEXT:    xxswapd vs10, vs1
+; PWR9BE-NEXT:    xsadddp f0, f0, f10
+; PWR9BE-NEXT:    xsadddp f0, f0, f6
+; PWR9BE-NEXT:    xxswapd vs11, vs6
+; PWR9BE-NEXT:    xsadddp f0, f0, f11
+; PWR9BE-NEXT:    xsadddp f0, f0, f2
+; PWR9BE-NEXT:    xxswapd vs12, vs2
+; PWR9BE-NEXT:    xsadddp f1, f0, f12
 ; PWR9BE-NEXT:    blr
 ;
 ; PWR10LE-LABEL: v32f64_b:
@@ -2150,25 +2150,25 @@ entry:
 define dso_local double @v32f64_fast(<32 x double> %a) local_unnamed_addr #0 {
 ; PWR9LE-LABEL: v32f64_fast:
 ; PWR9LE:       # %bb.0: # %entry
-; PWR9LE-NEXT:    lxv vs0, 256(r1)
-; PWR9LE-NEXT:    lxv vs1, 224(r1)
+; PWR9LE-NEXT:    lxv vs0, 240(r1)
 ; PWR9LE-NEXT:    lxv vs2, 272(r1)
-; PWR9LE-NEXT:    lxv vs3, 240(r1)
-; PWR9LE-NEXT:    xvadddp vs4, v3, v11
-; PWR9LE-NEXT:    xvadddp vs5, v5, v13
-; PWR9LE-NEXT:    xvadddp vs6, v2, v10
+; PWR9LE-NEXT:    lxv vs4, 224(r1)
+; PWR9LE-NEXT:    lxv vs6, 256(r1)
+; PWR9LE-NEXT:    xvadddp vs1, v3, v11
+; PWR9LE-NEXT:    xvadddp vs3, v5, v13
+; PWR9LE-NEXT:    xvadddp vs5, v2, v10
 ; PWR9LE-NEXT:    xvadddp vs7, v4, v12
-; PWR9LE-NEXT:    xvadddp vs3, v7, vs3
+; PWR9LE-NEXT:    xvadddp vs0, v7, vs0
 ; PWR9LE-NEXT:    xvadddp vs2, v9, vs2
-; PWR9LE-NEXT:    xvadddp vs1, v6, vs1
-; PWR9LE-NEXT:    xvadddp vs0, v8, vs0
-; PWR9LE-NEXT:    xvadddp vs0, vs7, vs0
-; PWR9LE-NEXT:    xvadddp vs1, vs6, vs1
-; PWR9LE-NEXT:    xvadddp vs2, vs5, vs2
-; PWR9LE-NEXT:    xvadddp vs3, vs4, vs3
+; PWR9LE-NEXT:    xvadddp vs4, v6, vs4
+; PWR9LE-NEXT:    xvadddp vs6, v8, vs6
+; PWR9LE-NEXT:    xvadddp vs6, vs7, vs6
+; PWR9LE-NEXT:    xvadddp vs4, vs5, vs4
 ; PWR9LE-NEXT:    xvadddp vs2, vs3, vs2
 ; PWR9LE-NEXT:    xvadddp vs0, vs1, vs0
 ; PWR9LE-NEXT:    xvadddp vs0, vs0, vs2
+; PWR9LE-NEXT:    xvadddp vs1, vs4, vs6
+; PWR9LE-NEXT:    xvadddp vs0, vs1, vs0
 ; PWR9LE-NEXT:    xxswapd vs1, vs0
 ; PWR9LE-NEXT:    xvadddp vs0, vs0, vs1
 ; PWR9LE-NEXT:    xxswapd vs1, vs0
@@ -2176,25 +2176,25 @@ define dso_local double @v32f64_fast(<32 x double> %a) local_unnamed_addr #0 {
 ;
 ; PWR9BE-LABEL: v32f64_fast:
 ; PWR9BE:       # %bb.0: # %entry
-; PWR9BE-NEXT:    lxv vs0, 272(r1)
-; PWR9BE-NEXT:    lxv vs1, 240(r1)
+; PWR9BE-NEXT:    lxv vs0, 256(r1)
 ; PWR9BE-NEXT:    lxv vs2, 288(r1)
-; PWR9BE-NEXT:    lxv vs3, 256(r1)
-; PWR9BE-NEXT:    xvadddp vs4, v3, v11
-; PWR9BE-NEXT:    xvadddp vs5, v5, v13
-; PWR9BE-NEXT:    xvadddp vs6, v2, v10
+; PWR9BE-NEXT:    lxv vs4, 240(r1)
+; PWR9BE-NEXT:    lxv vs6, 272(r1)
+; PWR9BE-NEXT:    xvadddp vs1, v3, v11
+; PWR9BE-NEXT:    xvadddp vs3, v5, v13
+; PWR9BE-NEXT:    xvadddp vs5, v2, v10
 ; PWR9BE-NEXT:    xvadddp vs7, v4, v12
-; PWR9BE-NEXT:    xvadddp vs3, v7, vs3
+; PWR9BE-NEXT:    xvadddp vs0, v7, vs0
 ; PWR9BE-NEXT:    xvadddp vs2, v9, vs2
-; PWR9BE-NEXT:    xvadddp vs1, v6, vs1
-; PWR9BE-NEXT:    xvadddp vs0, v8, vs0
-; PWR9BE-NEXT:    xvadddp vs0, vs7, vs0
-; PWR9BE-NEXT:    xvadddp vs1, vs6, vs1
-; PWR9BE-NEXT:    xvadddp vs2, vs5, vs2
-; PWR9BE-NEXT:    xvadddp vs3, vs4, vs3
+; PWR9BE-NEXT:    xvadddp vs4, v6, vs4
+; PWR9BE-NEXT:    xvadddp vs6, v8, vs6
+; PWR9BE-NEXT:    xvadddp vs6, vs7, vs6
+; PWR9BE-NEXT:    xvadddp vs4, vs5, vs4
 ; PWR9BE-NEXT:    xvadddp vs2, vs3, vs2
 ; PWR9BE-NEXT:    xvadddp vs0, vs1, vs0
 ; PWR9BE-NEXT:    xvadddp vs0, vs0, vs2
+; PWR9BE-NEXT:    xvadddp vs1, vs4, vs6
+; PWR9BE-NEXT:    xvadddp vs0, vs1, vs0
 ; PWR9BE-NEXT:    xxswapd vs1, vs0
 ; PWR9BE-NEXT:    xvadddp vs1, vs0, vs1
 ; PWR9BE-NEXT:    blr
@@ -2257,478 +2257,478 @@ entry:
 define dso_local double @v64f64(<64 x double> %a) local_unnamed_addr #0 {
 ; PWR9LE-LABEL: v64f64:
 ; PWR9LE:       # %bb.0: # %entry
+; PWR9LE-NEXT:    xxswapd vs0, v2
+; PWR9LE-NEXT:    lxv vs12, 224(r1)
+; PWR9LE-NEXT:    lxv v0, 240(r1)
+; PWR9LE-NEXT:    lxv v14, 256(r1)
+; PWR9LE-NEXT:    xxswapd vs1, v3
+; PWR9LE-NEXT:    lxv v16, 272(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v2
+; PWR9LE-NEXT:    lxv v2, 288(r1)
+; PWR9LE-NEXT:    xxswapd vs2, v4
+; PWR9LE-NEXT:    xsadddp f0, f0, f1
+; PWR9LE-NEXT:    lxv vs1, 304(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v3
+; PWR9LE-NEXT:    xsadddp f0, f0, f2
+; PWR9LE-NEXT:    lxv vs2, 320(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v4
+; PWR9LE-NEXT:    xxswapd vs3, v5
+; PWR9LE-NEXT:    xsadddp f0, f0, f3
+; PWR9LE-NEXT:    lxv vs3, 336(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v5
+; PWR9LE-NEXT:    xxswapd vs4, v6
+; PWR9LE-NEXT:    xsadddp f0, f0, f4
+; PWR9LE-NEXT:    lxv vs4, 352(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v6
+; PWR9LE-NEXT:    xxswapd vs5, v7
+; PWR9LE-NEXT:    xsadddp f0, f0, f5
+; PWR9LE-NEXT:    lxv vs5, 368(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v7
+; PWR9LE-NEXT:    xxswapd vs6, v8
+; PWR9LE-NEXT:    xsadddp f0, f0, f6
+; PWR9LE-NEXT:    lxv vs6, 384(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v8
+; PWR9LE-NEXT:    xxswapd vs7, v9
+; PWR9LE-NEXT:    xsadddp f0, f0, f7
+; PWR9LE-NEXT:    lxv vs7, 400(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v9
+; PWR9LE-NEXT:    xxswapd vs8, v10
+; PWR9LE-NEXT:    xsadddp f0, f0, f8
+; PWR9LE-NEXT:    lxv vs8, 416(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v10
+; PWR9LE-NEXT:    xxswapd vs9, v11
+; PWR9LE-NEXT:    xsadddp f0, f0, f9
+; PWR9LE-NEXT:    lxv vs9, 432(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v11
+; PWR9LE-NEXT:    xxswapd vs10, v12
+; PWR9LE-NEXT:    xsadddp f0, f0, f10
+; PWR9LE-NEXT:    lxv vs10, 448(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v12
+; PWR9LE-NEXT:    xxswapd vs11, v13
+; PWR9LE-NEXT:    xsadddp f0, f0, f11
+; PWR9LE-NEXT:    lxv vs11, 464(r1)
+; PWR9LE-NEXT:    xsadddp f0, f0, v13
+; PWR9LE-NEXT:    xxswapd vs13, vs12
+; PWR9LE-NEXT:    xsadddp f0, f0, f13
+; PWR9LE-NEXT:    xsadddp f0, f0, f12
+; PWR9LE-NEXT:    lxv vs12, 480(r1)
+; PWR9LE-NEXT:    xxswapd v1, v0
+; PWR9LE-NEXT:    xsadddp f0, f0, v1
+; PWR9LE-NEXT:    xsadddp f0, f0, v0
+; PWR9LE-NEXT:    lxv v0, 496(r1)
+; PWR9LE-NEXT:    xxswapd v15, v14
+; PWR9LE-NEXT:    xsadddp f0, f0, v15
+; PWR9LE-NEXT:    xsadddp f0, f0, v14
+; PWR9LE-NEXT:    lxv v14, 512(r1)
+; PWR9LE-NEXT:    xxswapd v17, v16
+; PWR9LE-NEXT:    xsadddp f0, f0, v17
+; PWR9LE-NEXT:    xsadddp f0, f0, v16
+; PWR9LE-NEXT:    lxv v16, 528(r1)
 ; PWR9LE-NEXT:    xxswapd v18, v2
-; PWR9LE-NEXT:    lxv v17, 224(r1)
-; PWR9LE-NEXT:    lxv v16, 240(r1)
-; PWR9LE-NEXT:    lxv v15, 256(r1)
-; PWR9LE-NEXT:    lxv v14, 272(r1)
-; PWR9LE-NEXT:    xsadddp v2, v18, v2
-; PWR9LE-NEXT:    xxswapd v18, v3
-; PWR9LE-NEXT:    lxv v1, 288(r1)
-; PWR9LE-NEXT:    lxv v0, 304(r1)
-; PWR9LE-NEXT:    lxv vs13, 320(r1)
-; PWR9LE-NEXT:    lxv vs12, 336(r1)
-; PWR9LE-NEXT:    lxv vs11, 352(r1)
-; PWR9LE-NEXT:    lxv vs10, 368(r1)
-; PWR9LE-NEXT:    lxv vs9, 384(r1)
-; PWR9LE-NEXT:    lxv vs8, 400(r1)
-; PWR9LE-NEXT:    lxv vs7, 416(r1)
-; PWR9LE-NEXT:    lxv vs6, 432(r1)
-; PWR9LE-NEXT:    lxv vs5, 448(r1)
-; PWR9LE-NEXT:    lxv vs4, 464(r1)
-; PWR9LE-NEXT:    xsadddp v2, v2, v18
-; PWR9LE-NEXT:    lxv vs3, 480(r1)
-; PWR9LE-NEXT:    lxv vs2, 496(r1)
-; PWR9LE-NEXT:    lxv vs1, 512(r1)
-; PWR9LE-NEXT:    lxv vs0, 528(r1)
-; PWR9LE-NEXT:    xsadddp v2, v2, v3
-; PWR9LE-NEXT:    xxswapd v3, v4
-; PWR9LE-NEXT:    xsadddp v2, v2, v3
-; PWR9LE-NEXT:    xxswapd v3, v5
-; PWR9LE-NEXT:    xsadddp v2, v2, v4
-; PWR9LE-NEXT:    xsadddp v2, v2, v3
-; PWR9LE-NEXT:    xxswapd v3, v6
-; PWR9LE-NEXT:    xsadddp v2, v2, v5
-; PWR9LE-NEXT:    xsadddp v2, v2, v3
-; PWR9LE-NEXT:    xxswapd v3, v7
-; PWR9LE-NEXT:    xsadddp v2, v2, v6
-; PWR9LE-NEXT:    xsadddp v2, v2, v3
-; PWR9LE-NEXT:    xxswapd v3, v8
-; PWR9LE-NEXT:    xsadddp v2, v2, v7
-; PWR9LE-NEXT:    xsadddp v2, v2, v3
-; PWR9LE-NEXT:    xxswapd v3, v9
-; PWR9LE-NEXT:    xsadddp v2, v2, v8
-; PWR9LE-NEXT:    xsadddp v2, v2, v3
-; PWR9LE-NEXT:    xxswapd v3, v10
-; PWR9LE-NEXT:    xsadddp v2, v2, v9
-; PWR9LE-NEXT:    xsadddp v2, v2, v3
-; PWR9LE-NEXT:    xxswapd v3, v11
-; PWR9LE-NEXT:    xsadddp v2, v2, v10
-; PWR9LE-NEXT:    xsadddp v2, v2, v3
-; PWR9LE-NEXT:    xxswapd v3, v12
-; PWR9LE-NEXT:    xsadddp v2, v2, v11
-; PWR9LE-NEXT:    xsadddp v2, v2, v3
-; PWR9LE-NEXT:    xxswapd v3, v13
-; PWR9LE-NEXT:    xsadddp v2, v2, v12
-; PWR9LE-NEXT:    xsadddp v2, v2, v3
-; PWR9LE-NEXT:    xxswapd v3, v17
-; PWR9LE-NEXT:    xsadddp v2, v2, v13
-; PWR9LE-NEXT:    xsadddp v2, v2, v3
-; PWR9LE-NEXT:    xxswapd v3, v16
-; PWR9LE-NEXT:    xsadddp v2, v2, v17
-; PWR9LE-NEXT:    xsadddp v2, v2, v3
-; PWR9LE-NEXT:    xxswapd v3, v15
-; PWR9LE-NEXT:    xsadddp v2, v2, v16
-; PWR9LE-NEXT:    xsadddp v2, v2, v3
-; PWR9LE-NEXT:    xxswapd v3, v14
-; PWR9LE-NEXT:    xsadddp v2, v2, v15
-; PWR9LE-NEXT:    xsadddp v2, v2, v3
-; PWR9LE-NEXT:    xxswapd v3, v1
-; PWR9LE-NEXT:    xsadddp v2, v2, v14
-; PWR9LE-NEXT:    xsadddp v2, v2, v3
-; PWR9LE-NEXT:    xxswapd v3, v0
-; PWR9LE-NEXT:    xsadddp v2, v2, v1
-; PWR9LE-NEXT:    xsadddp v2, v2, v3
-; PWR9LE-NEXT:    xxswapd v3, vs13
-; PWR9LE-NEXT:    xsadddp v2, v2, v0
-; PWR9LE-NEXT:    xsadddp v2, v2, v3
-; PWR9LE-NEXT:    xsadddp f13, v2, f13
-; PWR9LE-NEXT:    xxswapd v2, vs12
-; PWR9LE-NEXT:    xsadddp f13, f13, v2
-; PWR9LE-NEXT:    xsadddp f12, f13, f12
-; PWR9LE-NEXT:    xxswapd vs13, vs11
-; PWR9LE-NEXT:    xsadddp f12, f12, f13
-; PWR9LE-NEXT:    xsadddp f11, f12, f11
-; PWR9LE-NEXT:    xxswapd vs12, vs10
-; PWR9LE-NEXT:    xsadddp f11, f11, f12
-; PWR9LE-NEXT:    xsadddp f10, f11, f10
-; PWR9LE-NEXT:    xxswapd vs11, vs9
-; PWR9LE-NEXT:    xsadddp f10, f10, f11
-; PWR9LE-NEXT:    xsadddp f9, f10, f9
-; PWR9LE-NEXT:    xxswapd vs10, vs8
-; PWR9LE-NEXT:    xsadddp f9, f9, f10
-; PWR9LE-NEXT:    xsadddp f8, f9, f8
-; PWR9LE-NEXT:    xxswapd vs9, vs7
-; PWR9LE-NEXT:    xsadddp f8, f8, f9
-; PWR9LE-NEXT:    xsadddp f7, f8, f7
-; PWR9LE-NEXT:    xxswapd vs8, vs6
-; PWR9LE-NEXT:    xsadddp f7, f7, f8
-; PWR9LE-NEXT:    xsadddp f6, f7, f6
-; PWR9LE-NEXT:    xxswapd vs7, vs5
-; PWR9LE-NEXT:    xsadddp f6, f6, f7
-; PWR9LE-NEXT:    xsadddp f5, f6, f5
-; PWR9LE-NEXT:    xxswapd vs6, vs4
-; PWR9LE-NEXT:    xsadddp f5, f5, f6
-; PWR9LE-NEXT:    xsadddp f4, f5, f4
-; PWR9LE-NEXT:    xxswapd vs5, vs3
-; PWR9LE-NEXT:    xsadddp f4, f4, f5
-; PWR9LE-NEXT:    xsadddp f3, f4, f3
-; PWR9LE-NEXT:    xxswapd vs4, vs2
-; PWR9LE-NEXT:    xsadddp f3, f3, f4
-; PWR9LE-NEXT:    xsadddp f2, f3, f2
-; PWR9LE-NEXT:    xxswapd vs3, vs1
-; PWR9LE-NEXT:    xsadddp f2, f2, f3
-; PWR9LE-NEXT:    xsadddp f1, f2, f1
-; PWR9LE-NEXT:    xxswapd vs2, vs0
-; PWR9LE-NEXT:    xsadddp f1, f1, f2
-; PWR9LE-NEXT:    xsadddp f1, f1, f0
+; PWR9LE-NEXT:    xsadddp f0, f0, v18
+; PWR9LE-NEXT:    xsadddp f0, f0, v2
+; PWR9LE-NEXT:    xxswapd v3, vs1
+; PWR9LE-NEXT:    xsadddp f0, f0, v3
+; PWR9LE-NEXT:    xsadddp f0, f0, f1
+; PWR9LE-NEXT:    xxswapd v4, vs2
+; PWR9LE-NEXT:    xsadddp f0, f0, v4
+; PWR9LE-NEXT:    xsadddp f0, f0, f2
+; PWR9LE-NEXT:    xxswapd v5, vs3
+; PWR9LE-NEXT:    xsadddp f0, f0, v5
+; PWR9LE-NEXT:    xsadddp f0, f0, f3
+; PWR9LE-NEXT:    xxswapd v6, vs4
+; PWR9LE-NEXT:    xsadddp f0, f0, v6
+; PWR9LE-NEXT:    xsadddp f0, f0, f4
+; PWR9LE-NEXT:    xxswapd v7, vs5
+; PWR9LE-NEXT:    xsadddp f0, f0, v7
+; PWR9LE-NEXT:    xsadddp f0, f0, f5
+; PWR9LE-NEXT:    xxswapd v8, vs6
+; PWR9LE-NEXT:    xsadddp f0, f0, v8
+; PWR9LE-NEXT:    xsadddp f0, f0, f6
+; PWR9LE-NEXT:    xxswapd v9, vs7
+; PWR9LE-NEXT:    xsadddp f0, f0, v9
+; PWR9LE-NEXT:    xsadddp f0, f0, f7
+; PWR9LE-NEXT:    xxswapd v10, vs8
+; PWR9LE-NEXT:    xsadddp f0, f0, v10
+; PWR9LE-NEXT:    xsadddp f0, f0, f8
+; PWR9LE-NEXT:    xxswapd v11, vs9
+; PWR9LE-NEXT:    xsadddp f0, f0, v11
+; PWR9LE-NEXT:    xsadddp f0, f0, f9
+; PWR9LE-NEXT:    xxswapd v12, vs10
+; PWR9LE-NEXT:    xsadddp f0, f0, v12
+; PWR9LE-NEXT:    xsadddp f0, f0, f10
+; PWR9LE-NEXT:    xxswapd v13, vs11
+; PWR9LE-NEXT:    xsadddp f0, f0, v13
+; PWR9LE-NEXT:    xsadddp f0, f0, f11
+; PWR9LE-NEXT:    xxswapd vs13, vs12
+; PWR9LE-NEXT:    xsadddp f0, f0, f13
+; PWR9LE-NEXT:    xsadddp f0, f0, f12
+; PWR9LE-NEXT:    xxswapd v1, v0
+; PWR9LE-NEXT:    xsadddp f0, f0, v1
+; PWR9LE-NEXT:    xsadddp f0, f0, v0
+; PWR9LE-NEXT:    xxswapd v15, v14
+; PWR9LE-NEXT:    xsadddp f0, f0, v15
+; PWR9LE-NEXT:    xsadddp f0, f0, v14
+; PWR9LE-NEXT:    xxswapd v17, v16
+; PWR9LE-NEXT:    xsadddp f0, f0, v17
+; PWR9LE-NEXT:    xsadddp f1, f0, v16
 ; PWR9LE-NEXT:    blr
 ;
 ; PWR9BE-LABEL: v64f64:
 ; PWR9BE:       # %bb.0: # %entry
+; PWR9BE-NEXT:    xxswapd vs0, v2
+; PWR9BE-NEXT:    lxv vs12, 240(r1)
+; PWR9BE-NEXT:    lxv v0, 256(r1)
+; PWR9BE-NEXT:    lxv v14, 272(r1)
+; PWR9BE-NEXT:    xxswapd vs1, v3
+; PWR9BE-NEXT:    lxv v16, 288(r1)
+; PWR9BE-NEXT:    xsadddp f0, v2, f0
+; PWR9BE-NEXT:    lxv v2, 304(r1)
+; PWR9BE-NEXT:    xxswapd vs2, v4
+; PWR9BE-NEXT:    xsadddp f0, f0, v3
+; PWR9BE-NEXT:    xsadddp f0, f0, f1
+; PWR9BE-NEXT:    lxv vs1, 320(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v4
+; PWR9BE-NEXT:    xsadddp f0, f0, f2
+; PWR9BE-NEXT:    lxv vs2, 336(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v5
+; PWR9BE-NEXT:    xxswapd vs3, v5
+; PWR9BE-NEXT:    xsadddp f0, f0, f3
+; PWR9BE-NEXT:    lxv vs3, 352(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v6
+; PWR9BE-NEXT:    xxswapd vs4, v6
+; PWR9BE-NEXT:    xsadddp f0, f0, f4
+; PWR9BE-NEXT:    lxv vs4, 368(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v7
+; PWR9BE-NEXT:    xxswapd vs5, v7
+; PWR9BE-NEXT:    xsadddp f0, f0, f5
+; PWR9BE-NEXT:    lxv vs5, 384(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v8
+; PWR9BE-NEXT:    xxswapd vs6, v8
+; PWR9BE-NEXT:    xsadddp f0, f0, f6
+; PWR9BE-NEXT:    lxv vs6, 400(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v9
+; PWR9BE-NEXT:    xxswapd vs7, v9
+; PWR9BE-NEXT:    xsadddp f0, f0, f7
+; PWR9BE-NEXT:    lxv vs7, 416(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v10
+; PWR9BE-NEXT:    xxswapd vs8, v10
+; PWR9BE-NEXT:    xsadddp f0, f0, f8
+; PWR9BE-NEXT:    lxv vs8, 432(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v11
+; PWR9BE-NEXT:    xxswapd vs9, v11
+; PWR9BE-NEXT:    xsadddp f0, f0, f9
+; PWR9BE-NEXT:    lxv vs9, 448(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v12
+; PWR9BE-NEXT:    xxswapd vs10, v12
+; PWR9BE-NEXT:    xsadddp f0, f0, f10
+; PWR9BE-NEXT:    lxv vs10, 464(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v13
+; PWR9BE-NEXT:    xxswapd vs11, v13
+; PWR9BE-NEXT:    xsadddp f0, f0, f11
+; PWR9BE-NEXT:    lxv vs11, 480(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, f12
+; PWR9BE-NEXT:    xxswapd vs13, vs12
+; PWR9BE-NEXT:    lxv vs12, 496(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, f13
+; PWR9BE-NEXT:    xsadddp f0, f0, v0
+; PWR9BE-NEXT:    xxswapd v1, v0
+; PWR9BE-NEXT:    lxv v0, 512(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v1
+; PWR9BE-NEXT:    xsadddp f0, f0, v14
+; PWR9BE-NEXT:    xxswapd v15, v14
+; PWR9BE-NEXT:    lxv v14, 528(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v15
+; PWR9BE-NEXT:    xsadddp f0, f0, v16
+; PWR9BE-NEXT:    xxswapd v17, v16
+; PWR9BE-NEXT:    lxv v16, 544(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v17
+; PWR9BE-NEXT:    xsadddp f0, f0, v2
 ; PWR9BE-NEXT:    xxswapd v18, v2
-; PWR9BE-NEXT:    lxv v17, 240(r1)
-; PWR9BE-NEXT:    lxv v16, 256(r1)
-; PWR9BE-NEXT:    lxv v15, 272(r1)
-; PWR9BE-NEXT:    lxv v14, 288(r1)
-; PWR9BE-NEXT:    xsadddp v2, v2, v18
-; PWR9BE-NEXT:    lxv v1, 304(r1)
-; PWR9BE-NEXT:    lxv v0, 320(r1)
-; PWR9BE-NEXT:    lxv vs13, 336(r1)
-; PWR9BE-NEXT:    lxv vs12, 352(r1)
-; PWR9BE-NEXT:    lxv vs11, 368(r1)
-; PWR9BE-NEXT:    lxv vs10, 384(r1)
-; PWR9BE-NEXT:    lxv vs9, 400(r1)
-; PWR9BE-NEXT:    lxv vs8, 416(r1)
-; PWR9BE-NEXT:    lxv vs7, 432(r1)
-; PWR9BE-NEXT:    lxv vs6, 448(r1)
-; PWR9BE-NEXT:    lxv vs5, 464(r1)
-; PWR9BE-NEXT:    lxv vs4, 480(r1)
-; PWR9BE-NEXT:    xsadddp v2, v2, v3
-; PWR9BE-NEXT:    xxswapd v3, v3
-; PWR9BE-NEXT:    lxv vs3, 496(r1)
-; PWR9BE-NEXT:    lxv vs2, 512(r1)
-; PWR9BE-NEXT:    lxv vs1, 528(r1)
-; PWR9BE-NEXT:    lxv vs0, 544(r1)
-; PWR9BE-NEXT:    xsadddp v2, v2, v3
-; PWR9BE-NEXT:    xxswapd v3, v4
-; PWR9BE-NEXT:    xsadddp v2, v2, v4
-; PWR9BE-NEXT:    xsadddp v2, v2, v3
-; PWR9BE-NEXT:    xxswapd v3, v5
-; PWR9BE-NEXT:    xsadddp v2, v2, v5
-; PWR9BE-NEXT:    xsadddp v2, v2, v3
-; PWR9BE-NEXT:    xxswapd v3, v6
-; PWR9BE-NEXT:    xsadddp v2, v2, v6
-; PWR9BE-NEXT:    xsadddp v2, v2, v3
-; PWR9BE-NEXT:    xxswapd v3, v7
-; PWR9BE-NEXT:    xsadddp v2, v2, v7
-; PWR9BE-NEXT:    xsadddp v2, v2, v3
-; PWR9BE-NEXT:    xxswapd v3, v8
-; PWR9BE-NEXT:    xsadddp v2, v2, v8
-; PWR9BE-NEXT:    xsadddp v2, v2, v3
-; PWR9BE-NEXT:    xxswapd v3, v9
-; PWR9BE-NEXT:    xsadddp v2, v2, v9
-; PWR9BE-NEXT:    xsadddp v2, v2, v3
-; PWR9BE-NEXT:    xxswapd v3, v10
-; PWR9BE-NEXT:    xsadddp v2, v2, v10
-; PWR9BE-NEXT:    xsadddp v2, v2, v3
-; PWR9BE-NEXT:    xxswapd v3, v11
-; PWR9BE-NEXT:    xsadddp v2, v2, v11
-; PWR9BE-NEXT:    xsadddp v2, v2, v3
-; PWR9BE-NEXT:    xxswapd v3, v12
-; PWR9BE-NEXT:    xsadddp v2, v2, v12
-; PWR9BE-NEXT:    xsadddp v2, v2, v3
-; PWR9BE-NEXT:    xxswapd v3, v13
-; PWR9BE-NEXT:    xsadddp v2, v2, v13
-; PWR9BE-NEXT:    xsadddp v2, v2, v3
-; PWR9BE-NEXT:    xxswapd v3, v17
-; PWR9BE-NEXT:    xsadddp v2, v2, v17
-; PWR9BE-NEXT:    xsadddp v2, v2, v3
-; PWR9BE-NEXT:    xxswapd v3, v16
-; PWR9BE-NEXT:    xsadddp v2, v2, v16
-; PWR9BE-NEXT:    xsadddp v2, v2, v3
-; PWR9BE-NEXT:    xxswapd v3, v15
-; PWR9BE-NEXT:    xsadddp v2, v2, v15
-; PWR9BE-NEXT:    xsadddp v2, v2, v3
-; PWR9BE-NEXT:    xxswapd v3, v14
-; PWR9BE-NEXT:    xsadddp v2, v2, v14
-; PWR9BE-NEXT:    xsadddp v2, v2, v3
-; PWR9BE-NEXT:    xxswapd v3, v1
-; PWR9BE-NEXT:    xsadddp v2, v2, v1
-; PWR9BE-NEXT:    xsadddp v2, v2, v3
-; PWR9BE-NEXT:    xxswapd v3, v0
-; PWR9BE-NEXT:    xsadddp v2, v2, v0
-; PWR9BE-NEXT:    xsadddp v2, v2, v3
-; PWR9BE-NEXT:    xsadddp v2, v2, f13
-; PWR9BE-NEXT:    xxswapd vs13, vs13
-; PWR9BE-NEXT:    xsadddp f13, v2, f13
-; PWR9BE-NEXT:    xsadddp f13, f13, f12
-; PWR9BE-NEXT:    xxswapd vs12, vs12
-; PWR9BE-NEXT:    xsadddp f12, f13, f12
-; PWR9BE-NEXT:    xsadddp f12, f12, f11
-; PWR9BE-NEXT:    xxswapd vs11, vs11
-; PWR9BE-NEXT:    xsadddp f11, f12, f11
-; PWR9BE-NEXT:    xsadddp f11, f11, f10
-; PWR9BE-NEXT:    xxswapd vs10, vs10
-; PWR9BE-NEXT:    xsadddp f10, f11, f10
-; PWR9BE-NEXT:    xsadddp f10, f10, f9
-; PWR9BE-NEXT:    xxswapd vs9, vs9
-; PWR9BE-NEXT:    xsadddp f9, f10, f9
-; PWR9BE-NEXT:    xsadddp f9, f9, f8
-; PWR9BE-NEXT:    xxswapd vs8, vs8
-; PWR9BE-NEXT:    xsadddp f8, f9, f8
-; PWR9BE-NEXT:    xsadddp f8, f8, f7
-; PWR9BE-NEXT:    xxswapd vs7, vs7
-; PWR9BE-NEXT:    xsadddp f7, f8, f7
-; PWR9BE-NEXT:    xsadddp f7, f7, f6
-; PWR9BE-NEXT:    xxswapd vs6, vs6
-; PWR9BE-NEXT:    xsadddp f6, f7, f6
-; PWR9BE-NEXT:    xsadddp f6, f6, f5
-; PWR9BE-NEXT:    xxswapd vs5, vs5
-; PWR9BE-NEXT:    xsadddp f5, f6, f5
-; PWR9BE-NEXT:    xsadddp f5, f5, f4
-; PWR9BE-NEXT:    xxswapd vs4, vs4
-; PWR9BE-NEXT:    xsadddp f4, f5, f4
-; PWR9BE-NEXT:    xsadddp f4, f4, f3
-; PWR9BE-NEXT:    xxswapd vs3, vs3
-; PWR9BE-NEXT:    xsadddp f3, f4, f3
-; PWR9BE-NEXT:    xsadddp f3, f3, f2
-; PWR9BE-NEXT:    xxswapd vs2, vs2
-; PWR9BE-NEXT:    xsadddp f2, f3, f2
-; PWR9BE-NEXT:    xsadddp f2, f2, f1
-; PWR9BE-NEXT:    xxswapd vs1, vs1
-; PWR9BE-NEXT:    xsadddp f1, f2, f1
-; PWR9BE-NEXT:    xsadddp f1, f1, f0
-; PWR9BE-NEXT:    xxswapd vs0, vs0
-; PWR9BE-NEXT:    xsadddp f1, f1, f0
+; PWR9BE-NEXT:    xsadddp f0, f0, v18
+; PWR9BE-NEXT:    xsadddp f0, f0, f1
+; PWR9BE-NEXT:    xxswapd v3, vs1
+; PWR9BE-NEXT:    xsadddp f0, f0, v3
+; PWR9BE-NEXT:    xsadddp f0, f0, f2
+; PWR9BE-NEXT:    xxswapd v4, vs2
+; PWR9BE-NEXT:    xsadddp f0, f0, v4
+; PWR9BE-NEXT:    xsadddp f0, f0, f3
+; PWR9BE-NEXT:    xxswapd v5, vs3
+; PWR9BE-NEXT:    xsadddp f0, f0, v5
+; PWR9BE-NEXT:    xsadddp f0, f0, f4
+; PWR9BE-NEXT:    xxswapd v6, vs4
+; PWR9BE-NEXT:    xsadddp f0, f0, v6
+; PWR9BE-NEXT:    xsadddp f0, f0, f5
+; PWR9BE-NEXT:    xxswapd v7, vs5
+; PWR9BE-NEXT:    xsadddp f0, f0, v7
+; PWR9BE-NEXT:    xsadddp f0, f0, f6
+; PWR9BE-NEXT:    xxswapd v8, vs6
+; PWR9BE-NEXT:    xsadddp f0, f0, v8
+; PWR9BE-NEXT:    xsadddp f0, f0, f7
+; PWR9BE-NEXT:    xxswapd v9, vs7
+; PWR9BE-NEXT:    xsadddp f0, f0, v9
+; PWR9BE-NEXT:    xsadddp f0, f0, f8
+; PWR9BE-NEXT:    xxswapd v10, vs8
+; PWR9BE-NEXT:    xsadddp f0, f0, v10
+; PWR9BE-NEXT:    xsadddp f0, f0, f9
+; PWR9BE-NEXT:    xxswapd v11, vs9
+; PWR9BE-NEXT:    xsadddp f0, f0, v11
+; PWR9BE-NEXT:    xsadddp f0, f0, f10
+; PWR9BE-NEXT:    xxswapd v12, vs10
+; PWR9BE-NEXT:    xsadddp f0, f0, v12
+; PWR9BE-NEXT:    xsadddp f0, f0, f11
+; PWR9BE-NEXT:    xxswapd v13, vs11
+; PWR9BE-NEXT:    xsadddp f0, f0, v13
+; PWR9BE-NEXT:    xsadddp f0, f0, f12
+; PWR9BE-NEXT:    xxswapd vs13, vs12
+; PWR9BE-NEXT:    xsadddp f0, f0, f13
+; PWR9BE-NEXT:    xsadddp f0, f0, v0
+; PWR9BE-NEXT:    xxswapd v1, v0
+; PWR9BE-NEXT:    xsadddp f0, f0, v1
+; PWR9BE-NEXT:    xsadddp f0, f0, v14
+; PWR9BE-NEXT:    xxswapd v15, v14
+; PWR9BE-NEXT:    xsadddp f0, f0, v15
+; PWR9BE-NEXT:    xsadddp f0, f0, v16
+; PWR9BE-NEXT:    xxswapd v17, v16
+; PWR9BE-NEXT:    xsadddp f1, f0, v17
 ; PWR9BE-NEXT:    blr
 ;
 ; PWR10LE-LABEL: v64f64:
 ; PWR10LE:       # %bb.0: # %entry
-; PWR10LE-NEXT:    xxswapd v18, v2
-; PWR10LE-NEXT:    lxv v17, 224(r1)
-; PWR10LE-NEXT:    lxv v16, 240(r1)
-; PWR10LE-NEXT:    xsadddp v2, v18, v2
-; PWR10LE-NEXT:    xxswapd v18, v3
-; PWR10LE-NEXT:    lxv v15, 256(r1)
-; PWR10LE-NEXT:    lxv v14, 272(r1)
-; PWR10LE-NEXT:    lxv v1, 288(r1)
-; PWR10LE-NEXT:    lxv v0, 304(r1)
-; PWR10LE-NEXT:    lxv vs13, 320(r1)
-; PWR10LE-NEXT:    lxv vs12, 336(r1)
-; PWR10LE-NEXT:    lxv vs11, 352(r1)
-; PWR10LE-NEXT:    lxv vs10, 368(r1)
-; PWR10LE-NEXT:    xsadddp v2, v2, v18
-; PWR10LE-NEXT:    lxv vs9, 384(r1)
-; PWR10LE-NEXT:    lxv vs8, 400(r1)
-; PWR10LE-NEXT:    lxv vs7, 416(r1)
-; PWR10LE-NEXT:    lxv vs6, 432(r1)
-; PWR10LE-NEXT:    lxv vs5, 448(r1)
-; PWR10LE-NEXT:    lxv vs4, 464(r1)
-; PWR10LE-NEXT:    lxv vs3, 480(r1)
-; PWR10LE-NEXT:    lxv vs2, 496(r1)
+; PWR10LE-NEXT:    xxswapd vs0, v2
+; PWR10LE-NEXT:    xxswapd vs1, v3
+; PWR10LE-NEXT:    xsadddp f0, f0, v2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v4
+; PWR10LE-NEXT:    xsadddp f0, f0, v3
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v5
+; PWR10LE-NEXT:    xsadddp f0, f0, v4
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v6
+; PWR10LE-NEXT:    xsadddp f0, f0, v5
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v7
+; PWR10LE-NEXT:    xsadddp f0, f0, v6
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v8
+; PWR10LE-NEXT:    xsadddp f0, f0, v7
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v9
+; PWR10LE-NEXT:    xsadddp f0, f0, v8
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v10
+; PWR10LE-NEXT:    xsadddp f0, f0, v9
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v11
+; PWR10LE-NEXT:    xsadddp f0, f0, v10
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v12
+; PWR10LE-NEXT:    xsadddp f0, f0, v11
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v13
+; PWR10LE-NEXT:    xsadddp f0, f0, v12
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 224(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, v13
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 240(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 256(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 272(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 288(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 304(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 320(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 336(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 352(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 368(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 384(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 400(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 416(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 432(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 448(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 464(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 480(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 496(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
 ; PWR10LE-NEXT:    lxv vs1, 512(r1)
-; PWR10LE-NEXT:    lxv vs0, 528(r1)
-; PWR10LE-NEXT:    xsadddp v2, v2, v3
-; PWR10LE-NEXT:    xxswapd v3, v4
-; PWR10LE-NEXT:    xsadddp v2, v2, v3
-; PWR10LE-NEXT:    xxswapd v3, v5
-; PWR10LE-NEXT:    xsadddp v2, v2, v4
-; PWR10LE-NEXT:    xsadddp v2, v2, v3
-; PWR10LE-NEXT:    xxswapd v3, v6
-; PWR10LE-NEXT:    xsadddp v2, v2, v5
-; PWR10LE-NEXT:    xsadddp v2, v2, v3
-; PWR10LE-NEXT:    xxswapd v3, v7
-; PWR10LE-NEXT:    xsadddp v2, v2, v6
-; PWR10LE-NEXT:    xsadddp v2, v2, v3
-; PWR10LE-NEXT:    xxswapd v3, v8
-; PWR10LE-NEXT:    xsadddp v2, v2, v7
-; PWR10LE-NEXT:    xsadddp v2, v2, v3
-; PWR10LE-NEXT:    xxswapd v3, v9
-; PWR10LE-NEXT:    xsadddp v2, v2, v8
-; PWR10LE-NEXT:    xsadddp v2, v2, v3
-; PWR10LE-NEXT:    xxswapd v3, v10
-; PWR10LE-NEXT:    xsadddp v2, v2, v9
-; PWR10LE-NEXT:    xsadddp v2, v2, v3
-; PWR10LE-NEXT:    xxswapd v3, v11
-; PWR10LE-NEXT:    xsadddp v2, v2, v10
-; PWR10LE-NEXT:    xsadddp v2, v2, v3
-; PWR10LE-NEXT:    xxswapd v3, v12
-; PWR10LE-NEXT:    xsadddp v2, v2, v11
-; PWR10LE-NEXT:    xsadddp v2, v2, v3
-; PWR10LE-NEXT:    xxswapd v3, v13
-; PWR10LE-NEXT:    xsadddp v2, v2, v12
-; PWR10LE-NEXT:    xsadddp v2, v2, v3
-; PWR10LE-NEXT:    xxswapd v3, v17
-; PWR10LE-NEXT:    xsadddp v2, v2, v13
-; PWR10LE-NEXT:    xsadddp v2, v2, v3
-; PWR10LE-NEXT:    xxswapd v3, v16
-; PWR10LE-NEXT:    xsadddp v2, v2, v17
-; PWR10LE-NEXT:    xsadddp v2, v2, v3
-; PWR10LE-NEXT:    xxswapd v3, v15
-; PWR10LE-NEXT:    xsadddp v2, v2, v16
-; PWR10LE-NEXT:    xsadddp v2, v2, v3
-; PWR10LE-NEXT:    xxswapd v3, v14
-; PWR10LE-NEXT:    xsadddp v2, v2, v15
-; PWR10LE-NEXT:    xsadddp v2, v2, v3
-; PWR10LE-NEXT:    xxswapd v3, v1
-; PWR10LE-NEXT:    xsadddp v2, v2, v14
-; PWR10LE-NEXT:    xsadddp v2, v2, v3
-; PWR10LE-NEXT:    xxswapd v3, v0
-; PWR10LE-NEXT:    xsadddp v2, v2, v1
-; PWR10LE-NEXT:    xsadddp v2, v2, v3
-; PWR10LE-NEXT:    xxswapd v3, vs13
-; PWR10LE-NEXT:    xsadddp v2, v2, v0
-; PWR10LE-NEXT:    xsadddp v2, v2, v3
-; PWR10LE-NEXT:    xsadddp f13, v2, f13
-; PWR10LE-NEXT:    xxswapd v2, vs12
-; PWR10LE-NEXT:    xsadddp f13, f13, v2
-; PWR10LE-NEXT:    xsadddp f12, f13, f12
-; PWR10LE-NEXT:    xxswapd vs13, vs11
-; PWR10LE-NEXT:    xsadddp f12, f12, f13
-; PWR10LE-NEXT:    xsadddp f11, f12, f11
-; PWR10LE-NEXT:    xxswapd vs12, vs10
-; PWR10LE-NEXT:    xsadddp f11, f11, f12
-; PWR10LE-NEXT:    xsadddp f10, f11, f10
-; PWR10LE-NEXT:    xxswapd vs11, vs9
-; PWR10LE-NEXT:    xsadddp f10, f10, f11
-; PWR10LE-NEXT:    xsadddp f9, f10, f9
-; PWR10LE-NEXT:    xxswapd vs10, vs8
-; PWR10LE-NEXT:    xsadddp f9, f9, f10
-; PWR10LE-NEXT:    xsadddp f8, f9, f8
-; PWR10LE-NEXT:    xxswapd vs9, vs7
-; PWR10LE-NEXT:    xsadddp f8, f8, f9
-; PWR10LE-NEXT:    xsadddp f7, f8, f7
-; PWR10LE-NEXT:    xxswapd vs8, vs6
-; PWR10LE-NEXT:    xsadddp f7, f7, f8
-; PWR10LE-NEXT:    xsadddp f6, f7, f6
-; PWR10LE-NEXT:    xxswapd vs7, vs5
-; PWR10LE-NEXT:    xsadddp f6, f6, f7
-; PWR10LE-NEXT:    xsadddp f5, f6, f5
-; PWR10LE-NEXT:    xxswapd vs6, vs4
-; PWR10LE-NEXT:    xsadddp f5, f5, f6
-; PWR10LE-NEXT:    xsadddp f4, f5, f4
-; PWR10LE-NEXT:    xxswapd vs5, vs3
-; PWR10LE-NEXT:    xsadddp f4, f4, f5
-; PWR10LE-NEXT:    xsadddp f3, f4, f3
-; PWR10LE-NEXT:    xxswapd vs4, vs2
-; PWR10LE-NEXT:    xsadddp f3, f3, f4
-; PWR10LE-NEXT:    xsadddp f2, f3, f2
-; PWR10LE-NEXT:    xxswapd vs3, vs1
-; PWR10LE-NEXT:    xsadddp f2, f2, f3
-; PWR10LE-NEXT:    xsadddp f1, f2, f1
-; PWR10LE-NEXT:    xxswapd vs2, vs0
-; PWR10LE-NEXT:    xsadddp f1, f1, f2
-; PWR10LE-NEXT:    xsadddp f1, f1, f0
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 528(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f1, f0, f1
 ; PWR10LE-NEXT:    blr
 ;
 ; PWR10BE-LABEL: v64f64:
 ; PWR10BE:       # %bb.0: # %entry
-; PWR10BE-NEXT:    xxswapd v18, v2
-; PWR10BE-NEXT:    lxv v17, 240(r1)
-; PWR10BE-NEXT:    lxv v16, 256(r1)
-; PWR10BE-NEXT:    xsadddp v2, v2, v18
-; PWR10BE-NEXT:    lxv v15, 272(r1)
-; PWR10BE-NEXT:    lxv v14, 288(r1)
-; PWR10BE-NEXT:    lxv v1, 304(r1)
-; PWR10BE-NEXT:    lxv v0, 320(r1)
-; PWR10BE-NEXT:    lxv vs13, 336(r1)
-; PWR10BE-NEXT:    lxv vs12, 352(r1)
-; PWR10BE-NEXT:    lxv vs11, 368(r1)
-; PWR10BE-NEXT:    lxv vs10, 384(r1)
-; PWR10BE-NEXT:    xsadddp v2, v2, v3
-; PWR10BE-NEXT:    xxswapd v3, v3
-; PWR10BE-NEXT:    lxv vs9, 400(r1)
-; PWR10BE-NEXT:    lxv vs8, 416(r1)
-; PWR10BE-NEXT:    lxv vs7, 432(r1)
-; PWR10BE-NEXT:    lxv vs6, 448(r1)
-; PWR10BE-NEXT:    lxv vs5, 464(r1)
-; PWR10BE-NEXT:    lxv vs4, 480(r1)
-; PWR10BE-NEXT:    lxv vs3, 496(r1)
-; PWR10BE-NEXT:    lxv vs2, 512(r1)
-; PWR10BE-NEXT:    lxv vs1, 528(r1)
-; PWR10BE-NEXT:    lxv vs0, 544(r1)
-; PWR10BE-NEXT:    xsadddp v2, v2, v3
-; PWR10BE-NEXT:    xxswapd v3, v4
-; PWR10BE-NEXT:    xsadddp v2, v2, v4
-; PWR10BE-NEXT:    xsadddp v2, v2, v3
-; PWR10BE-NEXT:    xxswapd v3, v5
-; PWR10BE-NEXT:    xsadddp v2, v2, v5
-; PWR10BE-NEXT:    xsadddp v2, v2, v3
-; PWR10BE-NEXT:    xxswapd v3, v6
-; PWR10BE-NEXT:    xsadddp v2, v2, v6
-; PWR10BE-NEXT:    xsadddp v2, v2, v3
-; PWR10BE-NEXT:    xxswapd v3, v7
-; PWR10BE-NEXT:    xsadddp v2, v2, v7
-; PWR10BE-NEXT:    xsadddp v2, v2, v3
-; PWR10BE-NEXT:    xxswapd v3, v8
-; PWR10BE-NEXT:    xsadddp v2, v2, v8
-; PWR10BE-NEXT:    xsadddp v2, v2, v3
-; PWR10BE-NEXT:    xxswapd v3, v9
-; PWR10BE-NEXT:    xsadddp v2, v2, v9
-; PWR10BE-NEXT:    xsadddp v2, v2, v3
-; PWR10BE-NEXT:    xxswapd v3, v10
-; PWR10BE-NEXT:    xsadddp v2, v2, v10
-; PWR10BE-NEXT:    xsadddp v2, v2, v3
-; PWR10BE-NEXT:    xxswapd v3, v11
-; PWR10BE-NEXT:    xsadddp v2, v2, v11
-; PWR10BE-NEXT:    xsadddp v2, v2, v3
-; PWR10BE-NEXT:    xxswapd v3, v12
-; PWR10BE-NEXT:    xsadddp v2, v2, v12
-; PWR10BE-NEXT:    xsadddp v2, v2, v3
-; PWR10BE-NEXT:    xxswapd v3, v13
-; PWR10BE-NEXT:    xsadddp v2, v2, v13
-; PWR10BE-NEXT:    xsadddp v2, v2, v3
-; PWR10BE-NEXT:    xxswapd v3, v17
-; PWR10BE-NEXT:    xsadddp v2, v2, v17
-; PWR10BE-NEXT:    xsadddp v2, v2, v3
-; PWR10BE-NEXT:    xxswapd v3, v16
-; PWR10BE-NEXT:    xsadddp v2, v2, v16
-; PWR10BE-NEXT:    xsadddp v2, v2, v3
-; PWR10BE-NEXT:    xxswapd v3, v15
-; PWR10BE-NEXT:    xsadddp v2, v2, v15
-; PWR10BE-NEXT:    xsadddp v2, v2, v3
-; PWR10BE-NEXT:    xxswapd v3, v14
-; PWR10BE-NEXT:    xsadddp v2, v2, v14
-; PWR10BE-NEXT:    xsadddp v2, v2, v3
-; PWR10BE-NEXT:    xxswapd v3, v1
-; PWR10BE-NEXT:    xsadddp v2, v2, v1
-; PWR10BE-NEXT:    xsadddp v2, v2, v3
-; PWR10BE-NEXT:    xxswapd v3, v0
-; PWR10BE-NEXT:    xsadddp v2, v2, v0
-; PWR10BE-NEXT:    xsadddp v2, v2, v3
-; PWR10BE-NEXT:    xsadddp v2, v2, f13
-; PWR10BE-NEXT:    xxswapd vs13, vs13
-; PWR10BE-NEXT:    xsadddp f13, v2, f13
-; PWR10BE-NEXT:    xsadddp f13, f13, f12
-; PWR10BE-NEXT:    xxswapd vs12, vs12
-; PWR10BE-NEXT:    xsadddp f12, f13, f12
-; PWR10BE-NEXT:    xsadddp f12, f12, f11
-; PWR10BE-NEXT:    xxswapd vs11, vs11
-; PWR10BE-NEXT:    xsadddp f11, f12, f11
-; PWR10BE-NEXT:    xsadddp f11, f11, f10
-; PWR10BE-NEXT:    xxswapd vs10, vs10
-; PWR10BE-NEXT:    xsadddp f10, f11, f10
-; PWR10BE-NEXT:    xsadddp f10, f10, f9
-; PWR10BE-NEXT:    xxswapd vs9, vs9
-; PWR10BE-NEXT:    xsadddp f9, f10, f9
-; PWR10BE-NEXT:    xsadddp f9, f9, f8
-; PWR10BE-NEXT:    xxswapd vs8, vs8
-; PWR10BE-NEXT:    xsadddp f8, f9, f8
-; PWR10BE-NEXT:    xsadddp f8, f8, f7
-; PWR10BE-NEXT:    xxswapd vs7, vs7
-; PWR10BE-NEXT:    xsadddp f7, f8, f7
-; PWR10BE-NEXT:    xsadddp f7, f7, f6
-; PWR10BE-NEXT:    xxswapd vs6, vs6
-; PWR10BE-NEXT:    xsadddp f6, f7, f6
-; PWR10BE-NEXT:    xsadddp f6, f6, f5
-; PWR10BE-NEXT:    xxswapd vs5, vs5
-; PWR10BE-NEXT:    xsadddp f5, f6, f5
-; PWR10BE-NEXT:    xsadddp f5, f5, f4
-; PWR10BE-NEXT:    xxswapd vs4, vs4
-; PWR10BE-NEXT:    xsadddp f4, f5, f4
-; PWR10BE-NEXT:    xsadddp f4, f4, f3
-; PWR10BE-NEXT:    xxswapd vs3, vs3
-; PWR10BE-NEXT:    xsadddp f3, f4, f3
-; PWR10BE-NEXT:    xsadddp f3, f3, f2
-; PWR10BE-NEXT:    xxswapd vs2, vs2
-; PWR10BE-NEXT:    xsadddp f2, f3, f2
-; PWR10BE-NEXT:    xsadddp f2, f2, f1
+; PWR10BE-NEXT:    xxswapd vs0, v2
+; PWR10BE-NEXT:    xxswapd vs1, v3
+; PWR10BE-NEXT:    xxswapd vs2, v13
+; PWR10BE-NEXT:    xsadddp f0, v2, f0
+; PWR10BE-NEXT:    xsadddp f0, f0, v3
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, v4
+; PWR10BE-NEXT:    xsadddp f0, f0, v4
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, v5
+; PWR10BE-NEXT:    xsadddp f0, f0, v5
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, v6
+; PWR10BE-NEXT:    xsadddp f0, f0, v6
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, v7
+; PWR10BE-NEXT:    xsadddp f0, f0, v7
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, v8
+; PWR10BE-NEXT:    xsadddp f0, f0, v8
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, v9
+; PWR10BE-NEXT:    xsadddp f0, f0, v9
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, v10
+; PWR10BE-NEXT:    xsadddp f0, f0, v10
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, v11
+; PWR10BE-NEXT:    xsadddp f0, f0, v11
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, v12
+; PWR10BE-NEXT:    xsadddp f0, f0, v12
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 240(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, v13
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 256(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
 ; PWR10BE-NEXT:    xxswapd vs1, vs1
-; PWR10BE-NEXT:    xsadddp f1, f2, f1
-; PWR10BE-NEXT:    xsadddp f1, f1, f0
-; PWR10BE-NEXT:    xxswapd vs0, vs0
-; PWR10BE-NEXT:    xsadddp f1, f1, f0
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 272(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    xxswapd vs2, vs2
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 288(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs1
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 304(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    xxswapd vs2, vs2
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 320(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs1
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 336(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    xxswapd vs2, vs2
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 352(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs1
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 368(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    xxswapd vs2, vs2
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 384(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs1
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 400(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    xxswapd vs2, vs2
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 416(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs1
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 432(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    xxswapd vs2, vs2
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 448(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs1
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 464(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    xxswapd vs2, vs2
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 480(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs1
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 496(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    xxswapd vs2, vs2
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 512(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs1
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 528(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    xxswapd vs2, vs2
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 544(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs1
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs2
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    xsadddp f1, f0, f1
 ; PWR10BE-NEXT:    blr
 entry:
   %0 = call double @llvm.vector.reduce.fadd.v64f64(double -0.000000e+00, <64 x double> %a)
@@ -2738,482 +2738,482 @@ entry:
 define dso_local double @v64f64_b(<64 x double> %a, double %b) local_unnamed_addr #0 {
 ; PWR9LE-LABEL: v64f64_b:
 ; PWR9LE:       # %bb.0: # %entry
-; PWR9LE-NEXT:    xxswapd v19, v2
-; PWR9LE-NEXT:    lxv v18, 224(r1)
-; PWR9LE-NEXT:    lxv v17, 240(r1)
-; PWR9LE-NEXT:    lxv v16, 256(r1)
-; PWR9LE-NEXT:    lxv v15, 272(r1)
-; PWR9LE-NEXT:    xsadddp f1, f1, v19
-; PWR9LE-NEXT:    lxv v14, 288(r1)
-; PWR9LE-NEXT:    lxv v1, 304(r1)
-; PWR9LE-NEXT:    lxv v0, 320(r1)
-; PWR9LE-NEXT:    lxv vs13, 336(r1)
-; PWR9LE-NEXT:    lxv vs12, 352(r1)
-; PWR9LE-NEXT:    lxv vs11, 368(r1)
-; PWR9LE-NEXT:    lxv vs10, 384(r1)
-; PWR9LE-NEXT:    lxv vs9, 400(r1)
-; PWR9LE-NEXT:    lxv vs8, 416(r1)
-; PWR9LE-NEXT:    lxv vs7, 432(r1)
-; PWR9LE-NEXT:    lxv vs6, 448(r1)
-; PWR9LE-NEXT:    lxv vs5, 464(r1)
+; PWR9LE-NEXT:    xxswapd vs4, v2
+; PWR9LE-NEXT:    lxv v14, 224(r1)
+; PWR9LE-NEXT:    lxv vs3, 240(r1)
+; PWR9LE-NEXT:    lxv vs2, 256(r1)
+; PWR9LE-NEXT:    xxswapd vs5, v3
+; PWR9LE-NEXT:    lxv vs0, 272(r1)
+; PWR9LE-NEXT:    xsadddp f1, f1, f4
+; PWR9LE-NEXT:    lxv vs4, 288(r1)
+; PWR9LE-NEXT:    xxswapd vs6, v4
 ; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xxswapd v2, v3
-; PWR9LE-NEXT:    lxv vs4, 480(r1)
-; PWR9LE-NEXT:    lxv vs3, 496(r1)
-; PWR9LE-NEXT:    lxv vs2, 512(r1)
-; PWR9LE-NEXT:    lxv vs0, 528(r1)
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xxswapd v2, v4
+; PWR9LE-NEXT:    xsadddp f1, f1, f5
+; PWR9LE-NEXT:    lxv vs5, 304(r1)
 ; PWR9LE-NEXT:    xsadddp f1, f1, v3
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xxswapd v2, v5
+; PWR9LE-NEXT:    xsadddp f1, f1, f6
+; PWR9LE-NEXT:    lxv vs6, 320(r1)
 ; PWR9LE-NEXT:    xsadddp f1, f1, v4
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xxswapd v2, v6
+; PWR9LE-NEXT:    xxswapd vs7, v5
+; PWR9LE-NEXT:    xsadddp f1, f1, f7
+; PWR9LE-NEXT:    lxv vs7, 336(r1)
 ; PWR9LE-NEXT:    xsadddp f1, f1, v5
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xxswapd v2, v7
+; PWR9LE-NEXT:    xxswapd vs8, v6
+; PWR9LE-NEXT:    xsadddp f1, f1, f8
+; PWR9LE-NEXT:    lxv vs8, 352(r1)
 ; PWR9LE-NEXT:    xsadddp f1, f1, v6
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xxswapd v2, v8
+; PWR9LE-NEXT:    xxswapd vs9, v7
+; PWR9LE-NEXT:    xsadddp f1, f1, f9
+; PWR9LE-NEXT:    lxv vs9, 368(r1)
 ; PWR9LE-NEXT:    xsadddp f1, f1, v7
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xxswapd v2, v9
+; PWR9LE-NEXT:    xxswapd vs10, v8
+; PWR9LE-NEXT:    xsadddp f1, f1, f10
+; PWR9LE-NEXT:    lxv vs10, 384(r1)
 ; PWR9LE-NEXT:    xsadddp f1, f1, v8
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xxswapd v2, v10
+; PWR9LE-NEXT:    xxswapd vs11, v9
+; PWR9LE-NEXT:    xsadddp f1, f1, f11
+; PWR9LE-NEXT:    lxv vs11, 400(r1)
 ; PWR9LE-NEXT:    xsadddp f1, f1, v9
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xxswapd v2, v11
+; PWR9LE-NEXT:    xxswapd vs12, v10
+; PWR9LE-NEXT:    xsadddp f1, f1, f12
+; PWR9LE-NEXT:    lxv vs12, 416(r1)
 ; PWR9LE-NEXT:    xsadddp f1, f1, v10
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xxswapd v2, v12
+; PWR9LE-NEXT:    xxswapd vs13, v11
+; PWR9LE-NEXT:    xsadddp f1, f1, f13
+; PWR9LE-NEXT:    lxv vs13, 432(r1)
 ; PWR9LE-NEXT:    xsadddp f1, f1, v11
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xxswapd v2, v13
-; PWR9LE-NEXT:    xsadddp f1, f1, v12
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xxswapd v2, v18
-; PWR9LE-NEXT:    xsadddp f1, f1, v13
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xxswapd v2, v17
-; PWR9LE-NEXT:    xsadddp f1, f1, v18
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xxswapd v2, v16
-; PWR9LE-NEXT:    xsadddp f1, f1, v17
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xxswapd v2, v15
-; PWR9LE-NEXT:    xsadddp f1, f1, v16
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xxswapd v2, v14
-; PWR9LE-NEXT:    xsadddp f1, f1, v15
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xxswapd v2, v1
-; PWR9LE-NEXT:    xsadddp f1, f1, v14
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xxswapd v2, v0
-; PWR9LE-NEXT:    xsadddp f1, f1, v1
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xxswapd v2, vs13
+; PWR9LE-NEXT:    xxswapd v0, v12
 ; PWR9LE-NEXT:    xsadddp f1, f1, v0
-; PWR9LE-NEXT:    xsadddp f1, f1, v2
-; PWR9LE-NEXT:    xsadddp f1, f1, f13
-; PWR9LE-NEXT:    xxswapd vs13, vs12
-; PWR9LE-NEXT:    xsadddp f1, f1, f13
-; PWR9LE-NEXT:    xsadddp f1, f1, f12
-; PWR9LE-NEXT:    xxswapd vs12, vs11
-; PWR9LE-NEXT:    xsadddp f1, f1, f12
-; PWR9LE-NEXT:    xsadddp f1, f1, f11
-; PWR9LE-NEXT:    xxswapd vs11, vs10
-; PWR9LE-NEXT:    xsadddp f1, f1, f11
-; PWR9LE-NEXT:    xsadddp f1, f1, f10
-; PWR9LE-NEXT:    xxswapd vs10, vs9
-; PWR9LE-NEXT:    xsadddp f1, f1, f10
-; PWR9LE-NEXT:    xsadddp f1, f1, f9
-; PWR9LE-NEXT:    xxswapd vs9, vs8
-; PWR9LE-NEXT:    xsadddp f1, f1, f9
-; PWR9LE-NEXT:    xsadddp f1, f1, f8
-; PWR9LE-NEXT:    xxswapd vs8, vs7
-; PWR9LE-NEXT:    xsadddp f1, f1, f8
-; PWR9LE-NEXT:    xsadddp f1, f1, f7
-; PWR9LE-NEXT:    xxswapd vs7, vs6
-; PWR9LE-NEXT:    xsadddp f1, f1, f7
-; PWR9LE-NEXT:    xsadddp f1, f1, f6
-; PWR9LE-NEXT:    xxswapd vs6, vs5
-; PWR9LE-NEXT:    xsadddp f1, f1, f6
-; PWR9LE-NEXT:    xsadddp f1, f1, f5
-; PWR9LE-NEXT:    xxswapd vs5, vs4
-; PWR9LE-NEXT:    xsadddp f1, f1, f5
-; PWR9LE-NEXT:    xsadddp f1, f1, f4
-; PWR9LE-NEXT:    xxswapd vs4, vs3
-; PWR9LE-NEXT:    xsadddp f1, f1, f4
+; PWR9LE-NEXT:    lxv v0, 448(r1)
+; PWR9LE-NEXT:    xsadddp f1, f1, v12
+; PWR9LE-NEXT:    xxswapd v1, v13
+; PWR9LE-NEXT:    xsadddp f1, f1, v1
+; PWR9LE-NEXT:    lxv v1, 464(r1)
+; PWR9LE-NEXT:    xsadddp f1, f1, v13
+; PWR9LE-NEXT:    lxv v13, 480(r1)
+; PWR9LE-NEXT:    xxswapd v15, v14
+; PWR9LE-NEXT:    xsadddp f1, f1, v15
+; PWR9LE-NEXT:    xsadddp f1, f1, v14
+; PWR9LE-NEXT:    lxv v14, 496(r1)
+; PWR9LE-NEXT:    xxswapd v16, vs3
+; PWR9LE-NEXT:    xsadddp f1, f1, v16
 ; PWR9LE-NEXT:    xsadddp f1, f1, f3
-; PWR9LE-NEXT:    xxswapd vs3, vs2
-; PWR9LE-NEXT:    xsadddp f1, f1, f3
+; PWR9LE-NEXT:    lxv vs3, 512(r1)
+; PWR9LE-NEXT:    xxswapd v17, vs2
+; PWR9LE-NEXT:    xsadddp f1, f1, v17
 ; PWR9LE-NEXT:    xsadddp f1, f1, f2
-; PWR9LE-NEXT:    xxswapd vs2, vs0
-; PWR9LE-NEXT:    xsadddp f1, f1, f2
-; PWR9LE-NEXT:    xsadddp f1, f1, f0
+; PWR9LE-NEXT:    lxv vs2, 528(r1)
+; PWR9LE-NEXT:    xxswapd v18, vs0
+; PWR9LE-NEXT:    xsadddp f1, f1, v18
+; PWR9LE-NEXT:    xsadddp f0, f1, f0
+; PWR9LE-NEXT:    xxswapd v19, vs4
+; PWR9LE-NEXT:    xsadddp f0, f0, v19
+; PWR9LE-NEXT:    xsadddp f0, f0, f4
+; PWR9LE-NEXT:    xxswapd v2, vs5
+; PWR9LE-NEXT:    xsadddp f0, f0, v2
+; PWR9LE-NEXT:    xsadddp f0, f0, f5
+; PWR9LE-NEXT:    xxswapd v3, vs6
+; PWR9LE-NEXT:    xsadddp f0, f0, v3
+; PWR9LE-NEXT:    xsadddp f0, f0, f6
+; PWR9LE-NEXT:    xxswapd v4, vs7
+; PWR9LE-NEXT:    xsadddp f0, f0, v4
+; PWR9LE-NEXT:    xsadddp f0, f0, f7
+; PWR9LE-NEXT:    xxswapd v5, vs8
+; PWR9LE-NEXT:    xsadddp f0, f0, v5
+; PWR9LE-NEXT:    xsadddp f0, f0, f8
+; PWR9LE-NEXT:    xxswapd v6, vs9
+; PWR9LE-NEXT:    xsadddp f0, f0, v6
+; PWR9LE-NEXT:    xsadddp f0, f0, f9
+; PWR9LE-NEXT:    xxswapd v7, vs10
+; PWR9LE-NEXT:    xsadddp f0, f0, v7
+; PWR9LE-NEXT:    xsadddp f0, f0, f10
+; PWR9LE-NEXT:    xxswapd v8, vs11
+; PWR9LE-NEXT:    xsadddp f0, f0, v8
+; PWR9LE-NEXT:    xsadddp f0, f0, f11
+; PWR9LE-NEXT:    xxswapd v9, vs12
+; PWR9LE-NEXT:    xsadddp f0, f0, v9
+; PWR9LE-NEXT:    xsadddp f0, f0, f12
+; PWR9LE-NEXT:    xxswapd v10, vs13
+; PWR9LE-NEXT:    xsadddp f0, f0, v10
+; PWR9LE-NEXT:    xsadddp f0, f0, f13
+; PWR9LE-NEXT:    xxswapd v11, v0
+; PWR9LE-NEXT:    xsadddp f0, f0, v11
+; PWR9LE-NEXT:    xsadddp f0, f0, v0
+; PWR9LE-NEXT:    xxswapd v12, v1
+; PWR9LE-NEXT:    xsadddp f0, f0, v12
+; PWR9LE-NEXT:    xsadddp f0, f0, v1
+; PWR9LE-NEXT:    xxswapd v15, v13
+; PWR9LE-NEXT:    xsadddp f0, f0, v15
+; PWR9LE-NEXT:    xsadddp f0, f0, v13
+; PWR9LE-NEXT:    xxswapd v16, v14
+; PWR9LE-NEXT:    xsadddp f0, f0, v16
+; PWR9LE-NEXT:    xsadddp f0, f0, v14
+; PWR9LE-NEXT:    xxswapd v17, vs3
+; PWR9LE-NEXT:    xsadddp f0, f0, v17
+; PWR9LE-NEXT:    xsadddp f0, f0, f3
+; PWR9LE-NEXT:    xxswapd v18, vs2
+; PWR9LE-NEXT:    xsadddp f0, f0, v18
+; PWR9LE-NEXT:    xsadddp f1, f0, f2
 ; PWR9LE-NEXT:    blr
 ;
 ; PWR9BE-LABEL: v64f64_b:
 ; PWR9BE:       # %bb.0: # %entry
 ; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd v2, v2
-; PWR9BE-NEXT:    lxv v18, 240(r1)
-; PWR9BE-NEXT:    lxv v17, 256(r1)
-; PWR9BE-NEXT:    lxv v16, 272(r1)
-; PWR9BE-NEXT:    lxv v15, 288(r1)
-; PWR9BE-NEXT:    lxv v14, 304(r1)
-; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd v2, v3
-; PWR9BE-NEXT:    lxv v1, 320(r1)
-; PWR9BE-NEXT:    lxv v0, 336(r1)
-; PWR9BE-NEXT:    lxv vs13, 352(r1)
-; PWR9BE-NEXT:    lxv vs12, 368(r1)
-; PWR9BE-NEXT:    lxv vs11, 384(r1)
-; PWR9BE-NEXT:    lxv vs10, 400(r1)
-; PWR9BE-NEXT:    lxv vs9, 416(r1)
-; PWR9BE-NEXT:    lxv vs8, 432(r1)
-; PWR9BE-NEXT:    lxv vs7, 448(r1)
-; PWR9BE-NEXT:    lxv vs6, 464(r1)
-; PWR9BE-NEXT:    lxv vs5, 480(r1)
-; PWR9BE-NEXT:    lxv vs4, 496(r1)
-; PWR9BE-NEXT:    lxv vs3, 512(r1)
-; PWR9BE-NEXT:    lxv vs2, 528(r1)
-; PWR9BE-NEXT:    lxv vs0, 544(r1)
-; PWR9BE-NEXT:    xsadddp f1, f1, v3
-; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd v2, v4
-; PWR9BE-NEXT:    xsadddp f1, f1, v4
-; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd v2, v5
-; PWR9BE-NEXT:    xsadddp f1, f1, v5
-; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd v2, v6
-; PWR9BE-NEXT:    xsadddp f1, f1, v6
-; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd v2, v7
-; PWR9BE-NEXT:    xsadddp f1, f1, v7
-; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd v2, v8
-; PWR9BE-NEXT:    xsadddp f1, f1, v8
-; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd v2, v9
-; PWR9BE-NEXT:    xsadddp f1, f1, v9
-; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd v2, v10
-; PWR9BE-NEXT:    xsadddp f1, f1, v10
-; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd v2, v11
-; PWR9BE-NEXT:    xsadddp f1, f1, v11
-; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd v2, v12
-; PWR9BE-NEXT:    xsadddp f1, f1, v12
-; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd v2, v13
-; PWR9BE-NEXT:    xsadddp f1, f1, v13
-; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd v2, v18
-; PWR9BE-NEXT:    xsadddp f1, f1, v18
-; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd v2, v17
-; PWR9BE-NEXT:    xsadddp f1, f1, v17
-; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd v2, v16
-; PWR9BE-NEXT:    xsadddp f1, f1, v16
-; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd v2, v15
-; PWR9BE-NEXT:    xsadddp f1, f1, v15
-; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd v2, v14
-; PWR9BE-NEXT:    xsadddp f1, f1, v14
-; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd v2, v1
-; PWR9BE-NEXT:    xsadddp f1, f1, v1
-; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xxswapd v2, v0
-; PWR9BE-NEXT:    xsadddp f1, f1, v0
-; PWR9BE-NEXT:    xsadddp f1, f1, v2
-; PWR9BE-NEXT:    xsadddp f1, f1, f13
-; PWR9BE-NEXT:    xxswapd vs13, vs13
-; PWR9BE-NEXT:    xsadddp f1, f1, f13
-; PWR9BE-NEXT:    xsadddp f1, f1, f12
-; PWR9BE-NEXT:    xxswapd vs12, vs12
-; PWR9BE-NEXT:    xsadddp f1, f1, f12
-; PWR9BE-NEXT:    xsadddp f1, f1, f11
-; PWR9BE-NEXT:    xxswapd vs11, vs11
-; PWR9BE-NEXT:    xsadddp f1, f1, f11
-; PWR9BE-NEXT:    xsadddp f1, f1, f10
-; PWR9BE-NEXT:    xxswapd vs10, vs10
-; PWR9BE-NEXT:    xsadddp f1, f1, f10
-; PWR9BE-NEXT:    xsadddp f1, f1, f9
-; PWR9BE-NEXT:    xxswapd vs9, vs9
-; PWR9BE-NEXT:    xsadddp f1, f1, f9
-; PWR9BE-NEXT:    xsadddp f1, f1, f8
-; PWR9BE-NEXT:    xxswapd vs8, vs8
-; PWR9BE-NEXT:    xsadddp f1, f1, f8
-; PWR9BE-NEXT:    xsadddp f1, f1, f7
-; PWR9BE-NEXT:    xxswapd vs7, vs7
-; PWR9BE-NEXT:    xsadddp f1, f1, f7
-; PWR9BE-NEXT:    xsadddp f1, f1, f6
-; PWR9BE-NEXT:    xxswapd vs6, vs6
-; PWR9BE-NEXT:    xsadddp f1, f1, f6
-; PWR9BE-NEXT:    xsadddp f1, f1, f5
-; PWR9BE-NEXT:    xxswapd vs5, vs5
-; PWR9BE-NEXT:    xsadddp f1, f1, f5
-; PWR9BE-NEXT:    xsadddp f1, f1, f4
-; PWR9BE-NEXT:    xxswapd vs4, vs4
-; PWR9BE-NEXT:    xsadddp f1, f1, f4
-; PWR9BE-NEXT:    xsadddp f1, f1, f3
-; PWR9BE-NEXT:    xxswapd vs3, vs3
-; PWR9BE-NEXT:    xsadddp f1, f1, f3
-; PWR9BE-NEXT:    xsadddp f1, f1, f2
-; PWR9BE-NEXT:    xxswapd vs2, vs2
-; PWR9BE-NEXT:    xsadddp f1, f1, f2
-; PWR9BE-NEXT:    xsadddp f1, f1, f0
-; PWR9BE-NEXT:    xxswapd vs0, vs0
-; PWR9BE-NEXT:    xsadddp f1, f1, f0
+; PWR9BE-NEXT:    xxswapd vs0, v2
+; PWR9BE-NEXT:    lxv vs13, 240(r1)
+; PWR9BE-NEXT:    lxv v1, 256(r1)
+; PWR9BE-NEXT:    lxv v15, 272(r1)
+; PWR9BE-NEXT:    xxswapd vs2, v3
+; PWR9BE-NEXT:    lxv v17, 288(r1)
+; PWR9BE-NEXT:    xsadddp f0, f1, f0
+; PWR9BE-NEXT:    lxv vs1, 304(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v3
+; PWR9BE-NEXT:    xsadddp f0, f0, f2
+; PWR9BE-NEXT:    lxv vs2, 320(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v4
+; PWR9BE-NEXT:    xxswapd vs3, v4
+; PWR9BE-NEXT:    xsadddp f0, f0, f3
+; PWR9BE-NEXT:    lxv vs3, 336(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v5
+; PWR9BE-NEXT:    xxswapd vs4, v5
+; PWR9BE-NEXT:    xsadddp f0, f0, f4
+; PWR9BE-NEXT:    lxv vs4, 352(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v6
+; PWR9BE-NEXT:    xxswapd vs5, v6
+; PWR9BE-NEXT:    xsadddp f0, f0, f5
+; PWR9BE-NEXT:    lxv vs5, 368(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v7
+; PWR9BE-NEXT:    xxswapd vs6, v7
+; PWR9BE-NEXT:    xsadddp f0, f0, f6
+; PWR9BE-NEXT:    lxv vs6, 384(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v8
+; PWR9BE-NEXT:    xxswapd vs7, v8
+; PWR9BE-NEXT:    xsadddp f0, f0, f7
+; PWR9BE-NEXT:    lxv vs7, 400(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v9
+; PWR9BE-NEXT:    xxswapd vs8, v9
+; PWR9BE-NEXT:    xsadddp f0, f0, f8
+; PWR9BE-NEXT:    lxv vs8, 416(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v10
+; PWR9BE-NEXT:    xxswapd vs9, v10
+; PWR9BE-NEXT:    xsadddp f0, f0, f9
+; PWR9BE-NEXT:    lxv vs9, 432(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v11
+; PWR9BE-NEXT:    xxswapd vs10, v11
+; PWR9BE-NEXT:    xsadddp f0, f0, f10
+; PWR9BE-NEXT:    lxv vs10, 448(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v12
+; PWR9BE-NEXT:    xxswapd vs11, v12
+; PWR9BE-NEXT:    xsadddp f0, f0, f11
+; PWR9BE-NEXT:    lxv vs11, 464(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v13
+; PWR9BE-NEXT:    xxswapd vs12, v13
+; PWR9BE-NEXT:    xsadddp f0, f0, f12
+; PWR9BE-NEXT:    lxv vs12, 480(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, f13
+; PWR9BE-NEXT:    xxswapd v0, vs13
+; PWR9BE-NEXT:    lxv vs13, 496(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v0
+; PWR9BE-NEXT:    xsadddp f0, f0, v1
+; PWR9BE-NEXT:    xxswapd v14, v1
+; PWR9BE-NEXT:    lxv v1, 512(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v14
+; PWR9BE-NEXT:    xsadddp f0, f0, v15
+; PWR9BE-NEXT:    xxswapd v16, v15
+; PWR9BE-NEXT:    lxv v15, 528(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v16
+; PWR9BE-NEXT:    xsadddp f0, f0, v17
+; PWR9BE-NEXT:    xxswapd v18, v17
+; PWR9BE-NEXT:    lxv v17, 544(r1)
+; PWR9BE-NEXT:    xsadddp f0, f0, v18
+; PWR9BE-NEXT:    xsadddp f0, f0, f1
+; PWR9BE-NEXT:    xxswapd v2, vs1
+; PWR9BE-NEXT:    xsadddp f0, f0, v2
+; PWR9BE-NEXT:    xsadddp f0, f0, f2
+; PWR9BE-NEXT:    xxswapd v3, vs2
+; PWR9BE-NEXT:    xsadddp f0, f0, v3
+; PWR9BE-NEXT:    xsadddp f0, f0, f3
+; PWR9BE-NEXT:    xxswapd v4, vs3
+; PWR9BE-NEXT:    xsadddp f0, f0, v4
+; PWR9BE-NEXT:    xsadddp f0, f0, f4
+; PWR9BE-NEXT:    xxswapd v5, vs4
+; PWR9BE-NEXT:    xsadddp f0, f0, v5
+; PWR9BE-NEXT:    xsadddp f0, f0, f5
+; PWR9BE-NEXT:    xxswapd v6, vs5
+; PWR9BE-NEXT:    xsadddp f0, f0, v6
+; PWR9BE-NEXT:    xsadddp f0, f0, f6
+; PWR9BE-NEXT:    xxswapd v7, vs6
+; PWR9BE-NEXT:    xsadddp f0, f0, v7
+; PWR9BE-NEXT:    xsadddp f0, f0, f7
+; PWR9BE-NEXT:    xxswapd v8, vs7
+; PWR9BE-NEXT:    xsadddp f0, f0, v8
+; PWR9BE-NEXT:    xsadddp f0, f0, f8
+; PWR9BE-NEXT:    xxswapd v9, vs8
+; PWR9BE-NEXT:    xsadddp f0, f0, v9
+; PWR9BE-NEXT:    xsadddp f0, f0, f9
+; PWR9BE-NEXT:    xxswapd v10, vs9
+; PWR9BE-NEXT:    xsadddp f0, f0, v10
+; PWR9BE-NEXT:    xsadddp f0, f0, f10
+; PWR9BE-NEXT:    xxswapd v11, vs10
+; PWR9BE-NEXT:    xsadddp f0, f0, v11
+; PWR9BE-NEXT:    xsadddp f0, f0, f11
+; PWR9BE-NEXT:    xxswapd v12, vs11
+; PWR9BE-NEXT:    xsadddp f0, f0, v12
+; PWR9BE-NEXT:    xsadddp f0, f0, f12
+; PWR9BE-NEXT:    xxswapd v13, vs12
+; PWR9BE-NEXT:    xsadddp f0, f0, v13
+; PWR9BE-NEXT:    xsadddp f0, f0, f13
+; PWR9BE-NEXT:    xxswapd v0, vs13
+; PWR9BE-NEXT:    xsadddp f0, f0, v0
+; PWR9BE-NEXT:    xsadddp f0, f0, v1
+; PWR9BE-NEXT:    xxswapd v14, v1
+; PWR9BE-NEXT:    xsadddp f0, f0, v14
+; PWR9BE-NEXT:    xsadddp f0, f0, v15
+; PWR9BE-NEXT:    xxswapd v16, v15
+; PWR9BE-NEXT:    xsadddp f0, f0, v16
+; PWR9BE-NEXT:    xsadddp f0, f0, v17
+; PWR9BE-NEXT:    xxswapd v18, v17
+; PWR9BE-NEXT:    xsadddp f1, f0, v18
 ; PWR9BE-NEXT:    blr
 ;
 ; PWR10LE-LABEL: v64f64_b:
 ; PWR10LE:       # %bb.0: # %entry
-; PWR10LE-NEXT:    xxswapd v19, v2
-; PWR10LE-NEXT:    lxv v18, 224(r1)
-; PWR10LE-NEXT:    lxv v17, 240(r1)
-; PWR10LE-NEXT:    xsadddp f1, f1, v19
-; PWR10LE-NEXT:    lxv v16, 256(r1)
-; PWR10LE-NEXT:    lxv v15, 272(r1)
-; PWR10LE-NEXT:    lxv v14, 288(r1)
-; PWR10LE-NEXT:    lxv v1, 304(r1)
-; PWR10LE-NEXT:    lxv v0, 320(r1)
-; PWR10LE-NEXT:    lxv vs13, 336(r1)
-; PWR10LE-NEXT:    lxv vs12, 352(r1)
-; PWR10LE-NEXT:    lxv vs11, 368(r1)
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xxswapd v2, v3
-; PWR10LE-NEXT:    lxv vs10, 384(r1)
-; PWR10LE-NEXT:    lxv vs9, 400(r1)
-; PWR10LE-NEXT:    lxv vs8, 416(r1)
-; PWR10LE-NEXT:    lxv vs7, 432(r1)
-; PWR10LE-NEXT:    lxv vs6, 448(r1)
-; PWR10LE-NEXT:    lxv vs5, 464(r1)
-; PWR10LE-NEXT:    lxv vs4, 480(r1)
-; PWR10LE-NEXT:    lxv vs3, 496(r1)
-; PWR10LE-NEXT:    lxv vs2, 512(r1)
-; PWR10LE-NEXT:    lxv vs0, 528(r1)
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xxswapd v2, v4
-; PWR10LE-NEXT:    xsadddp f1, f1, v3
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xxswapd v2, v5
-; PWR10LE-NEXT:    xsadddp f1, f1, v4
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xxswapd v2, v6
-; PWR10LE-NEXT:    xsadddp f1, f1, v5
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xxswapd v2, v7
-; PWR10LE-NEXT:    xsadddp f1, f1, v6
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xxswapd v2, v8
-; PWR10LE-NEXT:    xsadddp f1, f1, v7
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xxswapd v2, v9
-; PWR10LE-NEXT:    xsadddp f1, f1, v8
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xxswapd v2, v10
-; PWR10LE-NEXT:    xsadddp f1, f1, v9
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xxswapd v2, v11
-; PWR10LE-NEXT:    xsadddp f1, f1, v10
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xxswapd v2, v12
-; PWR10LE-NEXT:    xsadddp f1, f1, v11
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xxswapd v2, v13
-; PWR10LE-NEXT:    xsadddp f1, f1, v12
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xxswapd v2, v18
-; PWR10LE-NEXT:    xsadddp f1, f1, v13
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xxswapd v2, v17
-; PWR10LE-NEXT:    xsadddp f1, f1, v18
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xxswapd v2, v16
-; PWR10LE-NEXT:    xsadddp f1, f1, v17
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xxswapd v2, v15
-; PWR10LE-NEXT:    xsadddp f1, f1, v16
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xxswapd v2, v14
-; PWR10LE-NEXT:    xsadddp f1, f1, v15
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xxswapd v2, v1
-; PWR10LE-NEXT:    xsadddp f1, f1, v14
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xxswapd v2, v0
-; PWR10LE-NEXT:    xsadddp f1, f1, v1
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xxswapd v2, vs13
-; PWR10LE-NEXT:    xsadddp f1, f1, v0
-; PWR10LE-NEXT:    xsadddp f1, f1, v2
-; PWR10LE-NEXT:    xsadddp f1, f1, f13
-; PWR10LE-NEXT:    xxswapd vs13, vs12
-; PWR10LE-NEXT:    xsadddp f1, f1, f13
-; PWR10LE-NEXT:    xsadddp f1, f1, f12
-; PWR10LE-NEXT:    xxswapd vs12, vs11
-; PWR10LE-NEXT:    xsadddp f1, f1, f12
-; PWR10LE-NEXT:    xsadddp f1, f1, f11
-; PWR10LE-NEXT:    xxswapd vs11, vs10
-; PWR10LE-NEXT:    xsadddp f1, f1, f11
-; PWR10LE-NEXT:    xsadddp f1, f1, f10
-; PWR10LE-NEXT:    xxswapd vs10, vs9
-; PWR10LE-NEXT:    xsadddp f1, f1, f10
-; PWR10LE-NEXT:    xsadddp f1, f1, f9
-; PWR10LE-NEXT:    xxswapd vs9, vs8
-; PWR10LE-NEXT:    xsadddp f1, f1, f9
-; PWR10LE-NEXT:    xsadddp f1, f1, f8
-; PWR10LE-NEXT:    xxswapd vs8, vs7
-; PWR10LE-NEXT:    xsadddp f1, f1, f8
-; PWR10LE-NEXT:    xsadddp f1, f1, f7
-; PWR10LE-NEXT:    xxswapd vs7, vs6
-; PWR10LE-NEXT:    xsadddp f1, f1, f7
-; PWR10LE-NEXT:    xsadddp f1, f1, f6
-; PWR10LE-NEXT:    xxswapd vs6, vs5
-; PWR10LE-NEXT:    xsadddp f1, f1, f6
-; PWR10LE-NEXT:    xsadddp f1, f1, f5
-; PWR10LE-NEXT:    xxswapd vs5, vs4
-; PWR10LE-NEXT:    xsadddp f1, f1, f5
-; PWR10LE-NEXT:    xsadddp f1, f1, f4
-; PWR10LE-NEXT:    xxswapd vs4, vs3
-; PWR10LE-NEXT:    xsadddp f1, f1, f4
-; PWR10LE-NEXT:    xsadddp f1, f1, f3
-; PWR10LE-NEXT:    xxswapd vs3, vs2
-; PWR10LE-NEXT:    xsadddp f1, f1, f3
-; PWR10LE-NEXT:    xsadddp f1, f1, f2
-; PWR10LE-NEXT:    xxswapd vs2, vs0
-; PWR10LE-NEXT:    xsadddp f1, f1, f2
-; PWR10LE-NEXT:    xsadddp f1, f1, f0
+; PWR10LE-NEXT:    xxswapd vs0, v2
+; PWR10LE-NEXT:    xsadddp f0, f1, f0
+; PWR10LE-NEXT:    xxswapd vs1, v3
+; PWR10LE-NEXT:    xsadddp f0, f0, v2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v4
+; PWR10LE-NEXT:    xsadddp f0, f0, v3
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v5
+; PWR10LE-NEXT:    xsadddp f0, f0, v4
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v6
+; PWR10LE-NEXT:    xsadddp f0, f0, v5
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v7
+; PWR10LE-NEXT:    xsadddp f0, f0, v6
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v8
+; PWR10LE-NEXT:    xsadddp f0, f0, v7
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v9
+; PWR10LE-NEXT:    xsadddp f0, f0, v8
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v10
+; PWR10LE-NEXT:    xsadddp f0, f0, v9
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v11
+; PWR10LE-NEXT:    xsadddp f0, f0, v10
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v12
+; PWR10LE-NEXT:    xsadddp f0, f0, v11
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    xxswapd vs1, v13
+; PWR10LE-NEXT:    xsadddp f0, f0, v12
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 224(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, v13
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 240(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 256(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 272(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 288(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 304(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 320(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 336(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 352(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 368(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 384(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 400(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 416(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 432(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 448(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 464(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 480(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 496(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 512(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f0, f0, f1
+; PWR10LE-NEXT:    lxv vs1, 528(r1)
+; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    xsadddp f0, f0, f2
+; PWR10LE-NEXT:    xsadddp f1, f0, f1
 ; PWR10LE-NEXT:    blr
 ;
 ; PWR10BE-LABEL: v64f64_b:
 ; PWR10BE:       # %bb.0: # %entry
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xxswapd v2, v2
-; PWR10BE-NEXT:    lxv v18, 240(r1)
-; PWR10BE-NEXT:    lxv v17, 256(r1)
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xxswapd v2, v3
-; PWR10BE-NEXT:    lxv v16, 272(r1)
-; PWR10BE-NEXT:    lxv v15, 288(r1)
-; PWR10BE-NEXT:    lxv v14, 304(r1)
-; PWR10BE-NEXT:    lxv v1, 320(r1)
-; PWR10BE-NEXT:    lxv v0, 336(r1)
-; PWR10BE-NEXT:    lxv vs13, 352(r1)
-; PWR10BE-NEXT:    lxv vs12, 368(r1)
-; PWR10BE-NEXT:    lxv vs11, 384(r1)
-; PWR10BE-NEXT:    lxv vs10, 400(r1)
-; PWR10BE-NEXT:    lxv vs9, 416(r1)
-; PWR10BE-NEXT:    xsadddp f1, f1, v3
-; PWR10BE-NEXT:    lxv vs8, 432(r1)
-; PWR10BE-NEXT:    lxv vs7, 448(r1)
-; PWR10BE-NEXT:    lxv vs6, 464(r1)
-; PWR10BE-NEXT:    lxv vs5, 480(r1)
-; PWR10BE-NEXT:    lxv vs4, 496(r1)
-; PWR10BE-NEXT:    lxv vs3, 512(r1)
-; PWR10BE-NEXT:    lxv vs2, 528(r1)
-; PWR10BE-NEXT:    lxv vs0, 544(r1)
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xxswapd v2, v4
-; PWR10BE-NEXT:    xsadddp f1, f1, v4
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xxswapd v2, v5
-; PWR10BE-NEXT:    xsadddp f1, f1, v5
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xxswapd v2, v6
-; PWR10BE-NEXT:    xsadddp f1, f1, v6
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xxswapd v2, v7
-; PWR10BE-NEXT:    xsadddp f1, f1, v7
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xxswapd v2, v8
-; PWR10BE-NEXT:    xsadddp f1, f1, v8
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xxswapd v2, v9
-; PWR10BE-NEXT:    xsadddp f1, f1, v9
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xxswapd v2, v10
-; PWR10BE-NEXT:    xsadddp f1, f1, v10
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xxswapd v2, v11
-; PWR10BE-NEXT:    xsadddp f1, f1, v11
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xxswapd v2, v12
-; PWR10BE-NEXT:    xsadddp f1, f1, v12
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xxswapd v2, v13
-; PWR10BE-NEXT:    xsadddp f1, f1, v13
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xxswapd v2, v18
-; PWR10BE-NEXT:    xsadddp f1, f1, v18
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xxswapd v2, v17
-; PWR10BE-NEXT:    xsadddp f1, f1, v17
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xxswapd v2, v16
-; PWR10BE-NEXT:    xsadddp f1, f1, v16
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xxswapd v2, v15
-; PWR10BE-NEXT:    xsadddp f1, f1, v15
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xxswapd v2, v14
-; PWR10BE-NEXT:    xsadddp f1, f1, v14
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xxswapd v2, v1
-; PWR10BE-NEXT:    xsadddp f1, f1, v1
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xxswapd v2, v0
-; PWR10BE-NEXT:    xsadddp f1, f1, v0
-; PWR10BE-NEXT:    xsadddp f1, f1, v2
-; PWR10BE-NEXT:    xsadddp f1, f1, f13
-; PWR10BE-NEXT:    xxswapd vs13, vs13
-; PWR10BE-NEXT:    xsadddp f1, f1, f13
-; PWR10BE-NEXT:    xsadddp f1, f1, f12
-; PWR10BE-NEXT:    xxswapd vs12, vs12
-; PWR10BE-NEXT:    xsadddp f1, f1, f12
-; PWR10BE-NEXT:    xsadddp f1, f1, f11
-; PWR10BE-NEXT:    xxswapd vs11, vs11
-; PWR10BE-NEXT:    xsadddp f1, f1, f11
-; PWR10BE-NEXT:    xsadddp f1, f1, f10
-; PWR10BE-NEXT:    xxswapd vs10, vs10
-; PWR10BE-NEXT:    xsadddp f1, f1, f10
-; PWR10BE-NEXT:    xsadddp f1, f1, f9
-; PWR10BE-NEXT:    xxswapd vs9, vs9
-; PWR10BE-NEXT:    xsadddp f1, f1, f9
-; PWR10BE-NEXT:    xsadddp f1, f1, f8
-; PWR10BE-NEXT:    xxswapd vs8, vs8
-; PWR10BE-NEXT:    xsadddp f1, f1, f8
-; PWR10BE-NEXT:    xsadddp f1, f1, f7
-; PWR10BE-NEXT:    xxswapd vs7, vs7
-; PWR10BE-NEXT:    xsadddp f1, f1, f7
-; PWR10BE-NEXT:    xsadddp f1, f1, f6
-; PWR10BE-NEXT:    xxswapd vs6, vs6
-; PWR10BE-NEXT:    xsadddp f1, f1, f6
-; PWR10BE-NEXT:    xsadddp f1, f1, f5
-; PWR10BE-NEXT:    xxswapd vs5, vs5
-; PWR10BE-NEXT:    xsadddp f1, f1, f5
-; PWR10BE-NEXT:    xsadddp f1, f1, f4
-; PWR10BE-NEXT:    xxswapd vs4, vs4
-; PWR10BE-NEXT:    xsadddp f1, f1, f4
-; PWR10BE-NEXT:    xsadddp f1, f1, f3
-; PWR10BE-NEXT:    xxswapd vs3, vs3
-; PWR10BE-NEXT:    xsadddp f1, f1, f3
-; PWR10BE-NEXT:    xsadddp f1, f1, f2
+; PWR10BE-NEXT:    xsadddp f0, f1, v2
+; PWR10BE-NEXT:    xxswapd vs1, v2
+; PWR10BE-NEXT:    xxswapd vs2, v13
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, v3
+; PWR10BE-NEXT:    xsadddp f0, f0, v3
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, v4
+; PWR10BE-NEXT:    xsadddp f0, f0, v4
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, v5
+; PWR10BE-NEXT:    xsadddp f0, f0, v5
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, v6
+; PWR10BE-NEXT:    xsadddp f0, f0, v6
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, v7
+; PWR10BE-NEXT:    xsadddp f0, f0, v7
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, v8
+; PWR10BE-NEXT:    xsadddp f0, f0, v8
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, v9
+; PWR10BE-NEXT:    xsadddp f0, f0, v9
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, v10
+; PWR10BE-NEXT:    xsadddp f0, f0, v10
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, v11
+; PWR10BE-NEXT:    xsadddp f0, f0, v11
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, v12
+; PWR10BE-NEXT:    xsadddp f0, f0, v12
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 240(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, v13
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 256(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs1
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 272(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
 ; PWR10BE-NEXT:    xxswapd vs2, vs2
-; PWR10BE-NEXT:    xsadddp f1, f1, f2
-; PWR10BE-NEXT:    xsadddp f1, f1, f0
-; PWR10BE-NEXT:    xxswapd vs0, vs0
-; PWR10BE-NEXT:    xsadddp f1, f1, f0
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 288(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs1
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 304(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    xxswapd vs2, vs2
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 320(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs1
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 336(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    xxswapd vs2, vs2
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 352(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs1
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 368(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    xxswapd vs2, vs2
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 384(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs1
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 400(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    xxswapd vs2, vs2
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 416(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs1
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 432(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    xxswapd vs2, vs2
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 448(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs1
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 464(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    xxswapd vs2, vs2
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 480(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs1
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 496(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    xxswapd vs2, vs2
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 512(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs1
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    lxv vs1, 528(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    xxswapd vs2, vs2
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    lxv vs2, 544(r1)
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs1
+; PWR10BE-NEXT:    xsadddp f0, f0, f1
+; PWR10BE-NEXT:    xxswapd vs1, vs2
+; PWR10BE-NEXT:    xsadddp f0, f0, f2
+; PWR10BE-NEXT:    xsadddp f1, f0, f1
 ; PWR10BE-NEXT:    blr
 entry:
   %0 = call double @llvm.vector.reduce.fadd.v64f64(double %b, <64 x double> %a)
@@ -3223,57 +3223,57 @@ entry:
 define dso_local double @v64f64_fast(<64 x double> %a) local_unnamed_addr #0 {
 ; PWR9LE-LABEL: v64f64_fast:
 ; PWR9LE:       # %bb.0: # %entry
-; PWR9LE-NEXT:    lxv vs0, 368(r1)
-; PWR9LE-NEXT:    lxv vs1, 496(r1)
-; PWR9LE-NEXT:    lxv vs2, 240(r1)
-; PWR9LE-NEXT:    lxv vs3, 304(r1)
-; PWR9LE-NEXT:    xvadddp vs3, v3, vs3
-; PWR9LE-NEXT:    lxv vs4, 432(r1)
-; PWR9LE-NEXT:    lxv vs5, 400(r1)
-; PWR9LE-NEXT:    lxv vs6, 528(r1)
-; PWR9LE-NEXT:    lxv vs7, 272(r1)
-; PWR9LE-NEXT:    lxv vs8, 336(r1)
-; PWR9LE-NEXT:    lxv vs9, 464(r1)
-; PWR9LE-NEXT:    lxv vs10, 352(r1)
-; PWR9LE-NEXT:    lxv vs11, 480(r1)
-; PWR9LE-NEXT:    lxv vs12, 224(r1)
-; PWR9LE-NEXT:    lxv vs13, 288(r1)
-; PWR9LE-NEXT:    lxv v0, 416(r1)
-; PWR9LE-NEXT:    lxv v1, 384(r1)
-; PWR9LE-NEXT:    lxv v14, 512(r1)
-; PWR9LE-NEXT:    lxv v15, 256(r1)
-; PWR9LE-NEXT:    lxv v16, 320(r1)
-; PWR9LE-NEXT:    lxv v17, 448(r1)
-; PWR9LE-NEXT:    xvadddp v12, v12, v17
-; PWR9LE-NEXT:    xvadddp v4, v4, v16
-; PWR9LE-NEXT:    xvadddp v14, v15, v14
-; PWR9LE-NEXT:    xvadddp v1, v8, v1
-; PWR9LE-NEXT:    xvadddp v0, v10, v0
-; PWR9LE-NEXT:    xvadddp vs13, v2, vs13
-; PWR9LE-NEXT:    xvadddp vs11, vs12, vs11
-; PWR9LE-NEXT:    xvadddp vs10, v6, vs10
-; PWR9LE-NEXT:    xvadddp vs9, v13, vs9
-; PWR9LE-NEXT:    xvadddp vs8, v5, vs8
-; PWR9LE-NEXT:    xvadddp vs6, vs7, vs6
-; PWR9LE-NEXT:    xvadddp vs5, v9, vs5
-; PWR9LE-NEXT:    xvadddp vs4, v11, vs4
-; PWR9LE-NEXT:    xvadddp vs1, vs2, vs1
-; PWR9LE-NEXT:    xvadddp vs0, v7, vs0
-; PWR9LE-NEXT:    xvadddp vs0, vs0, vs1
-; PWR9LE-NEXT:    xvadddp vs1, vs3, vs4
-; PWR9LE-NEXT:    xvadddp vs2, vs5, vs6
-; PWR9LE-NEXT:    xvadddp vs3, vs8, vs9
-; PWR9LE-NEXT:    xvadddp vs4, vs10, vs11
-; PWR9LE-NEXT:    xvadddp vs5, vs13, v0
-; PWR9LE-NEXT:    xvadddp vs6, v1, v14
-; PWR9LE-NEXT:    xvadddp vs7, v4, v12
-; PWR9LE-NEXT:    xvadddp vs6, vs7, vs6
-; PWR9LE-NEXT:    xvadddp vs4, vs5, vs4
+; PWR9LE-NEXT:    lxv vs5, 288(r1)
+; PWR9LE-NEXT:    lxv vs13, 304(r1)
+; PWR9LE-NEXT:    lxv vs2, 512(r1)
+; PWR9LE-NEXT:    lxv vs3, 256(r1)
+; PWR9LE-NEXT:    xvadddp vs5, v2, vs5
+; PWR9LE-NEXT:    lxv vs6, 480(r1)
+; PWR9LE-NEXT:    lxv vs7, 224(r1)
+; PWR9LE-NEXT:    lxv vs10, 528(r1)
+; PWR9LE-NEXT:    lxv vs11, 272(r1)
+; PWR9LE-NEXT:    xvadddp vs13, v3, vs13
+; PWR9LE-NEXT:    lxv v2, 496(r1)
+; PWR9LE-NEXT:    lxv v3, 240(r1)
+; PWR9LE-NEXT:    lxv vs0, 448(r1)
+; PWR9LE-NEXT:    lxv vs1, 320(r1)
 ; PWR9LE-NEXT:    xvadddp vs2, vs3, vs2
+; PWR9LE-NEXT:    lxv vs3, 384(r1)
+; PWR9LE-NEXT:    lxv vs4, 416(r1)
+; PWR9LE-NEXT:    xvadddp vs6, vs7, vs6
+; PWR9LE-NEXT:    lxv vs7, 352(r1)
+; PWR9LE-NEXT:    lxv vs8, 464(r1)
+; PWR9LE-NEXT:    lxv vs9, 336(r1)
+; PWR9LE-NEXT:    xvadddp vs10, vs11, vs10
+; PWR9LE-NEXT:    lxv vs11, 400(r1)
+; PWR9LE-NEXT:    lxv vs12, 432(r1)
+; PWR9LE-NEXT:    xvadddp vs0, v12, vs0
+; PWR9LE-NEXT:    xvadddp vs1, v4, vs1
+; PWR9LE-NEXT:    xvadddp vs4, v10, vs4
+; PWR9LE-NEXT:    xvadddp vs8, v13, vs8
+; PWR9LE-NEXT:    xvadddp vs9, v5, vs9
+; PWR9LE-NEXT:    xvadddp vs12, v11, vs12
+; PWR9LE-NEXT:    xvadddp v2, v3, v2
+; PWR9LE-NEXT:    lxv v3, 368(r1)
+; PWR9LE-NEXT:    xvadddp vs3, v8, vs3
+; PWR9LE-NEXT:    xvadddp vs7, v6, vs7
+; PWR9LE-NEXT:    xvadddp vs11, v9, vs11
+; PWR9LE-NEXT:    xvadddp vs12, vs13, vs12
+; PWR9LE-NEXT:    xvadddp vs8, vs9, vs8
+; PWR9LE-NEXT:    xvadddp vs4, vs5, vs4
 ; PWR9LE-NEXT:    xvadddp vs0, vs1, vs0
+; PWR9LE-NEXT:    xvadddp v3, v7, v3
+; PWR9LE-NEXT:    xvadddp vs10, vs11, vs10
+; PWR9LE-NEXT:    xvadddp vs6, vs7, vs6
+; PWR9LE-NEXT:    xvadddp vs2, vs3, vs2
+; PWR9LE-NEXT:    xvadddp v2, v3, v2
 ; PWR9LE-NEXT:    xvadddp vs0, vs0, vs2
 ; PWR9LE-NEXT:    xvadddp vs1, vs4, vs6
+; PWR9LE-NEXT:    xvadddp vs2, vs8, vs10
+; PWR9LE-NEXT:    xvadddp vs3, vs12, v2
 ; PWR9LE-NEXT:    xvadddp vs0, vs1, vs0
+; PWR9LE-NEXT:    xvadddp vs2, vs3, vs2
+; PWR9LE-NEXT:    xvadddp vs0, vs0, vs2
 ; PWR9LE-NEXT:    xxswapd vs1, vs0
 ; PWR9LE-NEXT:    xvadddp vs0, vs0, vs1
 ; PWR9LE-NEXT:    xxswapd vs1, vs0
@@ -3281,57 +3281,57 @@ define dso_local double @v64f64_fast(<64 x double> %a) local_unnamed_addr #0 {
 ;
 ; PWR9BE-LABEL: v64f64_fast:
 ; PWR9BE:       # %bb.0: # %entry
-; PWR9BE-NEXT:    lxv vs0, 384(r1)
-; PWR9BE-NEXT:    lxv vs1, 512(r1)
-; PWR9BE-NEXT:    lxv vs2, 256(r1)
-; PWR9BE-NEXT:    lxv vs3, 320(r1)
-; PWR9BE-NEXT:    xvadddp vs3, v3, vs3
-; PWR9BE-NEXT:    lxv vs4, 448(r1)
-; PWR9BE-NEXT:    lxv vs5, 416(r1)
-; PWR9BE-NEXT:    lxv vs6, 544(r1)
-; PWR9BE-NEXT:    lxv vs7, 288(r1)
-; PWR9BE-NEXT:    lxv vs8, 352(r1)
-; PWR9BE-NEXT:    lxv vs9, 480(r1)
-; PWR9BE-NEXT:    lxv vs10, 368(r1)
-; PWR9BE-NEXT:    lxv vs11, 496(r1)
-; PWR9BE-NEXT:    lxv vs12, 240(r1)
-; PWR9BE-NEXT:    lxv vs13, 304(r1)
-; PWR9BE-NEXT:    lxv v0, 432(r1)
-; PWR9BE-NEXT:    lxv v1, 400(r1)
-; PWR9BE-NEXT:    lxv v14, 528(r1)
-; PWR9BE-NEXT:    lxv v15, 272(r1)
-; PWR9BE-NEXT:    lxv v16, 336(r1)
-; PWR9BE-NEXT:    lxv v17, 464(r1)
-; PWR9BE-NEXT:    xvadddp v12, v12, v17
-; PWR9BE-NEXT:    xvadddp v4, v4, v16
-; PWR9BE-NEXT:    xvadddp v14, v15, v14
-; PWR9BE-NEXT:    xvadddp v1, v8, v1
-; PWR9BE-NEXT:    xvadddp v0, v10, v0
-; PWR9BE-NEXT:    xvadddp vs13, v2, vs13
-; PWR9BE-NEXT:    xvadddp vs11, vs12, vs11
-; PWR9BE-NEXT:    xvadddp vs10, v6, vs10
-; PWR9BE-NEXT:    xvadddp vs9, v13, vs9
-; PWR9BE-NEXT:    xvadddp vs8, v5, vs8
-; PWR9BE-NEXT:    xvadddp vs6, vs7, vs6
-; PWR9BE-NEXT:    xvadddp vs5, v9, vs5
-; PWR9BE-NEXT:    xvadddp vs4, v11, vs4
-; PWR9BE-NEXT:    xvadddp vs1, vs2, vs1
-; PWR9BE-NEXT:    xvadddp vs0, v7, vs0
-; PWR9BE-NEXT:    xvadddp vs0, vs0, vs1
-; PWR9BE-NEXT:    xvadddp vs1, vs3, vs4
-; PWR9BE-NEXT:    xvadddp vs2, vs5, vs6
-; PWR9BE-NEXT:    xvadddp vs3, vs8, vs9
-; PWR9BE-NEXT:    xvadddp vs4, vs10, vs11
-; PWR9BE-NEXT:    xvadddp vs5, vs13, v0
-; PWR9BE-NEXT:    xvadddp vs6, v1, v14
-; PWR9BE-NEXT:    xvadddp vs7, v4, v12
-; PWR9BE-NEXT:    xvadddp vs6, vs7, vs6
-; PWR9BE-NEXT:    xvadddp vs4, vs5, vs4
+; PWR9BE-NEXT:    lxv vs5, 304(r1)
+; PWR9BE-NEXT:    lxv vs13, 320(r1)
+; PWR9BE-NEXT:    lxv vs2, 528(r1)
+; PWR9BE-NEXT:    lxv vs3, 272(r1)
+; PWR9BE-NEXT:    xvadddp vs5, v2, vs5
+; PWR9BE-NEXT:    lxv vs6, 496(r1)
+; PWR9BE-NEXT:    lxv vs7, 240(r1)
+; PWR9BE-NEXT:    lxv vs10, 544(r1)
+; PWR9BE-NEXT:    lxv vs11, 288(r1)
+; PWR9BE-NEXT:    xvadddp vs13, v3, vs13
+; PWR9BE-NEXT:    lxv v2, 512(r1)
+; PWR9BE-NEXT:    lxv v3, 256(r1)
+; PWR9BE-NEXT:    lxv vs0, 464(r1)
+; PWR9BE-NEXT:    lxv vs1, 336(r1)
 ; PWR9BE-NEXT:    xvadddp vs2, vs3, vs2
+; PWR9BE-NEXT:    lxv vs3, 400(r1)
+; PWR9BE-NEXT:    lxv vs4, 432(r1)
+; PWR9BE-NEXT:    xvadddp vs6, vs7, vs6
+; PWR9BE-NEXT:    lxv vs7, 368(r1)
+; PWR9BE-NEXT:    lxv vs8, 480(r1)
+; PWR9BE-NEXT:    lxv vs9, 352(r1)
+; PWR9BE-NEXT:    xvadddp vs10, vs11, vs10
+; PWR9BE-NEXT:    lxv vs11, 416(r1)
+; PWR9BE-NEXT:    lxv vs12, 448(r1)
+; PWR9BE-NEXT:    xvadddp vs0, v12, vs0
+; PWR9BE-NEXT:    xvadddp vs1, v4, vs1
+; PWR9BE-NEXT:    xvadddp vs4, v10, vs4
+; PWR9BE-NEXT:    xvadddp vs8, v13, vs8
+; PWR9BE-NEXT:    xvadddp vs9, v5, vs9
+; PWR9BE-NEXT:    xvadddp vs12, v11, vs12
+; PWR9BE-NEXT:    xvadddp v2, v3, v2
+; PWR9BE-NEXT:    lxv v3, 384(r1)
+; PWR9BE-NEXT:    xvadddp vs3, v8, vs3
+; PWR9BE-NEXT:    xvadddp vs7, v6, vs7
+; PWR9BE-NEXT:    xvadddp vs11, v9, vs11
+; PWR9BE-NEXT:    xvadddp vs12, vs13, vs12
+; PWR9BE-NEXT:    xvadddp vs8, vs9, vs8
+; PWR9BE-NEXT:    xvadddp vs4, vs5, vs4
 ; PWR9BE-NEXT:    xvadddp vs0, vs1, vs0
+; PWR9BE-NEXT:    xvadddp v3, v7, v3
+; PWR9BE-NEXT:    xvadddp vs10, vs11, vs10
+; PWR9BE-NEXT:    xvadddp vs6, vs7, vs6
+; PWR9BE-NEXT:    xvadddp vs2, vs3, vs2
+; PWR9BE-NEXT:    xvadddp v2, v3, v2
 ; PWR9BE-NEXT:    xvadddp vs0, vs0, vs2
 ; PWR9BE-NEXT:    xvadddp vs1, vs4, vs6
+; PWR9BE-NEXT:    xvadddp vs2, vs8, vs10
+; PWR9BE-NEXT:    xvadddp vs3, vs12, v2
 ; PWR9BE-NEXT:    xvadddp vs0, vs1, vs0
+; PWR9BE-NEXT:    xvadddp vs2, vs3, vs2
+; PWR9BE-NEXT:    xvadddp vs0, vs0, vs2
 ; PWR9BE-NEXT:    xxswapd vs1, vs0
 ; PWR9BE-NEXT:    xvadddp vs1, vs0, vs1
 ; PWR9BE-NEXT:    blr

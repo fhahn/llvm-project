@@ -734,114 +734,110 @@ declare <4 x i128> @llvm.sadd.sat.v4i128(<4 x i128> %a, <4 x i128> %b);
 define <4 x i128> @sadd(<4 x i128> %a, <4 x i128> %b) local_unnamed_addr {
 ; CHECK-LABEL: sadd:
 ; CHECK:       # %bb.0:
-; CHECK-NEXT:    vadduqm 0, 2, 6
-; CHECK-NEXT:    vadduqm 10, 4, 8
-; CHECK-NEXT:    mfocrf 12, 32
-; CHECK-NEXT:    stw 12, 8(1)
-; CHECK-NEXT:    xxswapd 0, 34
-; CHECK-NEXT:    xxswapd 4, 36
 ; CHECK-NEXT:    vadduqm 1, 3, 7
-; CHECK-NEXT:    vadduqm 11, 5, 9
-; CHECK-NEXT:    mffprd 3, 0
-; CHECK-NEXT:    mffprd 6, 4
-; CHECK-NEXT:    lwz 12, 8(1)
 ; CHECK-NEXT:    xxswapd 2, 35
-; CHECK-NEXT:    xxswapd 5, 37
-; CHECK-NEXT:    mffprd 4, 2
-; CHECK-NEXT:    xxswapd 1, 32
-; CHECK-NEXT:    xxswapd 6, 42
-; CHECK-NEXT:    mffprd 5, 1
-; CHECK-NEXT:    cmpld 6, 5, 3
-; CHECK-NEXT:    mffprd 7, 6
-; CHECK-NEXT:    xxswapd 3, 33
-; CHECK-NEXT:    xxswapd 7, 43
-; CHECK-NEXT:    mffprd 3, 3
-; CHECK-NEXT:    cmpld 5, 7, 6
-; CHECK-NEXT:    mffprd 6, 5
-; CHECK-NEXT:    mffprd 7, 7
-; CHECK-NEXT:    mfvsrd 5, 36
-; CHECK-NEXT:    cmpld 3, 4
+; CHECK-NEXT:    vadduqm 0, 2, 6
+; CHECK-NEXT:    xxswapd 0, 34
 ; CHECK-NEXT:    mfvsrd 3, 34
-; CHECK-NEXT:    cmpld 1, 7, 6
-; CHECK-NEXT:    mfvsrd 7, 32
-; CHECK-NEXT:    mfvsrd 4, 35
+; CHECK-NEXT:    vadduqm 10, 4, 8
+; CHECK-NEXT:    xxswapd 4, 36
+; CHECK-NEXT:    vadduqm 11, 5, 9
+; CHECK-NEXT:    mffprd 7, 2
+; CHECK-NEXT:    mffprd 4, 0
+; CHECK-NEXT:    mffprd 8, 4
 ; CHECK-NEXT:    mfvsrd 6, 37
-; CHECK-NEXT:    cmpld 7, 7, 3
-; CHECK-NEXT:    cmpd 2, 7, 3
-; CHECK-NEXT:    mfvsrd 3, 33
-; CHECK-NEXT:    crandc 21, 8, 30
-; CHECK-NEXT:    crand 22, 30, 24
-; CHECK-NEXT:    cmpld 6, 3, 4
-; CHECK-NEXT:    cmpd 7, 3, 4
-; CHECK-NEXT:    mfvsrd 4, 42
+; CHECK-NEXT:    xxswapd 6, 37
+; CHECK-NEXT:    xxswapd 3, 33
+; CHECK-NEXT:    xxswapd 1, 32
+; CHECK-NEXT:    mffprd 9, 3
+; CHECK-NEXT:    cmpld 1, 9, 7
+; CHECK-NEXT:    mffprd 5, 1
+; CHECK-NEXT:    cmpld 5, 4
+; CHECK-NEXT:    mfvsrd 7, 32
+; CHECK-NEXT:    cmpld 5, 7, 3
+; CHECK-NEXT:    cmpd 6, 7, 3
+; CHECK-NEXT:    crandc 20, 24, 22
+; CHECK-NEXT:    crand 21, 22, 0
+; CHECK-NEXT:    crnor 20, 21, 20
+; CHECK-NEXT:    mfvsrd 4, 35
+; CHECK-NEXT:    mfvsrd 9, 33
+; CHECK-NEXT:    cmpld 9, 4
+; CHECK-NEXT:    cmpd 6, 9, 4
+; CHECK-NEXT:    crandc 22, 24, 2
+; CHECK-NEXT:    crand 23, 2, 4
+; CHECK-NEXT:    crnor 21, 23, 22
+; CHECK-NEXT:    mfvsrd 5, 36
+; CHECK-NEXT:    mfvsrd 3, 42
+; CHECK-NEXT:    cmpld 3, 5
+; CHECK-NEXT:    cmpd 1, 3, 5
 ; CHECK-NEXT:    sradi 3, 3, 63
-; CHECK-NEXT:    mtocrf 32, 12
-; CHECK-NEXT:    crnor 21, 22, 21
-; CHECK-NEXT:    crandc 23, 28, 26
-; CHECK-NEXT:    crand 24, 26, 0
-; CHECK-NEXT:    cmpld 4, 5
-; CHECK-NEXT:    cmpd 7, 4, 5
-; CHECK-NEXT:    mfvsrd 5, 43
-; CHECK-NEXT:    crnor 22, 24, 23
-; CHECK-NEXT:    mtfprd 5, 3
-; CHECK-NEXT:    sradi 4, 4, 63
-; CHECK-NEXT:    mtfprd 6, 4
-; CHECK-NEXT:    crandc 25, 28, 2
-; CHECK-NEXT:    crand 20, 2, 20
-; CHECK-NEXT:    cmpld 5, 6
-; CHECK-NEXT:    cmpd 7, 5, 6
-; CHECK-NEXT:    mfvsrd 6, 38
+; CHECK-NEXT:    crandc 24, 4, 2
+; CHECK-NEXT:    xxswapd 5, 42
+; CHECK-NEXT:    mffprd 10, 5
+; CHECK-NEXT:    cmpld 1, 10, 8
+; CHECK-NEXT:    li 8, -1
+; CHECK-NEXT:    isel 10, 0, 8, 20
+; CHECK-NEXT:    isel 11, 0, 8, 21
+; CHECK-NEXT:    crand 25, 2, 4
+; CHECK-NEXT:    crnor 22, 25, 24
+; CHECK-NEXT:    isel 12, 0, 8, 22
+; CHECK-NEXT:    mfvsrd 4, 43
+; CHECK-NEXT:    cmpld 4, 6
+; CHECK-NEXT:    cmpd 1, 4, 6
+; CHECK-NEXT:    crandc 26, 4, 2
+; CHECK-NEXT:    xxswapd 7, 43
+; CHECK-NEXT:    mffprd 5, 6
+; CHECK-NEXT:    mffprd 6, 7
+; CHECK-NEXT:    cmpld 1, 6, 5
+; CHECK-NEXT:    crand 20, 2, 4
+; CHECK-NEXT:    crnor 20, 20, 26
+; CHECK-NEXT:    mfvsrd 5, 38
 ; CHECK-NEXT:    sradi 5, 5, 63
-; CHECK-NEXT:    crnor 20, 20, 25
-; CHECK-NEXT:    mtfprd 7, 5
-; CHECK-NEXT:    sradi 6, 6, 63
-; CHECK-NEXT:    crandc 26, 28, 2
-; CHECK-NEXT:    crand 27, 2, 4
-; CHECK-NEXT:    crnor 23, 27, 26
-; CHECK-NEXT:    mtfprd 0, 6
-; CHECK-NEXT:    mfvsrd 6, 39
-; CHECK-NEXT:    sradi 6, 6, 63
-; CHECK-NEXT:    mtfprd 1, 6
-; CHECK-NEXT:    mfvsrd 6, 40
-; CHECK-NEXT:    sradi 6, 6, 63
-; CHECK-NEXT:    mtfprd 2, 6
-; CHECK-NEXT:    mfvsrd 6, 41
-; CHECK-NEXT:    sradi 6, 6, 63
-; CHECK-NEXT:    mtfprd 3, 6
-; CHECK-NEXT:    sradi 6, 7, 63
-; CHECK-NEXT:    mtfprd 4, 6
-; CHECK-NEXT:    li 6, -1
-; CHECK-NEXT:    isel 3, 0, 6, 21
-; CHECK-NEXT:    isel 4, 0, 6, 22
-; CHECK-NEXT:    isel 5, 0, 6, 20
-; CHECK-NEXT:    isel 6, 0, 6, 23
-; CHECK-NEXT:    mtfprd 8, 3
+; CHECK-NEXT:    mtfprd 6, 3
+; CHECK-NEXT:    sradi 3, 4, 63
+; CHECK-NEXT:    mtfprd 7, 3
+; CHECK-NEXT:    isel 3, 0, 8, 20
+; CHECK-NEXT:    mtfprd 0, 5
+; CHECK-NEXT:    mfvsrd 5, 39
+; CHECK-NEXT:    sradi 5, 5, 63
+; CHECK-NEXT:    mtfprd 11, 3
 ; CHECK-NEXT:    addis 3, 2, .LCPI48_0@toc@ha
-; CHECK-NEXT:    mtfprd 10, 4
-; CHECK-NEXT:    mtfprd 11, 5
-; CHECK-NEXT:    mtfprd 12, 6
 ; CHECK-NEXT:    addi 3, 3, .LCPI48_0@toc@l
-; CHECK-NEXT:    lxvd2x 9, 0, 3
+; CHECK-NEXT:    lxvd2x 12, 0, 3
+; CHECK-NEXT:    mtfprd 1, 5
+; CHECK-NEXT:    mfvsrd 5, 40
+; CHECK-NEXT:    sradi 5, 5, 63
+; CHECK-NEXT:    mtfprd 8, 10
+; CHECK-NEXT:    mtfprd 9, 11
+; CHECK-NEXT:    mtfprd 10, 12
+; CHECK-NEXT:    mtfprd 2, 5
+; CHECK-NEXT:    mfvsrd 5, 41
+; CHECK-NEXT:    sradi 5, 5, 63
+; CHECK-NEXT:    mtfprd 3, 5
+; CHECK-NEXT:    sradi 5, 7, 63
+; CHECK-NEXT:    mtfprd 4, 5
+; CHECK-NEXT:    sradi 5, 9, 63
+; CHECK-NEXT:    mtfprd 5, 5
 ; CHECK-NEXT:    xxspltd 45, 6, 0
 ; CHECK-NEXT:    xxspltd 46, 7, 0
+; CHECK-NEXT:    xxspltd 44, 9, 0
+; CHECK-NEXT:    xxspltd 47, 10, 0
 ; CHECK-NEXT:    xxspltd 34, 0, 0
-; CHECK-NEXT:    xxspltd 40, 5, 0
+; CHECK-NEXT:    xxspltd 48, 11, 0
 ; CHECK-NEXT:    xxspltd 35, 1, 0
+; CHECK-NEXT:    xxlxor 1, 35, 44
+; CHECK-NEXT:    xxswapd 37, 12
+; CHECK-NEXT:    xxspltd 41, 8, 0
+; CHECK-NEXT:    xxlxor 0, 34, 41
 ; CHECK-NEXT:    xxspltd 36, 2, 0
 ; CHECK-NEXT:    xxspltd 38, 3, 0
 ; CHECK-NEXT:    xxspltd 39, 4, 0
-; CHECK-NEXT:    xxspltd 41, 8, 0
-; CHECK-NEXT:    xxspltd 44, 10, 0
-; CHECK-NEXT:    xxspltd 47, 11, 0
-; CHECK-NEXT:    xxspltd 48, 12, 0
-; CHECK-NEXT:    xxlxor 0, 34, 41
-; CHECK-NEXT:    xxlxor 1, 35, 44
-; CHECK-NEXT:    xxswapd 37, 9
 ; CHECK-NEXT:    xxlxor 2, 39, 37
+; CHECK-NEXT:    xxspltd 40, 5, 0
 ; CHECK-NEXT:    xxlxor 3, 40, 37
 ; CHECK-NEXT:    xxsel 34, 32, 2, 0
-; CHECK-NEXT:    xxsel 35, 33, 3, 1
 ; CHECK-NEXT:    xxlxor 0, 36, 47
+; CHECK-NEXT:    xxsel 35, 33, 3, 1
 ; CHECK-NEXT:    xxlxor 1, 45, 37
 ; CHECK-NEXT:    xxsel 36, 42, 1, 0
 ; CHECK-NEXT:    xxlxor 0, 38, 48

@@ -3619,8 +3619,30 @@ void GenericSchedulerBase::setPolicy(CandPolicy &Policy, bool IsPostRA,
                       << CurrZone.getCurrCycle() << "c > CritPath "
                       << Rem.CriticalPath << "\n");
   }
+  // On an out-of-order core, instructions wait for a buffered resource in its
+  // reservation station. If the region uses the zone's critical resource more
+  // often than that buffer can hold, clustering its uses fills the buffer and
+  // stalls dispatch of all later instructions, independent of the latency and
+  // of the critical resource outside the zone. Balance its use in that case.
+  unsigned CritIdx = CurrZone.getZoneCritResIdx();
+  bool CritOverflowsBuffer = false;
+  if (CritIdx) {
+    int BufferSize = SchedModel->getResourceBufferSize(CritIdx);
+    if (BufferSize < 0)
+      BufferSize = SchedModel->getMicroOpBufferSize();
+    unsigned RegionCount =
+        CurrZone.getResourceCount(CritIdx) + Rem.RemainingCounts[CritIdx] +
+        (OtherZone ? OtherZone->getResourceCount(CritIdx) : 0);
+    CritOverflowsBuffer =
+        BufferSize > 1 &&
+        RegionCount > BufferSize * SchedModel->getResourceFactor(CritIdx);
+    LLVM_DEBUG(if (CritOverflowsBuffer) dbgs()
+               << "  " << CurrZone.Available.getName() << " BufferLimited: "
+               << SchedModel->getResourceName(CritIdx) << "\n");
+  }
+
   // If the same resource is limiting inside and outside the zone, do nothing.
-  if (CurrZone.getZoneCritResIdx() == OtherCritIdx)
+  if (CritIdx == OtherCritIdx && !CritOverflowsBuffer)
     return;
 
   LLVM_DEBUG(if (CurrZone.isResourceLimited()) {
@@ -3632,10 +3654,11 @@ void GenericSchedulerBase::setPolicy(CandPolicy &Policy, bool IsPostRA,
              if (!CurrZone.isResourceLimited() && !OtherResLimited) dbgs()
              << "  Latency limited both directions.\n");
 
-  if (CurrZone.isResourceLimited() && !Policy.ReduceResIdx)
-    Policy.ReduceResIdx = CurrZone.getZoneCritResIdx();
+  if ((CurrZone.isResourceLimited() || CritOverflowsBuffer) &&
+      !Policy.ReduceResIdx)
+    Policy.ReduceResIdx = CritIdx;
 
-  if (OtherResLimited)
+  if (OtherResLimited && OtherCritIdx != CritIdx)
     Policy.DemandResIdx = OtherCritIdx;
 }
 

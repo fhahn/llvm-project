@@ -412,9 +412,9 @@ define dso_local zeroext i32 @spill(ptr nocapture readonly %in) #0 {
 ; BE-P9-NEXT:    stdu r1, -624(r1)
 ; BE-P9-NEXT:    lwz r4, 12(r3)
 ; BE-P9-NEXT:    std r14, 336(r1) # 8-byte Folded Spill
-; BE-P9-NEXT:    std r15, 344(r1) # 8-byte Folded Spill
 ; BE-P9-NEXT:    stxv v20, 144(r1) # 16-byte Folded Spill
 ; BE-P9-NEXT:    stxv v21, 160(r1) # 16-byte Folded Spill
+; BE-P9-NEXT:    std r15, 344(r1) # 8-byte Folded Spill
 ; BE-P9-NEXT:    stxv v22, 176(r1) # 16-byte Folded Spill
 ; BE-P9-NEXT:    std r16, 352(r1) # 8-byte Folded Spill
 ; BE-P9-NEXT:    std r17, 360(r1) # 8-byte Folded Spill
@@ -501,15 +501,16 @@ define dso_local zeroext i32 @spill(ptr nocapture readonly %in) #0 {
 ; BE-P9-NEXT:    ld r21, 392(r1) # 8-byte Folded Reload
 ; BE-P9-NEXT:    lwz r4, 16(r4)
 ; BE-P9-NEXT:    add r3, r4, r3
-; BE-P9-NEXT:    lfd f23, 552(r1) # 8-byte Folded Reload
-; BE-P9-NEXT:    lfd f22, 544(r1) # 8-byte Folded Reload
 ; BE-P9-NEXT:    ld r20, 384(r1) # 8-byte Folded Reload
 ; BE-P9-NEXT:    ld r19, 376(r1) # 8-byte Folded Reload
+; BE-P9-NEXT:    clrldi r3, r3, 32
 ; BE-P9-NEXT:    ld r18, 368(r1) # 8-byte Folded Reload
 ; BE-P9-NEXT:    ld r17, 360(r1) # 8-byte Folded Reload
 ; BE-P9-NEXT:    ld r16, 352(r1) # 8-byte Folded Reload
 ; BE-P9-NEXT:    ld r15, 344(r1) # 8-byte Folded Reload
 ; BE-P9-NEXT:    ld r14, 336(r1) # 8-byte Folded Reload
+; BE-P9-NEXT:    lfd f23, 552(r1) # 8-byte Folded Reload
+; BE-P9-NEXT:    lfd f22, 544(r1) # 8-byte Folded Reload
 ; BE-P9-NEXT:    lfd f21, 536(r1) # 8-byte Folded Reload
 ; BE-P9-NEXT:    lfd f20, 528(r1) # 8-byte Folded Reload
 ; BE-P9-NEXT:    lfd f19, 520(r1) # 8-byte Folded Reload
@@ -518,7 +519,6 @@ define dso_local zeroext i32 @spill(ptr nocapture readonly %in) #0 {
 ; BE-P9-NEXT:    lfd f16, 496(r1) # 8-byte Folded Reload
 ; BE-P9-NEXT:    lfd f15, 488(r1) # 8-byte Folded Reload
 ; BE-P9-NEXT:    lfd f14, 480(r1) # 8-byte Folded Reload
-; BE-P9-NEXT:    clrldi r3, r3, 32
 ; BE-P9-NEXT:    addi r1, r1, 624
 ; BE-P9-NEXT:    ld r0, 16(r1)
 ; BE-P9-NEXT:    lwz r12, 8(r1)
@@ -647,12 +647,12 @@ define dso_local zeroext i32 @spill(ptr nocapture readonly %in) #0 {
 ; BE-P8-NEXT:    lxvd2x v30, r1, r4 # 16-byte Folded Reload
 ; BE-P8-NEXT:    li r4, 288
 ; BE-P8-NEXT:    ld r15, 344(r1) # 8-byte Folded Reload
-; BE-P8-NEXT:    ld r14, 336(r1) # 8-byte Folded Reload
 ; BE-P8-NEXT:    clrldi r3, r3, 32
 ; BE-P8-NEXT:    lxvd2x v29, r1, r4 # 16-byte Folded Reload
 ; BE-P8-NEXT:    li r4, 272
 ; BE-P8-NEXT:    lxvd2x v28, r1, r4 # 16-byte Folded Reload
 ; BE-P8-NEXT:    li r4, 256
+; BE-P8-NEXT:    ld r14, 336(r1) # 8-byte Folded Reload
 ; BE-P8-NEXT:    lxvd2x v27, r1, r4 # 16-byte Folded Reload
 ; BE-P8-NEXT:    li r4, 240
 ; BE-P8-NEXT:    lxvd2x v26, r1, r4 # 16-byte Folded Reload
@@ -812,9 +812,9 @@ define dso_local zeroext i32 @spill(ptr nocapture readonly %in) #0 {
 ; BE-32BIT-P9-NEXT:    stwu r1, -496(r1)
 ; BE-32BIT-P9-NEXT:    lwz r4, 12(r3)
 ; BE-32BIT-P9-NEXT:    stw r13, 276(r1) # 4-byte Folded Spill
-; BE-32BIT-P9-NEXT:    stw r14, 280(r1) # 4-byte Folded Spill
 ; BE-32BIT-P9-NEXT:    stxv v20, 80(r1) # 16-byte Folded Spill
 ; BE-32BIT-P9-NEXT:    stxv v21, 96(r1) # 16-byte Folded Spill
+; BE-32BIT-P9-NEXT:    stw r14, 280(r1) # 4-byte Folded Spill
 ; BE-32BIT-P9-NEXT:    stxv v22, 112(r1) # 16-byte Folded Spill
 ; BE-32BIT-P9-NEXT:    stw r15, 284(r1) # 4-byte Folded Spill
 ; BE-32BIT-P9-NEXT:    stw r16, 288(r1) # 4-byte Folded Spill
@@ -902,13 +902,13 @@ define dso_local zeroext i32 @spill(ptr nocapture readonly %in) #0 {
 ; BE-32BIT-P9-NEXT:    lwz r21, 308(r1) # 4-byte Folded Reload
 ; BE-32BIT-P9-NEXT:    lwz r4, 16(r4)
 ; BE-32BIT-P9-NEXT:    add r3, r4, r3
-; BE-32BIT-P9-NEXT:    lfd f23, 424(r1) # 8-byte Folded Reload
-; BE-32BIT-P9-NEXT:    lfd f22, 416(r1) # 8-byte Folded Reload
 ; BE-32BIT-P9-NEXT:    lwz r20, 304(r1) # 4-byte Folded Reload
 ; BE-32BIT-P9-NEXT:    lwz r19, 300(r1) # 4-byte Folded Reload
+; BE-32BIT-P9-NEXT:    lfd f23, 424(r1) # 8-byte Folded Reload
 ; BE-32BIT-P9-NEXT:    lwz r18, 296(r1) # 4-byte Folded Reload
 ; BE-32BIT-P9-NEXT:    lwz r17, 292(r1) # 4-byte Folded Reload
 ; BE-32BIT-P9-NEXT:    lwz r16, 288(r1) # 4-byte Folded Reload
+; BE-32BIT-P9-NEXT:    lfd f22, 416(r1) # 8-byte Folded Reload
 ; BE-32BIT-P9-NEXT:    lwz r15, 284(r1) # 4-byte Folded Reload
 ; BE-32BIT-P9-NEXT:    lwz r14, 280(r1) # 4-byte Folded Reload
 ; BE-32BIT-P9-NEXT:    lwz r13, 276(r1) # 4-byte Folded Reload
@@ -1049,12 +1049,12 @@ define dso_local zeroext i32 @spill(ptr nocapture readonly %in) #0 {
 ; BE-32BIT-P8-NEXT:    lxvd2x v30, r1, r4 # 16-byte Folded Reload
 ; BE-32BIT-P8-NEXT:    li r4, 224
 ; BE-32BIT-P8-NEXT:    lwz r15, 284(r1) # 4-byte Folded Reload
-; BE-32BIT-P8-NEXT:    lwz r14, 280(r1) # 4-byte Folded Reload
-; BE-32BIT-P8-NEXT:    lwz r13, 276(r1) # 4-byte Folded Reload
 ; BE-32BIT-P8-NEXT:    lxvd2x v29, r1, r4 # 16-byte Folded Reload
 ; BE-32BIT-P8-NEXT:    li r4, 208
 ; BE-32BIT-P8-NEXT:    lxvd2x v28, r1, r4 # 16-byte Folded Reload
 ; BE-32BIT-P8-NEXT:    li r4, 192
+; BE-32BIT-P8-NEXT:    lwz r14, 280(r1) # 4-byte Folded Reload
+; BE-32BIT-P8-NEXT:    lwz r13, 276(r1) # 4-byte Folded Reload
 ; BE-32BIT-P8-NEXT:    lxvd2x v27, r1, r4 # 16-byte Folded Reload
 ; BE-32BIT-P8-NEXT:    li r4, 176
 ; BE-32BIT-P8-NEXT:    lxvd2x v26, r1, r4 # 16-byte Folded Reload
@@ -1213,9 +1213,9 @@ define dso_local zeroext i32 @spill(ptr nocapture readonly %in) #0 {
 ; BE-P9-PRIV-NEXT:    stdu r1, -624(r1)
 ; BE-P9-PRIV-NEXT:    lwz r4, 12(r3)
 ; BE-P9-PRIV-NEXT:    std r14, 336(r1) # 8-byte Folded Spill
-; BE-P9-PRIV-NEXT:    std r15, 344(r1) # 8-byte Folded Spill
 ; BE-P9-PRIV-NEXT:    stxv v20, 144(r1) # 16-byte Folded Spill
 ; BE-P9-PRIV-NEXT:    stxv v21, 160(r1) # 16-byte Folded Spill
+; BE-P9-PRIV-NEXT:    std r15, 344(r1) # 8-byte Folded Spill
 ; BE-P9-PRIV-NEXT:    stxv v22, 176(r1) # 16-byte Folded Spill
 ; BE-P9-PRIV-NEXT:    std r16, 352(r1) # 8-byte Folded Spill
 ; BE-P9-PRIV-NEXT:    std r17, 360(r1) # 8-byte Folded Spill
@@ -1302,15 +1302,16 @@ define dso_local zeroext i32 @spill(ptr nocapture readonly %in) #0 {
 ; BE-P9-PRIV-NEXT:    ld r21, 392(r1) # 8-byte Folded Reload
 ; BE-P9-PRIV-NEXT:    lwz r4, 16(r4)
 ; BE-P9-PRIV-NEXT:    add r3, r4, r3
-; BE-P9-PRIV-NEXT:    lfd f23, 552(r1) # 8-byte Folded Reload
-; BE-P9-PRIV-NEXT:    lfd f22, 544(r1) # 8-byte Folded Reload
 ; BE-P9-PRIV-NEXT:    ld r20, 384(r1) # 8-byte Folded Reload
 ; BE-P9-PRIV-NEXT:    ld r19, 376(r1) # 8-byte Folded Reload
+; BE-P9-PRIV-NEXT:    clrldi r3, r3, 32
 ; BE-P9-PRIV-NEXT:    ld r18, 368(r1) # 8-byte Folded Reload
 ; BE-P9-PRIV-NEXT:    ld r17, 360(r1) # 8-byte Folded Reload
 ; BE-P9-PRIV-NEXT:    ld r16, 352(r1) # 8-byte Folded Reload
 ; BE-P9-PRIV-NEXT:    ld r15, 344(r1) # 8-byte Folded Reload
 ; BE-P9-PRIV-NEXT:    ld r14, 336(r1) # 8-byte Folded Reload
+; BE-P9-PRIV-NEXT:    lfd f23, 552(r1) # 8-byte Folded Reload
+; BE-P9-PRIV-NEXT:    lfd f22, 544(r1) # 8-byte Folded Reload
 ; BE-P9-PRIV-NEXT:    lfd f21, 536(r1) # 8-byte Folded Reload
 ; BE-P9-PRIV-NEXT:    lfd f20, 528(r1) # 8-byte Folded Reload
 ; BE-P9-PRIV-NEXT:    lfd f19, 520(r1) # 8-byte Folded Reload
@@ -1319,7 +1320,6 @@ define dso_local zeroext i32 @spill(ptr nocapture readonly %in) #0 {
 ; BE-P9-PRIV-NEXT:    lfd f16, 496(r1) # 8-byte Folded Reload
 ; BE-P9-PRIV-NEXT:    lfd f15, 488(r1) # 8-byte Folded Reload
 ; BE-P9-PRIV-NEXT:    lfd f14, 480(r1) # 8-byte Folded Reload
-; BE-P9-PRIV-NEXT:    clrldi r3, r3, 32
 ; BE-P9-PRIV-NEXT:    addi r1, r1, 624
 ; BE-P9-PRIV-NEXT:    ld r0, 16(r1)
 ; BE-P9-PRIV-NEXT:    lwz r12, 8(r1)
@@ -1448,12 +1448,12 @@ define dso_local zeroext i32 @spill(ptr nocapture readonly %in) #0 {
 ; BE-P8-PRIV-NEXT:    lxvd2x v30, r1, r4 # 16-byte Folded Reload
 ; BE-P8-PRIV-NEXT:    li r4, 288
 ; BE-P8-PRIV-NEXT:    ld r15, 344(r1) # 8-byte Folded Reload
-; BE-P8-PRIV-NEXT:    ld r14, 336(r1) # 8-byte Folded Reload
 ; BE-P8-PRIV-NEXT:    clrldi r3, r3, 32
 ; BE-P8-PRIV-NEXT:    lxvd2x v29, r1, r4 # 16-byte Folded Reload
 ; BE-P8-PRIV-NEXT:    li r4, 272
 ; BE-P8-PRIV-NEXT:    lxvd2x v28, r1, r4 # 16-byte Folded Reload
 ; BE-P8-PRIV-NEXT:    li r4, 256
+; BE-P8-PRIV-NEXT:    ld r14, 336(r1) # 8-byte Folded Reload
 ; BE-P8-PRIV-NEXT:    lxvd2x v27, r1, r4 # 16-byte Folded Reload
 ; BE-P8-PRIV-NEXT:    li r4, 240
 ; BE-P8-PRIV-NEXT:    lxvd2x v26, r1, r4 # 16-byte Folded Reload
@@ -1613,9 +1613,9 @@ define dso_local zeroext i32 @spill(ptr nocapture readonly %in) #0 {
 ; BE-32BIT-P9-PRIV-NEXT:    stwu r1, -496(r1)
 ; BE-32BIT-P9-PRIV-NEXT:    lwz r4, 12(r3)
 ; BE-32BIT-P9-PRIV-NEXT:    stw r13, 276(r1) # 4-byte Folded Spill
-; BE-32BIT-P9-PRIV-NEXT:    stw r14, 280(r1) # 4-byte Folded Spill
 ; BE-32BIT-P9-PRIV-NEXT:    stxv v20, 80(r1) # 16-byte Folded Spill
 ; BE-32BIT-P9-PRIV-NEXT:    stxv v21, 96(r1) # 16-byte Folded Spill
+; BE-32BIT-P9-PRIV-NEXT:    stw r14, 280(r1) # 4-byte Folded Spill
 ; BE-32BIT-P9-PRIV-NEXT:    stxv v22, 112(r1) # 16-byte Folded Spill
 ; BE-32BIT-P9-PRIV-NEXT:    stw r15, 284(r1) # 4-byte Folded Spill
 ; BE-32BIT-P9-PRIV-NEXT:    stw r16, 288(r1) # 4-byte Folded Spill
@@ -1703,13 +1703,13 @@ define dso_local zeroext i32 @spill(ptr nocapture readonly %in) #0 {
 ; BE-32BIT-P9-PRIV-NEXT:    lwz r21, 308(r1) # 4-byte Folded Reload
 ; BE-32BIT-P9-PRIV-NEXT:    lwz r4, 16(r4)
 ; BE-32BIT-P9-PRIV-NEXT:    add r3, r4, r3
-; BE-32BIT-P9-PRIV-NEXT:    lfd f23, 424(r1) # 8-byte Folded Reload
-; BE-32BIT-P9-PRIV-NEXT:    lfd f22, 416(r1) # 8-byte Folded Reload
 ; BE-32BIT-P9-PRIV-NEXT:    lwz r20, 304(r1) # 4-byte Folded Reload
 ; BE-32BIT-P9-PRIV-NEXT:    lwz r19, 300(r1) # 4-byte Folded Reload
+; BE-32BIT-P9-PRIV-NEXT:    lfd f23, 424(r1) # 8-byte Folded Reload
 ; BE-32BIT-P9-PRIV-NEXT:    lwz r18, 296(r1) # 4-byte Folded Reload
 ; BE-32BIT-P9-PRIV-NEXT:    lwz r17, 292(r1) # 4-byte Folded Reload
 ; BE-32BIT-P9-PRIV-NEXT:    lwz r16, 288(r1) # 4-byte Folded Reload
+; BE-32BIT-P9-PRIV-NEXT:    lfd f22, 416(r1) # 8-byte Folded Reload
 ; BE-32BIT-P9-PRIV-NEXT:    lwz r15, 284(r1) # 4-byte Folded Reload
 ; BE-32BIT-P9-PRIV-NEXT:    lwz r14, 280(r1) # 4-byte Folded Reload
 ; BE-32BIT-P9-PRIV-NEXT:    lwz r13, 276(r1) # 4-byte Folded Reload
@@ -1850,12 +1850,12 @@ define dso_local zeroext i32 @spill(ptr nocapture readonly %in) #0 {
 ; BE-32BIT-P8-PRIV-NEXT:    lxvd2x v30, r1, r4 # 16-byte Folded Reload
 ; BE-32BIT-P8-PRIV-NEXT:    li r4, 224
 ; BE-32BIT-P8-PRIV-NEXT:    lwz r15, 284(r1) # 4-byte Folded Reload
-; BE-32BIT-P8-PRIV-NEXT:    lwz r14, 280(r1) # 4-byte Folded Reload
-; BE-32BIT-P8-PRIV-NEXT:    lwz r13, 276(r1) # 4-byte Folded Reload
 ; BE-32BIT-P8-PRIV-NEXT:    lxvd2x v29, r1, r4 # 16-byte Folded Reload
 ; BE-32BIT-P8-PRIV-NEXT:    li r4, 208
 ; BE-32BIT-P8-PRIV-NEXT:    lxvd2x v28, r1, r4 # 16-byte Folded Reload
 ; BE-32BIT-P8-PRIV-NEXT:    li r4, 192
+; BE-32BIT-P8-PRIV-NEXT:    lwz r14, 280(r1) # 4-byte Folded Reload
+; BE-32BIT-P8-PRIV-NEXT:    lwz r13, 276(r1) # 4-byte Folded Reload
 ; BE-32BIT-P8-PRIV-NEXT:    lxvd2x v27, r1, r4 # 16-byte Folded Reload
 ; BE-32BIT-P8-PRIV-NEXT:    li r4, 176
 ; BE-32BIT-P8-PRIV-NEXT:    lxvd2x v26, r1, r4 # 16-byte Folded Reload

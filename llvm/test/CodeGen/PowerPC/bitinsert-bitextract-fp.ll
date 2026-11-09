@@ -285,6 +285,7 @@ define b231 @test_bitinsert_double_b231_var(b231 %base, double %val, i32 %off) {
 ; CHECK-NEXT:    addi 12, 1, -128
 ; CHECK-NEXT:    li 0, 0
 ; CHECK-NEXT:    li 29, -1
+; CHECK-NEXT:    clrlwi 7, 8, 26
 ; CHECK-NEXT:    std 30, -16(1) # 8-byte Folded Spill
 ; CHECK-NEXT:    rlwinm 30, 8, 29, 27, 28
 ; CHECK-NEXT:    std 25, -56(1) # 8-byte Folded Spill
@@ -295,7 +296,6 @@ define b231 @test_bitinsert_double_b231_var(b231 %base, double %val, i32 %off) {
 ; CHECK-NEXT:    stxvw4x 0, 10, 11
 ; CHECK-NEXT:    stxvw4x 0, 12, 9
 ; CHECK-NEXT:    stxvw4x 0, 12, 11
-; CHECK-NEXT:    clrlwi 7, 8, 26
 ; CHECK-NEXT:    mr 8, 30
 ; CHECK-NEXT:    stxvw4x 0, 0, 10
 ; CHECK-NEXT:    stxvw4x 0, 0, 12
@@ -312,11 +312,11 @@ define b231 @test_bitinsert_double_b231_var(b231 %base, double %val, i32 %off) {
 ; CHECK-NEXT:    sld 26, 11, 7
 ; CHECK-NEXT:    ld 0, 16(8)
 ; CHECK-NEXT:    ld 29, 8(8)
-; CHECK-NEXT:    ld 8, 24(8)
-; CHECK-NEXT:    or 27, 26, 27
-; CHECK-NEXT:    ld 30, 24(30)
 ; CHECK-NEXT:    srd 25, 0, 28
+; CHECK-NEXT:    or 27, 26, 27
 ; CHECK-NEXT:    sld 0, 0, 7
+; CHECK-NEXT:    ld 8, 24(8)
+; CHECK-NEXT:    ld 30, 24(30)
 ; CHECK-NEXT:    sld 9, 9, 7
 ; CHECK-NEXT:    srd 11, 11, 28
 ; CHECK-NEXT:    sld 12, 12, 7

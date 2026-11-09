@@ -21,66 +21,66 @@ define void @lane_gather(ptr %src, ptr %tbl, ptr %dst, i64 %n) {
 ; CHECK-NEXT:    mov w9, #216 ; =0xd8
 ; CHECK-NEXT:  LBB0_1: ; %loop
 ; CHECK-NEXT:    ; =>This Inner Loop Header: Depth=1
-; CHECK-NEXT:    add x13, x0, x8
-; CHECK-NEXT:    ldrb w10, [x13]
-; CHECK-NEXT:    umull x14, w10, w9
-; CHECK-NEXT:    ldrb w10, [x13, #3]
-; CHECK-NEXT:    umaddl x16, w10, w9, x1
-; CHECK-NEXT:    ldrb w10, [x13, #6]
-; CHECK-NEXT:    umaddl x4, w10, w9, x1
-; CHECK-NEXT:    ldrb w10, [x13, #9]
-; CHECK-NEXT:    umaddl x5, w10, w9, x1
-; CHECK-NEXT:    ldrb w10, [x13, #12]
-; CHECK-NEXT:    umull x6, w10, w9
-; CHECK-NEXT:    ldrb w10, [x13, #15]
-; CHECK-NEXT:    umaddl x7, w10, w9, x1
-; CHECK-NEXT:    ldrb w10, [x13, #18]
-; CHECK-NEXT:    umaddl x19, w10, w9, x1
-; CHECK-NEXT:    ldrb w10, [x13, #21]
-; CHECK-NEXT:    umaddl x20, w10, w9, x1
-; CHECK-NEXT:    ldrb w10, [x13, #24]
-; CHECK-NEXT:    umull x10, w10, w9
-; CHECK-NEXT:    ldrb w11, [x13, #27]
-; CHECK-NEXT:    umaddl x11, w11, w9, x1
-; CHECK-NEXT:    ldrb w12, [x13, #30]
-; CHECK-NEXT:    umaddl x12, w12, w9, x1
-; CHECK-NEXT:    ldrb w15, [x13, #33]
-; CHECK-NEXT:    umaddl x15, w15, w9, x1
-; CHECK-NEXT:    ldrb w17, [x13, #36]
-; CHECK-NEXT:    umull x17, w17, w9
-; CHECK-NEXT:    ldrb w21, [x13, #39]
-; CHECK-NEXT:    umaddl x21, w21, w9, x1
-; CHECK-NEXT:    ldrb w22, [x13, #42]
-; CHECK-NEXT:    umaddl x22, w22, w9, x1
-; CHECK-NEXT:    ldrb w13, [x13, #45]
-; CHECK-NEXT:    ldr s0, [x1, x14]
-; CHECK-NEXT:    ld1.s { v0 }[1], [x16]
-; CHECK-NEXT:    ld1.s { v0 }[2], [x4]
+; CHECK-NEXT:    add x16, x0, x8
+; CHECK-NEXT:    ldrb w10, [x16]
+; CHECK-NEXT:    ldrb w12, [x16, #3]
+; CHECK-NEXT:    ldrb w14, [x16, #6]
+; CHECK-NEXT:    ldrb w5, [x16, #9]
+; CHECK-NEXT:    ldrb w6, [x16, #12]
+; CHECK-NEXT:    ldrb w7, [x16, #15]
+; CHECK-NEXT:    ldrb w19, [x16, #18]
+; CHECK-NEXT:    ldrb w17, [x16, #21]
+; CHECK-NEXT:    ldrb w4, [x16, #24]
+; CHECK-NEXT:    umull x20, w10, w9
+; CHECK-NEXT:    ldrb w10, [x16, #27]
+; CHECK-NEXT:    ldrb w11, [x16, #30]
+; CHECK-NEXT:    umaddl x21, w12, w9, x1
+; CHECK-NEXT:    ldrb w12, [x16, #33]
+; CHECK-NEXT:    ldrb w13, [x16, #36]
+; CHECK-NEXT:    umaddl x22, w14, w9, x1
+; CHECK-NEXT:    ldrb w14, [x16, #39]
+; CHECK-NEXT:    ldrb w15, [x16, #42]
+; CHECK-NEXT:    umaddl x5, w5, w9, x1
+; CHECK-NEXT:    ldrb w16, [x16, #45]
+; CHECK-NEXT:    ldr s0, [x1, x20]
+; CHECK-NEXT:    umull x6, w6, w9
+; CHECK-NEXT:    ld1.s { v0 }[1], [x21]
+; CHECK-NEXT:    ld1.s { v0 }[2], [x22]
+; CHECK-NEXT:    umaddl x7, w7, w9, x1
 ; CHECK-NEXT:    ld1.s { v0 }[3], [x5]
-; CHECK-NEXT:    fadd.4s v0, v0, v0
 ; CHECK-NEXT:    ldr s1, [x1, x6]
+; CHECK-NEXT:    umaddl x5, w19, w9, x1
 ; CHECK-NEXT:    ld1.s { v1 }[1], [x7]
-; CHECK-NEXT:    ld1.s { v1 }[2], [x19]
-; CHECK-NEXT:    ld1.s { v1 }[3], [x20]
+; CHECK-NEXT:    ld1.s { v1 }[2], [x5]
+; CHECK-NEXT:    umaddl x17, w17, w9, x1
+; CHECK-NEXT:    ld1.s { v1 }[3], [x17]
+; CHECK-NEXT:    umull x17, w4, w9
+; CHECK-NEXT:    fadd.4s v0, v0, v0
 ; CHECK-NEXT:    ldp q2, q3, [x2]
 ; CHECK-NEXT:    fadd.4s v0, v2, v0
-; CHECK-NEXT:    ldr s2, [x1, x10]
-; CHECK-NEXT:    ld1.s { v2 }[1], [x11]
-; CHECK-NEXT:    ld1.s { v2 }[2], [x12]
-; CHECK-NEXT:    umaddl x10, w13, w9, x1
-; CHECK-NEXT:    ld1.s { v2 }[3], [x15]
+; CHECK-NEXT:    ldr s2, [x1, x17]
+; CHECK-NEXT:    umaddl x10, w10, w9, x1
+; CHECK-NEXT:    ld1.s { v2 }[1], [x10]
+; CHECK-NEXT:    umaddl x10, w11, w9, x1
+; CHECK-NEXT:    ld1.s { v2 }[2], [x10]
+; CHECK-NEXT:    umaddl x10, w12, w9, x1
+; CHECK-NEXT:    ld1.s { v2 }[3], [x10]
+; CHECK-NEXT:    umull x10, w13, w9
 ; CHECK-NEXT:    fadd.4s v1, v1, v1
 ; CHECK-NEXT:    fadd.4s v1, v3, v1
-; CHECK-NEXT:    ldr s3, [x1, x17]
-; CHECK-NEXT:    ld1.s { v3 }[1], [x21]
-; CHECK-NEXT:    ld1.s { v3 }[2], [x22]
+; CHECK-NEXT:    ldr s3, [x1, x10]
+; CHECK-NEXT:    umaddl x10, w14, w9, x1
+; CHECK-NEXT:    ld1.s { v3 }[1], [x10]
+; CHECK-NEXT:    umaddl x10, w15, w9, x1
+; CHECK-NEXT:    ld1.s { v3 }[2], [x10]
+; CHECK-NEXT:    umaddl x10, w16, w9, x1
 ; CHECK-NEXT:    ld1.s { v3 }[3], [x10]
 ; CHECK-NEXT:    stp q0, q1, [x2]
-; CHECK-NEXT:    fadd.4s v0, v2, v2
-; CHECK-NEXT:    ldp q1, q2, [x2, #32]
-; CHECK-NEXT:    fadd.4s v0, v1, v0
-; CHECK-NEXT:    fadd.4s v1, v3, v3
-; CHECK-NEXT:    fadd.4s v1, v2, v1
+; CHECK-NEXT:    ldp q0, q1, [x2, #32]
+; CHECK-NEXT:    fadd.4s v2, v2, v2
+; CHECK-NEXT:    fadd.4s v0, v0, v2
+; CHECK-NEXT:    fadd.4s v2, v3, v3
+; CHECK-NEXT:    fadd.4s v1, v1, v2
 ; CHECK-NEXT:    stp q0, q1, [x2, #32]
 ; CHECK-NEXT:    add x8, x8, #48
 ; CHECK-NEXT:    cmp x8, x3

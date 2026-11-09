@@ -1422,42 +1422,42 @@ define dso_local i64 @v16i8tov16i64_sign(<16 x i8> %a) local_unnamed_addr #0 {
 ; PWR9LE-NEXT:    addis r3, r2, .LCPI23_0@toc@ha
 ; PWR9LE-NEXT:    addi r3, r3, .LCPI23_0@toc@l
 ; PWR9LE-NEXT:    lxv v3, 0(r3)
+; PWR9LE-NEXT:    vperm v3, v2, v2, v3
 ; PWR9LE-NEXT:    addis r3, r2, .LCPI23_1@toc@ha
 ; PWR9LE-NEXT:    addi r3, r3, .LCPI23_1@toc@l
 ; PWR9LE-NEXT:    lxv v4, 0(r3)
 ; PWR9LE-NEXT:    addis r3, r2, .LCPI23_2@toc@ha
-; PWR9LE-NEXT:    vperm v3, v2, v2, v3
 ; PWR9LE-NEXT:    addi r3, r3, .LCPI23_2@toc@l
 ; PWR9LE-NEXT:    lxv v5, 0(r3)
 ; PWR9LE-NEXT:    addis r3, r2, .LCPI23_3@toc@ha
-; PWR9LE-NEXT:    vextsb2d v3, v3
-; PWR9LE-NEXT:    vperm v4, v2, v2, v4
 ; PWR9LE-NEXT:    addi r3, r3, .LCPI23_3@toc@l
 ; PWR9LE-NEXT:    lxv v0, 0(r3)
 ; PWR9LE-NEXT:    addis r3, r2, .LCPI23_4@toc@ha
-; PWR9LE-NEXT:    vextsb2d v4, v4
-; PWR9LE-NEXT:    vperm v5, v2, v2, v5
 ; PWR9LE-NEXT:    addi r3, r3, .LCPI23_4@toc@l
-; PWR9LE-NEXT:    vaddudm v3, v4, v3
 ; PWR9LE-NEXT:    lxv v1, 0(r3)
 ; PWR9LE-NEXT:    addis r3, r2, .LCPI23_5@toc@ha
-; PWR9LE-NEXT:    vextsb2d v5, v5
-; PWR9LE-NEXT:    vperm v0, v2, v2, v0
 ; PWR9LE-NEXT:    addi r3, r3, .LCPI23_5@toc@l
 ; PWR9LE-NEXT:    lxv v6, 0(r3)
 ; PWR9LE-NEXT:    addis r3, r2, .LCPI23_6@toc@ha
-; PWR9LE-NEXT:    vperm v1, v2, v2, v1
-; PWR9LE-NEXT:    vextsb2d v0, v0
 ; PWR9LE-NEXT:    addi r3, r3, .LCPI23_6@toc@l
-; PWR9LE-NEXT:    vaddudm v5, v0, v5
 ; PWR9LE-NEXT:    lxv v7, 0(r3)
 ; PWR9LE-NEXT:    addis r3, r2, .LCPI23_7@toc@ha
-; PWR9LE-NEXT:    vperm v6, v2, v2, v6
-; PWR9LE-NEXT:    vextsb2d v1, v1
-; PWR9LE-NEXT:    vaddudm v3, v3, v5
 ; PWR9LE-NEXT:    addi r3, r3, .LCPI23_7@toc@l
 ; PWR9LE-NEXT:    lxv v8, 0(r3)
+; PWR9LE-NEXT:    vperm v4, v2, v2, v4
+; PWR9LE-NEXT:    vperm v5, v2, v2, v5
+; PWR9LE-NEXT:    vperm v0, v2, v2, v0
+; PWR9LE-NEXT:    vperm v1, v2, v2, v1
+; PWR9LE-NEXT:    vperm v6, v2, v2, v6
+; PWR9LE-NEXT:    vextsb2d v3, v3
+; PWR9LE-NEXT:    vextsb2d v4, v4
+; PWR9LE-NEXT:    vextsb2d v5, v5
+; PWR9LE-NEXT:    vextsb2d v0, v0
+; PWR9LE-NEXT:    vextsb2d v1, v1
 ; PWR9LE-NEXT:    vextsb2d v6, v6
+; PWR9LE-NEXT:    vaddudm v5, v0, v5
+; PWR9LE-NEXT:    vaddudm v3, v4, v3
+; PWR9LE-NEXT:    vaddudm v3, v3, v5
 ; PWR9LE-NEXT:    vperm v7, v2, v2, v7
 ; PWR9LE-NEXT:    vaddudm v1, v6, v1
 ; PWR9LE-NEXT:    vextsb2d v7, v7
@@ -1476,42 +1476,42 @@ define dso_local i64 @v16i8tov16i64_sign(<16 x i8> %a) local_unnamed_addr #0 {
 ; PWR9BE-NEXT:    addis r3, r2, .LCPI23_0@toc@ha
 ; PWR9BE-NEXT:    addi r3, r3, .LCPI23_0@toc@l
 ; PWR9BE-NEXT:    lxv v3, 0(r3)
+; PWR9BE-NEXT:    vperm v3, v2, v2, v3
 ; PWR9BE-NEXT:    addis r3, r2, .LCPI23_1@toc@ha
 ; PWR9BE-NEXT:    addi r3, r3, .LCPI23_1@toc@l
 ; PWR9BE-NEXT:    lxv v4, 0(r3)
 ; PWR9BE-NEXT:    addis r3, r2, .LCPI23_2@toc@ha
-; PWR9BE-NEXT:    vperm v3, v2, v2, v3
 ; PWR9BE-NEXT:    addi r3, r3, .LCPI23_2@toc@l
 ; PWR9BE-NEXT:    lxv v5, 0(r3)
 ; PWR9BE-NEXT:    addis r3, r2, .LCPI23_3@toc@ha
-; PWR9BE-NEXT:    vextsb2d v3, v3
-; PWR9BE-NEXT:    vperm v4, v2, v2, v4
 ; PWR9BE-NEXT:    addi r3, r3, .LCPI23_3@toc@l
 ; PWR9BE-NEXT:    lxv v0, 0(r3)
 ; PWR9BE-NEXT:    addis r3, r2, .LCPI23_4@toc@ha
-; PWR9BE-NEXT:    vextsb2d v4, v4
-; PWR9BE-NEXT:    vperm v5, v2, v2, v5
 ; PWR9BE-NEXT:    addi r3, r3, .LCPI23_4@toc@l
-; PWR9BE-NEXT:    vaddudm v3, v4, v3
 ; PWR9BE-NEXT:    lxv v1, 0(r3)
 ; PWR9BE-NEXT:    addis r3, r2, .LCPI23_5@toc@ha
-; PWR9BE-NEXT:    vextsb2d v5, v5
-; PWR9BE-NEXT:    vperm v0, v2, v2, v0
 ; PWR9BE-NEXT:    addi r3, r3, .LCPI23_5@toc@l
 ; PWR9BE-NEXT:    lxv v6, 0(r3)
 ; PWR9BE-NEXT:    addis r3, r2, .LCPI23_6@toc@ha
-; PWR9BE-NEXT:    vperm v1, v2, v2, v1
-; PWR9BE-NEXT:    vextsb2d v0, v0
 ; PWR9BE-NEXT:    addi r3, r3, .LCPI23_6@toc@l
-; PWR9BE-NEXT:    vaddudm v5, v0, v5
 ; PWR9BE-NEXT:    lxv v7, 0(r3)
 ; PWR9BE-NEXT:    addis r3, r2, .LCPI23_7@toc@ha
-; PWR9BE-NEXT:    vperm v6, v2, v2, v6
-; PWR9BE-NEXT:    vextsb2d v1, v1
-; PWR9BE-NEXT:    vaddudm v3, v3, v5
 ; PWR9BE-NEXT:    addi r3, r3, .LCPI23_7@toc@l
 ; PWR9BE-NEXT:    lxv v8, 0(r3)
+; PWR9BE-NEXT:    vperm v4, v2, v2, v4
+; PWR9BE-NEXT:    vperm v5, v2, v2, v5
+; PWR9BE-NEXT:    vperm v0, v2, v2, v0
+; PWR9BE-NEXT:    vperm v1, v2, v2, v1
+; PWR9BE-NEXT:    vperm v6, v2, v2, v6
+; PWR9BE-NEXT:    vextsb2d v3, v3
+; PWR9BE-NEXT:    vextsb2d v4, v4
+; PWR9BE-NEXT:    vextsb2d v5, v5
+; PWR9BE-NEXT:    vextsb2d v0, v0
+; PWR9BE-NEXT:    vextsb2d v1, v1
 ; PWR9BE-NEXT:    vextsb2d v6, v6
+; PWR9BE-NEXT:    vaddudm v5, v0, v5
+; PWR9BE-NEXT:    vaddudm v3, v4, v3
+; PWR9BE-NEXT:    vaddudm v3, v3, v5
 ; PWR9BE-NEXT:    vperm v7, v2, v2, v7
 ; PWR9BE-NEXT:    vaddudm v1, v6, v1
 ; PWR9BE-NEXT:    vextsb2d v7, v7
@@ -1625,45 +1625,45 @@ define dso_local i64 @v16i8tov16i64_zero(<16 x i8> %a) local_unnamed_addr #0 {
 ; PWR9LE-LABEL: v16i8tov16i64_zero:
 ; PWR9LE:       # %bb.0: # %entry
 ; PWR9LE-NEXT:    addis r3, r2, .LCPI24_0@toc@ha
-; PWR9LE-NEXT:    xxlxor v4, v4, v4
+; PWR9LE-NEXT:    xxlxor v3, v3, v3
 ; PWR9LE-NEXT:    addi r3, r3, .LCPI24_0@toc@l
-; PWR9LE-NEXT:    lxv v3, 0(r3)
+; PWR9LE-NEXT:    lxv v4, 0(r3)
 ; PWR9LE-NEXT:    addis r3, r2, .LCPI24_1@toc@ha
 ; PWR9LE-NEXT:    addi r3, r3, .LCPI24_1@toc@l
 ; PWR9LE-NEXT:    lxv v5, 0(r3)
 ; PWR9LE-NEXT:    addis r3, r2, .LCPI24_2@toc@ha
-; PWR9LE-NEXT:    vperm v3, v4, v2, v3
+; PWR9LE-NEXT:    vperm v4, v3, v2, v4
 ; PWR9LE-NEXT:    addi r3, r3, .LCPI24_2@toc@l
 ; PWR9LE-NEXT:    lxv v0, 0(r3)
 ; PWR9LE-NEXT:    addis r3, r2, .LCPI24_3@toc@ha
-; PWR9LE-NEXT:    vperm v5, v4, v2, v5
 ; PWR9LE-NEXT:    addi r3, r3, .LCPI24_3@toc@l
 ; PWR9LE-NEXT:    lxv v1, 0(r3)
 ; PWR9LE-NEXT:    addis r3, r2, .LCPI24_4@toc@ha
-; PWR9LE-NEXT:    vaddudm v3, v5, v3
-; PWR9LE-NEXT:    vperm v0, v4, v2, v0
 ; PWR9LE-NEXT:    addi r3, r3, .LCPI24_4@toc@l
 ; PWR9LE-NEXT:    lxv v6, 0(r3)
 ; PWR9LE-NEXT:    addis r3, r2, .LCPI24_5@toc@ha
-; PWR9LE-NEXT:    vperm v1, v4, v2, v1
 ; PWR9LE-NEXT:    addi r3, r3, .LCPI24_5@toc@l
 ; PWR9LE-NEXT:    lxv v7, 0(r3)
 ; PWR9LE-NEXT:    addis r3, r2, .LCPI24_6@toc@ha
-; PWR9LE-NEXT:    vaddudm v0, v1, v0
-; PWR9LE-NEXT:    vperm v6, v4, v2, v6
 ; PWR9LE-NEXT:    addi r3, r3, .LCPI24_6@toc@l
 ; PWR9LE-NEXT:    lxv v8, 0(r3)
 ; PWR9LE-NEXT:    addis r3, r2, .LCPI24_7@toc@ha
-; PWR9LE-NEXT:    vaddudm v3, v3, v0
-; PWR9LE-NEXT:    vperm v7, v4, v2, v7
 ; PWR9LE-NEXT:    addi r3, r3, .LCPI24_7@toc@l
 ; PWR9LE-NEXT:    lxv v9, 0(r3)
-; PWR9LE-NEXT:    vperm v8, v4, v2, v8
-; PWR9LE-NEXT:    vperm v2, v4, v2, v9
-; PWR9LE-NEXT:    vaddudm v4, v7, v6
+; PWR9LE-NEXT:    vperm v5, v3, v2, v5
+; PWR9LE-NEXT:    vperm v0, v3, v2, v0
+; PWR9LE-NEXT:    vperm v1, v3, v2, v1
+; PWR9LE-NEXT:    vperm v6, v3, v2, v6
+; PWR9LE-NEXT:    vperm v7, v3, v2, v7
+; PWR9LE-NEXT:    vaddudm v0, v1, v0
+; PWR9LE-NEXT:    vaddudm v4, v5, v4
+; PWR9LE-NEXT:    vaddudm v4, v4, v0
+; PWR9LE-NEXT:    vperm v8, v3, v2, v8
+; PWR9LE-NEXT:    vperm v2, v3, v2, v9
+; PWR9LE-NEXT:    vaddudm v3, v7, v6
 ; PWR9LE-NEXT:    vaddudm v2, v2, v8
-; PWR9LE-NEXT:    vaddudm v2, v4, v2
-; PWR9LE-NEXT:    vaddudm v2, v2, v3
+; PWR9LE-NEXT:    vaddudm v2, v3, v2
+; PWR9LE-NEXT:    vaddudm v2, v2, v4
 ; PWR9LE-NEXT:    xxswapd v3, v2
 ; PWR9LE-NEXT:    vaddudm v2, v2, v3
 ; PWR9LE-NEXT:    mfvsrld r3, v2
@@ -1672,45 +1672,45 @@ define dso_local i64 @v16i8tov16i64_zero(<16 x i8> %a) local_unnamed_addr #0 {
 ; PWR9BE-LABEL: v16i8tov16i64_zero:
 ; PWR9BE:       # %bb.0: # %entry
 ; PWR9BE-NEXT:    addis r3, r2, .LCPI24_0@toc@ha
-; PWR9BE-NEXT:    xxlxor v4, v4, v4
+; PWR9BE-NEXT:    xxlxor v3, v3, v3
 ; PWR9BE-NEXT:    addi r3, r3, .LCPI24_0@toc@l
-; PWR9BE-NEXT:    lxv v3, 0(r3)
+; PWR9BE-NEXT:    lxv v4, 0(r3)
 ; PWR9BE-NEXT:    addis r3, r2, .LCPI24_1@toc@ha
 ; PWR9BE-NEXT:    addi r3, r3, .LCPI24_1@toc@l
 ; PWR9BE-NEXT:    lxv v5, 0(r3)
 ; PWR9BE-NEXT:    addis r3, r2, .LCPI24_2@toc@ha
-; PWR9BE-NEXT:    vperm v3, v4, v2, v3
+; PWR9BE-NEXT:    vperm v4, v3, v2, v4
 ; PWR9BE-NEXT:    addi r3, r3, .LCPI24_2@toc@l
 ; PWR9BE-NEXT:    lxv v0, 0(r3)
 ; PWR9BE-NEXT:    addis r3, r2, .LCPI24_3@toc@ha
-; PWR9BE-NEXT:    vperm v5, v4, v2, v5
 ; PWR9BE-NEXT:    addi r3, r3, .LCPI24_3@toc@l
 ; PWR9BE-NEXT:    lxv v1, 0(r3)
 ; PWR9BE-NEXT:    addis r3, r2, .LCPI24_4@toc@ha
-; PWR9BE-NEXT:    vaddudm v3, v5, v3
-; PWR9BE-NEXT:    vperm v0, v4, v2, v0
 ; PWR9BE-NEXT:    addi r3, r3, .LCPI24_4@toc@l
 ; PWR9BE-NEXT:    lxv v6, 0(r3)
 ; PWR9BE-NEXT:    addis r3, r2, .LCPI24_5@toc@ha
-; PWR9BE-NEXT:    vperm v1, v4, v2, v1
 ; PWR9BE-NEXT:    addi r3, r3, .LCPI24_5@toc@l
 ; PWR9BE-NEXT:    lxv v7, 0(r3)
 ; PWR9BE-NEXT:    addis r3, r2, .LCPI24_6@toc@ha
-; PWR9BE-NEXT:    vaddudm v0, v1, v0
-; PWR9BE-NEXT:    vperm v6, v4, v2, v6
 ; PWR9BE-NEXT:    addi r3, r3, .LCPI24_6@toc@l
 ; PWR9BE-NEXT:    lxv v8, 0(r3)
 ; PWR9BE-NEXT:    addis r3, r2, .LCPI24_7@toc@ha
-; PWR9BE-NEXT:    vaddudm v3, v3, v0
-; PWR9BE-NEXT:    vperm v7, v4, v2, v7
 ; PWR9BE-NEXT:    addi r3, r3, .LCPI24_7@toc@l
 ; PWR9BE-NEXT:    lxv v9, 0(r3)
-; PWR9BE-NEXT:    vperm v8, v4, v2, v8
-; PWR9BE-NEXT:    vperm v2, v4, v2, v9
-; PWR9BE-NEXT:    vaddudm v4, v7, v6
+; PWR9BE-NEXT:    vperm v5, v3, v2, v5
+; PWR9BE-NEXT:    vperm v0, v3, v2, v0
+; PWR9BE-NEXT:    vperm v1, v3, v2, v1
+; PWR9BE-NEXT:    vperm v6, v3, v2, v6
+; PWR9BE-NEXT:    vperm v7, v3, v2, v7
+; PWR9BE-NEXT:    vaddudm v0, v1, v0
+; PWR9BE-NEXT:    vaddudm v4, v5, v4
+; PWR9BE-NEXT:    vaddudm v4, v4, v0
+; PWR9BE-NEXT:    vperm v8, v3, v2, v8
+; PWR9BE-NEXT:    vperm v2, v3, v2, v9
+; PWR9BE-NEXT:    vaddudm v3, v7, v6
 ; PWR9BE-NEXT:    vaddudm v2, v2, v8
-; PWR9BE-NEXT:    vaddudm v2, v4, v2
-; PWR9BE-NEXT:    vaddudm v2, v2, v3
+; PWR9BE-NEXT:    vaddudm v2, v3, v2
+; PWR9BE-NEXT:    vaddudm v2, v2, v4
 ; PWR9BE-NEXT:    xxswapd v3, v2
 ; PWR9BE-NEXT:    vaddudm v2, v2, v3
 ; PWR9BE-NEXT:    mfvsrd r3, v2

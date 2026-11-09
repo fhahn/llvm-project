@@ -343,8 +343,8 @@ define i8 @scmp_8_128(i128 %x, i128 %y) nounwind {
 ; AIX32-PWR9-NEXT:    li 4, -1
 ; AIX32-PWR9-NEXT:    cror 25, 21, 20
 ; AIX32-PWR9-NEXT:    cmplwi 5, 3, 0
-; AIX32-PWR9-NEXT:    crandc 21, 29, 30
 ; AIX32-PWR9-NEXT:    li 3, 1
+; AIX32-PWR9-NEXT:    crandc 21, 29, 30
 ; AIX32-PWR9-NEXT:    crand 23, 30, 9
 ; AIX32-PWR9-NEXT:    cror 21, 23, 21
 ; AIX32-PWR9-NEXT:    crandc 20, 25, 22

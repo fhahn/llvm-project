@@ -293,37 +293,37 @@ define <8 x i16> @testInvalidExtend(<16 x i8> %a) {
 ; CHECK-LE-NEXT:    li 5, 4
 ; CHECK-LE-NEXT:    li 6, 6
 ; CHECK-LE-NEXT:    vextubrx 3, 3, 2
-; CHECK-LE-NEXT:    vextubrx 4, 4, 2
-; CHECK-LE-NEXT:    vextubrx 5, 5, 2
-; CHECK-LE-NEXT:    vextubrx 6, 6, 2
 ; CHECK-LE-NEXT:    li 7, 8
 ; CHECK-LE-NEXT:    li 8, 10
 ; CHECK-LE-NEXT:    li 9, 12
 ; CHECK-LE-NEXT:    li 10, 14
 ; CHECK-LE-NEXT:    extsb 3, 3
+; CHECK-LE-NEXT:    vextubrx 4, 4, 2
 ; CHECK-LE-NEXT:    extsb 4, 4
-; CHECK-LE-NEXT:    extsb 5, 5
-; CHECK-LE-NEXT:    extsb 6, 6
+; CHECK-LE-NEXT:    mtvsrd 35, 4
+; CHECK-LE-NEXT:    vextubrx 5, 5, 2
+; CHECK-LE-NEXT:    vextubrx 6, 6, 2
+; CHECK-LE-NEXT:    extsb 4, 6
+; CHECK-LE-NEXT:    mtvsrd 36, 4
 ; CHECK-LE-NEXT:    vextubrx 7, 7, 2
 ; CHECK-LE-NEXT:    vextubrx 8, 8, 2
-; CHECK-LE-NEXT:    extsb 7, 7
-; CHECK-LE-NEXT:    extsb 8, 8
-; CHECK-LE-NEXT:    mtvsrd 35, 4
+; CHECK-LE-NEXT:    extsb 4, 8
 ; CHECK-LE-NEXT:    vextubrx 9, 9, 2
 ; CHECK-LE-NEXT:    vextubrx 10, 10, 2
 ; CHECK-LE-NEXT:    mtvsrd 34, 3
-; CHECK-LE-NEXT:    mtvsrd 36, 6
-; CHECK-LE-NEXT:    extsb 9, 9
-; CHECK-LE-NEXT:    extsb 10, 10
+; CHECK-LE-NEXT:    extsb 3, 5
 ; CHECK-LE-NEXT:    vmrghh 2, 3, 2
-; CHECK-LE-NEXT:    mtvsrd 35, 5
+; CHECK-LE-NEXT:    mtvsrd 35, 3
+; CHECK-LE-NEXT:    extsb 3, 7
 ; CHECK-LE-NEXT:    vmrghh 3, 4, 3
-; CHECK-LE-NEXT:    mtvsrd 36, 10
 ; CHECK-LE-NEXT:    xxmrglw 0, 35, 34
-; CHECK-LE-NEXT:    mtvsrd 34, 7
-; CHECK-LE-NEXT:    mtvsrd 35, 8
+; CHECK-LE-NEXT:    mtvsrd 34, 3
+; CHECK-LE-NEXT:    mtvsrd 35, 4
+; CHECK-LE-NEXT:    extsb 3, 9
+; CHECK-LE-NEXT:    extsb 4, 10
+; CHECK-LE-NEXT:    mtvsrd 36, 4
 ; CHECK-LE-NEXT:    vmrghh 2, 3, 2
-; CHECK-LE-NEXT:    mtvsrd 35, 9
+; CHECK-LE-NEXT:    mtvsrd 35, 3
 ; CHECK-LE-NEXT:    vmrghh 3, 4, 3
 ; CHECK-LE-NEXT:    xxmrglw 1, 35, 34
 ; CHECK-LE-NEXT:    xxmrgld 34, 1, 0
@@ -336,32 +336,32 @@ define <8 x i16> @testInvalidExtend(<16 x i8> %a) {
 ; CHECK-BE-NEXT:    li 7, 8
 ; CHECK-BE-NEXT:    li 8, 10
 ; CHECK-BE-NEXT:    vextublx 9, 9, 2
-; CHECK-BE-NEXT:    vextublx 10, 10, 2
-; CHECK-BE-NEXT:    vextublx 7, 7, 2
-; CHECK-BE-NEXT:    vextublx 8, 8, 2
 ; CHECK-BE-NEXT:    li 5, 4
 ; CHECK-BE-NEXT:    li 6, 6
 ; CHECK-BE-NEXT:    li 3, 0
 ; CHECK-BE-NEXT:    li 4, 2
 ; CHECK-BE-NEXT:    extsb 9, 9
-; CHECK-BE-NEXT:    extsb 10, 10
-; CHECK-BE-NEXT:    extsb 7, 7
-; CHECK-BE-NEXT:    extsb 8, 8
-; CHECK-BE-NEXT:    vextublx 5, 5, 2
-; CHECK-BE-NEXT:    vextublx 6, 6, 2
-; CHECK-BE-NEXT:    extsb 5, 5
-; CHECK-BE-NEXT:    extsb 6, 6
 ; CHECK-BE-NEXT:    mtfprwz 1, 9
 ; CHECK-BE-NEXT:    addis 9, 2, .LCPI11_0@toc@ha
+; CHECK-BE-NEXT:    addi 9, 9, .LCPI11_0@toc@l
+; CHECK-BE-NEXT:    lxv 2, 0(9)
+; CHECK-BE-NEXT:    vextublx 10, 10, 2
+; CHECK-BE-NEXT:    extsb 10, 10
 ; CHECK-BE-NEXT:    mtfprwz 0, 10
+; CHECK-BE-NEXT:    vextublx 7, 7, 2
+; CHECK-BE-NEXT:    extsb 7, 7
 ; CHECK-BE-NEXT:    mtfprwz 3, 7
+; CHECK-BE-NEXT:    vextublx 8, 8, 2
+; CHECK-BE-NEXT:    extsb 8, 8
+; CHECK-BE-NEXT:    vextublx 5, 5, 2
+; CHECK-BE-NEXT:    extsb 5, 5
+; CHECK-BE-NEXT:    vextublx 6, 6, 2
+; CHECK-BE-NEXT:    extsb 6, 6
 ; CHECK-BE-NEXT:    vextublx 3, 3, 2
 ; CHECK-BE-NEXT:    extsb 3, 3
 ; CHECK-BE-NEXT:    mtfprwz 4, 3
-; CHECK-BE-NEXT:    addi 9, 9, .LCPI11_0@toc@l
 ; CHECK-BE-NEXT:    vextublx 4, 4, 2
 ; CHECK-BE-NEXT:    extsb 4, 4
-; CHECK-BE-NEXT:    lxv 2, 0(9)
 ; CHECK-BE-NEXT:    xxperm 0, 1, 2
 ; CHECK-BE-NEXT:    mtfprwz 1, 8
 ; CHECK-BE-NEXT:    xxperm 1, 3, 2

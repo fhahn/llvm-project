@@ -564,39 +564,39 @@ define dso_local float @v16f32(<16 x float> %a) local_unnamed_addr #0 {
 ; PWR9LE-LABEL: v16f32:
 ; PWR9LE:       # %bb.0: # %entry
 ; PWR9LE-NEXT:    xxsldwi vs0, v2, v2, 3
-; PWR9LE-NEXT:    xxswapd vs1, v2
+; PWR9LE-NEXT:    xscvspdpn f2, v2
 ; PWR9LE-NEXT:    xscvspdpn f0, vs0
+; PWR9LE-NEXT:    xxswapd vs1, v2
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
 ; PWR9LE-NEXT:    xsmulsp f0, f0, f1
 ; PWR9LE-NEXT:    xxsldwi vs1, v2, v2, 1
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
 ; PWR9LE-NEXT:    xsmulsp f0, f0, f1
-; PWR9LE-NEXT:    xscvspdpn f1, v2
-; PWR9LE-NEXT:    xsmulsp f0, f0, f1
+; PWR9LE-NEXT:    xsmulsp f0, f0, f2
 ; PWR9LE-NEXT:    xxsldwi vs1, v3, v3, 3
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
 ; PWR9LE-NEXT:    xsmulsp f0, f0, f1
-; PWR9LE-NEXT:    xxswapd vs1, v3
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
-; PWR9LE-NEXT:    xsmulsp f0, f0, f1
+; PWR9LE-NEXT:    xxswapd vs2, v3
+; PWR9LE-NEXT:    xscvspdpn f2, vs2
+; PWR9LE-NEXT:    xsmulsp f0, f0, f2
 ; PWR9LE-NEXT:    xxsldwi vs1, v3, v3, 1
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
 ; PWR9LE-NEXT:    xsmulsp f0, f0, f1
 ; PWR9LE-NEXT:    xscvspdpn f1, v3
 ; PWR9LE-NEXT:    xsmulsp f0, f0, f1
-; PWR9LE-NEXT:    xxsldwi vs1, v4, v4, 3
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
+; PWR9LE-NEXT:    xxsldwi vs2, v4, v4, 3
+; PWR9LE-NEXT:    xscvspdpn f1, vs2
 ; PWR9LE-NEXT:    xsmulsp f0, f0, f1
-; PWR9LE-NEXT:    xxswapd vs1, v4
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
+; PWR9LE-NEXT:    xxswapd vs2, v4
+; PWR9LE-NEXT:    xscvspdpn f1, vs2
 ; PWR9LE-NEXT:    xsmulsp f0, f0, f1
-; PWR9LE-NEXT:    xxsldwi vs1, v4, v4, 1
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
+; PWR9LE-NEXT:    xxsldwi vs2, v4, v4, 1
+; PWR9LE-NEXT:    xscvspdpn f1, vs2
 ; PWR9LE-NEXT:    xsmulsp f0, f0, f1
 ; PWR9LE-NEXT:    xscvspdpn f1, v4
 ; PWR9LE-NEXT:    xsmulsp f0, f0, f1
-; PWR9LE-NEXT:    xxsldwi vs1, v5, v5, 3
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
+; PWR9LE-NEXT:    xxsldwi vs2, v5, v5, 3
+; PWR9LE-NEXT:    xscvspdpn f1, vs2
 ; PWR9LE-NEXT:    xsmulsp f0, f0, f1
 ; PWR9LE-NEXT:    xxswapd vs1, v5
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
@@ -610,45 +610,45 @@ define dso_local float @v16f32(<16 x float> %a) local_unnamed_addr #0 {
 ;
 ; PWR9BE-LABEL: v16f32:
 ; PWR9BE:       # %bb.0: # %entry
-; PWR9BE-NEXT:    xxsldwi vs1, v2, v2, 1
-; PWR9BE-NEXT:    xscvspdpn f0, v2
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
-; PWR9BE-NEXT:    xsmulsp f0, f0, f1
+; PWR9BE-NEXT:    xxsldwi vs0, v2, v2, 1
+; PWR9BE-NEXT:    xscvspdpn f1, v2
+; PWR9BE-NEXT:    xscvspdpn f0, vs0
+; PWR9BE-NEXT:    xsmulsp f0, f1, f0
 ; PWR9BE-NEXT:    xxswapd vs1, v2
 ; PWR9BE-NEXT:    xscvspdpn f1, vs1
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v2, v2, 3
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
-; PWR9BE-NEXT:    xsmulsp f0, f0, f1
-; PWR9BE-NEXT:    xscvspdpn f1, v3
-; PWR9BE-NEXT:    xsmulsp f0, f0, f1
+; PWR9BE-NEXT:    xxsldwi vs2, v2, v2, 3
+; PWR9BE-NEXT:    xscvspdpn f2, vs2
+; PWR9BE-NEXT:    xsmulsp f0, f0, f2
+; PWR9BE-NEXT:    xscvspdpn f2, v3
+; PWR9BE-NEXT:    xsmulsp f0, f0, f2
 ; PWR9BE-NEXT:    xxsldwi vs1, v3, v3, 1
 ; PWR9BE-NEXT:    xscvspdpn f1, vs1
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
-; PWR9BE-NEXT:    xxswapd vs1, v3
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
+; PWR9BE-NEXT:    xxswapd vs2, v3
+; PWR9BE-NEXT:    xscvspdpn f1, vs2
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v3, v3, 3
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
+; PWR9BE-NEXT:    xxsldwi vs3, v3, v3, 3
+; PWR9BE-NEXT:    xscvspdpn f1, vs3
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
 ; PWR9BE-NEXT:    xscvspdpn f1, v4
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v4, v4, 1
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
+; PWR9BE-NEXT:    xxsldwi vs2, v4, v4, 1
+; PWR9BE-NEXT:    xscvspdpn f1, vs2
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
-; PWR9BE-NEXT:    xxswapd vs1, v4
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
+; PWR9BE-NEXT:    xxswapd vs3, v4
+; PWR9BE-NEXT:    xscvspdpn f1, vs3
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v4, v4, 3
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
+; PWR9BE-NEXT:    xxsldwi vs2, v4, v4, 3
+; PWR9BE-NEXT:    xscvspdpn f1, vs2
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
 ; PWR9BE-NEXT:    xscvspdpn f1, v5
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v5, v5, 1
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
+; PWR9BE-NEXT:    xxsldwi vs2, v5, v5, 1
+; PWR9BE-NEXT:    xscvspdpn f1, vs2
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
-; PWR9BE-NEXT:    xxswapd vs1, v5
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
+; PWR9BE-NEXT:    xxswapd vs2, v5
+; PWR9BE-NEXT:    xscvspdpn f1, vs2
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
 ; PWR9BE-NEXT:    xxsldwi vs1, v5, v5, 3
 ; PWR9BE-NEXT:    xscvspdpn f1, vs1
@@ -757,6 +757,7 @@ define dso_local float @v16f32_b(<16 x float> %a, float %b) local_unnamed_addr #
 ; PWR9LE-LABEL: v16f32_b:
 ; PWR9LE:       # %bb.0: # %entry
 ; PWR9LE-NEXT:    xxsldwi vs0, v2, v2, 3
+; PWR9LE-NEXT:    xscvspdpn f2, v2
 ; PWR9LE-NEXT:    xscvspdpn f0, vs0
 ; PWR9LE-NEXT:    xsmulsp f0, f1, f0
 ; PWR9LE-NEXT:    xxswapd vs1, v2
@@ -765,32 +766,31 @@ define dso_local float @v16f32_b(<16 x float> %a, float %b) local_unnamed_addr #
 ; PWR9LE-NEXT:    xxsldwi vs1, v2, v2, 1
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
 ; PWR9LE-NEXT:    xsmulsp f0, f0, f1
-; PWR9LE-NEXT:    xscvspdpn f1, v2
-; PWR9LE-NEXT:    xsmulsp f0, f0, f1
+; PWR9LE-NEXT:    xsmulsp f0, f0, f2
 ; PWR9LE-NEXT:    xxsldwi vs1, v3, v3, 3
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
 ; PWR9LE-NEXT:    xsmulsp f0, f0, f1
-; PWR9LE-NEXT:    xxswapd vs1, v3
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
-; PWR9LE-NEXT:    xsmulsp f0, f0, f1
+; PWR9LE-NEXT:    xxswapd vs2, v3
+; PWR9LE-NEXT:    xscvspdpn f2, vs2
+; PWR9LE-NEXT:    xsmulsp f0, f0, f2
 ; PWR9LE-NEXT:    xxsldwi vs1, v3, v3, 1
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
 ; PWR9LE-NEXT:    xsmulsp f0, f0, f1
 ; PWR9LE-NEXT:    xscvspdpn f1, v3
 ; PWR9LE-NEXT:    xsmulsp f0, f0, f1
-; PWR9LE-NEXT:    xxsldwi vs1, v4, v4, 3
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
+; PWR9LE-NEXT:    xxsldwi vs2, v4, v4, 3
+; PWR9LE-NEXT:    xscvspdpn f1, vs2
 ; PWR9LE-NEXT:    xsmulsp f0, f0, f1
-; PWR9LE-NEXT:    xxswapd vs1, v4
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
+; PWR9LE-NEXT:    xxswapd vs2, v4
+; PWR9LE-NEXT:    xscvspdpn f1, vs2
 ; PWR9LE-NEXT:    xsmulsp f0, f0, f1
-; PWR9LE-NEXT:    xxsldwi vs1, v4, v4, 1
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
+; PWR9LE-NEXT:    xxsldwi vs2, v4, v4, 1
+; PWR9LE-NEXT:    xscvspdpn f1, vs2
 ; PWR9LE-NEXT:    xsmulsp f0, f0, f1
 ; PWR9LE-NEXT:    xscvspdpn f1, v4
 ; PWR9LE-NEXT:    xsmulsp f0, f0, f1
-; PWR9LE-NEXT:    xxsldwi vs1, v5, v5, 3
-; PWR9LE-NEXT:    xscvspdpn f1, vs1
+; PWR9LE-NEXT:    xxsldwi vs2, v5, v5, 3
+; PWR9LE-NEXT:    xscvspdpn f1, vs2
 ; PWR9LE-NEXT:    xsmulsp f0, f0, f1
 ; PWR9LE-NEXT:    xxswapd vs1, v5
 ; PWR9LE-NEXT:    xscvspdpn f1, vs1
@@ -805,45 +805,45 @@ define dso_local float @v16f32_b(<16 x float> %a, float %b) local_unnamed_addr #
 ; PWR9BE-LABEL: v16f32_b:
 ; PWR9BE:       # %bb.0: # %entry
 ; PWR9BE-NEXT:    xscvspdpn f0, v2
+; PWR9BE-NEXT:    xxsldwi vs2, v2, v2, 3
 ; PWR9BE-NEXT:    xsmulsp f0, f1, f0
+; PWR9BE-NEXT:    xscvspdpn f2, vs2
 ; PWR9BE-NEXT:    xxsldwi vs1, v2, v2, 1
 ; PWR9BE-NEXT:    xscvspdpn f1, vs1
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
 ; PWR9BE-NEXT:    xxswapd vs1, v2
 ; PWR9BE-NEXT:    xscvspdpn f1, vs1
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v2, v2, 3
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
-; PWR9BE-NEXT:    xsmulsp f0, f0, f1
-; PWR9BE-NEXT:    xscvspdpn f1, v3
-; PWR9BE-NEXT:    xsmulsp f0, f0, f1
+; PWR9BE-NEXT:    xsmulsp f0, f0, f2
+; PWR9BE-NEXT:    xscvspdpn f2, v3
+; PWR9BE-NEXT:    xsmulsp f0, f0, f2
 ; PWR9BE-NEXT:    xxsldwi vs1, v3, v3, 1
 ; PWR9BE-NEXT:    xscvspdpn f1, vs1
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
-; PWR9BE-NEXT:    xxswapd vs1, v3
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
+; PWR9BE-NEXT:    xxswapd vs2, v3
+; PWR9BE-NEXT:    xscvspdpn f1, vs2
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v3, v3, 3
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
+; PWR9BE-NEXT:    xxsldwi vs3, v3, v3, 3
+; PWR9BE-NEXT:    xscvspdpn f1, vs3
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
 ; PWR9BE-NEXT:    xscvspdpn f1, v4
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v4, v4, 1
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
+; PWR9BE-NEXT:    xxsldwi vs2, v4, v4, 1
+; PWR9BE-NEXT:    xscvspdpn f1, vs2
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
-; PWR9BE-NEXT:    xxswapd vs1, v4
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
+; PWR9BE-NEXT:    xxswapd vs3, v4
+; PWR9BE-NEXT:    xscvspdpn f1, vs3
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v4, v4, 3
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
+; PWR9BE-NEXT:    xxsldwi vs2, v4, v4, 3
+; PWR9BE-NEXT:    xscvspdpn f1, vs2
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
 ; PWR9BE-NEXT:    xscvspdpn f1, v5
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
-; PWR9BE-NEXT:    xxsldwi vs1, v5, v5, 1
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
+; PWR9BE-NEXT:    xxsldwi vs2, v5, v5, 1
+; PWR9BE-NEXT:    xscvspdpn f1, vs2
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
-; PWR9BE-NEXT:    xxswapd vs1, v5
-; PWR9BE-NEXT:    xscvspdpn f1, vs1
+; PWR9BE-NEXT:    xxswapd vs2, v5
+; PWR9BE-NEXT:    xscvspdpn f1, vs2
 ; PWR9BE-NEXT:    xsmulsp f0, f0, f1
 ; PWR9BE-NEXT:    xxsldwi vs1, v5, v5, 3
 ; PWR9BE-NEXT:    xscvspdpn f1, vs1

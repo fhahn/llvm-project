@@ -577,8 +577,8 @@ define <2 x i64> @clmul_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    vspltisw 0, 1
 ; LE-NEXT:    vaddudm 8, 2, 2
 ; LE-NEXT:    addis 3, 2, .LCPI3_0@toc@ha
-; LE-NEXT:    vspltisw 6, 8
 ; LE-NEXT:    addi 3, 3, .LCPI3_0@toc@l
+; LE-NEXT:    vspltisw 6, 8
 ; LE-NEXT:    vspltisw 5, 4
 ; LE-NEXT:    vupklsw 7, 4
 ; LE-NEXT:    vspltisw 4, 3
@@ -617,47 +617,25 @@ define <2 x i64> @clmul_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    vsld 0, 2, 0
 ; LE-NEXT:    vcmpgtud 9, 9, 4
 ; LE-NEXT:    vupklsw 10, 10
-; LE-NEXT:    xxland 3, 41, 37
+; LE-NEXT:    xxland 4, 41, 37
 ; LE-NEXT:    lxvd2x 37, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_2@toc@ha
-; LE-NEXT:    vspltisw 7, 6
 ; LE-NEXT:    addi 3, 3, .LCPI3_2@toc@l
-; LE-NEXT:    xxlxor 0, 0, 3
 ; LE-NEXT:    lxvd2x 5, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_3@toc@ha
-; LE-NEXT:    xxland 41, 35, 37
-; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    addi 3, 3, .LCPI3_3@toc@l
-; LE-NEXT:    vupklsw 7, 7
-; LE-NEXT:    vsld 7, 2, 7
-; LE-NEXT:    vcmpgtud 9, 9, 4
 ; LE-NEXT:    lxvd2x 6, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_4@toc@ha
-; LE-NEXT:    xxland 4, 41, 40
-; LE-NEXT:    xxland 40, 35, 5
 ; LE-NEXT:    addi 3, 3, .LCPI3_4@toc@l
-; LE-NEXT:    vcmpgtud 8, 8, 4
-; LE-NEXT:    xxlxor 0, 0, 4
 ; LE-NEXT:    lxvd2x 7, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_5@toc@ha
-; LE-NEXT:    xxland 41, 35, 6
-; LE-NEXT:    xxland 5, 40, 39
-; LE-NEXT:    vsld 7, 2, 10
 ; LE-NEXT:    addi 3, 3, .LCPI3_5@toc@l
-; LE-NEXT:    vcmpgtud 9, 9, 4
-; LE-NEXT:    xxlxor 0, 0, 5
 ; LE-NEXT:    lxvd2x 8, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_6@toc@ha
-; LE-NEXT:    xxland 6, 41, 39
-; LE-NEXT:    xxland 41, 35, 7
 ; LE-NEXT:    addi 3, 3, .LCPI3_6@toc@l
-; LE-NEXT:    vcmpgtud 9, 9, 4
-; LE-NEXT:    xxlxor 0, 0, 6
 ; LE-NEXT:    lxvd2x 9, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_7@toc@ha
-; LE-NEXT:    xxland 7, 41, 38
 ; LE-NEXT:    addi 3, 3, .LCPI3_7@toc@l
-; LE-NEXT:    xxlxor 0, 0, 7
 ; LE-NEXT:    lxvd2x 10, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_8@toc@ha
 ; LE-NEXT:    addi 3, 3, .LCPI3_8@toc@l
@@ -667,6 +645,28 @@ define <2 x i64> @clmul_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_10@toc@ha
 ; LE-NEXT:    addi 3, 3, .LCPI3_10@toc@l
+; LE-NEXT:    xxland 41, 35, 37
+; LE-NEXT:    vspltisw 7, 6
+; LE-NEXT:    vcmpgtud 9, 9, 4
+; LE-NEXT:    xxland 3, 41, 40
+; LE-NEXT:    xxland 40, 35, 5
+; LE-NEXT:    vcmpgtud 8, 8, 4
+; LE-NEXT:    xxland 41, 35, 6
+; LE-NEXT:    vupklsw 7, 7
+; LE-NEXT:    vsld 7, 2, 7
+; LE-NEXT:    xxland 5, 40, 39
+; LE-NEXT:    vsld 7, 2, 10
+; LE-NEXT:    vcmpgtud 9, 9, 4
+; LE-NEXT:    xxland 6, 41, 39
+; LE-NEXT:    xxland 41, 35, 7
+; LE-NEXT:    vcmpgtud 9, 9, 4
+; LE-NEXT:    xxland 7, 41, 38
+; LE-NEXT:    xxlxor 0, 0, 4
+; LE-NEXT:    xxlxor 0, 0, 3
+; LE-NEXT:    xxlxor 0, 0, 5
+; LE-NEXT:    xxlxor 0, 0, 6
+; LE-NEXT:    xxlxor 0, 0, 7
+; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    vspltisw 8, 9
 ; LE-NEXT:    vupklsw 7, 8
 ; LE-NEXT:    vsld 6, 2, 7
@@ -697,18 +697,18 @@ define <2 x i64> @clmul_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    xxland 39, 35, 2
 ; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    lxvd2x 1, 0, 3
-; LE-NEXT:    vcmpgtud 7, 7, 4
 ; LE-NEXT:    addis 3, 2, .LCPI3_11@toc@ha
-; LE-NEXT:    vspltisw 1, 13
 ; LE-NEXT:    addi 3, 3, .LCPI3_11@toc@l
+; LE-NEXT:    vspltisw 1, 13
+; LE-NEXT:    vcmpgtud 7, 7, 4
 ; LE-NEXT:    vupklsw 1, 1
 ; LE-NEXT:    vsld 1, 2, 1
 ; LE-NEXT:    xxland 2, 39, 33
 ; LE-NEXT:    xxlxor 0, 0, 2
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_12@toc@ha
-; LE-NEXT:    xxland 39, 35, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_12@toc@l
+; LE-NEXT:    xxland 39, 35, 1
 ; LE-NEXT:    vspltisw 6, 14
 ; LE-NEXT:    vcmpgtud 7, 7, 4
 ; LE-NEXT:    vupklsw 6, 6
@@ -718,409 +718,409 @@ define <2 x i64> @clmul_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    lxvd2x 1, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_13@toc@ha
-; LE-NEXT:    vcmpgtud 6, 6, 4
-; LE-NEXT:    vspltisw 1, 15
 ; LE-NEXT:    addi 3, 3, .LCPI3_13@toc@l
+; LE-NEXT:    vspltisw 1, 15
+; LE-NEXT:    vcmpgtud 6, 6, 4
 ; LE-NEXT:    vupklsw 1, 1
 ; LE-NEXT:    vsld 1, 2, 1
 ; LE-NEXT:    xxland 2, 38, 33
 ; LE-NEXT:    lxvd2x 33, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_14@toc@ha
-; LE-NEXT:    xxlxor 0, 0, 2
-; LE-NEXT:    xxland 38, 35, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_14@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxlxor 0, 0, 2
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_15@toc@ha
-; LE-NEXT:    xxland 1, 38, 32
-; LE-NEXT:    vsld 1, 2, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_15@toc@l
-; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 38, 35, 1
+; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 1, 38, 32
 ; LE-NEXT:    lxvd2x 32, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_16@toc@ha
-; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    addi 3, 3, .LCPI3_16@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    lxvd2x 1, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_17@toc@ha
-; LE-NEXT:    xxland 2, 38, 33
-; LE-NEXT:    vsld 0, 2, 0
 ; LE-NEXT:    addi 3, 3, .LCPI3_17@toc@l
-; LE-NEXT:    xxlxor 0, 0, 2
+; LE-NEXT:    xxland 38, 35, 2
+; LE-NEXT:    vsld 1, 2, 1
+; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 2, 38, 33
 ; LE-NEXT:    lxvd2x 33, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_18@toc@ha
-; LE-NEXT:    xxland 38, 35, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_18@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxlxor 0, 0, 2
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_19@toc@ha
-; LE-NEXT:    xxland 1, 38, 32
-; LE-NEXT:    vsld 1, 2, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_19@toc@l
-; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 38, 35, 1
+; LE-NEXT:    vsld 0, 2, 0
+; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 1, 38, 32
 ; LE-NEXT:    lxvd2x 32, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_20@toc@ha
-; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    addi 3, 3, .LCPI3_20@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    lxvd2x 1, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_21@toc@ha
-; LE-NEXT:    xxland 2, 38, 33
-; LE-NEXT:    vsld 0, 2, 0
 ; LE-NEXT:    addi 3, 3, .LCPI3_21@toc@l
-; LE-NEXT:    xxlxor 0, 0, 2
+; LE-NEXT:    xxland 38, 35, 2
+; LE-NEXT:    vsld 1, 2, 1
+; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 2, 38, 33
 ; LE-NEXT:    lxvd2x 33, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_22@toc@ha
-; LE-NEXT:    xxland 38, 35, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_22@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxlxor 0, 0, 2
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_23@toc@ha
-; LE-NEXT:    xxland 1, 38, 32
-; LE-NEXT:    vsld 1, 2, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_23@toc@l
-; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 38, 35, 1
+; LE-NEXT:    vsld 0, 2, 0
+; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 1, 38, 32
 ; LE-NEXT:    lxvd2x 32, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_24@toc@ha
-; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    addi 3, 3, .LCPI3_24@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    lxvd2x 1, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_25@toc@ha
-; LE-NEXT:    xxland 2, 38, 33
-; LE-NEXT:    vsld 0, 2, 0
 ; LE-NEXT:    addi 3, 3, .LCPI3_25@toc@l
-; LE-NEXT:    xxlxor 0, 0, 2
+; LE-NEXT:    xxland 38, 35, 2
+; LE-NEXT:    vsld 1, 2, 1
+; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 2, 38, 33
 ; LE-NEXT:    lxvd2x 33, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_26@toc@ha
-; LE-NEXT:    xxland 38, 35, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_26@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxlxor 0, 0, 2
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_27@toc@ha
-; LE-NEXT:    xxland 1, 38, 32
-; LE-NEXT:    vsld 1, 2, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_27@toc@l
-; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 38, 35, 1
+; LE-NEXT:    vsld 0, 2, 0
+; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 1, 38, 32
 ; LE-NEXT:    lxvd2x 32, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_28@toc@ha
-; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    addi 3, 3, .LCPI3_28@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    lxvd2x 1, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_29@toc@ha
-; LE-NEXT:    xxland 2, 38, 33
-; LE-NEXT:    vsld 0, 2, 0
 ; LE-NEXT:    addi 3, 3, .LCPI3_29@toc@l
-; LE-NEXT:    xxlxor 0, 0, 2
+; LE-NEXT:    xxland 38, 35, 2
+; LE-NEXT:    vsld 1, 2, 1
+; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 2, 38, 33
 ; LE-NEXT:    lxvd2x 33, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_30@toc@ha
-; LE-NEXT:    xxland 38, 35, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_30@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxlxor 0, 0, 2
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_31@toc@ha
-; LE-NEXT:    xxland 1, 38, 32
-; LE-NEXT:    vsld 1, 2, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_31@toc@l
-; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 38, 35, 1
+; LE-NEXT:    vsld 0, 2, 0
+; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 1, 38, 32
 ; LE-NEXT:    lxvd2x 32, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_32@toc@ha
-; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    addi 3, 3, .LCPI3_32@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    lxvd2x 1, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_33@toc@ha
-; LE-NEXT:    xxland 2, 38, 33
-; LE-NEXT:    vsld 0, 2, 0
 ; LE-NEXT:    addi 3, 3, .LCPI3_33@toc@l
-; LE-NEXT:    xxlxor 0, 0, 2
+; LE-NEXT:    xxland 38, 35, 2
+; LE-NEXT:    vsld 1, 2, 1
+; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 2, 38, 33
 ; LE-NEXT:    lxvd2x 33, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_34@toc@ha
-; LE-NEXT:    xxland 38, 35, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_34@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxlxor 0, 0, 2
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_35@toc@ha
-; LE-NEXT:    xxland 1, 38, 32
-; LE-NEXT:    vsld 1, 2, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_35@toc@l
-; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 38, 35, 1
+; LE-NEXT:    vsld 0, 2, 0
+; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 1, 38, 32
 ; LE-NEXT:    lxvd2x 32, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_36@toc@ha
-; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    addi 3, 3, .LCPI3_36@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    lxvd2x 1, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_37@toc@ha
-; LE-NEXT:    xxland 2, 38, 33
-; LE-NEXT:    vsld 0, 2, 0
 ; LE-NEXT:    addi 3, 3, .LCPI3_37@toc@l
-; LE-NEXT:    xxlxor 0, 0, 2
+; LE-NEXT:    xxland 38, 35, 2
+; LE-NEXT:    vsld 1, 2, 1
+; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 2, 38, 33
 ; LE-NEXT:    lxvd2x 33, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_38@toc@ha
-; LE-NEXT:    xxland 38, 35, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_38@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxlxor 0, 0, 2
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_39@toc@ha
-; LE-NEXT:    xxland 1, 38, 32
-; LE-NEXT:    vsld 1, 2, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_39@toc@l
-; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 38, 35, 1
+; LE-NEXT:    vsld 0, 2, 0
+; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 1, 38, 32
 ; LE-NEXT:    lxvd2x 32, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_40@toc@ha
-; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    addi 3, 3, .LCPI3_40@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    lxvd2x 1, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_41@toc@ha
-; LE-NEXT:    xxland 2, 38, 33
-; LE-NEXT:    vsld 0, 2, 0
 ; LE-NEXT:    addi 3, 3, .LCPI3_41@toc@l
-; LE-NEXT:    xxlxor 0, 0, 2
+; LE-NEXT:    xxland 38, 35, 2
+; LE-NEXT:    vsld 1, 2, 1
+; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 2, 38, 33
 ; LE-NEXT:    lxvd2x 33, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_42@toc@ha
-; LE-NEXT:    xxland 38, 35, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_42@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxlxor 0, 0, 2
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_43@toc@ha
-; LE-NEXT:    xxland 1, 38, 32
-; LE-NEXT:    vsld 1, 2, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_43@toc@l
-; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    lxvd2x 3, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_44@toc@ha
-; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    addi 3, 3, .LCPI3_44@toc@l
+; LE-NEXT:    xxland 38, 35, 1
+; LE-NEXT:    vsld 0, 2, 0
 ; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 1, 38, 32
 ; LE-NEXT:    lxvd2x 32, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_45@toc@ha
-; LE-NEXT:    xxland 1, 38, 33
-; LE-NEXT:    xxland 38, 35, 3
 ; LE-NEXT:    addi 3, 3, .LCPI3_45@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
-; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_46@toc@ha
-; LE-NEXT:    xxland 1, 38, 37
-; LE-NEXT:    vsld 0, 2, 0
 ; LE-NEXT:    addi 3, 3, .LCPI3_46@toc@l
+; LE-NEXT:    vsld 1, 2, 1
+; LE-NEXT:    vcmpgtud 6, 6, 4
 ; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 1, 38, 33
 ; LE-NEXT:    lxvd2x 33, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_47@toc@ha
-; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    addi 3, 3, .LCPI3_47@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 38, 35, 3
 ; LE-NEXT:    lxvd2x 3, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_48@toc@ha
-; LE-NEXT:    xxland 1, 38, 32
-; LE-NEXT:    vsld 1, 2, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_48@toc@l
+; LE-NEXT:    vcmpgtud 6, 6, 4
 ; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 1, 38, 37
 ; LE-NEXT:    lxvd2x 37, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_49@toc@ha
-; LE-NEXT:    xxland 38, 35, 3
 ; LE-NEXT:    addi 3, 3, .LCPI3_49@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_50@toc@ha
-; LE-NEXT:    xxland 1, 38, 33
-; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    addi 3, 3, .LCPI3_50@toc@l
+; LE-NEXT:    vsld 0, 2, 0
+; LE-NEXT:    vcmpgtud 6, 6, 4
 ; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 1, 38, 32
 ; LE-NEXT:    lxvd2x 32, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_51@toc@ha
-; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    addi 3, 3, .LCPI3_51@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 38, 35, 3
 ; LE-NEXT:    lxvd2x 3, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_52@toc@ha
-; LE-NEXT:    xxland 1, 38, 37
-; LE-NEXT:    vsld 0, 2, 0
 ; LE-NEXT:    addi 3, 3, .LCPI3_52@toc@l
+; LE-NEXT:    vsld 1, 2, 1
+; LE-NEXT:    vcmpgtud 6, 6, 4
 ; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 1, 38, 33
 ; LE-NEXT:    lxvd2x 33, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_53@toc@ha
-; LE-NEXT:    xxland 38, 35, 3
 ; LE-NEXT:    addi 3, 3, .LCPI3_53@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_54@toc@ha
-; LE-NEXT:    xxland 1, 38, 32
-; LE-NEXT:    vsld 1, 2, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_54@toc@l
+; LE-NEXT:    vsld 5, 2, 5
+; LE-NEXT:    vcmpgtud 6, 6, 4
 ; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 1, 38, 37
 ; LE-NEXT:    lxvd2x 37, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_55@toc@ha
-; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    addi 3, 3, .LCPI3_55@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 38, 35, 3
 ; LE-NEXT:    lxvd2x 3, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_56@toc@ha
-; LE-NEXT:    xxland 1, 38, 33
-; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    addi 3, 3, .LCPI3_56@toc@l
+; LE-NEXT:    vsld 0, 2, 0
+; LE-NEXT:    vcmpgtud 6, 6, 4
 ; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 1, 38, 32
 ; LE-NEXT:    lxvd2x 32, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_57@toc@ha
-; LE-NEXT:    xxland 38, 35, 3
 ; LE-NEXT:    addi 3, 3, .LCPI3_57@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_58@toc@ha
-; LE-NEXT:    xxland 1, 38, 37
-; LE-NEXT:    vsld 0, 2, 0
 ; LE-NEXT:    addi 3, 3, .LCPI3_58@toc@l
+; LE-NEXT:    vsld 1, 2, 1
+; LE-NEXT:    vcmpgtud 6, 6, 4
 ; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 1, 38, 33
 ; LE-NEXT:    lxvd2x 33, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_59@toc@ha
-; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    addi 3, 3, .LCPI3_59@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 38, 35, 3
 ; LE-NEXT:    lxvd2x 3, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_60@toc@ha
-; LE-NEXT:    xxland 1, 38, 32
-; LE-NEXT:    vsld 1, 2, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_60@toc@l
+; LE-NEXT:    vsld 5, 2, 5
+; LE-NEXT:    vcmpgtud 6, 6, 4
 ; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 1, 38, 37
 ; LE-NEXT:    lxvd2x 37, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_61@toc@ha
-; LE-NEXT:    xxland 38, 35, 3
 ; LE-NEXT:    addi 3, 3, .LCPI3_61@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_62@toc@ha
-; LE-NEXT:    xxland 1, 38, 33
-; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    addi 3, 3, .LCPI3_62@toc@l
+; LE-NEXT:    vsld 0, 2, 0
+; LE-NEXT:    vcmpgtud 6, 6, 4
 ; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 1, 38, 32
 ; LE-NEXT:    lxvd2x 32, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_63@toc@ha
-; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    addi 3, 3, .LCPI3_63@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 38, 35, 3
 ; LE-NEXT:    lxvd2x 3, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_64@toc@ha
-; LE-NEXT:    xxland 1, 38, 37
-; LE-NEXT:    vsld 0, 2, 0
 ; LE-NEXT:    addi 3, 3, .LCPI3_64@toc@l
+; LE-NEXT:    vsld 1, 2, 1
+; LE-NEXT:    vcmpgtud 6, 6, 4
 ; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 1, 38, 33
 ; LE-NEXT:    lxvd2x 33, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_65@toc@ha
-; LE-NEXT:    xxland 38, 35, 3
 ; LE-NEXT:    addi 3, 3, .LCPI3_65@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_66@toc@ha
-; LE-NEXT:    xxland 1, 38, 32
-; LE-NEXT:    vsld 1, 2, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_66@toc@l
+; LE-NEXT:    vsld 5, 2, 5
+; LE-NEXT:    vcmpgtud 6, 6, 4
 ; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 1, 38, 37
 ; LE-NEXT:    lxvd2x 37, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_67@toc@ha
-; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    addi 3, 3, .LCPI3_67@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 38, 35, 3
 ; LE-NEXT:    lxvd2x 3, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_68@toc@ha
-; LE-NEXT:    xxland 1, 38, 33
-; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    addi 3, 3, .LCPI3_68@toc@l
+; LE-NEXT:    vsld 0, 2, 0
+; LE-NEXT:    vcmpgtud 6, 6, 4
 ; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 1, 38, 32
 ; LE-NEXT:    lxvd2x 32, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_69@toc@ha
-; LE-NEXT:    xxland 38, 35, 3
 ; LE-NEXT:    addi 3, 3, .LCPI3_69@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_70@toc@ha
-; LE-NEXT:    xxland 1, 38, 37
-; LE-NEXT:    vsld 0, 2, 0
 ; LE-NEXT:    addi 3, 3, .LCPI3_70@toc@l
+; LE-NEXT:    vsld 1, 2, 1
+; LE-NEXT:    vcmpgtud 6, 6, 4
 ; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 1, 38, 33
 ; LE-NEXT:    lxvd2x 33, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_71@toc@ha
-; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    addi 3, 3, .LCPI3_71@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 38, 35, 3
 ; LE-NEXT:    lxvd2x 3, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_72@toc@ha
-; LE-NEXT:    xxland 1, 38, 32
-; LE-NEXT:    vsld 1, 2, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_72@toc@l
+; LE-NEXT:    vsld 5, 2, 5
+; LE-NEXT:    vcmpgtud 6, 6, 4
 ; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 1, 38, 37
 ; LE-NEXT:    lxvd2x 37, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_73@toc@ha
-; LE-NEXT:    xxland 38, 35, 3
 ; LE-NEXT:    addi 3, 3, .LCPI3_73@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_74@toc@ha
-; LE-NEXT:    xxland 1, 38, 33
-; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    addi 3, 3, .LCPI3_74@toc@l
+; LE-NEXT:    vsld 0, 2, 0
+; LE-NEXT:    vcmpgtud 6, 6, 4
 ; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 1, 38, 32
 ; LE-NEXT:    lxvd2x 32, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_75@toc@ha
-; LE-NEXT:    xxland 38, 35, 2
 ; LE-NEXT:    addi 3, 3, .LCPI3_75@toc@l
-; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 38, 35, 3
 ; LE-NEXT:    lxvd2x 3, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_76@toc@ha
-; LE-NEXT:    xxland 1, 38, 37
-; LE-NEXT:    vsld 0, 2, 0
 ; LE-NEXT:    addi 3, 3, .LCPI3_76@toc@l
+; LE-NEXT:    vsld 1, 2, 1
+; LE-NEXT:    vcmpgtud 6, 6, 4
 ; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 1, 38, 33
 ; LE-NEXT:    lxvd2x 33, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_77@toc@ha
-; LE-NEXT:    xxland 38, 35, 3
 ; LE-NEXT:    addi 3, 3, .LCPI3_77@toc@l
+; LE-NEXT:    xxland 38, 35, 2
+; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 1, 38, 37
+; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    lxvd2x 1, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_78@toc@ha
-; LE-NEXT:    xxland 2, 38, 32
-; LE-NEXT:    vsld 0, 2, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_78@toc@l
-; LE-NEXT:    xxlxor 0, 0, 2
 ; LE-NEXT:    lxvd2x 37, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_79@toc@ha
-; LE-NEXT:    xxland 33, 35, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_79@toc@l
-; LE-NEXT:    vcmpgtud 1, 1, 4
+; LE-NEXT:    xxland 38, 35, 3
+; LE-NEXT:    vsld 0, 2, 0
+; LE-NEXT:    vcmpgtud 6, 6, 4
+; LE-NEXT:    xxland 2, 38, 32
+; LE-NEXT:    xxlxor 0, 0, 2
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_80@toc@ha
-; LE-NEXT:    xxland 1, 33, 32
-; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    addi 3, 3, .LCPI3_80@toc@l
-; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    vsld 0, 2, 1
+; LE-NEXT:    xxland 33, 35, 1
+; LE-NEXT:    vcmpgtud 1, 1, 4
+; LE-NEXT:    xxland 1, 33, 32
 ; LE-NEXT:    lxvd2x 32, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_81@toc@ha
-; LE-NEXT:    xxland 33, 35, 2
 ; LE-NEXT:    addi 3, 3, .LCPI3_81@toc@l
-; LE-NEXT:    vcmpgtud 1, 1, 4
+; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    lxvd2x 1, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_82@toc@ha
-; LE-NEXT:    xxland 2, 33, 37
-; LE-NEXT:    vsld 0, 2, 0
 ; LE-NEXT:    addi 3, 3, .LCPI3_82@toc@l
-; LE-NEXT:    xxlxor 0, 0, 2
+; LE-NEXT:    xxland 33, 35, 2
+; LE-NEXT:    vsld 5, 2, 5
+; LE-NEXT:    vcmpgtud 1, 1, 4
+; LE-NEXT:    xxland 2, 33, 37
 ; LE-NEXT:    lxvd2x 37, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_83@toc@ha
-; LE-NEXT:    xxland 33, 35, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_83@toc@l
-; LE-NEXT:    vcmpgtud 1, 1, 4
+; LE-NEXT:    xxlxor 0, 0, 2
 ; LE-NEXT:    lxvd2x 2, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_84@toc@ha
-; LE-NEXT:    xxland 1, 33, 32
-; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    addi 3, 3, .LCPI3_84@toc@l
-; LE-NEXT:    xxlxor 0, 0, 1
+; LE-NEXT:    xxland 33, 35, 1
+; LE-NEXT:    vsld 0, 2, 0
+; LE-NEXT:    vcmpgtud 1, 1, 4
+; LE-NEXT:    xxland 1, 33, 32
 ; LE-NEXT:    lxvd2x 32, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_85@toc@ha
-; LE-NEXT:    xxland 33, 35, 2
 ; LE-NEXT:    addi 3, 3, .LCPI3_85@toc@l
+; LE-NEXT:    xxland 33, 35, 2
+; LE-NEXT:    vsld 5, 2, 5
+; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    vcmpgtud 1, 1, 4
 ; LE-NEXT:    xxland 1, 33, 37
 ; LE-NEXT:    vsld 0, 2, 0
@@ -1130,8 +1130,8 @@ define <2 x i64> @clmul_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    addi 3, 3, .LCPI3_86@toc@l
 ; LE-NEXT:    lxvd2x 37, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_87@toc@ha
-; LE-NEXT:    xxland 33, 35, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_87@toc@l
+; LE-NEXT:    xxland 33, 35, 1
 ; LE-NEXT:    vcmpgtud 1, 1, 4
 ; LE-NEXT:    xxland 1, 33, 32
 ; LE-NEXT:    vsld 5, 2, 5
@@ -1141,8 +1141,8 @@ define <2 x i64> @clmul_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    addi 3, 3, .LCPI3_88@toc@l
 ; LE-NEXT:    lxvd2x 32, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_89@toc@ha
-; LE-NEXT:    xxland 33, 35, 1
 ; LE-NEXT:    addi 3, 3, .LCPI3_89@toc@l
+; LE-NEXT:    xxland 33, 35, 1
 ; LE-NEXT:    vcmpgtud 1, 1, 4
 ; LE-NEXT:    xxland 1, 33, 37
 ; LE-NEXT:    vsld 5, 2, 0
@@ -1159,8 +1159,8 @@ define <2 x i64> @clmul_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    lxvd2x 1, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_92@toc@ha
-; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    addi 3, 3, .LCPI3_92@toc@l
+; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    xxland 32, 35, 1
 ; LE-NEXT:    vcmpgtud 0, 0, 4
 ; LE-NEXT:    xxland 1, 32, 37
@@ -1170,8 +1170,8 @@ define <2 x i64> @clmul_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    lxvd2x 1, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_94@toc@ha
-; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    addi 3, 3, .LCPI3_94@toc@l
+; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    xxland 32, 35, 1
 ; LE-NEXT:    vcmpgtud 0, 0, 4
 ; LE-NEXT:    xxland 1, 32, 37
@@ -1181,8 +1181,8 @@ define <2 x i64> @clmul_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    lxvd2x 1, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_96@toc@ha
-; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    addi 3, 3, .LCPI3_96@toc@l
+; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    xxland 32, 35, 1
 ; LE-NEXT:    vcmpgtud 0, 0, 4
 ; LE-NEXT:    xxland 1, 32, 37
@@ -1192,8 +1192,8 @@ define <2 x i64> @clmul_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    lxvd2x 1, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_98@toc@ha
-; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    addi 3, 3, .LCPI3_98@toc@l
+; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    xxland 32, 35, 1
 ; LE-NEXT:    vcmpgtud 0, 0, 4
 ; LE-NEXT:    xxland 1, 32, 37
@@ -1203,8 +1203,8 @@ define <2 x i64> @clmul_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    lxvd2x 1, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_100@toc@ha
-; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    addi 3, 3, .LCPI3_100@toc@l
+; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    xxland 32, 35, 1
 ; LE-NEXT:    vcmpgtud 0, 0, 4
 ; LE-NEXT:    xxland 1, 32, 37
@@ -1214,8 +1214,8 @@ define <2 x i64> @clmul_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    lxvd2x 1, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_102@toc@ha
-; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    addi 3, 3, .LCPI3_102@toc@l
+; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    xxland 32, 35, 1
 ; LE-NEXT:    vcmpgtud 0, 0, 4
 ; LE-NEXT:    xxland 1, 32, 37
@@ -1225,8 +1225,8 @@ define <2 x i64> @clmul_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    xxlxor 0, 0, 1
 ; LE-NEXT:    lxvd2x 1, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI3_104@toc@ha
-; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    addi 3, 3, .LCPI3_104@toc@l
+; LE-NEXT:    vsld 5, 2, 5
 ; LE-NEXT:    xxland 32, 35, 1
 ; LE-NEXT:    vcmpgtud 0, 0, 4
 ; LE-NEXT:    xxland 1, 32, 37
@@ -1543,34 +1543,34 @@ define <8 x i16> @clmulr_v8i16(<8 x i16> %a, <8 x i16> %b) nounwind {
 ; LE-NEXT:    xxlor 32, 1, 38
 ; LE-NEXT:    lxvd2x 1, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI5_3@toc@ha
-; LE-NEXT:    vsrb 6, 0, 2
 ; LE-NEXT:    addi 3, 3, .LCPI5_3@toc@l
 ; LE-NEXT:    lxvd2x 3, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI5_4@toc@ha
+; LE-NEXT:    addi 3, 3, .LCPI5_4@toc@l
+; LE-NEXT:    lxvd2x 5, 0, 3
+; LE-NEXT:    addis 3, 2, .LCPI5_5@toc@ha
+; LE-NEXT:    addi 3, 3, .LCPI5_5@toc@l
+; LE-NEXT:    lxvd2x 7, 0, 3
+; LE-NEXT:    vsrb 6, 0, 2
 ; LE-NEXT:    xxland 2, 38, 1
 ; LE-NEXT:    vslb 6, 1, 3
 ; LE-NEXT:    vsrb 1, 1, 3
-; LE-NEXT:    xxland 32, 32, 1
-; LE-NEXT:    addi 3, 3, .LCPI5_4@toc@l
 ; LE-NEXT:    xxlor 33, 33, 38
-; LE-NEXT:    vaddubm 0, 0, 0
-; LE-NEXT:    lxvd2x 5, 0, 3
-; LE-NEXT:    addis 3, 2, .LCPI5_5@toc@ha
 ; LE-NEXT:    xxland 38, 33, 0
 ; LE-NEXT:    vsrb 1, 1, 5
-; LE-NEXT:    xxlor 2, 2, 32
-; LE-NEXT:    addi 3, 3, .LCPI5_5@toc@l
 ; LE-NEXT:    vslb 6, 6, 5
 ; LE-NEXT:    xxland 4, 33, 0
+; LE-NEXT:    xxland 32, 32, 1
+; LE-NEXT:    vaddubm 0, 0, 0
+; LE-NEXT:    xxlor 2, 2, 32
 ; LE-NEXT:    xxland 32, 2, 3
-; LE-NEXT:    lxvd2x 7, 0, 3
 ; LE-NEXT:    xxlor 33, 4, 38
 ; LE-NEXT:    xxland 40, 2, 5
 ; LE-NEXT:    vsrb 6, 1, 2
 ; LE-NEXT:    xxland 33, 33, 1
 ; LE-NEXT:    xxland 4, 38, 1
-; LE-NEXT:    vaddubm 1, 1, 1
 ; LE-NEXT:    vxor 6, 6, 6
+; LE-NEXT:    vaddubm 1, 1, 1
 ; LE-NEXT:    xxlor 4, 4, 33
 ; LE-NEXT:    xxland 33, 4, 5
 ; LE-NEXT:    xxland 41, 4, 3
@@ -2106,219 +2106,223 @@ define <4 x i32> @clmulr_v4i32(<4 x i32> %a, <4 x i32> %b) nounwind {
 ; LE-LABEL: clmulr_v4i32:
 ; LE:       # %bb.0:
 ; LE-NEXT:    xxsldwi 0, 35, 35, 1
-; LE-NEXT:    mfvsrwz 9, 35
+; LE-NEXT:    xxswapd 3, 35
 ; LE-NEXT:    lis 3, -21846
-; LE-NEXT:    lis 6, 13107
-; LE-NEXT:    xxswapd 1, 35
-; LE-NEXT:    xxsldwi 3, 35, 35, 3
-; LE-NEXT:    lis 7, 3855
-; LE-NEXT:    ori 4, 3, 43690
+; LE-NEXT:    lis 4, 21845
+; LE-NEXT:    xxsldwi 4, 35, 35, 3
+; LE-NEXT:    mfvsrwz 9, 35
+; LE-NEXT:    std 30, -16(1) # 8-byte Folded Spill
+; LE-NEXT:    std 29, -24(1) # 8-byte Folded Spill
+; LE-NEXT:    ori 3, 3, 43690
+; LE-NEXT:    ori 8, 4, 21845
+; LE-NEXT:    lis 4, -13108
+; LE-NEXT:    lis 5, 3855
 ; LE-NEXT:    mffprwz 11, 0
-; LE-NEXT:    lis 3, 21845
-; LE-NEXT:    mffprwz 0, 1
-; LE-NEXT:    ori 8, 6, 13107
-; LE-NEXT:    lis 6, -3856
-; LE-NEXT:    ori 7, 7, 3855
-; LE-NEXT:    xxsldwi 2, 34, 34, 1
-; LE-NEXT:    xxswapd 4, 34
-; LE-NEXT:    ori 5, 3, 21845
-; LE-NEXT:    lis 3, -13108
-; LE-NEXT:    ori 6, 6, 61680
+; LE-NEXT:    mffprwz 0, 3
+; LE-NEXT:    ori 5, 5, 3855
+; LE-NEXT:    xxsldwi 1, 34, 34, 1
+; LE-NEXT:    ori 6, 4, 52428
+; LE-NEXT:    lis 4, 13107
+; LE-NEXT:    xxswapd 2, 34
 ; LE-NEXT:    xxsldwi 0, 34, 34, 3
 ; LE-NEXT:    slwi 10, 9, 1
 ; LE-NEXT:    srwi 9, 9, 1
-; LE-NEXT:    vspltisb 3, -16
-; LE-NEXT:    vspltisb 4, 1
-; LE-NEXT:    ori 3, 3, 52428
+; LE-NEXT:    vspltisb 3, 1
+; LE-NEXT:    ori 7, 4, 13107
+; LE-NEXT:    lis 4, -3856
 ; LE-NEXT:    slwi 12, 11, 1
 ; LE-NEXT:    srwi 11, 11, 1
-; LE-NEXT:    and 10, 10, 4
+; LE-NEXT:    slwi 30, 0, 1
+; LE-NEXT:    srwi 0, 0, 1
+; LE-NEXT:    and 9, 9, 8
+; LE-NEXT:    ori 4, 4, 61680
+; LE-NEXT:    and 12, 12, 3
+; LE-NEXT:    and 11, 11, 8
+; LE-NEXT:    and 30, 30, 3
+; LE-NEXT:    and 0, 0, 8
+; LE-NEXT:    or 12, 11, 12
+; LE-NEXT:    mffprwz 11, 4
+; LE-NEXT:    or 0, 0, 30
+; LE-NEXT:    slwi 30, 11, 1
+; LE-NEXT:    srwi 29, 11, 1
+; LE-NEXT:    and 11, 10, 3
+; LE-NEXT:    and 10, 30, 3
+; LE-NEXT:    and 30, 29, 8
+; LE-NEXT:    or 9, 9, 11
+; LE-NEXT:    ld 29, -24(1) # 8-byte Folded Reload
+; LE-NEXT:    or 10, 30, 10
+; LE-NEXT:    slwi 30, 12, 2
+; LE-NEXT:    srwi 12, 12, 2
+; LE-NEXT:    slwi 11, 9, 2
+; LE-NEXT:    srwi 9, 9, 2
+; LE-NEXT:    and 30, 30, 6
+; LE-NEXT:    and 12, 12, 7
+; LE-NEXT:    and 11, 11, 6
+; LE-NEXT:    and 9, 9, 7
+; LE-NEXT:    or 12, 12, 30
+; LE-NEXT:    slwi 30, 0, 2
+; LE-NEXT:    srwi 0, 0, 2
+; LE-NEXT:    or 9, 9, 11
+; LE-NEXT:    and 30, 30, 6
+; LE-NEXT:    and 0, 0, 7
+; LE-NEXT:    slwi 11, 9, 4
+; LE-NEXT:    srwi 9, 9, 4
+; LE-NEXT:    or 0, 0, 30
+; LE-NEXT:    slwi 30, 10, 2
+; LE-NEXT:    srwi 10, 10, 2
+; LE-NEXT:    and 11, 11, 4
 ; LE-NEXT:    and 9, 9, 5
+; LE-NEXT:    and 30, 30, 6
+; LE-NEXT:    and 10, 10, 7
+; LE-NEXT:    or 9, 9, 11
+; LE-NEXT:    or 10, 10, 30
+; LE-NEXT:    slwi 30, 12, 4
+; LE-NEXT:    srwi 12, 12, 4
+; LE-NEXT:    rotlwi 11, 9, 24
+; LE-NEXT:    and 30, 30, 4
+; LE-NEXT:    and 12, 12, 5
+; LE-NEXT:    rlwimi 11, 9, 8, 8, 15
+; LE-NEXT:    rlwimi 11, 9, 8, 24, 31
+; LE-NEXT:    or 12, 12, 30
+; LE-NEXT:    slwi 30, 0, 4
+; LE-NEXT:    srwi 0, 0, 4
+; LE-NEXT:    rldicl 9, 11, 0, 32
+; LE-NEXT:    mffprwz 11, 1
+; LE-NEXT:    and 30, 30, 4
+; LE-NEXT:    and 0, 0, 5
+; LE-NEXT:    or 0, 0, 30
+; LE-NEXT:    slwi 30, 10, 4
+; LE-NEXT:    srwi 10, 10, 4
+; LE-NEXT:    and 30, 30, 4
+; LE-NEXT:    and 10, 10, 5
+; LE-NEXT:    or 10, 10, 30
+; LE-NEXT:    rotlwi 30, 12, 24
+; LE-NEXT:    rlwimi 30, 12, 8, 8, 15
+; LE-NEXT:    rlwimi 30, 12, 8, 24, 31
+; LE-NEXT:    rotlwi 12, 0, 24
+; LE-NEXT:    rldicl 30, 30, 0, 32
+; LE-NEXT:    rlwimi 12, 0, 8, 8, 15
+; LE-NEXT:    rlwimi 12, 0, 8, 24, 31
+; LE-NEXT:    rotlwi 0, 10, 24
+; LE-NEXT:    rlwimi 0, 10, 8, 8, 15
+; LE-NEXT:    rlwimi 0, 10, 8, 24, 31
+; LE-NEXT:    rldicl 10, 12, 0, 32
+; LE-NEXT:    rldicl 12, 0, 0, 32
+; LE-NEXT:    rldimi 10, 30, 32, 0
+; LE-NEXT:    rldimi 9, 12, 32, 0
+; LE-NEXT:    mtfprd 1, 9
+; LE-NEXT:    addis 9, 2, .LCPI6_0@toc@ha
+; LE-NEXT:    addi 9, 9, .LCPI6_0@toc@l
+; LE-NEXT:    slwi 12, 11, 1
+; LE-NEXT:    srwi 11, 11, 1
+; LE-NEXT:    and 12, 12, 3
+; LE-NEXT:    and 11, 11, 8
+; LE-NEXT:    or 11, 11, 12
+; LE-NEXT:    slwi 12, 11, 2
+; LE-NEXT:    srwi 11, 11, 2
+; LE-NEXT:    and 12, 12, 6
+; LE-NEXT:    and 11, 11, 7
+; LE-NEXT:    or 11, 11, 12
+; LE-NEXT:    slwi 12, 11, 4
+; LE-NEXT:    srwi 11, 11, 4
 ; LE-NEXT:    and 12, 12, 4
 ; LE-NEXT:    and 11, 11, 5
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    mffprwz 10, 3
 ; LE-NEXT:    or 11, 11, 12
-; LE-NEXT:    slwi 12, 0, 1
-; LE-NEXT:    srwi 0, 0, 1
-; LE-NEXT:    and 12, 12, 4
-; LE-NEXT:    and 0, 0, 5
-; LE-NEXT:    or 12, 0, 12
-; LE-NEXT:    slwi 0, 10, 1
-; LE-NEXT:    srwi 10, 10, 1
-; LE-NEXT:    and 0, 0, 4
-; LE-NEXT:    and 10, 10, 5
-; LE-NEXT:    or 10, 10, 0
-; LE-NEXT:    slwi 0, 11, 2
-; LE-NEXT:    srwi 11, 11, 2
-; LE-NEXT:    and 0, 0, 3
-; LE-NEXT:    and 11, 11, 8
-; LE-NEXT:    or 11, 11, 0
-; LE-NEXT:    slwi 0, 12, 2
-; LE-NEXT:    srwi 12, 12, 2
+; LE-NEXT:    rotlwi 12, 11, 24
+; LE-NEXT:    rlwimi 12, 11, 8, 8, 15
+; LE-NEXT:    rlwimi 12, 11, 8, 24, 31
+; LE-NEXT:    rldicl 11, 12, 0, 32
+; LE-NEXT:    mffprwz 12, 2
+; LE-NEXT:    slwi 0, 12, 1
+; LE-NEXT:    srwi 12, 12, 1
 ; LE-NEXT:    and 0, 0, 3
 ; LE-NEXT:    and 12, 12, 8
 ; LE-NEXT:    or 12, 12, 0
-; LE-NEXT:    slwi 0, 10, 2
-; LE-NEXT:    srwi 10, 10, 2
-; LE-NEXT:    and 0, 0, 3
-; LE-NEXT:    and 10, 10, 8
-; LE-NEXT:    or 10, 10, 0
-; LE-NEXT:    slwi 0, 11, 4
-; LE-NEXT:    srwi 11, 11, 4
-; LE-NEXT:    and 0, 0, 6
-; LE-NEXT:    and 11, 11, 7
-; LE-NEXT:    or 11, 11, 0
-; LE-NEXT:    slwi 0, 12, 4
-; LE-NEXT:    srwi 12, 12, 4
+; LE-NEXT:    slwi 0, 12, 2
+; LE-NEXT:    srwi 12, 12, 2
 ; LE-NEXT:    and 0, 0, 6
 ; LE-NEXT:    and 12, 12, 7
 ; LE-NEXT:    or 12, 12, 0
-; LE-NEXT:    slwi 0, 10, 4
-; LE-NEXT:    srwi 10, 10, 4
+; LE-NEXT:    slwi 0, 12, 4
+; LE-NEXT:    srwi 12, 12, 4
+; LE-NEXT:    and 0, 0, 4
+; LE-NEXT:    and 12, 12, 5
+; LE-NEXT:    or 12, 12, 0
+; LE-NEXT:    rotlwi 0, 12, 24
+; LE-NEXT:    rlwimi 0, 12, 8, 8, 15
+; LE-NEXT:    rlwimi 0, 12, 8, 24, 31
+; LE-NEXT:    rldicl 12, 0, 0, 32
+; LE-NEXT:    rldimi 12, 11, 32, 0
+; LE-NEXT:    mffprwz 11, 0
+; LE-NEXT:    mtfprd 0, 10
+; LE-NEXT:    slwi 0, 11, 1
+; LE-NEXT:    srwi 11, 11, 1
+; LE-NEXT:    and 0, 0, 3
+; LE-NEXT:    and 11, 11, 8
+; LE-NEXT:    or 11, 11, 0
+; LE-NEXT:    slwi 0, 11, 2
+; LE-NEXT:    srwi 11, 11, 2
 ; LE-NEXT:    and 0, 0, 6
-; LE-NEXT:    and 10, 10, 7
-; LE-NEXT:    or 10, 10, 0
+; LE-NEXT:    and 11, 11, 7
+; LE-NEXT:    or 11, 11, 0
+; LE-NEXT:    slwi 0, 11, 4
+; LE-NEXT:    srwi 11, 11, 4
+; LE-NEXT:    and 0, 0, 4
+; LE-NEXT:    and 11, 11, 5
+; LE-NEXT:    or 11, 11, 0
 ; LE-NEXT:    rotlwi 0, 11, 24
 ; LE-NEXT:    rlwimi 0, 11, 8, 8, 15
 ; LE-NEXT:    rlwimi 0, 11, 8, 24, 31
-; LE-NEXT:    rotlwi 11, 12, 24
-; LE-NEXT:    rlwimi 11, 12, 8, 8, 15
-; LE-NEXT:    rlwimi 11, 12, 8, 24, 31
-; LE-NEXT:    rotlwi 12, 10, 24
-; LE-NEXT:    rldicl 11, 11, 0, 32
-; LE-NEXT:    rlwimi 12, 10, 8, 8, 15
-; LE-NEXT:    rlwimi 12, 10, 8, 24, 31
-; LE-NEXT:    rldicl 10, 0, 0, 32
-; LE-NEXT:    rldimi 11, 10, 32, 0
-; LE-NEXT:    slwi 10, 9, 2
-; LE-NEXT:    srwi 9, 9, 2
-; LE-NEXT:    and 10, 10, 3
-; LE-NEXT:    and 9, 9, 8
-; LE-NEXT:    mtfprd 1, 11
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    rldicl 10, 12, 0, 32
-; LE-NEXT:    slwi 11, 9, 4
-; LE-NEXT:    srwi 9, 9, 4
-; LE-NEXT:    and 11, 11, 6
-; LE-NEXT:    and 9, 9, 7
-; LE-NEXT:    or 9, 9, 11
-; LE-NEXT:    rotlwi 11, 9, 24
-; LE-NEXT:    rlwimi 11, 9, 8, 8, 15
-; LE-NEXT:    rlwimi 11, 9, 8, 24, 31
-; LE-NEXT:    rldicl 9, 11, 0, 32
-; LE-NEXT:    rldimi 9, 10, 32, 0
-; LE-NEXT:    mtfprd 3, 9
-; LE-NEXT:    mffprwz 9, 2
-; LE-NEXT:    slwi 10, 9, 1
-; LE-NEXT:    srwi 9, 9, 1
-; LE-NEXT:    and 10, 10, 4
-; LE-NEXT:    and 9, 9, 5
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    slwi 10, 9, 2
-; LE-NEXT:    srwi 9, 9, 2
-; LE-NEXT:    and 10, 10, 3
-; LE-NEXT:    and 9, 9, 8
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    slwi 10, 9, 4
-; LE-NEXT:    srwi 9, 9, 4
-; LE-NEXT:    and 10, 10, 6
-; LE-NEXT:    and 9, 9, 7
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    rotlwi 10, 9, 24
-; LE-NEXT:    rlwimi 10, 9, 8, 8, 15
-; LE-NEXT:    rlwimi 10, 9, 8, 24, 31
-; LE-NEXT:    rldicl 9, 10, 0, 32
-; LE-NEXT:    mffprwz 10, 4
-; LE-NEXT:    slwi 11, 10, 1
-; LE-NEXT:    srwi 10, 10, 1
-; LE-NEXT:    and 11, 11, 4
-; LE-NEXT:    and 10, 10, 5
-; LE-NEXT:    or 10, 10, 11
-; LE-NEXT:    slwi 11, 10, 2
-; LE-NEXT:    srwi 10, 10, 2
-; LE-NEXT:    and 11, 11, 3
-; LE-NEXT:    and 10, 10, 8
-; LE-NEXT:    or 10, 10, 11
-; LE-NEXT:    slwi 11, 10, 4
-; LE-NEXT:    srwi 10, 10, 4
-; LE-NEXT:    and 11, 11, 6
-; LE-NEXT:    and 10, 10, 7
-; LE-NEXT:    or 10, 10, 11
-; LE-NEXT:    rotlwi 11, 10, 24
-; LE-NEXT:    rlwimi 11, 10, 8, 8, 15
-; LE-NEXT:    rlwimi 11, 10, 8, 24, 31
-; LE-NEXT:    rldicl 10, 11, 0, 32
-; LE-NEXT:    rldimi 10, 9, 32, 0
-; LE-NEXT:    mffprwz 9, 0
-; LE-NEXT:    mtfprd 2, 10
-; LE-NEXT:    slwi 10, 9, 1
-; LE-NEXT:    srwi 9, 9, 1
-; LE-NEXT:    and 10, 10, 4
-; LE-NEXT:    and 9, 9, 5
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    slwi 10, 9, 2
-; LE-NEXT:    srwi 9, 9, 2
-; LE-NEXT:    and 10, 10, 3
-; LE-NEXT:    and 9, 9, 8
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    slwi 10, 9, 4
-; LE-NEXT:    srwi 9, 9, 4
-; LE-NEXT:    and 10, 10, 6
-; LE-NEXT:    and 9, 9, 7
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    rotlwi 10, 9, 24
-; LE-NEXT:    rlwimi 10, 9, 8, 8, 15
-; LE-NEXT:    rlwimi 10, 9, 8, 24, 31
-; LE-NEXT:    rldicl 9, 10, 0, 32
-; LE-NEXT:    mfvsrwz 10, 34
-; LE-NEXT:    vsububm 2, 4, 3
-; LE-NEXT:    slwi 11, 10, 1
-; LE-NEXT:    srwi 10, 10, 1
-; LE-NEXT:    and 11, 11, 4
-; LE-NEXT:    and 10, 10, 5
-; LE-NEXT:    or 10, 10, 11
-; LE-NEXT:    slwi 11, 10, 2
-; LE-NEXT:    srwi 10, 10, 2
-; LE-NEXT:    and 11, 11, 3
-; LE-NEXT:    and 10, 10, 8
-; LE-NEXT:    or 10, 10, 11
-; LE-NEXT:    slwi 11, 10, 4
-; LE-NEXT:    srwi 10, 10, 4
-; LE-NEXT:    and 11, 11, 6
-; LE-NEXT:    and 10, 10, 7
-; LE-NEXT:    or 10, 10, 11
-; LE-NEXT:    rotlwi 11, 10, 24
-; LE-NEXT:    rlwimi 11, 10, 8, 8, 15
-; LE-NEXT:    rlwimi 11, 10, 8, 24, 31
-; LE-NEXT:    rldicl 10, 11, 0, 32
-; LE-NEXT:    rldimi 10, 9, 32, 0
-; LE-NEXT:    addis 9, 2, .LCPI6_0@toc@ha
-; LE-NEXT:    mtfprd 0, 10
-; LE-NEXT:    addi 9, 9, .LCPI6_0@toc@l
-; LE-NEXT:    xxmrghd 1, 3, 1
-; LE-NEXT:    xxland 35, 1, 34
-; LE-NEXT:    xxmrghd 0, 0, 2
+; LE-NEXT:    mfvsrwz 11, 34
+; LE-NEXT:    slwi 30, 11, 1
+; LE-NEXT:    srwi 11, 11, 1
+; LE-NEXT:    and 30, 30, 3
+; LE-NEXT:    and 11, 11, 8
+; LE-NEXT:    or 11, 11, 30
+; LE-NEXT:    slwi 30, 11, 2
+; LE-NEXT:    srwi 11, 11, 2
+; LE-NEXT:    and 30, 30, 6
+; LE-NEXT:    and 11, 11, 7
+; LE-NEXT:    or 11, 11, 30
+; LE-NEXT:    slwi 30, 11, 4
+; LE-NEXT:    srwi 11, 11, 4
+; LE-NEXT:    and 30, 30, 4
+; LE-NEXT:    and 11, 11, 5
+; LE-NEXT:    or 11, 11, 30
+; LE-NEXT:    rotlwi 30, 11, 24
+; LE-NEXT:    rlwimi 30, 11, 8, 8, 15
+; LE-NEXT:    rlwimi 30, 11, 8, 24, 31
+; LE-NEXT:    rldicl 11, 0, 0, 32
+; LE-NEXT:    rldicl 0, 30, 0, 32
+; LE-NEXT:    ld 30, -16(1) # 8-byte Folded Reload
+; LE-NEXT:    rldimi 0, 11, 32, 0
+; LE-NEXT:    mtfprd 2, 0
+; LE-NEXT:    xxmrghd 0, 1, 0
+; LE-NEXT:    mtfprd 1, 12
+; LE-NEXT:    vspltisb 2, -16
+; LE-NEXT:    vsububm 2, 3, 2
+; LE-NEXT:    xxland 35, 0, 34
+; LE-NEXT:    xxmrghd 1, 2, 1
 ; LE-NEXT:    lxvd2x 2, 0, 9
 ; LE-NEXT:    addis 9, 2, .LCPI6_1@toc@ha
 ; LE-NEXT:    addi 9, 9, .LCPI6_1@toc@l
-; LE-NEXT:    xxland 33, 0, 34
+; LE-NEXT:    xxland 33, 1, 34
 ; LE-NEXT:    lxvd2x 4, 0, 9
 ; LE-NEXT:    addis 9, 2, .LCPI6_2@toc@ha
 ; LE-NEXT:    vmuluwm 10, 1, 3
-; LE-NEXT:    xxland 36, 0, 2
-; LE-NEXT:    xxland 32, 1, 2
+; LE-NEXT:    xxland 36, 1, 2
+; LE-NEXT:    xxland 32, 0, 2
 ; LE-NEXT:    addi 9, 9, .LCPI6_2@toc@l
 ; LE-NEXT:    vmuluwm 5, 4, 3
 ; LE-NEXT:    vmuluwm 6, 1, 0
 ; LE-NEXT:    lxvd2x 5, 0, 9
-; LE-NEXT:    xxland 40, 0, 4
+; LE-NEXT:    xxland 40, 1, 4
 ; LE-NEXT:    xxlxor 3, 38, 37
-; LE-NEXT:    xxland 37, 1, 4
-; LE-NEXT:    xxland 38, 0, 5
+; LE-NEXT:    xxland 37, 0, 4
+; LE-NEXT:    xxland 38, 1, 5
 ; LE-NEXT:    vmuluwm 7, 6, 5
 ; LE-NEXT:    xxlxor 3, 3, 39
-; LE-NEXT:    xxland 39, 1, 5
+; LE-NEXT:    xxland 39, 0, 5
 ; LE-NEXT:    vmuluwm 9, 8, 7
 ; LE-NEXT:    xxlxor 0, 3, 41
 ; LE-NEXT:    vmuluwm 9, 4, 5
@@ -2352,90 +2356,90 @@ define <4 x i32> @clmulr_v4i32(<4 x i32> %a, <4 x i32> %b) nounwind {
 ; LE-NEXT:    xxswapd 2, 0
 ; LE-NEXT:    xxsldwi 3, 0, 0, 3
 ; LE-NEXT:    mffprwz 9, 1
-; LE-NEXT:    mffprwz 10, 2
-; LE-NEXT:    slwi 11, 9, 1
+; LE-NEXT:    mffprwz 11, 2
+; LE-NEXT:    slwi 10, 9, 1
 ; LE-NEXT:    srwi 9, 9, 1
-; LE-NEXT:    and 11, 11, 4
-; LE-NEXT:    and 9, 9, 5
-; LE-NEXT:    or 9, 9, 11
-; LE-NEXT:    slwi 11, 10, 1
-; LE-NEXT:    srwi 10, 10, 1
-; LE-NEXT:    and 11, 11, 4
-; LE-NEXT:    and 10, 10, 5
-; LE-NEXT:    or 10, 10, 11
+; LE-NEXT:    slwi 12, 11, 1
+; LE-NEXT:    srwi 11, 11, 1
+; LE-NEXT:    and 10, 10, 3
+; LE-NEXT:    and 9, 9, 8
+; LE-NEXT:    and 12, 12, 3
+; LE-NEXT:    and 11, 11, 8
+; LE-NEXT:    or 9, 9, 10
+; LE-NEXT:    or 10, 11, 12
 ; LE-NEXT:    slwi 11, 9, 2
 ; LE-NEXT:    srwi 9, 9, 2
-; LE-NEXT:    and 11, 11, 3
-; LE-NEXT:    and 9, 9, 8
-; LE-NEXT:    or 9, 9, 11
-; LE-NEXT:    slwi 11, 9, 4
-; LE-NEXT:    srwi 9, 9, 4
+; LE-NEXT:    slwi 12, 10, 2
+; LE-NEXT:    srwi 10, 10, 2
 ; LE-NEXT:    and 11, 11, 6
 ; LE-NEXT:    and 9, 9, 7
+; LE-NEXT:    and 12, 12, 6
+; LE-NEXT:    and 10, 10, 7
+; LE-NEXT:    or 9, 9, 11
+; LE-NEXT:    or 10, 10, 12
+; LE-NEXT:    slwi 11, 9, 4
+; LE-NEXT:    srwi 9, 9, 4
+; LE-NEXT:    and 11, 11, 4
+; LE-NEXT:    and 9, 9, 5
 ; LE-NEXT:    or 9, 9, 11
 ; LE-NEXT:    rotlwi 11, 9, 24
 ; LE-NEXT:    rlwimi 11, 9, 8, 8, 15
 ; LE-NEXT:    rlwimi 11, 9, 8, 24, 31
-; LE-NEXT:    slwi 9, 10, 2
-; LE-NEXT:    srwi 10, 10, 2
-; LE-NEXT:    rldicl 11, 11, 0, 32
-; LE-NEXT:    and 9, 9, 3
-; LE-NEXT:    and 10, 10, 8
-; LE-NEXT:    or 9, 10, 9
-; LE-NEXT:    slwi 10, 9, 4
-; LE-NEXT:    srwi 9, 9, 4
-; LE-NEXT:    and 10, 10, 6
-; LE-NEXT:    and 9, 9, 7
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    rotlwi 10, 9, 24
-; LE-NEXT:    rlwimi 10, 9, 8, 8, 15
-; LE-NEXT:    rlwimi 10, 9, 8, 24, 31
-; LE-NEXT:    rldicl 9, 10, 0, 32
-; LE-NEXT:    rldimi 9, 11, 32, 0
-; LE-NEXT:    mtfprd 1, 9
+; LE-NEXT:    rldicl 9, 11, 0, 32
+; LE-NEXT:    slwi 11, 10, 4
+; LE-NEXT:    srwi 10, 10, 4
+; LE-NEXT:    and 11, 11, 4
+; LE-NEXT:    and 10, 10, 5
+; LE-NEXT:    or 10, 10, 11
+; LE-NEXT:    rotlwi 11, 10, 24
+; LE-NEXT:    rlwimi 11, 10, 8, 8, 15
+; LE-NEXT:    rlwimi 11, 10, 8, 24, 31
+; LE-NEXT:    rldicl 10, 11, 0, 32
+; LE-NEXT:    rldimi 10, 9, 32, 0
 ; LE-NEXT:    mffprwz 9, 3
-; LE-NEXT:    slwi 10, 9, 1
+; LE-NEXT:    slwi 11, 9, 1
 ; LE-NEXT:    srwi 9, 9, 1
-; LE-NEXT:    and 10, 10, 4
-; LE-NEXT:    and 9, 9, 5
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    slwi 10, 9, 2
-; LE-NEXT:    srwi 9, 9, 2
-; LE-NEXT:    and 10, 10, 3
+; LE-NEXT:    and 11, 11, 3
 ; LE-NEXT:    and 9, 9, 8
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    slwi 10, 9, 4
-; LE-NEXT:    srwi 9, 9, 4
-; LE-NEXT:    and 10, 10, 6
+; LE-NEXT:    or 9, 9, 11
+; LE-NEXT:    slwi 11, 9, 2
+; LE-NEXT:    srwi 9, 9, 2
+; LE-NEXT:    and 11, 11, 6
 ; LE-NEXT:    and 9, 9, 7
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    rotlwi 10, 9, 24
-; LE-NEXT:    rlwimi 10, 9, 8, 8, 15
-; LE-NEXT:    rlwimi 10, 9, 8, 24, 31
-; LE-NEXT:    rldicl 9, 10, 0, 32
-; LE-NEXT:    mffprwz 10, 0
-; LE-NEXT:    slwi 11, 10, 1
-; LE-NEXT:    srwi 10, 10, 1
-; LE-NEXT:    and 4, 11, 4
-; LE-NEXT:    and 5, 10, 5
-; LE-NEXT:    or 4, 5, 4
-; LE-NEXT:    slwi 5, 4, 2
-; LE-NEXT:    srwi 4, 4, 2
-; LE-NEXT:    and 3, 5, 3
-; LE-NEXT:    and 4, 4, 8
-; LE-NEXT:    or 3, 4, 3
-; LE-NEXT:    slwi 4, 3, 4
-; LE-NEXT:    srwi 3, 3, 4
-; LE-NEXT:    and 4, 4, 6
+; LE-NEXT:    or 9, 9, 11
+; LE-NEXT:    slwi 11, 9, 4
+; LE-NEXT:    srwi 9, 9, 4
+; LE-NEXT:    and 11, 11, 4
+; LE-NEXT:    and 9, 9, 5
+; LE-NEXT:    or 9, 9, 11
+; LE-NEXT:    rotlwi 11, 9, 24
+; LE-NEXT:    rlwimi 11, 9, 8, 8, 15
+; LE-NEXT:    rlwimi 11, 9, 8, 24, 31
+; LE-NEXT:    mffprwz 9, 0
+; LE-NEXT:    mtfprd 0, 10
+; LE-NEXT:    rldicl 11, 11, 0, 32
+; LE-NEXT:    slwi 12, 9, 1
+; LE-NEXT:    srwi 9, 9, 1
+; LE-NEXT:    and 3, 12, 3
+; LE-NEXT:    and 8, 9, 8
+; LE-NEXT:    or 3, 8, 3
+; LE-NEXT:    slwi 8, 3, 2
+; LE-NEXT:    srwi 3, 3, 2
+; LE-NEXT:    and 6, 8, 6
 ; LE-NEXT:    and 3, 3, 7
+; LE-NEXT:    or 3, 3, 6
+; LE-NEXT:    slwi 6, 3, 4
+; LE-NEXT:    srwi 3, 3, 4
+; LE-NEXT:    and 4, 6, 4
+; LE-NEXT:    and 3, 3, 5
 ; LE-NEXT:    or 3, 3, 4
 ; LE-NEXT:    rotlwi 4, 3, 24
 ; LE-NEXT:    rlwimi 4, 3, 8, 8, 15
 ; LE-NEXT:    rlwimi 4, 3, 8, 24, 31
 ; LE-NEXT:    rldicl 3, 4, 0, 32
-; LE-NEXT:    rldimi 3, 9, 32, 0
-; LE-NEXT:    mtfprd 0, 3
-; LE-NEXT:    xxmrghd 34, 0, 1
+; LE-NEXT:    rldimi 3, 11, 32, 0
+; LE-NEXT:    mtfprd 1, 3
+; LE-NEXT:    xxmrghd 34, 1, 0
 ; LE-NEXT:    blr
   %a.ext = zext <4 x i32> %a to <4 x i64>
   %b.ext = zext <4 x i32> %b to <4 x i64>
@@ -2820,25 +2824,25 @@ define <2 x i64> @clmulr_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    sldi 5, 5, 32
 ; LE-NEXT:    sldi 6, 6, 32
 ; LE-NEXT:    sldi 7, 7, 32
-; LE-NEXT:    sldi 8, 8, 32
 ; LE-NEXT:    vspltisw 4, 4
 ; LE-NEXT:    vspltisw 0, 8
-; LE-NEXT:    oris 3, 3, 43690
-; LE-NEXT:    oris 4, 4, 21845
 ; LE-NEXT:    vspltisw 7, 1
 ; LE-NEXT:    vspltisw 10, 7
+; LE-NEXT:    sldi 8, 8, 32
+; LE-NEXT:    oris 3, 3, 43690
+; LE-NEXT:    oris 4, 4, 21845
 ; LE-NEXT:    oris 5, 5, 52428
-; LE-NEXT:    oris 11, 6, 13107
 ; LE-NEXT:    vupklsw 1, 4
 ; LE-NEXT:    vspltisw 4, 3
-; LE-NEXT:    oris 12, 7, 61680
-; LE-NEXT:    oris 0, 8, 3855
 ; LE-NEXT:    vupklsw 6, 0
 ; LE-NEXT:    vupklsw 10, 10
+; LE-NEXT:    oris 11, 6, 13107
+; LE-NEXT:    oris 12, 7, 61680
+; LE-NEXT:    oris 0, 8, 3855
 ; LE-NEXT:    ori 8, 3, 43690
-; LE-NEXT:    ori 7, 4, 21845
 ; LE-NEXT:    vupklsw 8, 4
 ; LE-NEXT:    xxlxor 36, 36, 36
+; LE-NEXT:    ori 7, 4, 21845
 ; LE-NEXT:    ori 6, 5, 52428
 ; LE-NEXT:    ori 5, 11, 13107
 ; LE-NEXT:    sldi 11, 9, 1
@@ -2888,9 +2892,9 @@ define <2 x i64> @clmulr_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    rlwimi 10, 11, 8, 24, 31
 ; LE-NEXT:    rotlwi 11, 0, 24
 ; LE-NEXT:    or 10, 12, 10
+; LE-NEXT:    mtfprd 0, 10
 ; LE-NEXT:    rlwimi 11, 0, 8, 8, 15
 ; LE-NEXT:    rlwimi 11, 0, 8, 24, 31
-; LE-NEXT:    mtfprd 0, 10
 ; LE-NEXT:    or 9, 9, 11
 ; LE-NEXT:    mtfprd 1, 9
 ; LE-NEXT:    mfvsrd 9, 35
@@ -3628,12 +3632,12 @@ define <2 x i64> @clmulr_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    sldi 9, 10, 32
 ; LE-NEXT:    or 9, 9, 11
 ; LE-NEXT:    xxswapd 1, 0
+; LE-NEXT:    mffprd 10, 1
 ; LE-NEXT:    mtfprd 0, 9
-; LE-NEXT:    mffprd 9, 1
-; LE-NEXT:    sldi 10, 9, 1
-; LE-NEXT:    rldicl 9, 9, 63, 1
-; LE-NEXT:    and 8, 10, 8
-; LE-NEXT:    and 7, 9, 7
+; LE-NEXT:    sldi 11, 10, 1
+; LE-NEXT:    rldicl 10, 10, 63, 1
+; LE-NEXT:    and 8, 11, 8
+; LE-NEXT:    and 7, 10, 7
 ; LE-NEXT:    or 7, 7, 8
 ; LE-NEXT:    sldi 8, 7, 2
 ; LE-NEXT:    rldicl 7, 7, 62, 2
@@ -3757,62 +3761,62 @@ define <16 x i8> @clmulh_v16i8(<16 x i8> %a, <16 x i8> %b) nounwind {
 ; LE-NEXT:    vspltisb 5, 2
 ; LE-NEXT:    addi 3, 3, .LCPI8_0@toc@l
 ; LE-NEXT:    vslb 1, 3, 4
+; LE-NEXT:    lxvd2x 0, 0, 3
+; LE-NEXT:    addis 3, 2, .LCPI8_3@toc@ha
+; LE-NEXT:    addi 3, 3, .LCPI8_3@toc@l
+; LE-NEXT:    lxvd2x 3, 0, 3
+; LE-NEXT:    addis 3, 2, .LCPI8_1@toc@ha
 ; LE-NEXT:    vsrb 3, 3, 4
+; LE-NEXT:    xxlor 35, 35, 33
 ; LE-NEXT:    vslb 6, 2, 4
 ; LE-NEXT:    vsrb 2, 2, 4
-; LE-NEXT:    lxvd2x 0, 0, 3
-; LE-NEXT:    addis 3, 2, .LCPI8_1@toc@ha
-; LE-NEXT:    xxlor 35, 35, 33
-; LE-NEXT:    xxlor 34, 34, 38
-; LE-NEXT:    vspltisb 0, 1
-; LE-NEXT:    addi 3, 3, .LCPI8_1@toc@l
 ; LE-NEXT:    vsrb 1, 3, 5
-; LE-NEXT:    vsrb 6, 2, 5
-; LE-NEXT:    lxvd2x 1, 0, 3
-; LE-NEXT:    addis 3, 2, .LCPI8_2@toc@ha
+; LE-NEXT:    addi 3, 3, .LCPI8_1@toc@l
 ; LE-NEXT:    xxland 35, 35, 0
+; LE-NEXT:    xxlor 34, 34, 38
+; LE-NEXT:    xxland 1, 33, 0
+; LE-NEXT:    vsrb 6, 2, 5
 ; LE-NEXT:    xxland 34, 34, 0
-; LE-NEXT:    xxland 2, 33, 0
-; LE-NEXT:    xxland 3, 38, 0
-; LE-NEXT:    addi 3, 3, .LCPI8_2@toc@l
+; LE-NEXT:    xxland 2, 38, 0
+; LE-NEXT:    vspltisb 0, 1
 ; LE-NEXT:    vslb 3, 3, 5
 ; LE-NEXT:    vslb 2, 2, 5
-; LE-NEXT:    xxlor 35, 2, 35
-; LE-NEXT:    xxlor 34, 3, 34
-; LE-NEXT:    lxvd2x 2, 0, 3
-; LE-NEXT:    addis 3, 2, .LCPI8_3@toc@ha
-; LE-NEXT:    vsrb 1, 3, 0
+; LE-NEXT:    xxlor 35, 1, 35
+; LE-NEXT:    lxvd2x 1, 0, 3
+; LE-NEXT:    addis 3, 2, .LCPI8_2@toc@ha
+; LE-NEXT:    addi 3, 3, .LCPI8_2@toc@l
+; LE-NEXT:    lxvd2x 4, 0, 3
+; LE-NEXT:    xxlor 34, 2, 34
+; LE-NEXT:    vsrb 6, 3, 0
+; LE-NEXT:    vsrb 7, 2, 0
 ; LE-NEXT:    xxland 35, 35, 1
-; LE-NEXT:    vsrb 6, 2, 0
 ; LE-NEXT:    xxland 34, 34, 1
-; LE-NEXT:    addi 3, 3, .LCPI8_3@toc@l
-; LE-NEXT:    xxland 3, 33, 1
+; LE-NEXT:    xxland 2, 38, 1
 ; LE-NEXT:    vaddubm 3, 3, 3
-; LE-NEXT:    xxland 4, 38, 1
 ; LE-NEXT:    vaddubm 2, 2, 2
-; LE-NEXT:    lxvd2x 5, 0, 3
-; LE-NEXT:    xxlor 3, 3, 35
-; LE-NEXT:    xxlor 4, 4, 34
-; LE-NEXT:    xxland 35, 3, 1
-; LE-NEXT:    xxland 33, 4, 2
-; LE-NEXT:    xxland 38, 3, 2
-; LE-NEXT:    xxland 39, 4, 1
-; LE-NEXT:    vmuloub 8, 1, 3
-; LE-NEXT:    vmuleub 9, 1, 3
+; LE-NEXT:    xxlor 2, 2, 35
+; LE-NEXT:    xxland 38, 2, 4
+; LE-NEXT:    xxswapd 33, 3
+; LE-NEXT:    xxland 3, 39, 1
+; LE-NEXT:    xxlor 3, 3, 34
+; LE-NEXT:    xxland 34, 2, 1
+; LE-NEXT:    xxland 35, 3, 4
+; LE-NEXT:    xxland 39, 3, 1
+; LE-NEXT:    vmuloub 8, 3, 2
+; LE-NEXT:    vmuleub 9, 3, 2
 ; LE-NEXT:    vmuloub 10, 7, 6
-; LE-NEXT:    xxswapd 34, 5
-; LE-NEXT:    vperm 8, 9, 8, 2
-; LE-NEXT:    vmuloub 9, 1, 6
-; LE-NEXT:    vmuleub 1, 1, 6
+; LE-NEXT:    vperm 8, 9, 8, 1
+; LE-NEXT:    vmuloub 9, 3, 6
+; LE-NEXT:    vmuleub 3, 3, 6
 ; LE-NEXT:    vmuleub 6, 7, 6
-; LE-NEXT:    vperm 1, 1, 9, 2
-; LE-NEXT:    vmuloub 9, 7, 3
-; LE-NEXT:    vmuleub 3, 7, 3
-; LE-NEXT:    vperm 6, 6, 10, 2
-; LE-NEXT:    xxlxor 3, 38, 40
-; LE-NEXT:    xxland 2, 3, 2
-; LE-NEXT:    vperm 2, 3, 9, 2
-; LE-NEXT:    xxlxor 3, 34, 33
+; LE-NEXT:    vperm 3, 3, 9, 1
+; LE-NEXT:    vmuloub 9, 7, 2
+; LE-NEXT:    vmuleub 2, 7, 2
+; LE-NEXT:    vperm 6, 6, 10, 1
+; LE-NEXT:    xxlxor 2, 38, 40
+; LE-NEXT:    xxland 2, 2, 4
+; LE-NEXT:    vperm 2, 2, 9, 1
+; LE-NEXT:    xxlxor 3, 34, 35
 ; LE-NEXT:    xxland 3, 3, 1
 ; LE-NEXT:    xxlor 34, 3, 2
 ; LE-NEXT:    vslb 3, 2, 4
@@ -3969,34 +3973,34 @@ define <8 x i16> @clmulh_v8i16(<8 x i16> %a, <8 x i16> %b) nounwind {
 ; LE-NEXT:    xxlor 32, 1, 38
 ; LE-NEXT:    lxvd2x 1, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI9_3@toc@ha
-; LE-NEXT:    vsrb 6, 0, 2
 ; LE-NEXT:    addi 3, 3, .LCPI9_3@toc@l
 ; LE-NEXT:    lxvd2x 3, 0, 3
 ; LE-NEXT:    addis 3, 2, .LCPI9_4@toc@ha
+; LE-NEXT:    addi 3, 3, .LCPI9_4@toc@l
+; LE-NEXT:    lxvd2x 5, 0, 3
+; LE-NEXT:    addis 3, 2, .LCPI9_5@toc@ha
+; LE-NEXT:    addi 3, 3, .LCPI9_5@toc@l
+; LE-NEXT:    lxvd2x 7, 0, 3
+; LE-NEXT:    vsrb 6, 0, 2
 ; LE-NEXT:    xxland 2, 38, 1
 ; LE-NEXT:    vslb 6, 1, 3
 ; LE-NEXT:    vsrb 1, 1, 3
-; LE-NEXT:    xxland 32, 32, 1
-; LE-NEXT:    addi 3, 3, .LCPI9_4@toc@l
 ; LE-NEXT:    xxlor 33, 33, 38
-; LE-NEXT:    vaddubm 0, 0, 0
-; LE-NEXT:    lxvd2x 5, 0, 3
-; LE-NEXT:    addis 3, 2, .LCPI9_5@toc@ha
 ; LE-NEXT:    xxland 38, 33, 0
 ; LE-NEXT:    vsrb 1, 1, 5
-; LE-NEXT:    xxlor 2, 2, 32
-; LE-NEXT:    addi 3, 3, .LCPI9_5@toc@l
 ; LE-NEXT:    vslb 6, 6, 5
 ; LE-NEXT:    xxland 4, 33, 0
+; LE-NEXT:    xxland 32, 32, 1
+; LE-NEXT:    vaddubm 0, 0, 0
+; LE-NEXT:    xxlor 2, 2, 32
 ; LE-NEXT:    xxland 32, 2, 3
-; LE-NEXT:    lxvd2x 7, 0, 3
 ; LE-NEXT:    xxlor 33, 4, 38
 ; LE-NEXT:    xxland 40, 2, 5
 ; LE-NEXT:    vsrb 6, 1, 2
 ; LE-NEXT:    xxland 33, 33, 1
 ; LE-NEXT:    xxland 4, 38, 1
-; LE-NEXT:    vaddubm 1, 1, 1
 ; LE-NEXT:    vxor 6, 6, 6
+; LE-NEXT:    vaddubm 1, 1, 1
 ; LE-NEXT:    xxlor 4, 4, 33
 ; LE-NEXT:    xxland 33, 4, 5
 ; LE-NEXT:    xxland 41, 4, 3
@@ -4535,199 +4539,203 @@ define <4 x i32> @clmulh_v4i32(<4 x i32> %a, <4 x i32> %b) nounwind {
 ;
 ; LE-LABEL: clmulh_v4i32:
 ; LE:       # %bb.0:
-; LE-NEXT:    lis 5, -13108
-; LE-NEXT:    lis 9, -3856
 ; LE-NEXT:    xxsldwi 0, 35, 35, 1
-; LE-NEXT:    lis 4, 21845
-; LE-NEXT:    lis 10, 3855
+; LE-NEXT:    xxswapd 3, 35
 ; LE-NEXT:    lis 3, -21846
-; LE-NEXT:    xxswapd 1, 35
-; LE-NEXT:    xxsldwi 5, 35, 35, 3
-; LE-NEXT:    ori 7, 5, 52428
-; LE-NEXT:    ori 5, 9, 61680
+; LE-NEXT:    lis 4, 21845
+; LE-NEXT:    xxsldwi 4, 35, 35, 3
 ; LE-NEXT:    mfvsrwz 9, 35
-; LE-NEXT:    ori 8, 4, 21845
-; LE-NEXT:    ori 4, 10, 3855
-; LE-NEXT:    mffprwz 10, 0
+; LE-NEXT:    std 30, -16(1) # 8-byte Folded Spill
+; LE-NEXT:    std 29, -24(1) # 8-byte Folded Spill
 ; LE-NEXT:    ori 3, 3, 43690
-; LE-NEXT:    mffprwz 11, 1
-; LE-NEXT:    mffprwz 0, 5
-; LE-NEXT:    lis 6, 13107
-; LE-NEXT:    ori 6, 6, 13107
-; LE-NEXT:    xxsldwi 2, 34, 34, 1
-; LE-NEXT:    xxswapd 3, 34
-; LE-NEXT:    xxsldwi 4, 34, 34, 3
-; LE-NEXT:    vspltisb 3, -16
-; LE-NEXT:    vspltisb 4, 1
-; LE-NEXT:    slwi 12, 9, 1
+; LE-NEXT:    ori 8, 4, 21845
+; LE-NEXT:    lis 4, -13108
+; LE-NEXT:    lis 5, 3855
+; LE-NEXT:    mffprwz 11, 0
+; LE-NEXT:    mffprwz 0, 3
+; LE-NEXT:    ori 5, 5, 3855
+; LE-NEXT:    xxsldwi 1, 34, 34, 1
+; LE-NEXT:    ori 6, 4, 52428
+; LE-NEXT:    lis 4, 13107
+; LE-NEXT:    xxswapd 2, 34
+; LE-NEXT:    xxsldwi 0, 34, 34, 3
+; LE-NEXT:    slwi 10, 9, 1
 ; LE-NEXT:    srwi 9, 9, 1
-; LE-NEXT:    and 12, 12, 3
+; LE-NEXT:    vspltisb 3, 1
+; LE-NEXT:    ori 7, 4, 13107
+; LE-NEXT:    lis 4, -3856
+; LE-NEXT:    slwi 12, 11, 1
+; LE-NEXT:    srwi 11, 11, 1
+; LE-NEXT:    slwi 30, 0, 1
+; LE-NEXT:    srwi 0, 0, 1
 ; LE-NEXT:    and 9, 9, 8
-; LE-NEXT:    or 9, 9, 12
-; LE-NEXT:    slwi 12, 10, 1
-; LE-NEXT:    srwi 10, 10, 1
+; LE-NEXT:    ori 4, 4, 61680
 ; LE-NEXT:    and 12, 12, 3
-; LE-NEXT:    and 10, 10, 8
-; LE-NEXT:    or 10, 10, 12
+; LE-NEXT:    and 11, 11, 8
+; LE-NEXT:    and 30, 30, 3
+; LE-NEXT:    and 0, 0, 8
+; LE-NEXT:    or 12, 11, 12
+; LE-NEXT:    mffprwz 11, 4
+; LE-NEXT:    or 0, 0, 30
+; LE-NEXT:    slwi 30, 11, 1
+; LE-NEXT:    srwi 29, 11, 1
+; LE-NEXT:    and 11, 10, 3
+; LE-NEXT:    and 10, 30, 3
+; LE-NEXT:    and 30, 29, 8
+; LE-NEXT:    or 9, 9, 11
+; LE-NEXT:    ld 29, -24(1) # 8-byte Folded Reload
+; LE-NEXT:    or 10, 30, 10
+; LE-NEXT:    slwi 30, 12, 2
+; LE-NEXT:    srwi 12, 12, 2
+; LE-NEXT:    slwi 11, 9, 2
+; LE-NEXT:    srwi 9, 9, 2
+; LE-NEXT:    and 30, 30, 6
+; LE-NEXT:    and 12, 12, 7
+; LE-NEXT:    and 11, 11, 6
+; LE-NEXT:    and 9, 9, 7
+; LE-NEXT:    or 12, 12, 30
+; LE-NEXT:    slwi 30, 0, 2
+; LE-NEXT:    srwi 0, 0, 2
+; LE-NEXT:    or 9, 9, 11
+; LE-NEXT:    and 30, 30, 6
+; LE-NEXT:    and 0, 0, 7
+; LE-NEXT:    slwi 11, 9, 4
+; LE-NEXT:    srwi 9, 9, 4
+; LE-NEXT:    or 0, 0, 30
+; LE-NEXT:    slwi 30, 10, 2
+; LE-NEXT:    srwi 10, 10, 2
+; LE-NEXT:    and 11, 11, 4
+; LE-NEXT:    and 9, 9, 5
+; LE-NEXT:    and 30, 30, 6
+; LE-NEXT:    and 10, 10, 7
+; LE-NEXT:    or 9, 9, 11
+; LE-NEXT:    or 10, 10, 30
+; LE-NEXT:    slwi 30, 12, 4
+; LE-NEXT:    srwi 12, 12, 4
+; LE-NEXT:    rotlwi 11, 9, 24
+; LE-NEXT:    and 30, 30, 4
+; LE-NEXT:    and 12, 12, 5
+; LE-NEXT:    rlwimi 11, 9, 8, 8, 15
+; LE-NEXT:    rlwimi 11, 9, 8, 24, 31
+; LE-NEXT:    or 12, 12, 30
+; LE-NEXT:    slwi 30, 0, 4
+; LE-NEXT:    srwi 0, 0, 4
+; LE-NEXT:    rldicl 9, 11, 0, 32
+; LE-NEXT:    mffprwz 11, 1
+; LE-NEXT:    and 30, 30, 4
+; LE-NEXT:    and 0, 0, 5
+; LE-NEXT:    or 0, 0, 30
+; LE-NEXT:    slwi 30, 10, 4
+; LE-NEXT:    srwi 10, 10, 4
+; LE-NEXT:    and 30, 30, 4
+; LE-NEXT:    and 10, 10, 5
+; LE-NEXT:    or 10, 10, 30
+; LE-NEXT:    rotlwi 30, 12, 24
+; LE-NEXT:    rlwimi 30, 12, 8, 8, 15
+; LE-NEXT:    rlwimi 30, 12, 8, 24, 31
+; LE-NEXT:    rotlwi 12, 0, 24
+; LE-NEXT:    rldicl 30, 30, 0, 32
+; LE-NEXT:    rlwimi 12, 0, 8, 8, 15
+; LE-NEXT:    rlwimi 12, 0, 8, 24, 31
+; LE-NEXT:    rotlwi 0, 10, 24
+; LE-NEXT:    rlwimi 0, 10, 8, 8, 15
+; LE-NEXT:    rlwimi 0, 10, 8, 24, 31
+; LE-NEXT:    rldicl 10, 12, 0, 32
+; LE-NEXT:    rldicl 12, 0, 0, 32
+; LE-NEXT:    rldimi 10, 30, 32, 0
+; LE-NEXT:    rldimi 9, 12, 32, 0
+; LE-NEXT:    mtfprd 1, 9
+; LE-NEXT:    addis 9, 2, .LCPI10_0@toc@ha
+; LE-NEXT:    addi 9, 9, .LCPI10_0@toc@l
 ; LE-NEXT:    slwi 12, 11, 1
 ; LE-NEXT:    srwi 11, 11, 1
 ; LE-NEXT:    and 12, 12, 3
 ; LE-NEXT:    and 11, 11, 8
 ; LE-NEXT:    or 11, 11, 12
-; LE-NEXT:    slwi 12, 0, 1
-; LE-NEXT:    srwi 0, 0, 1
-; LE-NEXT:    and 12, 12, 3
-; LE-NEXT:    and 0, 0, 8
-; LE-NEXT:    or 12, 0, 12
-; LE-NEXT:    slwi 0, 10, 2
-; LE-NEXT:    srwi 10, 10, 2
-; LE-NEXT:    and 0, 0, 7
-; LE-NEXT:    and 10, 10, 6
-; LE-NEXT:    or 10, 10, 0
-; LE-NEXT:    slwi 0, 11, 2
+; LE-NEXT:    slwi 12, 11, 2
 ; LE-NEXT:    srwi 11, 11, 2
-; LE-NEXT:    and 0, 0, 7
-; LE-NEXT:    and 11, 11, 6
-; LE-NEXT:    or 11, 11, 0
+; LE-NEXT:    and 12, 12, 6
+; LE-NEXT:    and 11, 11, 7
+; LE-NEXT:    or 11, 11, 12
+; LE-NEXT:    slwi 12, 11, 4
+; LE-NEXT:    srwi 11, 11, 4
+; LE-NEXT:    and 12, 12, 4
+; LE-NEXT:    and 11, 11, 5
+; LE-NEXT:    or 11, 11, 12
+; LE-NEXT:    rotlwi 12, 11, 24
+; LE-NEXT:    rlwimi 12, 11, 8, 8, 15
+; LE-NEXT:    rlwimi 12, 11, 8, 24, 31
+; LE-NEXT:    rldicl 11, 12, 0, 32
+; LE-NEXT:    mffprwz 12, 2
+; LE-NEXT:    slwi 0, 12, 1
+; LE-NEXT:    srwi 12, 12, 1
+; LE-NEXT:    and 0, 0, 3
+; LE-NEXT:    and 12, 12, 8
+; LE-NEXT:    or 12, 12, 0
 ; LE-NEXT:    slwi 0, 12, 2
 ; LE-NEXT:    srwi 12, 12, 2
-; LE-NEXT:    and 0, 0, 7
-; LE-NEXT:    and 12, 12, 6
+; LE-NEXT:    and 0, 0, 6
+; LE-NEXT:    and 12, 12, 7
 ; LE-NEXT:    or 12, 12, 0
-; LE-NEXT:    slwi 0, 10, 4
-; LE-NEXT:    srwi 10, 10, 4
-; LE-NEXT:    and 0, 0, 5
-; LE-NEXT:    and 10, 10, 4
-; LE-NEXT:    or 10, 10, 0
-; LE-NEXT:    slwi 0, 11, 4
-; LE-NEXT:    srwi 11, 11, 4
-; LE-NEXT:    and 0, 0, 5
-; LE-NEXT:    and 11, 11, 4
-; LE-NEXT:    or 11, 11, 0
 ; LE-NEXT:    slwi 0, 12, 4
 ; LE-NEXT:    srwi 12, 12, 4
-; LE-NEXT:    and 0, 0, 5
-; LE-NEXT:    and 12, 12, 4
+; LE-NEXT:    and 0, 0, 4
+; LE-NEXT:    and 12, 12, 5
 ; LE-NEXT:    or 12, 12, 0
-; LE-NEXT:    rotlwi 0, 10, 24
-; LE-NEXT:    rlwimi 0, 10, 8, 8, 15
-; LE-NEXT:    rlwimi 0, 10, 8, 24, 31
-; LE-NEXT:    rotlwi 10, 11, 24
-; LE-NEXT:    rlwimi 10, 11, 8, 8, 15
-; LE-NEXT:    rlwimi 10, 11, 8, 24, 31
-; LE-NEXT:    rotlwi 11, 12, 24
-; LE-NEXT:    rldicl 10, 10, 0, 32
-; LE-NEXT:    rlwimi 11, 12, 8, 8, 15
-; LE-NEXT:    rlwimi 11, 12, 8, 24, 31
+; LE-NEXT:    rotlwi 0, 12, 24
+; LE-NEXT:    rlwimi 0, 12, 8, 8, 15
+; LE-NEXT:    rlwimi 0, 12, 8, 24, 31
 ; LE-NEXT:    rldicl 12, 0, 0, 32
-; LE-NEXT:    rldicl 11, 11, 0, 32
-; LE-NEXT:    rldimi 10, 12, 32, 0
-; LE-NEXT:    slwi 12, 9, 2
-; LE-NEXT:    srwi 9, 9, 2
-; LE-NEXT:    and 12, 12, 7
-; LE-NEXT:    and 9, 9, 6
+; LE-NEXT:    rldimi 12, 11, 32, 0
+; LE-NEXT:    mffprwz 11, 0
 ; LE-NEXT:    mtfprd 0, 10
-; LE-NEXT:    or 9, 9, 12
-; LE-NEXT:    slwi 10, 9, 4
-; LE-NEXT:    srwi 9, 9, 4
-; LE-NEXT:    and 10, 10, 5
-; LE-NEXT:    and 9, 9, 4
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    rotlwi 10, 9, 24
-; LE-NEXT:    rlwimi 10, 9, 8, 8, 15
-; LE-NEXT:    rlwimi 10, 9, 8, 24, 31
-; LE-NEXT:    rldicl 9, 10, 0, 32
-; LE-NEXT:    rldimi 9, 11, 32, 0
-; LE-NEXT:    mtfprd 1, 9
-; LE-NEXT:    mffprwz 9, 2
-; LE-NEXT:    slwi 10, 9, 1
-; LE-NEXT:    srwi 9, 9, 1
-; LE-NEXT:    and 10, 10, 3
-; LE-NEXT:    and 9, 9, 8
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    slwi 10, 9, 2
-; LE-NEXT:    srwi 9, 9, 2
-; LE-NEXT:    and 10, 10, 7
-; LE-NEXT:    and 9, 9, 6
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    slwi 10, 9, 4
-; LE-NEXT:    srwi 9, 9, 4
-; LE-NEXT:    and 10, 10, 5
-; LE-NEXT:    and 9, 9, 4
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    rotlwi 10, 9, 24
-; LE-NEXT:    rlwimi 10, 9, 8, 8, 15
-; LE-NEXT:    rlwimi 10, 9, 8, 24, 31
-; LE-NEXT:    rldicl 9, 10, 0, 32
-; LE-NEXT:    mffprwz 10, 3
-; LE-NEXT:    slwi 11, 10, 1
-; LE-NEXT:    srwi 10, 10, 1
-; LE-NEXT:    and 11, 11, 3
-; LE-NEXT:    and 10, 10, 8
-; LE-NEXT:    or 10, 10, 11
-; LE-NEXT:    slwi 11, 10, 2
-; LE-NEXT:    srwi 10, 10, 2
+; LE-NEXT:    slwi 0, 11, 1
+; LE-NEXT:    srwi 11, 11, 1
+; LE-NEXT:    and 0, 0, 3
+; LE-NEXT:    and 11, 11, 8
+; LE-NEXT:    or 11, 11, 0
+; LE-NEXT:    slwi 0, 11, 2
+; LE-NEXT:    srwi 11, 11, 2
+; LE-NEXT:    and 0, 0, 6
 ; LE-NEXT:    and 11, 11, 7
-; LE-NEXT:    and 10, 10, 6
-; LE-NEXT:    or 10, 10, 11
-; LE-NEXT:    slwi 11, 10, 4
-; LE-NEXT:    srwi 10, 10, 4
+; LE-NEXT:    or 11, 11, 0
+; LE-NEXT:    slwi 0, 11, 4
+; LE-NEXT:    srwi 11, 11, 4
+; LE-NEXT:    and 0, 0, 4
 ; LE-NEXT:    and 11, 11, 5
-; LE-NEXT:    and 10, 10, 4
-; LE-NEXT:    or 10, 10, 11
-; LE-NEXT:    rotlwi 11, 10, 24
-; LE-NEXT:    rlwimi 11, 10, 8, 8, 15
-; LE-NEXT:    rlwimi 11, 10, 8, 24, 31
-; LE-NEXT:    rldicl 10, 11, 0, 32
-; LE-NEXT:    rldimi 10, 9, 32, 0
-; LE-NEXT:    mffprwz 9, 4
+; LE-NEXT:    or 11, 11, 0
+; LE-NEXT:    rotlwi 0, 11, 24
+; LE-NEXT:    rlwimi 0, 11, 8, 8, 15
+; LE-NEXT:    rlwimi 0, 11, 8, 24, 31
+; LE-NEXT:    mfvsrwz 11, 34
+; LE-NEXT:    slwi 30, 11, 1
+; LE-NEXT:    srwi 11, 11, 1
+; LE-NEXT:    and 30, 30, 3
+; LE-NEXT:    and 11, 11, 8
+; LE-NEXT:    or 11, 11, 30
+; LE-NEXT:    slwi 30, 11, 2
+; LE-NEXT:    srwi 11, 11, 2
+; LE-NEXT:    and 30, 30, 6
+; LE-NEXT:    and 11, 11, 7
+; LE-NEXT:    or 11, 11, 30
+; LE-NEXT:    slwi 30, 11, 4
+; LE-NEXT:    srwi 11, 11, 4
+; LE-NEXT:    and 30, 30, 4
+; LE-NEXT:    and 11, 11, 5
+; LE-NEXT:    or 11, 11, 30
+; LE-NEXT:    rotlwi 30, 11, 24
+; LE-NEXT:    rlwimi 30, 11, 8, 8, 15
+; LE-NEXT:    rlwimi 30, 11, 8, 24, 31
+; LE-NEXT:    rldicl 11, 0, 0, 32
+; LE-NEXT:    rldicl 0, 30, 0, 32
+; LE-NEXT:    ld 30, -16(1) # 8-byte Folded Reload
+; LE-NEXT:    rldimi 0, 11, 32, 0
+; LE-NEXT:    mtfprd 2, 0
 ; LE-NEXT:    xxmrghd 0, 1, 0
-; LE-NEXT:    mtfprd 1, 10
-; LE-NEXT:    slwi 10, 9, 1
-; LE-NEXT:    srwi 9, 9, 1
-; LE-NEXT:    and 10, 10, 3
-; LE-NEXT:    and 9, 9, 8
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    slwi 10, 9, 2
-; LE-NEXT:    srwi 9, 9, 2
-; LE-NEXT:    and 10, 10, 7
-; LE-NEXT:    and 9, 9, 6
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    slwi 10, 9, 4
-; LE-NEXT:    srwi 9, 9, 4
-; LE-NEXT:    and 10, 10, 5
-; LE-NEXT:    and 9, 9, 4
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    rotlwi 10, 9, 24
-; LE-NEXT:    rlwimi 10, 9, 8, 8, 15
-; LE-NEXT:    rlwimi 10, 9, 8, 24, 31
-; LE-NEXT:    rldicl 9, 10, 0, 32
-; LE-NEXT:    mfvsrwz 10, 34
-; LE-NEXT:    vsububm 2, 4, 3
+; LE-NEXT:    mtfprd 1, 12
+; LE-NEXT:    vspltisb 2, -16
+; LE-NEXT:    vsububm 2, 3, 2
 ; LE-NEXT:    xxland 35, 0, 34
-; LE-NEXT:    slwi 11, 10, 1
-; LE-NEXT:    srwi 10, 10, 1
-; LE-NEXT:    and 11, 11, 3
-; LE-NEXT:    and 10, 10, 8
-; LE-NEXT:    or 10, 10, 11
-; LE-NEXT:    slwi 11, 10, 2
-; LE-NEXT:    srwi 10, 10, 2
-; LE-NEXT:    and 11, 11, 7
-; LE-NEXT:    and 10, 10, 6
-; LE-NEXT:    or 10, 10, 11
-; LE-NEXT:    slwi 11, 10, 4
-; LE-NEXT:    srwi 10, 10, 4
-; LE-NEXT:    and 11, 11, 5
-; LE-NEXT:    and 10, 10, 4
-; LE-NEXT:    or 10, 10, 11
-; LE-NEXT:    rotlwi 11, 10, 24
-; LE-NEXT:    rlwimi 11, 10, 8, 8, 15
-; LE-NEXT:    rlwimi 11, 10, 8, 24, 31
-; LE-NEXT:    rldicl 10, 11, 0, 32
-; LE-NEXT:    rldimi 10, 9, 32, 0
-; LE-NEXT:    addis 9, 2, .LCPI10_0@toc@ha
-; LE-NEXT:    mtfprd 2, 10
-; LE-NEXT:    addi 9, 9, .LCPI10_0@toc@l
 ; LE-NEXT:    xxmrghd 1, 2, 1
 ; LE-NEXT:    lxvd2x 2, 0, 9
 ; LE-NEXT:    addis 9, 2, .LCPI10_1@toc@ha
@@ -4783,90 +4791,90 @@ define <4 x i32> @clmulh_v4i32(<4 x i32> %a, <4 x i32> %b) nounwind {
 ; LE-NEXT:    xxswapd 2, 0
 ; LE-NEXT:    xxsldwi 3, 0, 0, 3
 ; LE-NEXT:    mffprwz 9, 1
-; LE-NEXT:    mffprwz 10, 2
+; LE-NEXT:    mffprwz 11, 2
+; LE-NEXT:    slwi 10, 9, 1
+; LE-NEXT:    srwi 9, 9, 1
+; LE-NEXT:    slwi 12, 11, 1
+; LE-NEXT:    srwi 11, 11, 1
+; LE-NEXT:    and 10, 10, 3
+; LE-NEXT:    and 9, 9, 8
+; LE-NEXT:    and 12, 12, 3
+; LE-NEXT:    and 11, 11, 8
+; LE-NEXT:    or 9, 9, 10
+; LE-NEXT:    or 10, 11, 12
+; LE-NEXT:    slwi 11, 9, 2
+; LE-NEXT:    srwi 9, 9, 2
+; LE-NEXT:    slwi 12, 10, 2
+; LE-NEXT:    srwi 10, 10, 2
+; LE-NEXT:    and 11, 11, 6
+; LE-NEXT:    and 9, 9, 7
+; LE-NEXT:    and 12, 12, 6
+; LE-NEXT:    and 10, 10, 7
+; LE-NEXT:    or 9, 9, 11
+; LE-NEXT:    or 10, 10, 12
+; LE-NEXT:    slwi 11, 9, 4
+; LE-NEXT:    srwi 9, 9, 4
+; LE-NEXT:    and 11, 11, 4
+; LE-NEXT:    and 9, 9, 5
+; LE-NEXT:    or 9, 9, 11
+; LE-NEXT:    rotlwi 11, 9, 24
+; LE-NEXT:    rlwimi 11, 9, 8, 8, 15
+; LE-NEXT:    rlwimi 11, 9, 8, 24, 31
+; LE-NEXT:    rldicl 9, 11, 0, 32
+; LE-NEXT:    slwi 11, 10, 4
+; LE-NEXT:    srwi 10, 10, 4
+; LE-NEXT:    and 11, 11, 4
+; LE-NEXT:    and 10, 10, 5
+; LE-NEXT:    or 10, 10, 11
+; LE-NEXT:    rotlwi 11, 10, 24
+; LE-NEXT:    rlwimi 11, 10, 8, 8, 15
+; LE-NEXT:    rlwimi 11, 10, 8, 24, 31
+; LE-NEXT:    rldicl 10, 11, 0, 32
+; LE-NEXT:    rldimi 10, 9, 32, 0
+; LE-NEXT:    mffprwz 9, 3
 ; LE-NEXT:    slwi 11, 9, 1
 ; LE-NEXT:    srwi 9, 9, 1
 ; LE-NEXT:    and 11, 11, 3
 ; LE-NEXT:    and 9, 9, 8
 ; LE-NEXT:    or 9, 9, 11
-; LE-NEXT:    slwi 11, 10, 1
-; LE-NEXT:    srwi 10, 10, 1
-; LE-NEXT:    and 11, 11, 3
-; LE-NEXT:    and 10, 10, 8
-; LE-NEXT:    or 10, 10, 11
 ; LE-NEXT:    slwi 11, 9, 2
 ; LE-NEXT:    srwi 9, 9, 2
-; LE-NEXT:    and 11, 11, 7
-; LE-NEXT:    and 9, 9, 6
+; LE-NEXT:    and 11, 11, 6
+; LE-NEXT:    and 9, 9, 7
 ; LE-NEXT:    or 9, 9, 11
-; LE-NEXT:    slwi 11, 10, 2
-; LE-NEXT:    srwi 10, 10, 2
-; LE-NEXT:    and 11, 11, 7
-; LE-NEXT:    and 10, 10, 6
-; LE-NEXT:    or 10, 10, 11
 ; LE-NEXT:    slwi 11, 9, 4
 ; LE-NEXT:    srwi 9, 9, 4
-; LE-NEXT:    and 11, 11, 5
-; LE-NEXT:    and 9, 9, 4
+; LE-NEXT:    and 11, 11, 4
+; LE-NEXT:    and 9, 9, 5
 ; LE-NEXT:    or 9, 9, 11
 ; LE-NEXT:    rotlwi 11, 9, 24
 ; LE-NEXT:    rlwimi 11, 9, 8, 8, 15
 ; LE-NEXT:    rlwimi 11, 9, 8, 24, 31
-; LE-NEXT:    slwi 9, 10, 4
-; LE-NEXT:    srwi 10, 10, 4
+; LE-NEXT:    mffprwz 9, 0
+; LE-NEXT:    mtfprd 0, 10
 ; LE-NEXT:    rldicl 11, 11, 0, 32
-; LE-NEXT:    and 9, 9, 5
-; LE-NEXT:    and 10, 10, 4
-; LE-NEXT:    or 9, 10, 9
-; LE-NEXT:    rotlwi 10, 9, 24
-; LE-NEXT:    rlwimi 10, 9, 8, 8, 15
-; LE-NEXT:    rlwimi 10, 9, 8, 24, 31
-; LE-NEXT:    rldicl 9, 10, 0, 32
-; LE-NEXT:    rldimi 9, 11, 32, 0
-; LE-NEXT:    mtfprd 1, 9
-; LE-NEXT:    mffprwz 9, 3
-; LE-NEXT:    slwi 10, 9, 1
+; LE-NEXT:    slwi 12, 9, 1
 ; LE-NEXT:    srwi 9, 9, 1
-; LE-NEXT:    and 10, 10, 3
-; LE-NEXT:    and 9, 9, 8
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    slwi 10, 9, 2
-; LE-NEXT:    srwi 9, 9, 2
-; LE-NEXT:    and 10, 10, 7
-; LE-NEXT:    and 9, 9, 6
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    slwi 10, 9, 4
-; LE-NEXT:    srwi 9, 9, 4
-; LE-NEXT:    and 10, 10, 5
-; LE-NEXT:    and 9, 9, 4
-; LE-NEXT:    or 9, 9, 10
-; LE-NEXT:    rotlwi 10, 9, 24
-; LE-NEXT:    rlwimi 10, 9, 8, 8, 15
-; LE-NEXT:    rlwimi 10, 9, 8, 24, 31
-; LE-NEXT:    rldicl 9, 10, 0, 32
-; LE-NEXT:    mffprwz 10, 0
-; LE-NEXT:    slwi 11, 10, 1
-; LE-NEXT:    srwi 10, 10, 1
-; LE-NEXT:    and 3, 11, 3
-; LE-NEXT:    and 8, 10, 8
+; LE-NEXT:    and 3, 12, 3
+; LE-NEXT:    and 8, 9, 8
 ; LE-NEXT:    or 3, 8, 3
 ; LE-NEXT:    slwi 8, 3, 2
 ; LE-NEXT:    srwi 3, 3, 2
-; LE-NEXT:    and 7, 8, 7
-; LE-NEXT:    and 3, 3, 6
-; LE-NEXT:    or 3, 3, 7
+; LE-NEXT:    and 6, 8, 6
+; LE-NEXT:    and 3, 3, 7
+; LE-NEXT:    or 3, 3, 6
 ; LE-NEXT:    slwi 6, 3, 4
 ; LE-NEXT:    srwi 3, 3, 4
-; LE-NEXT:    and 5, 6, 5
-; LE-NEXT:    and 3, 3, 4
-; LE-NEXT:    or 3, 3, 5
+; LE-NEXT:    and 4, 6, 4
+; LE-NEXT:    and 3, 3, 5
+; LE-NEXT:    or 3, 3, 4
 ; LE-NEXT:    rotlwi 4, 3, 24
 ; LE-NEXT:    rlwimi 4, 3, 8, 8, 15
 ; LE-NEXT:    rlwimi 4, 3, 8, 24, 31
 ; LE-NEXT:    rldicl 3, 4, 0, 32
-; LE-NEXT:    rldimi 3, 9, 32, 0
-; LE-NEXT:    mtfprd 0, 3
-; LE-NEXT:    xxmrghd 34, 0, 1
+; LE-NEXT:    rldimi 3, 11, 32, 0
+; LE-NEXT:    mtfprd 1, 3
+; LE-NEXT:    xxmrghd 34, 1, 0
 ; LE-NEXT:    vsrw 2, 2, 3
 ; LE-NEXT:    blr
   %a.ext = zext <4 x i32> %a to <4 x i64>
@@ -5258,21 +5266,21 @@ define <2 x i64> @clmulh_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    sldi 5, 5, 32
 ; LE-NEXT:    sldi 6, 6, 32
 ; LE-NEXT:    sldi 7, 7, 32
-; LE-NEXT:    sldi 8, 8, 32
 ; LE-NEXT:    vspltisw 4, 2
 ; LE-NEXT:    vspltisw 5, 8
-; LE-NEXT:    oris 3, 3, 43690
-; LE-NEXT:    oris 4, 4, 21845
 ; LE-NEXT:    vspltisw 8, 1
 ; LE-NEXT:    vspltisw 10, 7
+; LE-NEXT:    sldi 8, 8, 32
+; LE-NEXT:    oris 3, 3, 43690
+; LE-NEXT:    oris 4, 4, 21845
 ; LE-NEXT:    oris 5, 5, 52428
-; LE-NEXT:    oris 11, 6, 13107
 ; LE-NEXT:    vupklsw 0, 4
 ; LE-NEXT:    vupklsw 6, 5
-; LE-NEXT:    oris 12, 7, 61680
-; LE-NEXT:    oris 0, 8, 3855
 ; LE-NEXT:    xxlxor 37, 37, 37
 ; LE-NEXT:    vupklsw 10, 10
+; LE-NEXT:    oris 11, 6, 13107
+; LE-NEXT:    oris 12, 7, 61680
+; LE-NEXT:    oris 0, 8, 3855
 ; LE-NEXT:    ori 8, 3, 43690
 ; LE-NEXT:    ori 7, 4, 21845
 ; LE-NEXT:    ori 6, 5, 52428
@@ -5324,9 +5332,9 @@ define <2 x i64> @clmulh_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    rlwimi 10, 11, 8, 24, 31
 ; LE-NEXT:    rotlwi 11, 0, 24
 ; LE-NEXT:    or 10, 12, 10
+; LE-NEXT:    mtfprd 0, 10
 ; LE-NEXT:    rlwimi 11, 0, 8, 8, 15
 ; LE-NEXT:    rlwimi 11, 0, 8, 24, 31
-; LE-NEXT:    mtfprd 0, 10
 ; LE-NEXT:    or 9, 9, 11
 ; LE-NEXT:    mtfprd 1, 9
 ; LE-NEXT:    mfvsrd 9, 35
@@ -6066,12 +6074,12 @@ define <2 x i64> @clmulh_v2i64(<2 x i64> %a, <2 x i64> %b) nounwind {
 ; LE-NEXT:    sldi 9, 10, 32
 ; LE-NEXT:    or 9, 9, 11
 ; LE-NEXT:    xxswapd 1, 0
+; LE-NEXT:    mffprd 10, 1
 ; LE-NEXT:    mtfprd 0, 9
-; LE-NEXT:    mffprd 9, 1
-; LE-NEXT:    sldi 10, 9, 1
-; LE-NEXT:    rldicl 9, 9, 63, 1
-; LE-NEXT:    and 8, 10, 8
-; LE-NEXT:    and 7, 9, 7
+; LE-NEXT:    sldi 11, 10, 1
+; LE-NEXT:    rldicl 10, 10, 63, 1
+; LE-NEXT:    and 8, 11, 8
+; LE-NEXT:    and 7, 10, 7
 ; LE-NEXT:    or 7, 7, 8
 ; LE-NEXT:    sldi 8, 7, 2
 ; LE-NEXT:    rldicl 7, 7, 62, 2

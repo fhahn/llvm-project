@@ -71,9 +71,9 @@ define signext i32 @shrinkwrapme(i32 signext %a, i32 signext %lim) {
 ; POWERPC32-AIX-NEXT:    ble 0, L..BB0_4
 ; POWERPC32-AIX-NEXT:  # %bb.1: # %for.body.preheader
 ; POWERPC32-AIX-NEXT:    stw 14, -72(1) # 4-byte Folded Spill
-; POWERPC32-AIX-NEXT:    stw 15, -68(1) # 4-byte Folded Spill
 ; POWERPC32-AIX-NEXT:    mr 5, 3
 ; POWERPC32-AIX-NEXT:    li 3, 0
+; POWERPC32-AIX-NEXT:    stw 15, -68(1) # 4-byte Folded Spill
 ; POWERPC32-AIX-NEXT:    stw 16, -64(1) # 4-byte Folded Spill
 ; POWERPC32-AIX-NEXT:    stw 17, -60(1) # 4-byte Folded Spill
 ; POWERPC32-AIX-NEXT:    stw 18, -56(1) # 4-byte Folded Spill

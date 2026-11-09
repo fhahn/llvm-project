@@ -607,26 +607,26 @@ define <16 x i64> @lrint_v16i64_v16f16(<16 x half> %x) nounwind {
 ; CHECK-NEXT:    std r23, 248(r1) # 8-byte Folded Spill
 ; CHECK-NEXT:    mr r23, r3
 ; CHECK-NEXT:    lhz r3, 416(r1)
-; CHECK-NEXT:    std r16, 192(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    std r17, 200(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    lhz r17, 432(r1)
 ; CHECK-NEXT:    stxvd2x v24, r1, r11 # 16-byte Folded Spill
 ; CHECK-NEXT:    li r11, 64
-; CHECK-NEXT:    std r18, 208(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    lhz r18, 440(r1)
-; CHECK-NEXT:    std r19, 216(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    lhz r19, 448(r1)
-; CHECK-NEXT:    lhz r16, 424(r1)
 ; CHECK-NEXT:    stxvd2x v25, r1, r11 # 16-byte Folded Spill
 ; CHECK-NEXT:    li r11, 80
+; CHECK-NEXT:    std r16, 192(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    std r17, 200(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    std r18, 208(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    std r19, 216(r1) # 8-byte Folded Spill
 ; CHECK-NEXT:    std r20, 224(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    std r21, 232(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    lhz r21, 464(r1)
 ; CHECK-NEXT:    lhz r20, 456(r1)
+; CHECK-NEXT:    lhz r19, 448(r1)
+; CHECK-NEXT:    lhz r18, 440(r1)
+; CHECK-NEXT:    lhz r17, 432(r1)
+; CHECK-NEXT:    lhz r16, 424(r1)
 ; CHECK-NEXT:    stxvd2x v26, r1, r11 # 16-byte Folded Spill
 ; CHECK-NEXT:    li r11, 96
-; CHECK-NEXT:    std r21, 232(r1) # 8-byte Folded Spill
 ; CHECK-NEXT:    std r22, 240(r1) # 8-byte Folded Spill
 ; CHECK-NEXT:    lhz r22, 472(r1)
-; CHECK-NEXT:    lhz r21, 464(r1)
 ; CHECK-NEXT:    stxvd2x v27, r1, r11 # 16-byte Folded Spill
 ; CHECK-NEXT:    li r11, 112
 ; CHECK-NEXT:    std r15, 184(r1) # 8-byte Folded Spill
@@ -1167,78 +1167,78 @@ define <32 x i64> @lrint_v32i64_v32f16(<32 x half> %x) nounwind {
 ; CHECK-NEXT:    mr r30, r3
 ; CHECK-NEXT:    lhz r3, 864(r1)
 ; CHECK-NEXT:    li r11, 240
-; CHECK-NEXT:    std r14, 432(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    std r19, 472(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    lhz r14, 744(r1)
 ; CHECK-NEXT:    stxvd2x v20, r1, r11 # 16-byte Folded Spill
 ; CHECK-NEXT:    li r11, 256
-; CHECK-NEXT:    std r22, 496(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    lhz r22, 680(r1)
+; CHECK-NEXT:    stxvd2x v21, r1, r11 # 16-byte Folded Spill
 ; CHECK-NEXT:    std r3, 216(r1) # 8-byte Folded Spill
 ; CHECK-NEXT:    lhz r3, 856(r1)
-; CHECK-NEXT:    lhz r19, 672(r1)
-; CHECK-NEXT:    stxvd2x v21, r1, r11 # 16-byte Folded Spill
 ; CHECK-NEXT:    li r11, 272
-; CHECK-NEXT:    std r23, 504(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    lhz r23, 688(r1)
 ; CHECK-NEXT:    stxvd2x v22, r1, r11 # 16-byte Folded Spill
 ; CHECK-NEXT:    std r3, 184(r1) # 8-byte Folded Spill
 ; CHECK-NEXT:    lhz r3, 848(r1)
 ; CHECK-NEXT:    li r11, 288
-; CHECK-NEXT:    std r25, 520(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    lhz r25, 696(r1)
 ; CHECK-NEXT:    stxvd2x v23, r1, r11 # 16-byte Folded Spill
 ; CHECK-NEXT:    li r11, 304
+; CHECK-NEXT:    std r14, 432(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    std r19, 472(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    std r22, 496(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    std r23, 504(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    std r25, 520(r1) # 8-byte Folded Spill
 ; CHECK-NEXT:    std r26, 528(r1) # 8-byte Folded Spill
 ; CHECK-NEXT:    std r27, 536(r1) # 8-byte Folded Spill
 ; CHECK-NEXT:    std r28, 544(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    std r29, 552(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    std r31, 568(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    lhz r14, 744(r1)
+; CHECK-NEXT:    lhz r31, 736(r1)
+; CHECK-NEXT:    lhz r29, 728(r1)
 ; CHECK-NEXT:    lhz r28, 720(r1)
 ; CHECK-NEXT:    lhz r27, 712(r1)
 ; CHECK-NEXT:    lhz r26, 704(r1)
+; CHECK-NEXT:    lhz r25, 696(r1)
+; CHECK-NEXT:    lhz r23, 688(r1)
+; CHECK-NEXT:    lhz r22, 680(r1)
+; CHECK-NEXT:    lhz r19, 672(r1)
 ; CHECK-NEXT:    stxvd2x v24, r1, r11 # 16-byte Folded Spill
-; CHECK-NEXT:    std r3, 176(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    lhz r3, 840(r1)
 ; CHECK-NEXT:    li r11, 320
-; CHECK-NEXT:    std r29, 552(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    lhz r29, 728(r1)
 ; CHECK-NEXT:    stxvd2x v25, r1, r11 # 16-byte Folded Spill
-; CHECK-NEXT:    std r3, 152(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    lhz r3, 832(r1)
 ; CHECK-NEXT:    li r11, 336
-; CHECK-NEXT:    std r31, 568(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    lhz r31, 736(r1)
 ; CHECK-NEXT:    stxvd2x v26, r1, r11 # 16-byte Folded Spill
 ; CHECK-NEXT:    li r11, 352
-; CHECK-NEXT:    std r15, 440(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    std r16, 448(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    std r17, 456(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    mr r17, r6
-; CHECK-NEXT:    mr r16, r5
 ; CHECK-NEXT:    stxvd2x v27, r1, r11 # 16-byte Folded Spill
-; CHECK-NEXT:    std r3, 144(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    lhz r3, 824(r1)
 ; CHECK-NEXT:    li r11, 368
-; CHECK-NEXT:    std r18, 464(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    std r20, 480(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    mr r20, r8
-; CHECK-NEXT:    mr r18, r7
 ; CHECK-NEXT:    stxvd2x v28, r1, r11 # 16-byte Folded Spill
-; CHECK-NEXT:    std r3, 120(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    lhz r3, 816(r1)
 ; CHECK-NEXT:    li r11, 384
-; CHECK-NEXT:    std r21, 488(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    std r24, 512(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    mr r24, r10
-; CHECK-NEXT:    mr r21, r9
 ; CHECK-NEXT:    stxvd2x v29, r1, r11 # 16-byte Folded Spill
 ; CHECK-NEXT:    li r11, 400
-; CHECK-NEXT:    std r3, 112(r1) # 8-byte Folded Spill
-; CHECK-NEXT:    lhz r3, 808(r1)
 ; CHECK-NEXT:    stxvd2x v30, r1, r11 # 16-byte Folded Spill
 ; CHECK-NEXT:    li r11, 416
+; CHECK-NEXT:    stxvd2x v31, r1, r11 # 16-byte Folded Spill
+; CHECK-NEXT:    std r3, 176(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    lhz r3, 840(r1)
+; CHECK-NEXT:    std r3, 152(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    lhz r3, 832(r1)
+; CHECK-NEXT:    std r3, 144(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    lhz r3, 824(r1)
+; CHECK-NEXT:    std r3, 120(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    lhz r3, 816(r1)
+; CHECK-NEXT:    std r3, 112(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    lhz r3, 808(r1)
 ; CHECK-NEXT:    std r3, 104(r1) # 8-byte Folded Spill
 ; CHECK-NEXT:    lhz r3, 800(r1)
-; CHECK-NEXT:    stxvd2x v31, r1, r11 # 16-byte Folded Spill
+; CHECK-NEXT:    std r15, 440(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    std r16, 448(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    mr r16, r5
+; CHECK-NEXT:    std r17, 456(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    mr r17, r6
+; CHECK-NEXT:    std r18, 464(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    mr r18, r7
+; CHECK-NEXT:    std r20, 480(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    mr r20, r8
+; CHECK-NEXT:    std r21, 488(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    mr r21, r9
+; CHECK-NEXT:    std r24, 512(r1) # 8-byte Folded Spill
+; CHECK-NEXT:    mr r24, r10
 ; CHECK-NEXT:    std r3, 96(r1) # 8-byte Folded Spill
 ; CHECK-NEXT:    lhz r3, 792(r1)
 ; CHECK-NEXT:    std r3, 88(r1) # 8-byte Folded Spill
