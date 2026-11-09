@@ -1750,18 +1750,19 @@ private:
   }
 
   /// Put the accesses of \p Leader's class in RtCheck.UnknownDepCands back
-  /// into DepCands: AddRecs as runs at most a step apart, without unknown
-  /// dependences between them, and all other accesses as classes of their
-  /// own. Accesses of a run need no checks against each other and are checked
-  /// as one group. For example, for two rows of an RGB image, r0 = img and
-  /// r1 = img + S:
+  /// into DepCands: AddRecs with a step larger than \p MaxAccessSize as runs
+  /// at most a step apart, without unknown dependences between them, and all
+  /// other accesses as classes of their own. Accesses of a run need no checks
+  /// against each other and are checked as one group. For example, for two
+  /// rows of an RGB image, r0 = img and r1 = img + S:
   ///
   ///   r0[3*x] = ..;  r0[3*x+1] = ..;  r0[3*x+2] = ..;
   ///   r1[3*x] = ..;  r1[3*x+1] = ..;  r1[3*x+2] = ..;
   ///
   /// all pairs across rows are unknown, and each row becomes a run, so a single
   /// check between the rows replaces nine.
-  void splitClass(const RuntimePointerChecking &RtCheck, MemAccessInfo Leader);
+  void splitClass(const RuntimePointerChecking &RtCheck, MemAccessInfo Leader,
+                  uint64_t MaxAccessSize);
 
   const AnalysisOptions &Opts;
 
@@ -2228,7 +2229,7 @@ bool AccessAnalysis::createCheckForAccess(RuntimePointerChecking &RtCheck,
 }
 
 void AccessAnalysis::splitClass(const RuntimePointerChecking &RtCheck,
-                                MemAccessInfo Leader) {
+                                MemAccessInfo Leader, uint64_t MaxAccessSize) {
   // Only AddRecs with the same step, whose starts differ by a constant, are at
   // constant distances from each other.
   struct Bucket {
@@ -2242,11 +2243,14 @@ void AccessAnalysis::splitClass(const RuntimePointerChecking &RtCheck,
     DepCands.insert(Access);
     const SCEV *Start;
     const SCEVConstant *Step;
-    // We can't tell where the range of such a pointer lies, so it keeps a
-    // sub-class of its own.
+    // A group of multiple pointers can only be checked by a range check. With
+    // a step not larger than an access, the pointers may have more precise
+    // diff checks, so keep them in sub-classes of their own, as for pointers
+    // whose ranges we can't place.
     if (!match(PSE.getSCEV(Access.getPointer()),
                m_scev_AffineAddRec(m_SCEV(Start), m_SCEVConstant(Step),
-                                   m_SpecificLoop(TheLoop))))
+                                   m_SpecificLoop(TheLoop))) ||
+        Step->getAPInt().abs().ule(MaxAccessSize))
       continue;
     auto *It = find_if(Buckets, [&](const Bucket &B) {
       return B.Step == Step && SE.computeConstantDifference(Start, B.Start);
@@ -2317,9 +2321,15 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
     }
 
     // Split the erased classes into runs that can be grouped.
+    const DataLayout &DL = TheLoop->getHeader()->getDataLayout();
+    uint64_t MaxAccessSize = 0;
+    for (const auto &[_, Tys] : Accesses)
+      for (Type *Ty : Tys)
+        MaxAccessSize = std::max(MaxAccessSize,
+                                 DL.getTypeAllocSize(Ty).getKnownMinValue());
     for (const auto *Class : RtCheck.UnknownDepCands)
       if (Class->isLeader())
-        splitClass(RtCheck, Class->getData());
+        splitClass(RtCheck, Class->getData(), MaxAccessSize);
   } else {
     CheckDeps.clear();
     DepCands = {};
