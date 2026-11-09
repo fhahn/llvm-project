@@ -1974,9 +1974,6 @@ bool IndVarSimplify::predicateLoopExits(Loop *L, SCEVExpander &Rewriter) {
   //    predicate even if we can't insert a loop invariant expression as
   //    peeling or unrolling will likely reduce the cost of the otherwise loop
   //    varying check.
-  Rewriter.setInsertPoint(L->getLoopPreheader()->getTerminator());
-  IRBuilder<> B(L->getLoopPreheader()->getTerminator());
-  Value *ExactBTCV = nullptr; // Lazily generated if needed.
   for (BasicBlock *ExitingBB : ExitingBlocks) {
     const SCEV *ExitCount = SE->getExitCount(L, ExitingBB);
 
@@ -1994,15 +1991,19 @@ bool IndVarSimplify::predicateLoopExits(Loop *L, SCEVExpander &Rewriter) {
       if (Unreachable == nullptr || !crashingBBWithoutEffect(*Unreachable))
         return Changed;
     }
+    // Insert the condition in the preheader of the outermost loop it is
+    // invariant in, as parent loops get unswitched as well.
+    Instruction *InsertPt =
+        findOutermostInvariantInsertPt(L, {ExitCount, ExactBTC}, Rewriter);
+    Rewriter.setInsertPoint(InsertPt);
+    IRBuilder<> B(InsertPt);
     Value *NewCond;
     if (ExitCount == ExactBTC) {
       NewCond = L->contains(BI->getSuccessor(0)) ?
         B.getFalse() : B.getTrue();
     } else {
       Value *ECV = Rewriter.expandCodeFor(ExitCount);
-      if (!ExactBTCV)
-        ExactBTCV = Rewriter.expandCodeFor(ExactBTC);
-      Value *RHS = ExactBTCV;
+      Value *RHS = Rewriter.expandCodeFor(ExactBTC);
       if (ECV->getType() != RHS->getType()) {
         Type *WiderTy = SE->getWiderType(ECV->getType(), RHS->getType());
         ECV = B.CreateZExt(ECV, WiderTy);

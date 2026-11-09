@@ -203,3 +203,82 @@ exit:
 exit.1:
   ret i8 1
 }
+
+; The predicated exit condition of the inner loop is invariant in the outer
+; loop and is hoisted to the outer preheader.
+define void @predicated_exit_invariant_in_outer_loop(ptr %p, i64 %n, i64 %m, i64 %k) {
+; CHECK-LABEL: define void @predicated_exit_invariant_in_outer_loop(
+; CHECK-SAME: ptr [[P:%.*]], i64 [[N:%.*]], i64 [[M:%.*]], i64 [[K:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[ENTER_OUTER:%.*]] = icmp sgt i64 [[N]], 0
+; CHECK-NEXT:    [[ENTER_INNER:%.*]] = icmp sgt i64 [[M]], 0
+; CHECK-NEXT:    [[ENTER:%.*]] = and i1 [[ENTER_OUTER]], [[ENTER_INNER]]
+; CHECK-NEXT:    br i1 [[ENTER]], label %[[OUTER_PREHEADER:.*]], label %[[EXIT:.*]]
+; CHECK:       [[OUTER_PREHEADER]]:
+; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[K]], i64 0)
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[M]], -1
+; CHECK-NEXT:    [[UMIN:%.*]] = call i64 @llvm.umin.i64(i64 [[SMAX]], i64 [[TMP0]])
+; CHECK-NEXT:    [[TMP1:%.*]] = icmp eq i64 [[SMAX]], [[UMIN]]
+; CHECK-NEXT:    br label %[[OUTER:.*]]
+; CHECK:       [[OUTER]]:
+; CHECK-NEXT:    [[I:%.*]] = phi i64 [ [[I_NEXT:%.*]], %[[OUTER_LATCH:.*]] ], [ 0, %[[OUTER_PREHEADER]] ]
+; CHECK-NEXT:    [[ROW:%.*]] = mul i64 [[I]], [[M]]
+; CHECK-NEXT:    br label %[[INNER_BODY:.*]]
+; CHECK:       [[INNER_BODY]]:
+; CHECK-NEXT:    [[J:%.*]] = phi i64 [ 0, %[[OUTER]] ], [ [[J_NEXT:%.*]], %[[INNER_LATCH:.*]] ]
+; CHECK-NEXT:    br i1 [[TMP1]], label %[[TRAP:.*]], label %[[INNER_LATCH]]
+; CHECK:       [[INNER_LATCH]]:
+; CHECK-NEXT:    [[IDX:%.*]] = add i64 [[ROW]], [[J]]
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr i8, ptr [[P]], i64 [[IDX]]
+; CHECK-NEXT:    store i8 0, ptr [[GEP]], align 1
+; CHECK-NEXT:    [[J_NEXT]] = add nuw nsw i64 [[J]], 1
+; CHECK-NEXT:    [[MORE:%.*]] = icmp slt i64 [[J_NEXT]], [[M]]
+; CHECK-NEXT:    br i1 [[MORE]], label %[[INNER_BODY]], label %[[OUTER_LATCH]]
+; CHECK:       [[OUTER_LATCH]]:
+; CHECK-NEXT:    [[I_NEXT]] = add nuw nsw i64 [[I]], 1
+; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i64 [[I_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT_LOOPEXIT:.*]], label %[[OUTER]]
+; CHECK:       [[EXIT_LOOPEXIT]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+; CHECK:       [[TRAP]]:
+; CHECK-NEXT:    call void @llvm.trap()
+; CHECK-NEXT:    unreachable
+;
+entry:
+  %enter.outer = icmp sgt i64 %n, 0
+  %enter.inner = icmp sgt i64 %m, 0
+  %enter = and i1 %enter.outer, %enter.inner
+  br i1 %enter, label %outer, label %exit
+
+outer:
+  %i = phi i64 [ 0, %entry ], [ %i.next, %outer.latch ]
+  %row = mul i64 %i, %m
+  br label %inner.body
+
+inner.body:
+  %j = phi i64 [ 0, %outer ], [ %j.next, %inner.latch ]
+  %oob = icmp sge i64 %j, %k
+  br i1 %oob, label %trap, label %inner.latch
+
+inner.latch:
+  %idx = add i64 %row, %j
+  %gep = getelementptr i8, ptr %p, i64 %idx
+  store i8 0, ptr %gep
+  %j.next = add nuw nsw i64 %j, 1
+  %more = icmp slt i64 %j.next, %m
+  br i1 %more, label %inner.body, label %outer.latch
+
+outer.latch:
+  %i.next = add i64 %i, 1
+  %done = icmp eq i64 %i.next, %n
+  br i1 %done, label %exit, label %outer
+
+exit:
+  ret void
+
+trap:
+  call void @llvm.trap()
+  unreachable
+}
