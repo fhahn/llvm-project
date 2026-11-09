@@ -56,8 +56,8 @@ class InstrItineraryData;
 
     ~ScheduleDAGSDNodes() override = default;
 
-    /// Run - perform scheduling.
-    ///
+    /// Run - perform scheduling. The scheduler is reused for all blocks of a
+    /// function, so each run must start from a clean state.
     void Run(SelectionDAG *dag, MachineBasicBlock *bb);
 
     /// isPassiveNode - Return true if the node is a non-scheduled leaf.

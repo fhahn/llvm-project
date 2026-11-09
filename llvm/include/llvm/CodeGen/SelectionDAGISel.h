@@ -54,6 +54,8 @@ public:
   MachineRegisterInfo *RegInfo;
   SelectionDAG *CurDAG;
   std::unique_ptr<SelectionDAGBuilder> SDB;
+  /// The scheduler, reused for all blocks of the current function.
+  std::unique_ptr<ScheduleDAGSDNodes> Scheduler;
   mutable std::optional<BatchAAResults> BatchAA;
   AssumptionCache *AC = nullptr;
   GCFunctionInfo *GFI = nullptr;
