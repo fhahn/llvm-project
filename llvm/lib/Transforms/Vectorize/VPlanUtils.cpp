@@ -943,9 +943,6 @@ bool vputils::isUsedByLoadStoreAddress(const VPValue *V) {
   return false;
 }
 
-/// Try to find a loop-invariant IR value for \p S in the plan's entry block
-/// that can be reused. Returns the corresponding live-in VPValue, or nullptr
-/// if no reusable IR value is found.
 VPValue *VPSCEVExpander::tryToReuseIRValue(const SCEV *S) {
   if (isa<SCEVConstant, SCEVUnknown>(S))
     return nullptr;
@@ -966,9 +963,11 @@ VPValue *VPSCEVExpander::tryToReuseIRValue(const SCEV *S) {
     SmallVector<Instruction *> DropPoisonGeneratingInsts;
     if (!SE.canReuseInstruction(S, I, DropPoisonGeneratingInsts))
       continue;
-    for (Instruction *DropI : DropPoisonGeneratingInsts)
-      SCEVExpander::dropPoisonGeneratingAnnotationsAndReinfer(SE, DropI);
-    return Plan.getOrAddLiveIn(V);
+    if (DropPoisonGeneratingInsts.empty())
+      return Plan.getOrAddLiveIn(V);
+    // Leave reusing I to SCEVExpander, which only drops the flags when
+    // executing the plan.
+    return vputils::getOrCreateVPValueForSCEVExpr(Plan, S, /*ExpandInIR=*/true);
   }
   return nullptr;
 }

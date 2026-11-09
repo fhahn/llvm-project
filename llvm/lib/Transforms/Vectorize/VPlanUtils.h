@@ -295,8 +295,8 @@ class VPSCEVExpander {
       InsertedExpressions;
 
   /// Try to find a loop-invariant IR value in the plan's entry block whose
-  /// SCEV matches \p S. Returns the corresponding live-in VPValue, or nullptr
-  /// if none is found.
+  /// SCEV matches \p S. Returns its live-in VPValue, a VPExpandSCEVRecipe if
+  /// reusing it requires dropping poison-generating flags, or nullptr.
   VPValue *tryToReuseIRValue(const SCEV *S);
 
   /// Returns true if \p S can be expanded in IR, hoisted out of HoistOutOf.

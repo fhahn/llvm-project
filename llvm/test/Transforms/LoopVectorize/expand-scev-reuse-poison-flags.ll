@@ -8,7 +8,7 @@ define i64 @reuse_add_nsw_for_end_value(i64 %a, i64 %b, i64 %n) {
 ; NOVEC-LABEL: define i64 @reuse_add_nsw_for_end_value(
 ; NOVEC-SAME: i64 [[A:%.*]], i64 [[B:%.*]], i64 [[N:%.*]]) {
 ; NOVEC-NEXT:  [[ENTRY:.*]]:
-; NOVEC-NEXT:    [[S:%.*]] = add i64 [[A]], [[B]]
+; NOVEC-NEXT:    [[S:%.*]] = add nsw i64 [[A]], [[B]]
 ; NOVEC-NEXT:    br label %[[LOOP:.*]]
 ; NOVEC:       [[LOOP]]:
 ; NOVEC-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
