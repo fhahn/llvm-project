@@ -799,7 +799,11 @@ void LiveRange::flushSegmentSet() {
 }
 
 bool LiveRange::isLiveAtIndexes(ArrayRef<SlotIndex> Slots) const {
-  ArrayRef<SlotIndex>::iterator SlotI = Slots.begin();
+  if (empty())
+    return false;
+
+  // Slots before the start of the range cannot be live.
+  ArrayRef<SlotIndex>::iterator SlotI = llvm::lower_bound(Slots, beginIndex());
   ArrayRef<SlotIndex>::iterator SlotE = Slots.end();
 
   // If there are no regmask slots, we have nothing to search.
