@@ -364,6 +364,8 @@ private:
   const TargetInfo &Target;
   std::unique_ptr<CGCXXABI> ABI;
   llvm::LLVMContext &VMContext;
+  /// The target-features attribute for functions without target attributes.
+  std::optional<llvm::Attribute> DefaultTargetFeatures;
   std::string ModuleNameHash;
   bool CXX20ModuleInits = false;
   std::unique_ptr<CodeGenTBAA> TBAA;

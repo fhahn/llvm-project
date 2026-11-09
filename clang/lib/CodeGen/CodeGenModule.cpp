@@ -3492,6 +3492,20 @@ getFeatureDeltaFromDefault(const CodeGenModule &CGM, StringRef TargetCPU,
   return Delta;
 }
 
+/// Get the target-features attribute for \p Features without read-only
+/// features, or an invalid attribute if there are none.
+static llvm::Attribute
+getTargetFeaturesAttr(CodeGenModule &CGM, std::vector<std::string> Features) {
+  llvm::erase_if(Features, [&](const std::string &F) {
+    return CGM.getTarget().isReadOnlyFeature(F.substr(1));
+  });
+  if (Features.empty())
+    return {};
+  llvm::sort(Features);
+  return llvm::Attribute::get(CGM.getLLVMContext(), "target-features",
+                              llvm::join(Features, ","));
+}
+
 bool CodeGenModule::GetCPUAndFeaturesAttributes(GlobalDecl GD,
                                                 llvm::AttrBuilder &Attrs,
                                                 bool SetTargetFeatures) {
@@ -3501,6 +3515,7 @@ bool CodeGenModule::GetCPUAndFeaturesAttributes(GlobalDecl GD,
   StringRef TargetCPU = getTarget().getTargetOpts().CPU;
   StringRef TuneCPU = getTarget().getTargetOpts().TuneCPU;
   std::vector<std::string> Features;
+  llvm::Attribute FeaturesAttr;
   const auto *FD = dyn_cast_or_null<FunctionDecl>(GD.getDecl());
   FD = FD ? FD->getMostRecentDecl() : FD;
   const auto *TD = FD ? FD->getAttr<TargetAttr>() : nullptr;
@@ -3568,7 +3583,12 @@ bool CodeGenModule::GetCPUAndFeaturesAttributes(GlobalDecl GD,
       // report all builtins as supported, but that union is meaningless in the
       // emitted IR.
     } else {
-      Features = getTarget().getTargetOpts().Features;
+      // The default features only depend on the target options, so build the
+      // attribute once.
+      if (!DefaultTargetFeatures)
+        DefaultTargetFeatures =
+            getTargetFeaturesAttr(*this, getTarget().getTargetOpts().Features);
+      FeaturesAttr = *DefaultTargetFeatures;
     }
   }
 
@@ -3580,13 +3600,11 @@ bool CodeGenModule::GetCPUAndFeaturesAttributes(GlobalDecl GD,
     Attrs.addAttribute("tune-cpu", TuneCPU);
     AddedAttr = true;
   }
-  if (!Features.empty() && SetTargetFeatures) {
-    llvm::erase_if(Features, [&](const std::string& F) {
-       return getTarget().isReadOnlyFeature(F.substr(1));
-    });
-    if (!Features.empty()) {
-      llvm::sort(Features);
-      Attrs.addAttribute("target-features", llvm::join(Features, ","));
+  if (SetTargetFeatures) {
+    if (!Features.empty())
+      FeaturesAttr = getTargetFeaturesAttr(*this, std::move(Features));
+    if (FeaturesAttr.isValid()) {
+      Attrs.addAttribute(FeaturesAttr);
       AddedAttr = true;
     }
   }
