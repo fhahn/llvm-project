@@ -2213,10 +2213,11 @@ bool AccessAnalysis::createCheckForAccess(RuntimePointerChecking &RtCheck,
   return true;
 }
 
-/// Split the class of \p Leader in \p DepCands into sub-classes, so that
-/// accesses of the same sub-class need no runtime checks against each other.
+/// Put \p Members, the accesses of a class erased from \p DepCands, back into
+/// DepCands as sub-classes, so that accesses of the same sub-class need no
+/// runtime checks against each other.
 ///
-/// \p UnknownDeps tell us which accesses must be in separate classes.
+/// \p UnknownDepPtrPairs tell us which accesses must be in separate classes.
 ///
 /// We assume that the dependency checker has already looked at
 /// every pair of accesses within a class. Every pair of elements should
@@ -2243,8 +2244,10 @@ bool AccessAnalysis::createCheckForAccess(RuntimePointerChecking &RtCheck,
 /// grouping turns them into a single check between the rows.
 static void
 splitClass(MemoryDepChecker::DepCandidates &DepCands,
-           MemoryDepChecker::MemAccessInfo Leader,
-           const DenseMap<Value *, SmallPtrSet<Value *, 2>> &UnknownDeps,
+           iterator_range<MemoryDepChecker::DepCandidates::member_iterator>
+               Members,
+           const DenseSet<std::pair<const Value *, const Value *>>
+               &UnknownDepPtrPairs,
            PredicatedScalarEvolution &PSE, const Loop *L) {
   // The main idea is to split the class into runs of interleaved pointers
   // without unknown dependences between them.
@@ -2263,9 +2266,6 @@ splitClass(MemoryDepChecker::DepCandidates &DepCands,
   // Grouping pointer runs into separate classes allows us to keep the
   // number of runtime checks under control for the most widespread cases
   // and avoid generating checks against too wide of a range.
-  SmallVector<MemoryDepChecker::MemAccessInfo> Members(
-      DepCands.members(Leader));
-  DepCands.eraseClass(Leader);
 
   // Only pointers with the same constant step, whose starts differ by a
   // constant, are at constant distances from each other, so only they can form
@@ -2308,11 +2308,9 @@ splitClass(MemoryDepChecker::DepCandidates &DepCands,
     const APInt *PrevOffset = nullptr;
     for (const auto &[Offset, Access] : B.Members) {
       Value *Ptr = Access.getPointer();
-      const auto DepsIt = UnknownDeps.find(Ptr);
-      const bool HasUnknownDepInRun = DepsIt != UnknownDeps.end() &&
-                                      any_of(DepsIt->second, [&](Value *Other) {
-                                        return RunPtrs.contains(Other);
-                                      });
+      const bool HasUnknownDepInRun = any_of(RunPtrs, [&](Value *Other) {
+        return UnknownDepPtrPairs.contains({Ptr, Other});
+      });
       // Assuming more than one iteration, if a pointer starts at most a step
       // after the previous one, it starts within the range of the previous
       // one. So the ranges of a run cover one region without gaps, and an
@@ -2352,13 +2350,6 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
     // Remove the equivalence classes containing them from DepCands. Within
     // such a class, only pairs with an unknown dependence need checking. The
     // other pairs are independent or have a safe dependence.
-    //
-    // Removing the class entirely can produce a large number of additional
-    // checks between the elements that don't have unknown dependencies, so
-    // we collect such classes and the dependencies that force the checks
-    // to split the classes isntead.
-    SmallSetVector<MemAccessInfo, 4> UnknownDepClasses;
-    DenseMap<Value *, SmallPtrSet<Value *, 2>> UnknownDeps;
     for (const auto &Dep : *Deps) {
       if (Dep.Type != MemoryDepChecker::Dependence::Unknown) {
         assert(MemoryDepChecker::Dependence::isSafeForVectorization(Dep.Type) ==
@@ -2368,22 +2359,25 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
       }
       MemAccessInfo Src = DepChecker.getAccess(Dep.Source);
       MemAccessInfo Dst = DepChecker.getAccess(Dep.Destination);
-      assert(DepCands.isEquivalent(Src, Dst) &&
-             "Dependences must be between accesses in the same class");
       assert(Src.getPointer() != Dst.getPointer() &&
              "Unknown dependence between accesses through the same pointer");
       RtCheck.UnknownDepPtrPairs.insert({Src.getPointer(), Dst.getPointer()});
       RtCheck.UnknownDepPtrPairs.insert({Dst.getPointer(), Src.getPointer()});
-      if (UnknownDepClasses.insert(DepCands.getLeaderValue(Src)))
-        for (MemAccessInfo M : DepCands.members(Src))
-          RtCheck.UnknownDepCands.unionSets(Src, M);
-      UnknownDeps[Src.getPointer()].insert(Dst.getPointer());
-      UnknownDeps[Dst.getPointer()].insert(Src.getPointer());
+      // Both accesses are in the same class, which may already have been
+      // erased for an earlier dependence.
+      assert((!DepCands.contains(Src) || DepCands.isEquivalent(Src, Dst)) &&
+             "Dependences must be between accesses in the same class");
+      for (MemAccessInfo M : DepCands.members(Src))
+        RtCheck.UnknownDepCands.unionSets(Src, M);
+      DepCands.eraseClass(Src);
     }
 
-    // Split the classes where we detected unknown dependencies.
-    for (MemAccessInfo Leader : UnknownDepClasses)
-      splitClass(DepCands, Leader, UnknownDeps, PSE, TheLoop);
+    // Put the accesses of the erased classes back into DepCands as runs that
+    // can be grouped.
+    for (const auto *Class : RtCheck.UnknownDepCands)
+      if (Class->isLeader())
+        splitClass(DepCands, RtCheck.UnknownDepCands.members(*Class),
+                   RtCheck.UnknownDepPtrPairs, PSE, TheLoop);
   } else {
     CheckDeps.clear();
     DepCands = {};
