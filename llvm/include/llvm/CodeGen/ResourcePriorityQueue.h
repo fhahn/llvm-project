@@ -59,6 +59,7 @@ namespace llvm {
     const TargetRegisterInfo *TRI;
     const TargetLowering *TLI;
     const TargetInstrInfo *TII;
+    MachineFunction *MF;
     const InstrItineraryData* InstrItins;
     /// ResourcesModel - Represents VLIW state.
     /// Not limited to VLIW targets per say, but assumes

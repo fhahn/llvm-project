@@ -190,7 +190,10 @@ public:
                     SchedulingPriorityQueue *availqueue,
                     CodeGenOptLevel OptLevel)
       : ScheduleDAGSDNodes(mf), NeedLatency(needlatency),
-        AvailableQueue(availqueue), Topo(SUnits, nullptr) {
+        AvailableQueue(availqueue),
+        LiveRegDefs(std::make_unique<SUnit *[]>(TRI->getNumRegs() + 1)),
+        LiveRegGens(std::make_unique<SUnit *[]>(TRI->getNumRegs() + 1)),
+        Topo(SUnits, nullptr) {
     const TargetSubtargetInfo &STI = mf.getSubtarget();
     if (DisableSchedCycles || !NeedLatency)
       HazardRec = new ScheduleHazardRecognizer();
@@ -354,10 +357,10 @@ void ScheduleDAGRRList::Schedule() {
   MinAvailableCycle =
       DisableSchedCycles ? 0 : std::numeric_limits<unsigned>::max();
   NumLiveRegs = 0;
-  // Allocate slots for each physical register, plus one for a special register
+  // Clear the slots for each physical register, plus one for a special register
   // to track the virtual resource of a calling sequence.
-  LiveRegDefs.reset(new SUnit*[TRI->getNumRegs() + 1]());
-  LiveRegGens.reset(new SUnit*[TRI->getNumRegs() + 1]());
+  std::fill_n(LiveRegDefs.get(), TRI->getNumRegs() + 1, nullptr);
+  std::fill_n(LiveRegGens.get(), TRI->getNumRegs() + 1, nullptr);
   CallSeqEndForStart.clear();
   assert(Interferences.empty() && LRegsMap.empty() && "stale Interferences");
 
@@ -1715,8 +1718,6 @@ public:
       RegPressure.resize(NumRC);
       llvm::fill(RegLimit, 0);
       llvm::fill(RegPressure, 0);
-      for (const TargetRegisterClass &RC : TRI->regclasses())
-        RegLimit[RC.getID()] = tri->getRegPressureLimit(&RC, MF);
     }
   }
 
@@ -1738,6 +1739,8 @@ public:
     SUnits = nullptr;
     SethiUllmanNumbers.clear();
     llvm::fill(RegPressure, 0);
+    CurQueueId = 0;
+    setCurCycle(0);
   }
 
   unsigned getNodePriority(const SUnit *SU) const;
@@ -2752,6 +2755,10 @@ bool ilp_ls_rr_sort::operator()(SUnit *left, SUnit *right) const {
 
 void RegReductionPQBase::initNodes(std::vector<SUnit> &sunits) {
   SUnits = &sunits;
+  // The limits depend on the function state, which can change between blocks.
+  if (TracksRegPressure)
+    for (const TargetRegisterClass &RC : TRI->regclasses())
+      RegLimit[RC.getID()] = TRI->getRegPressureLimit(&RC, MF);
   // Add pseudo dependency edges for two-address nodes.
   if (!Disable2AddrHack)
     AddPseudoTwoAddrDeps();

@@ -51,16 +51,11 @@ ResourcePriorityQueue::ResourcePriorityQueue(SelectionDAGISel *IS)
   // do not let it proceed.
   assert(ResourcesModel && "Unimplemented CreateTargetScheduleState.");
 
+  MF = IS->MF;
+
   unsigned NumRC = TRI->getNumRegClasses();
   RegLimit.resize(NumRC);
   RegPressure.resize(NumRC);
-  llvm::fill(RegLimit, 0);
-  llvm::fill(RegPressure, 0);
-  for (const TargetRegisterClass &RC : TRI->regclasses())
-    RegLimit[RC.getID()] = TRI->getRegPressureLimit(&RC, *IS->MF);
-
-  ParallelLiveRanges = 0;
-  HorizontalVerticalBalance = 0;
 }
 
 ResourcePriorityQueue::~ResourcePriorityQueue() = default;
@@ -164,7 +159,15 @@ static unsigned numberCtrlPredInSU(SUnit *SU) {
 ///
 void ResourcePriorityQueue::initNodes(std::vector<SUnit> &sunits) {
   SUnits = &sunits;
-  NumNodesSolelyBlocking.resize(SUnits->size(), 0);
+  NumNodesSolelyBlocking.assign(SUnits->size(), 0);
+  // The limits depend on the function state, which can change between blocks.
+  for (const TargetRegisterClass &RC : TRI->regclasses())
+    RegLimit[RC.getID()] = TRI->getRegPressureLimit(&RC, *MF);
+  llvm::fill(RegPressure, 0);
+  ParallelLiveRanges = 0;
+  HorizontalVerticalBalance = 0;
+  ResourcesModel->clearResources();
+  Packet.clear();
 
   for (SUnit &SU : *SUnits) {
     initNumRegDefsLeft(&SU);
