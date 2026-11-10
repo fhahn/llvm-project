@@ -1951,10 +1951,20 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
       LatchBuilder.createNaryOp(VPInstruction::AnyOf, {AllNaNLanes});
   VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
   VPBuilder MiddleBuilder(MiddleVPBB->begin());
+  VPBuilder PHBuilder(Plan.getVectorPreheader());
   for (const auto &[RedPhiR, _] : MinOrMaxNumReductionsToHandle) {
     assert(RecurrenceDescriptor::isFPMinMaxNumRecurrenceKind(
                RedPhiR->getRecurrenceKind()) &&
            "unsupported reduction");
+
+    // With an sNaN start, the first min/max in each lane may drop its other
+    // operand, whereas the scalar loop can only drop a prefix of all inputs.
+    // Replace NaN start values by a quiet NaN.
+    VPValue *Start = RedPhiR->getStartValue();
+    VPValue *IsNaN = PHBuilder.createFCmp(CmpInst::FCMP_UNO, Start, Start);
+    VPValue *QNaN =
+        Plan.getOrAddLiveIn(ConstantFP::getQNaN(Start->getScalarType()));
+    RedPhiR->setStartValue(PHBuilder.createSelect(IsNaN, QNaN, Start));
 
     // If we exit early due to NaNs, compute the final reduction result based on
     // the reduction phi at the beginning of the last vector iteration.

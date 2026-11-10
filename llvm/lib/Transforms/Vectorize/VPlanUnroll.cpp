@@ -267,6 +267,10 @@ void UnrollState::unrollHeaderPHIByUF(VPHeaderPHIRecipe *R,
       // create a new ReductionStartVector with the scale factor and both
       // operands set to the identity value.
       if (auto *VPI = dyn_cast<VPInstruction>(RdxPhi->getStartValue())) {
+        // The quieted start of FP min/max reductions is used for all parts.
+        if (RecurrenceDescriptor::isFPMinMaxNumRecurrenceKind(
+                RdxPhi->getRecurrenceKind()))
+          continue;
         assert(VPI->getOpcode() == VPInstruction::ReductionStartVector &&
                "unexpected start VPInstruction");
         if (Part != 1)
