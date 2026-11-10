@@ -476,3 +476,99 @@ for.end:
   %result.0.lcssa = phi i32 [ %v0, %for.body ]
   ret i32 %result.0.lcssa
 }
+
+define float @reduction_fmin(ptr nocapture %A) {
+; CHECK-LABEL: @reduction_fmin(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br label [[VECTOR_PH:%.*]]
+; CHECK:       vector.ph:
+; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
+; CHECK:       vector.body:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x float> [ splat (float +inf), [[VECTOR_PH]] ], [ [[TMP4:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i16> [ <i16 0, i16 1, i16 2, i16 3>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = icmp ule <4 x i16> [[VEC_IND]], splat (i16 256)
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds float, ptr [[A:%.*]], i32 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <4 x float> @llvm.masked.load.v4f32.p0(ptr align 4 [[TMP1]], <4 x i1> [[TMP0]], <4 x float> poison)
+; CHECK-NEXT:    [[TMP2:%.*]] = fcmp olt <4 x float> [[WIDE_MASKED_LOAD]], [[VEC_PHI]]
+; CHECK-NEXT:    [[TMP3:%.*]] = select <4 x i1> [[TMP0]], <4 x i1> [[TMP2]], <4 x i1> zeroinitializer
+; CHECK-NEXT:    [[TMP4]] = select <4 x i1> [[TMP3]], <4 x float> [[WIDE_MASKED_LOAD]], <4 x float> [[VEC_PHI]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i16> [[VEC_IND]], splat (i16 4)
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i32 [[INDEX_NEXT]], 260
+; CHECK-NEXT:    br i1 [[TMP5]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
+; CHECK:       middle.block:
+; CHECK-NEXT:    [[TMP6:%.*]] = call nnan ninf nsz float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[TMP4]])
+; CHECK-NEXT:    br label [[FOR_END:%.*]]
+; CHECK:       for.end:
+; CHECK-NEXT:    ret float [[TMP6]]
+;
+entry:
+  br label %for.body
+
+for.body:
+  %indvars.iv = phi i32 [ %indvars.iv.next, %for.body ], [ 0, %entry ]
+  %result.08 = phi float [ %v0, %for.body ], [ 0x7FF0000000000000, %entry ]
+  %arrayidx = getelementptr inbounds float, ptr %A, i32 %indvars.iv
+  %l0 = load float, ptr %arrayidx, align 4
+  %c0 = fcmp olt float %l0, %result.08
+  %v0 = select nnan ninf nsz i1 %c0, float %l0, float %result.08
+  %indvars.iv.next = add i32 %indvars.iv, 1
+  %exitcond = icmp eq i32 %indvars.iv.next, 257
+  br i1 %exitcond, label %for.end, label %for.body
+
+for.end:
+  %result.0.lcssa = phi float [ %v0, %for.body ]
+  ret float %result.0.lcssa
+}
+
+define float @reduction_fmin_select_minnum(ptr nocapture %A, ptr nocapture %B) {
+; CHECK-LABEL: @reduction_fmin_select_minnum(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br label [[VECTOR_PH:%.*]]
+; CHECK:       vector.ph:
+; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
+; CHECK:       vector.body:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x float> [ splat (float +inf), [[VECTOR_PH]] ], [ [[TMP6:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i16> [ <i16 0, i16 1, i16 2, i16 3>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = icmp ule <4 x i16> [[VEC_IND]], splat (i16 256)
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds float, ptr [[A:%.*]], i32 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <4 x float> @llvm.masked.load.v4f32.p0(ptr align 4 [[TMP1]], <4 x i1> [[TMP0]], <4 x float> poison)
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds float, ptr [[B:%.*]], i32 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_MASKED_LOAD1:%.*]] = call <4 x float> @llvm.masked.load.v4f32.p0(ptr align 4 [[TMP2]], <4 x i1> [[TMP0]], <4 x float> poison)
+; CHECK-NEXT:    [[TMP3:%.*]] = fcmp olt <4 x float> [[WIDE_MASKED_LOAD]], [[VEC_PHI]]
+; CHECK-NEXT:    [[TMP4:%.*]] = select nnan ninf nsz <4 x i1> [[TMP3]], <4 x float> [[WIDE_MASKED_LOAD]], <4 x float> [[VEC_PHI]]
+; CHECK-NEXT:    [[TMP5:%.*]] = call nnan ninf nsz <4 x float> @llvm.minnum.v4f32(<4 x float> [[TMP4]], <4 x float> [[WIDE_MASKED_LOAD1]])
+; CHECK-NEXT:    [[TMP6]] = select nnan ninf nsz <4 x i1> [[TMP0]], <4 x float> [[TMP5]], <4 x float> [[VEC_PHI]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i16> [[VEC_IND]], splat (i16 4)
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i32 [[INDEX_NEXT]], 260
+; CHECK-NEXT:    br i1 [[TMP7]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
+; CHECK:       middle.block:
+; CHECK-NEXT:    [[TMP8:%.*]] = call nnan ninf nsz float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[TMP6]])
+; CHECK-NEXT:    br label [[FOR_END:%.*]]
+; CHECK:       for.end:
+; CHECK-NEXT:    ret float [[TMP8]]
+;
+entry:
+  br label %for.body
+
+for.body:
+  %indvars.iv = phi i32 [ %indvars.iv.next, %for.body ], [ 0, %entry ]
+  %result.08 = phi float [ %v1, %for.body ], [ 0x7FF0000000000000, %entry ]
+  %arrayidx = getelementptr inbounds float, ptr %A, i32 %indvars.iv
+  %l0 = load float, ptr %arrayidx, align 4
+  %arrayidx2 = getelementptr inbounds float, ptr %B, i32 %indvars.iv
+  %l1 = load float, ptr %arrayidx2, align 4
+  %c0 = fcmp olt float %l0, %result.08
+  %v0 = select nnan ninf nsz i1 %c0, float %l0, float %result.08
+  %v1 = call nnan ninf nsz float @llvm.minnum.f32(float %v0, float %l1)
+  %indvars.iv.next = add i32 %indvars.iv, 1
+  %exitcond = icmp eq i32 %indvars.iv.next, 257
+  br i1 %exitcond, label %for.end, label %for.body
+
+for.end:
+  %result.0.lcssa = phi float [ %v1, %for.body ]
+  ret float %result.0.lcssa
+}
