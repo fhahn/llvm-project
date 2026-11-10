@@ -2239,16 +2239,15 @@ void AccessAnalysis::splitClass(const RuntimePointerChecking &RtCheck,
   SmallVector<Bucket> Buckets;
   ScalarEvolution &SE = *PSE.getSE();
   for (MemAccessInfo Access : RtCheck.UnknownDepCands.members(Leader)) {
+    DepCands.insert(Access);
     const SCEV *Start;
     const SCEVConstant *Step;
-    // We can't tell where the range of such a pointer lies, so it gets a
+    // We can't tell where the range of such a pointer lies, so it keeps a
     // sub-class of its own.
     if (!match(PSE.getSCEV(Access.getPointer()),
                m_scev_AffineAddRec(m_SCEV(Start), m_SCEVConstant(Step),
-                                   m_SpecificLoop(TheLoop)))) {
-      DepCands.insert(Access);
+                                   m_SpecificLoop(TheLoop))))
       continue;
-    }
     auto *It = find_if(Buckets, [&](const Bucket &B) {
       return B.Step == Step && SE.computeConstantDifference(Start, B.Start);
     });
@@ -2263,26 +2262,18 @@ void AccessAnalysis::splitClass(const RuntimePointerChecking &RtCheck,
     stable_sort(B.Members, [](const auto &X, const auto &Y) {
       return X.first.slt(Y.first);
     });
-    SmallPtrSet<Value *, 4> RunPtrs;
-    MemAccessInfo RunLeader;
-    const APInt *PrevOffset = nullptr;
-    for (const auto &[Offset, Access] : B.Members) {
-      Value *Ptr = Access.getPointer();
-      // With more than one iteration, a pointer at most a step after the
-      // previous one starts within its range, so the ranges of a run leave no
-      // gap for an access of another sub-class, e.g. a[i] and a[i + 9000] in
-      // a[i + off] = a[i] + a[i + 9000]. Also start a new run before a pointer
-      // with an unknown dependence on the run.
-      if (!PrevOffset || (Offset - *PrevOffset).ugt(Step) ||
-          any_of(RunPtrs, [&](Value *Other) {
-            return RtCheck.UnknownDepPtrPairs.contains({Ptr, Other});
-          })) {
-        RunLeader = Access;
-        RunPtrs.clear();
-      }
-      RunPtrs.insert(Ptr);
-      DepCands.unionSets(RunLeader, Access);
-      PrevOffset = &Offset;
+    // Add a pointer to the run of the previous one, if it is at most a step
+    // after it and has no unknown dependence on the run. With more than one
+    // iteration, it then starts within the previous pointer's range, so the
+    // ranges of a run leave no gap for an access of another sub-class, e.g.
+    // a[i] and a[i + 9000] in a[i + off] = a[i] + a[i + 9000].
+    for (auto [Prev, Cur] : zip(B.Members, drop_begin(B.Members))) {
+      Value *Ptr = Cur.second.getPointer();
+      if ((Cur.first - Prev.first).ule(Step) &&
+          none_of(DepCands.members(Prev.second), [&](MemAccessInfo M) {
+            return RtCheck.UnknownDepPtrPairs.contains({Ptr, M.getPointer()});
+          }))
+        DepCands.unionSets(Prev.second, Cur.second);
     }
   }
 }
