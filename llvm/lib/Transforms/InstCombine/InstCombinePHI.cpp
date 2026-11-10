@@ -77,6 +77,28 @@ bool InstCombinerImpl::foldDeadPhiWeb(PHINode &PN) {
   return true;
 }
 
+/// Return a PHI other than \p PN in PN's block with type \p Ty and incoming
+/// value \p Vals[I] for PN's I-th incoming block, or nullptr if there is none.
+/// Return std::nullopt if the block has more than \p MaxNumPhis PHIs to search.
+static std::optional<PHINode *>
+findPHIWithIncomingValues(PHINode &PN, Type *Ty, ArrayRef<Value *> Vals,
+                          unsigned MaxNumPhis) {
+  unsigned NumPhis = 0;
+  for (PHINode &P : PN.getParent()->phis()) {
+    // FIXME: consider handling this in AggressiveInstCombine
+    if (NumPhis++ > MaxNumPhis)
+      return std::nullopt;
+    if (&P == &PN || P.getType() != Ty)
+      continue;
+    if (all_of(zip_equal(PN.blocks(), Vals), [&](auto BlockAndValue) {
+          auto [BB, V] = BlockAndValue;
+          return P.getIncomingValueForBlock(BB) == V;
+        }))
+      return &P;
+  }
+  return nullptr;
+}
+
 // Replace Integer typed PHI PN if the PHI's value is used as a pointer value.
 // If there is an existing pointer typed PHI that produces the same value as PN,
 // replace PN and the IntToPtr operation with it. Otherwise, synthesize a new
@@ -217,34 +239,16 @@ bool InstCombinerImpl::foldIntegerTypedPHI(PHINode &PN) {
   }
 
   // Now search for a matching PHI
-  auto *BB = PN.getParent();
-  assert(AvailablePtrVals.size() == PN.getNumIncomingValues() &&
-         "Not enough available ptr typed incoming values");
-  PHINode *MatchingPtrPHI = nullptr;
-  unsigned NumPhis = 0;
-  for (PHINode &PtrPHI : BB->phis()) {
-    // FIXME: consider handling this in AggressiveInstCombine
-    if (NumPhis++ > CLOpts.max_num_phis)
-      return false;
-    if (&PtrPHI == &PN || PtrPHI.getType() != IntToPtr->getType())
-      continue;
-    if (any_of(zip(PN.blocks(), AvailablePtrVals),
-               [&](const auto &BlockAndValue) {
-                 BasicBlock *BB = std::get<0>(BlockAndValue);
-                 Value *V = std::get<1>(BlockAndValue);
-                 return PtrPHI.getIncomingValueForBlock(BB) != V;
-               }))
-      continue;
-    MatchingPtrPHI = &PtrPHI;
-    break;
-  }
+  std::optional<PHINode *> MatchingPtrPHI =
+      findPHIWithIncomingValues(PN, IntToPtr->getType(), AvailablePtrVals,
+                                CLOpts.max_num_phis);
+  if (!MatchingPtrPHI)
+    return false;
 
-  if (MatchingPtrPHI) {
-    assert(MatchingPtrPHI->getType() == IntToPtr->getType() &&
-           "Phi's Type does not match with IntToPtr");
+  if (*MatchingPtrPHI) {
     // Explicitly replace the inttoptr (rather than inserting a ptrtoint) here,
     // to make sure another transform can't undo it in the meantime.
-    replaceInstUsesWith(*IntToPtr, MatchingPtrPHI);
+    replaceInstUsesWith(*IntToPtr, *MatchingPtrPHI);
     eraseInstFromFunction(*IntToPtr);
     eraseInstFromFunction(PN);
     return true;
