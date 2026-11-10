@@ -498,7 +498,7 @@ define float @reduction_fmin(ptr nocapture %A) {
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i32 [[INDEX_NEXT]], 260
 ; CHECK-NEXT:    br i1 [[TMP5]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
 ; CHECK:       middle.block:
-; CHECK-NEXT:    [[TMP6:%.*]] = call nnan ninf nsz float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[TMP4]])
+; CHECK-NEXT:    [[TMP6:%.*]] = call nsz float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[TMP4]])
 ; CHECK-NEXT:    br label [[FOR_END:%.*]]
 ; CHECK:       for.end:
 ; CHECK-NEXT:    ret float [[TMP6]]
@@ -538,15 +538,15 @@ define float @reduction_fmin_select_minnum(ptr nocapture %A, ptr nocapture %B) {
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds float, ptr [[B:%.*]], i32 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_MASKED_LOAD1:%.*]] = call <4 x float> @llvm.masked.load.v4f32.p0(ptr align 4 [[TMP2]], <4 x i1> [[TMP0]], <4 x float> poison)
 ; CHECK-NEXT:    [[TMP3:%.*]] = fcmp olt <4 x float> [[WIDE_MASKED_LOAD]], [[VEC_PHI]]
-; CHECK-NEXT:    [[TMP4:%.*]] = select nnan ninf nsz <4 x i1> [[TMP3]], <4 x float> [[WIDE_MASKED_LOAD]], <4 x float> [[VEC_PHI]]
-; CHECK-NEXT:    [[TMP5:%.*]] = call nnan ninf nsz <4 x float> @llvm.minnum.v4f32(<4 x float> [[TMP4]], <4 x float> [[WIDE_MASKED_LOAD1]])
-; CHECK-NEXT:    [[TMP6]] = select nnan ninf nsz <4 x i1> [[TMP0]], <4 x float> [[TMP5]], <4 x float> [[VEC_PHI]]
+; CHECK-NEXT:    [[TMP4:%.*]] = select nsz <4 x i1> [[TMP3]], <4 x float> [[WIDE_MASKED_LOAD]], <4 x float> [[VEC_PHI]]
+; CHECK-NEXT:    [[TMP5:%.*]] = call nsz <4 x float> @llvm.minnum.v4f32(<4 x float> [[TMP4]], <4 x float> [[WIDE_MASKED_LOAD1]])
+; CHECK-NEXT:    [[TMP6]] = select nsz <4 x i1> [[TMP0]], <4 x float> [[TMP5]], <4 x float> [[VEC_PHI]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i16> [[VEC_IND]], splat (i16 4)
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i32 [[INDEX_NEXT]], 260
 ; CHECK-NEXT:    br i1 [[TMP7]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
 ; CHECK:       middle.block:
-; CHECK-NEXT:    [[TMP8:%.*]] = call nnan ninf nsz float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[TMP6]])
+; CHECK-NEXT:    [[TMP8:%.*]] = call nsz float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[TMP6]])
 ; CHECK-NEXT:    br label [[FOR_END:%.*]]
 ; CHECK:       for.end:
 ; CHECK-NEXT:    ret float [[TMP8]]

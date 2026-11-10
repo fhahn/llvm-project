@@ -168,10 +168,10 @@ for.end:
 
 ; Turn this into a max reduction in the presence of a no-nans-fp-math attribute.
 ; CHECK-LABEL: @max_red_float(
-; CHECK: fcmp fast ogt <2 x float>
-; CHECK: select nnan nsz <2 x i1>
+; CHECK: fcmp reassoc nsz arcp contract afn ogt <2 x float>
+; CHECK: select nsz <2 x i1>
 ; CHECK: middle.block
-; CHECK: call fast float @llvm.vector.reduce.fmax.v2f32
+; CHECK: call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmax.v2f32
 
 define float @max_red_float(float %max) {
 entry:
@@ -193,10 +193,10 @@ for.end:
 }
 
 ; CHECK-LABEL: @max_red_float_ge(
-; CHECK: fcmp fast oge <2 x float>
-; CHECK: select nnan nsz <2 x i1>
+; CHECK: fcmp reassoc nsz arcp contract afn oge <2 x float>
+; CHECK: select nsz <2 x i1>
 ; CHECK: middle.block
-; CHECK: call fast float @llvm.vector.reduce.fmax.v2f32
+; CHECK: call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmax.v2f32
 
 define float @max_red_float_ge(float %max) {
 entry:
@@ -218,10 +218,10 @@ for.end:
 }
 
 ; CHECK-LABEL: @inverted_max_red_float(
-; CHECK: fcmp fast olt <2 x float>
-; CHECK: select nnan nsz <2 x i1>
+; CHECK: fcmp reassoc nsz arcp contract afn olt <2 x float>
+; CHECK: select nsz <2 x i1>
 ; CHECK: middle.block
-; CHECK: call fast float @llvm.vector.reduce.fmax.v2f32
+; CHECK: call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmax.v2f32
 
 define float @inverted_max_red_float(float %max) {
 entry:
@@ -243,10 +243,10 @@ for.end:
 }
 
 ; CHECK-LABEL: @inverted_max_red_float_le(
-; CHECK: fcmp fast ole <2 x float>
-; CHECK: select nnan nsz <2 x i1>
+; CHECK: fcmp reassoc nsz arcp contract afn ole <2 x float>
+; CHECK: select nsz <2 x i1>
 ; CHECK: middle.block
-; CHECK: call fast float @llvm.vector.reduce.fmax.v2f32
+; CHECK: call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmax.v2f32
 
 define float @inverted_max_red_float_le(float %max) {
 entry:
@@ -268,10 +268,10 @@ for.end:
 }
 
 ; CHECK-LABEL: @unordered_max_red_float(
-; CHECK: fcmp fast ugt <2 x float>
-; CHECK: select nnan nsz <2 x i1>
+; CHECK: fcmp reassoc nsz arcp contract afn ugt <2 x float>
+; CHECK: select nsz <2 x i1>
 ; CHECK: middle.block
-; CHECK: call fast float @llvm.vector.reduce.fmax.v2f32
+; CHECK: call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmax.v2f32
 
 define float @unordered_max_red_float(float %max) {
 entry:
@@ -293,10 +293,10 @@ for.end:
 }
 
 ; CHECK-LABEL: @unordered_max_red_float_ge(
-; CHECK: fcmp fast uge <2 x float>
-; CHECK: select nnan nsz <2 x i1>
+; CHECK: fcmp reassoc nsz arcp contract afn uge <2 x float>
+; CHECK: select nsz <2 x i1>
 ; CHECK: middle.block
-; CHECK: call fast float @llvm.vector.reduce.fmax.v2f32
+; CHECK: call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmax.v2f32
 
 define float @unordered_max_red_float_ge(float %max) {
 entry:
@@ -318,10 +318,10 @@ for.end:
 }
 
 ; CHECK-LABEL: @inverted_unordered_max_red_float(
-; CHECK: fcmp fast ult <2 x float>
-; CHECK: select nnan nsz <2 x i1>
+; CHECK: fcmp reassoc nsz arcp contract afn ult <2 x float>
+; CHECK: select nsz <2 x i1>
 ; CHECK: middle.block
-; CHECK: call fast float @llvm.vector.reduce.fmax.v2f32
+; CHECK: call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmax.v2f32
 
 define float @inverted_unordered_max_red_float(float %max) {
 entry:
@@ -343,10 +343,10 @@ for.end:
 }
 
 ; CHECK-LABEL: @inverted_unordered_max_red_float_le(
-; CHECK: fcmp fast ule <2 x float>
-; CHECK: select nnan nsz <2 x i1>
+; CHECK: fcmp reassoc nsz arcp contract afn ule <2 x float>
+; CHECK: select nsz <2 x i1>
 ; CHECK: middle.block
-; CHECK: call fast float @llvm.vector.reduce.fmax.v2f32
+; CHECK: call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmax.v2f32
 
 define float @inverted_unordered_max_red_float_le(float %max) {
 entry:
@@ -371,10 +371,10 @@ for.end:
 
 ; Turn this into a min reduction in the presence of a no-nans-fp-math attribute.
 ; CHECK-LABEL: @min_red_float(
-; CHECK: fcmp fast olt <2 x float>
-; CHECK: select nnan nsz <2 x i1>
+; CHECK: fcmp reassoc nsz arcp contract afn olt <2 x float>
+; CHECK: select nsz <2 x i1>
 ; CHECK: middle.block
-; CHECK: call fast float @llvm.vector.reduce.fmin.v2f32
+; CHECK: call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmin.v2f32
 
 define float @min_red_float(float %min) {
 entry:
@@ -396,10 +396,10 @@ for.end:
 }
 
 ; CHECK-LABEL: @min_red_float_le(
-; CHECK: fcmp fast ole <2 x float>
-; CHECK: select nnan nsz <2 x i1>
+; CHECK: fcmp reassoc nsz arcp contract afn ole <2 x float>
+; CHECK: select nsz <2 x i1>
 ; CHECK: middle.block
-; CHECK: call fast float @llvm.vector.reduce.fmin.v2f32
+; CHECK: call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmin.v2f32
 
 define float @min_red_float_le(float %min) {
 entry:
@@ -421,10 +421,10 @@ for.end:
 }
 
 ; CHECK-LABEL: @inverted_min_red_float(
-; CHECK: fcmp fast ogt <2 x float>
-; CHECK: select nnan nsz <2 x i1>
+; CHECK: fcmp reassoc nsz arcp contract afn ogt <2 x float>
+; CHECK: select nsz <2 x i1>
 ; CHECK: middle.block
-; CHECK: call fast float @llvm.vector.reduce.fmin.v2f32
+; CHECK: call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmin.v2f32
 
 define float @inverted_min_red_float(float %min) {
 entry:
@@ -446,10 +446,10 @@ for.end:
 }
 
 ; CHECK-LABEL: @inverted_min_red_float_ge(
-; CHECK: fcmp fast oge <2 x float>
-; CHECK: select nnan nsz <2 x i1>
+; CHECK: fcmp reassoc nsz arcp contract afn oge <2 x float>
+; CHECK: select nsz <2 x i1>
 ; CHECK: middle.block
-; CHECK: call fast float @llvm.vector.reduce.fmin.v2f32
+; CHECK: call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmin.v2f32
 
 define float @inverted_min_red_float_ge(float %min) {
 entry:
@@ -471,10 +471,10 @@ for.end:
 }
 
 ; CHECK-LABEL: @unordered_min_red_float(
-; CHECK: fcmp fast ult <2 x float>
-; CHECK: select nnan nsz <2 x i1>
+; CHECK: fcmp reassoc nsz arcp contract afn ult <2 x float>
+; CHECK: select nsz <2 x i1>
 ; CHECK: middle.block
-; CHECK: call fast float @llvm.vector.reduce.fmin.v2f32
+; CHECK: call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmin.v2f32
 
 define float @unordered_min_red_float(float %min) {
 entry:
@@ -496,10 +496,10 @@ for.end:
 }
 
 ; CHECK-LABEL: @unordered_min_red_float_le(
-; CHECK: fcmp fast ule <2 x float>
-; CHECK: select nnan nsz <2 x i1>
+; CHECK: fcmp reassoc nsz arcp contract afn ule <2 x float>
+; CHECK: select nsz <2 x i1>
 ; CHECK: middle.block
-; CHECK: call fast float @llvm.vector.reduce.fmin.v2f32
+; CHECK: call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmin.v2f32
 
 define float @unordered_min_red_float_le(float %min) {
 entry:
@@ -521,10 +521,10 @@ for.end:
 }
 
 ; CHECK-LABEL: @inverted_unordered_min_red_float(
-; CHECK: fcmp fast ugt <2 x float>
-; CHECK: select nnan nsz <2 x i1>
+; CHECK: fcmp reassoc nsz arcp contract afn ugt <2 x float>
+; CHECK: select nsz <2 x i1>
 ; CHECK: middle.block
-; CHECK: call fast float @llvm.vector.reduce.fmin.v2f32
+; CHECK: call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmin.v2f32
 
 define float @inverted_unordered_min_red_float(float %min) {
 entry:
@@ -546,10 +546,10 @@ for.end:
 }
 
 ; CHECK-LABEL: @inverted_unordered_min_red_float_ge(
-; CHECK: fcmp fast uge <2 x float>
-; CHECK: select nnan nsz <2 x i1>
+; CHECK: fcmp reassoc nsz arcp contract afn uge <2 x float>
+; CHECK: select nsz <2 x i1>
 ; CHECK: middle.block
-; CHECK: call fast float @llvm.vector.reduce.fmin.v2f32
+; CHECK: call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmin.v2f32
 
 define float @inverted_unordered_min_red_float_ge(float %min) {
 entry:
@@ -572,10 +572,10 @@ for.end:
 
 ; Make sure we handle doubles, too.
 ; CHECK-LABEL: @min_red_double(
-; CHECK: fcmp fast olt <2 x double>
-; CHECK: select nnan nsz <2 x i1>
+; CHECK: fcmp reassoc nsz arcp contract afn olt <2 x double>
+; CHECK: select nsz <2 x i1>
 ; CHECK: middle.block
-; CHECK: call fast double @llvm.vector.reduce.fmin.v2f64
+; CHECK: call reassoc nsz arcp contract afn double @llvm.vector.reduce.fmin.v2f64
 
 define double @min_red_double(double %min) {
 entry:

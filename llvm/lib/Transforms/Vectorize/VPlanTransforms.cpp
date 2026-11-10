@@ -2291,11 +2291,24 @@ void VPlanTransforms::clearReductionWrapFlags(VPlan &Plan) {
   for (VPReductionPHIRecipe &PhiR : make_isa_range<VPReductionPHIRecipe>(
            Plan.getVectorLoopRegion()->getEntryBasicBlock()->phis())) {
     RecurKind RK = PhiR.getRecurrenceKind();
-    if (RK != RecurKind::Add && RK != RecurKind::Mul && RK != RecurKind::Sub &&
-        RK != RecurKind::AddChainWithSubs)
+    bool IsFPMinMax = RK == RecurKind::FMin || RK == RecurKind::FMax;
+    if (!IsFPMinMax && RK != RecurKind::Add && RK != RecurKind::Mul &&
+        RK != RecurKind::Sub && RK != RecurKind::AddChainWithSubs)
       continue;
 
-    for (VPUser *U : vputils::collectUsersRecursively(&PhiR))
+    SmallVector<VPUser *> Users = vputils::collectUsersRecursively(&PhiR);
+    // FMF on the selects of FP min/max reductions only apply to the values the
+    // scalar loop selects, but vector lanes may hold others (e.g. the start
+    // value), which also reach the other ops of the chain. Chains without
+    // min/max selects keep their FMF; in-loop ones are always select-based.
+    if (IsFPMinMax && !PhiR.isInLoop() && none_of(Users, [](VPUser *U) {
+          VPValue *C, *T, *F;
+          return match(U, m_Select(m_VPValue(C), m_VPValue(T), m_VPValue(F))) &&
+                 match(C, m_c_Cmp(m_Specific(T), m_Specific(F)));
+        }))
+      continue;
+
+    for (VPUser *U : Users)
       if (auto *RecWithFlags = dyn_cast<VPRecipeWithIRFlags>(U)) {
         RecWithFlags->dropPoisonGeneratingFlags();
       }

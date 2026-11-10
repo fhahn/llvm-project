@@ -1541,8 +1541,8 @@ Value *llvm::getReductionIdentity(Intrinsic::ID RdxID, Type *Ty,
 
 Value *llvm::getRecurrenceIdentity(RecurKind K, Type *Tp, FastMathFlags FMF) {
   assert((!(K == RecurKind::FMin || K == RecurKind::FMax) ||
-          (FMF.noNaNs() && FMF.noSignedZeros())) &&
-         "nnan, nsz is expected to be set for FP min/max reduction.");
+          FMF.noSignedZeros()) &&
+         "nsz is expected to be set for FP min/max reduction.");
   Intrinsic::ID RdxID = getReductionIntrinsicID(K);
   return getReductionIdentity(RdxID, Tp, FMF);
 }

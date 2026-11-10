@@ -994,9 +994,9 @@ define float @fmin(ptr %a, i64 %n, float %start) {
 ; IF-EVL-NEXT:    [[TMP11:%.*]] = call i32 @llvm.experimental.get.vector.length.i64(i64 [[AVL]], i32 4, i1 true)
 ; IF-EVL-NEXT:    [[TMP12:%.*]] = getelementptr inbounds float, ptr [[A:%.*]], i64 [[EVL_BASED_IV]]
 ; IF-EVL-NEXT:    [[VP_OP_LOAD:%.*]] = call <vscale x 4 x float> @llvm.vp.load.nxv4f32.p0(ptr align 4 [[TMP12]], <vscale x 4 x i1> splat (i1 true), i32 [[TMP11]])
-; IF-EVL-NEXT:    [[TMP14:%.*]] = call fast float @llvm.vp.reduce.fmin.nxv4f32(float f0x7F7FFFFF, <vscale x 4 x float> [[VP_OP_LOAD]], <vscale x 4 x i1> splat (i1 true), i32 [[TMP11]])
-; IF-EVL-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp fast olt float [[TMP14]], [[VEC_PHI]]
-; IF-EVL-NEXT:    [[RDX_MINMAX_SELECT]] = select fast i1 [[RDX_MINMAX_CMP]], float [[TMP14]], float [[VEC_PHI]]
+; IF-EVL-NEXT:    [[TMP14:%.*]] = call reassoc nsz arcp contract afn float @llvm.vp.reduce.fmin.nxv4f32(float +qnan, <vscale x 4 x float> [[VP_OP_LOAD]], <vscale x 4 x i1> splat (i1 true), i32 [[TMP11]])
+; IF-EVL-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp reassoc nsz arcp contract afn olt float [[TMP14]], [[VEC_PHI]]
+; IF-EVL-NEXT:    [[RDX_MINMAX_SELECT]] = select reassoc nsz arcp contract afn i1 [[RDX_MINMAX_CMP]], float [[TMP14]], float [[VEC_PHI]]
 ; IF-EVL-NEXT:    [[TMP8:%.*]] = zext i32 [[TMP11]] to i64
 ; IF-EVL-NEXT:    [[INDEX_EVL_NEXT]] = add i64 [[TMP8]], [[EVL_BASED_IV]]
 ; IF-EVL-NEXT:    [[AVL_NEXT]] = sub nuw i64 [[AVL]], [[TMP8]]
@@ -1022,9 +1022,9 @@ define float @fmin(ptr %a, i64 %n, float %start) {
 ; NO-VP-NEXT:    [[VEC_PHI:%.*]] = phi float [ [[START:%.*]], [[VECTOR_PH]] ], [ [[RDX_MINMAX_SELECT:%.*]], [[VECTOR_BODY]] ]
 ; NO-VP-NEXT:    [[TMP7:%.*]] = getelementptr inbounds float, ptr [[A:%.*]], i64 [[INDEX]]
 ; NO-VP-NEXT:    [[WIDE_LOAD:%.*]] = load <vscale x 4 x float>, ptr [[TMP7]], align 4
-; NO-VP-NEXT:    [[TMP9:%.*]] = call fast float @llvm.vector.reduce.fmin.nxv4f32(<vscale x 4 x float> [[WIDE_LOAD]])
-; NO-VP-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp fast olt float [[TMP9]], [[VEC_PHI]]
-; NO-VP-NEXT:    [[RDX_MINMAX_SELECT]] = select fast i1 [[RDX_MINMAX_CMP]], float [[TMP9]], float [[VEC_PHI]]
+; NO-VP-NEXT:    [[TMP9:%.*]] = call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmin.nxv4f32(<vscale x 4 x float> [[WIDE_LOAD]])
+; NO-VP-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp reassoc nsz arcp contract afn olt float [[TMP9]], [[VEC_PHI]]
+; NO-VP-NEXT:    [[RDX_MINMAX_SELECT]] = select reassoc nsz arcp contract afn i1 [[RDX_MINMAX_CMP]], float [[TMP9]], float [[VEC_PHI]]
 ; NO-VP-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP1]]
 ; NO-VP-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; NO-VP-NEXT:    br i1 [[TMP10]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP24:![0-9]+]]
@@ -1080,9 +1080,9 @@ define float @fmax(ptr %a, i64 %n, float %start) {
 ; IF-EVL-NEXT:    [[TMP11:%.*]] = call i32 @llvm.experimental.get.vector.length.i64(i64 [[AVL]], i32 4, i1 true)
 ; IF-EVL-NEXT:    [[TMP12:%.*]] = getelementptr inbounds float, ptr [[A:%.*]], i64 [[EVL_BASED_IV]]
 ; IF-EVL-NEXT:    [[VP_OP_LOAD:%.*]] = call <vscale x 4 x float> @llvm.vp.load.nxv4f32.p0(ptr align 4 [[TMP12]], <vscale x 4 x i1> splat (i1 true), i32 [[TMP11]])
-; IF-EVL-NEXT:    [[TMP14:%.*]] = call fast float @llvm.vp.reduce.fmax.nxv4f32(float f0xFF7FFFFF, <vscale x 4 x float> [[VP_OP_LOAD]], <vscale x 4 x i1> splat (i1 true), i32 [[TMP11]])
-; IF-EVL-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp fast ogt float [[TMP14]], [[VEC_PHI]]
-; IF-EVL-NEXT:    [[RDX_MINMAX_SELECT]] = select fast i1 [[RDX_MINMAX_CMP]], float [[TMP14]], float [[VEC_PHI]]
+; IF-EVL-NEXT:    [[TMP14:%.*]] = call reassoc nsz arcp contract afn float @llvm.vp.reduce.fmax.nxv4f32(float -qnan, <vscale x 4 x float> [[VP_OP_LOAD]], <vscale x 4 x i1> splat (i1 true), i32 [[TMP11]])
+; IF-EVL-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp reassoc nsz arcp contract afn ogt float [[TMP14]], [[VEC_PHI]]
+; IF-EVL-NEXT:    [[RDX_MINMAX_SELECT]] = select reassoc nsz arcp contract afn i1 [[RDX_MINMAX_CMP]], float [[TMP14]], float [[VEC_PHI]]
 ; IF-EVL-NEXT:    [[TMP8:%.*]] = zext i32 [[TMP11]] to i64
 ; IF-EVL-NEXT:    [[INDEX_EVL_NEXT]] = add i64 [[TMP8]], [[EVL_BASED_IV]]
 ; IF-EVL-NEXT:    [[AVL_NEXT]] = sub nuw i64 [[AVL]], [[TMP8]]
@@ -1108,9 +1108,9 @@ define float @fmax(ptr %a, i64 %n, float %start) {
 ; NO-VP-NEXT:    [[VEC_PHI:%.*]] = phi float [ [[START:%.*]], [[VECTOR_PH]] ], [ [[RDX_MINMAX_SELECT:%.*]], [[VECTOR_BODY]] ]
 ; NO-VP-NEXT:    [[TMP7:%.*]] = getelementptr inbounds float, ptr [[A:%.*]], i64 [[INDEX]]
 ; NO-VP-NEXT:    [[WIDE_LOAD:%.*]] = load <vscale x 4 x float>, ptr [[TMP7]], align 4
-; NO-VP-NEXT:    [[TMP9:%.*]] = call fast float @llvm.vector.reduce.fmax.nxv4f32(<vscale x 4 x float> [[WIDE_LOAD]])
-; NO-VP-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp fast ogt float [[TMP9]], [[VEC_PHI]]
-; NO-VP-NEXT:    [[RDX_MINMAX_SELECT]] = select fast i1 [[RDX_MINMAX_CMP]], float [[TMP9]], float [[VEC_PHI]]
+; NO-VP-NEXT:    [[TMP9:%.*]] = call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmax.nxv4f32(<vscale x 4 x float> [[WIDE_LOAD]])
+; NO-VP-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp reassoc nsz arcp contract afn ogt float [[TMP9]], [[VEC_PHI]]
+; NO-VP-NEXT:    [[RDX_MINMAX_SELECT]] = select reassoc nsz arcp contract afn i1 [[RDX_MINMAX_CMP]], float [[TMP9]], float [[VEC_PHI]]
 ; NO-VP-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP1]]
 ; NO-VP-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; NO-VP-NEXT:    br i1 [[TMP10]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP26:![0-9]+]]

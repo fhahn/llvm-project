@@ -172,10 +172,10 @@ define float @cond_cmp_sel(ptr noalias %a, ptr noalias %cond, i64 %N) {
 ; CHECK-NEXT:    br label [[PRED_LOAD_CONTINUE6]]
 ; CHECK:       pred.load.continue6:
 ; CHECK-NEXT:    [[TMP24:%.*]] = phi <4 x float> [ [[TMP18]], [[PRED_LOAD_CONTINUE4]] ], [ [[TMP23]], [[PRED_LOAD_IF5]] ]
-; CHECK-NEXT:    [[TMP25:%.*]] = select fast <4 x i1> [[TMP1]], <4 x float> [[TMP24]], <4 x float> splat (float f0x7F7FFFFF)
-; CHECK-NEXT:    [[TMP26:%.*]] = call fast float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[TMP25]])
-; CHECK-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp fast olt float [[TMP26]], [[VEC_PHI]]
-; CHECK-NEXT:    [[RDX_MINMAX_SELECT]] = select fast i1 [[RDX_MINMAX_CMP]], float [[TMP26]], float [[VEC_PHI]]
+; CHECK-NEXT:    [[TMP25:%.*]] = select reassoc nsz arcp contract afn <4 x i1> [[TMP1]], <4 x float> [[TMP24]], <4 x float> splat (float +qnan)
+; CHECK-NEXT:    [[TMP26:%.*]] = call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[TMP25]])
+; CHECK-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp reassoc nsz arcp contract afn olt float [[TMP26]], [[VEC_PHI]]
+; CHECK-NEXT:    [[RDX_MINMAX_SELECT]] = select reassoc nsz arcp contract afn i1 [[RDX_MINMAX_CMP]], float [[TMP26]], float [[VEC_PHI]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP27:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP27]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]

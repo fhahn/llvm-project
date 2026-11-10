@@ -276,7 +276,9 @@ struct VPlanTransforms {
                                        VPRecipeBuilder &RecipeBuilder,
                                        ScalarEvolution &SE);
 
-  /// Clear NSW/NUW flags from reduction instructions if necessary.
+  /// Clear poison-generating flags from reduction instructions if necessary,
+  /// e.g. NSW/NUW of add reductions and nnan/ninf of select-based FP min/max
+  /// reductions.
   static void clearReductionWrapFlags(VPlan &Plan);
 
   /// Explicitly unroll \p Plan by \p UF.

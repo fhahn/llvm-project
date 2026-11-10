@@ -108,13 +108,13 @@ define float @fp_reduction_max(ptr noalias %a, i64 %N) {
 ; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <8 x float> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP2:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <8 x float>, ptr [[TMP1]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = fcmp fast ogt <8 x float> [[VEC_PHI]], [[WIDE_LOAD]]
-; CHECK-NEXT:    [[TMP2]] = select fast <8 x i1> [[TMP3]], <8 x float> [[VEC_PHI]], <8 x float> [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP3:%.*]] = fcmp reassoc nsz arcp contract afn ogt <8 x float> [[VEC_PHI]], [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP2]] = select reassoc nsz arcp contract afn <8 x i1> [[TMP3]], <8 x float> [[VEC_PHI]], <8 x float> [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP4:%.*]] = call fast float @llvm.vector.reduce.fmax.v8f32(<8 x float> [[TMP2]])
+; CHECK-NEXT:    [[TMP4:%.*]] = call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmax.v8f32(<8 x float> [[TMP2]])
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[FOR_END:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
 ; CHECK:       [[VEC_EPILOG_ITER_CHECK]]:
@@ -133,13 +133,13 @@ define float @fp_reduction_max(ptr noalias %a, i64 %N) {
 ; CHECK-NEXT:    [[VEC_PHI5:%.*]] = phi <4 x float> [ [[MINMAX_IDENT_SPLAT]], %[[VEC_EPILOG_PH]] ], [ [[TMP11:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[INDEX4]]
 ; CHECK-NEXT:    [[WIDE_LOAD6:%.*]] = load <4 x float>, ptr [[TMP8]], align 4
-; CHECK-NEXT:    [[TMP10:%.*]] = fcmp fast ogt <4 x float> [[VEC_PHI5]], [[WIDE_LOAD6]]
-; CHECK-NEXT:    [[TMP11]] = select fast <4 x i1> [[TMP10]], <4 x float> [[VEC_PHI5]], <4 x float> [[WIDE_LOAD6]]
+; CHECK-NEXT:    [[TMP10:%.*]] = fcmp reassoc nsz arcp contract afn ogt <4 x float> [[VEC_PHI5]], [[WIDE_LOAD6]]
+; CHECK-NEXT:    [[TMP11]] = select reassoc nsz arcp contract afn <4 x i1> [[TMP10]], <4 x float> [[VEC_PHI5]], <4 x float> [[WIDE_LOAD6]]
 ; CHECK-NEXT:    [[INDEX_NEXT7]] = add nuw i64 [[INDEX4]], 4
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT7]], [[N_VEC3]]
 ; CHECK-NEXT:    br i1 [[TMP12]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP13:%.*]] = call fast float @llvm.vector.reduce.fmax.v4f32(<4 x float> [[TMP11]])
+; CHECK-NEXT:    [[TMP13:%.*]] = call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmax.v4f32(<4 x float> [[TMP11]])
 ; CHECK-NEXT:    [[CMP_N8:%.*]] = icmp eq i64 [[N]], [[N_VEC3]]
 ; CHECK-NEXT:    br i1 [[CMP_N8]], label %[[FOR_END]], label %[[VEC_EPILOG_SCALAR_PH]]
 ; CHECK:       [[VEC_EPILOG_SCALAR_PH]]:

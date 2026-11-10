@@ -1009,7 +1009,7 @@ define float @fmin(ptr %a, i64 %n, float %start) {
 ; IF-EVL-NEXT:    [[TMP9:%.*]] = call i32 @llvm.experimental.get.vector.length.i64(i64 [[AVL]], i32 4, i1 true)
 ; IF-EVL-NEXT:    [[TMP11:%.*]] = getelementptr inbounds float, ptr [[A:%.*]], i64 [[EVL_BASED_IV]]
 ; IF-EVL-NEXT:    [[VP_OP_LOAD:%.*]] = call <vscale x 4 x float> @llvm.vp.load.nxv4f32.p0(ptr align 4 [[TMP11]], <vscale x 4 x i1> splat (i1 true), i32 [[TMP9]])
-; IF-EVL-NEXT:    [[TMP13:%.*]] = fcmp fast olt <vscale x 4 x float> [[VP_OP_LOAD]], [[VEC_PHI]]
+; IF-EVL-NEXT:    [[TMP13:%.*]] = fcmp reassoc nsz arcp contract afn olt <vscale x 4 x float> [[VP_OP_LOAD]], [[VEC_PHI]]
 ; IF-EVL-NEXT:    [[TMP15]] = call <vscale x 4 x float> @llvm.vp.merge.nxv4f32(<vscale x 4 x i1> [[TMP13]], <vscale x 4 x float> [[VP_OP_LOAD]], <vscale x 4 x float> [[VEC_PHI]], i32 [[TMP9]])
 ; IF-EVL-NEXT:    [[TMP16:%.*]] = zext i32 [[TMP9]] to i64
 ; IF-EVL-NEXT:    [[INDEX_EVL_NEXT]] = add i64 [[TMP16]], [[EVL_BASED_IV]]
@@ -1017,7 +1017,7 @@ define float @fmin(ptr %a, i64 %n, float %start) {
 ; IF-EVL-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[AVL_NEXT]], 0
 ; IF-EVL-NEXT:    br i1 [[TMP12]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP15:![0-9]+]]
 ; IF-EVL:       middle.block:
-; IF-EVL-NEXT:    [[TMP18:%.*]] = call fast float @llvm.vector.reduce.fmin.nxv4f32(<vscale x 4 x float> [[TMP15]])
+; IF-EVL-NEXT:    [[TMP18:%.*]] = call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmin.nxv4f32(<vscale x 4 x float> [[TMP15]])
 ; IF-EVL-NEXT:    br label [[FOR_BODY:%.*]]
 ; IF-EVL:       for.end:
 ; IF-EVL-NEXT:    ret float [[TMP18]]
@@ -1039,13 +1039,13 @@ define float @fmin(ptr %a, i64 %n, float %start) {
 ; NO-VP-NEXT:    [[VEC_PHI:%.*]] = phi <vscale x 4 x float> [ [[BROADCAST_SPLAT]], [[VECTOR_PH]] ], [ [[TMP10:%.*]], [[VECTOR_BODY]] ]
 ; NO-VP-NEXT:    [[TMP7:%.*]] = getelementptr inbounds float, ptr [[A:%.*]], i64 [[INDEX]]
 ; NO-VP-NEXT:    [[WIDE_LOAD:%.*]] = load <vscale x 4 x float>, ptr [[TMP7]], align 4
-; NO-VP-NEXT:    [[TMP9:%.*]] = fcmp fast olt <vscale x 4 x float> [[WIDE_LOAD]], [[VEC_PHI]]
-; NO-VP-NEXT:    [[TMP10]] = select nnan nsz <vscale x 4 x i1> [[TMP9]], <vscale x 4 x float> [[WIDE_LOAD]], <vscale x 4 x float> [[VEC_PHI]]
+; NO-VP-NEXT:    [[TMP9:%.*]] = fcmp reassoc nsz arcp contract afn olt <vscale x 4 x float> [[WIDE_LOAD]], [[VEC_PHI]]
+; NO-VP-NEXT:    [[TMP10]] = select nsz <vscale x 4 x i1> [[TMP9]], <vscale x 4 x float> [[WIDE_LOAD]], <vscale x 4 x float> [[VEC_PHI]]
 ; NO-VP-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP1]]
 ; NO-VP-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; NO-VP-NEXT:    br i1 [[TMP11]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP24:![0-9]+]]
 ; NO-VP:       middle.block:
-; NO-VP-NEXT:    [[TMP12:%.*]] = call fast float @llvm.vector.reduce.fmin.nxv4f32(<vscale x 4 x float> [[TMP10]])
+; NO-VP-NEXT:    [[TMP12:%.*]] = call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmin.nxv4f32(<vscale x 4 x float> [[TMP10]])
 ; NO-VP-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; NO-VP-NEXT:    br i1 [[CMP_N]], label [[FOR_END:%.*]], label [[SCALAR_PH]]
 ; NO-VP:       scalar.ph:
@@ -1099,7 +1099,7 @@ define float @fmax(ptr %a, i64 %n, float %start) {
 ; IF-EVL-NEXT:    [[TMP9:%.*]] = call i32 @llvm.experimental.get.vector.length.i64(i64 [[AVL]], i32 4, i1 true)
 ; IF-EVL-NEXT:    [[TMP11:%.*]] = getelementptr inbounds float, ptr [[A:%.*]], i64 [[EVL_BASED_IV]]
 ; IF-EVL-NEXT:    [[VP_OP_LOAD:%.*]] = call <vscale x 4 x float> @llvm.vp.load.nxv4f32.p0(ptr align 4 [[TMP11]], <vscale x 4 x i1> splat (i1 true), i32 [[TMP9]])
-; IF-EVL-NEXT:    [[TMP13:%.*]] = fcmp fast ogt <vscale x 4 x float> [[VP_OP_LOAD]], [[VEC_PHI]]
+; IF-EVL-NEXT:    [[TMP13:%.*]] = fcmp reassoc nsz arcp contract afn ogt <vscale x 4 x float> [[VP_OP_LOAD]], [[VEC_PHI]]
 ; IF-EVL-NEXT:    [[TMP15]] = call <vscale x 4 x float> @llvm.vp.merge.nxv4f32(<vscale x 4 x i1> [[TMP13]], <vscale x 4 x float> [[VP_OP_LOAD]], <vscale x 4 x float> [[VEC_PHI]], i32 [[TMP9]])
 ; IF-EVL-NEXT:    [[TMP16:%.*]] = zext i32 [[TMP9]] to i64
 ; IF-EVL-NEXT:    [[INDEX_EVL_NEXT]] = add i64 [[TMP16]], [[EVL_BASED_IV]]
@@ -1107,7 +1107,7 @@ define float @fmax(ptr %a, i64 %n, float %start) {
 ; IF-EVL-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[AVL_NEXT]], 0
 ; IF-EVL-NEXT:    br i1 [[TMP12]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
 ; IF-EVL:       middle.block:
-; IF-EVL-NEXT:    [[TMP18:%.*]] = call fast float @llvm.vector.reduce.fmax.nxv4f32(<vscale x 4 x float> [[TMP15]])
+; IF-EVL-NEXT:    [[TMP18:%.*]] = call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmax.nxv4f32(<vscale x 4 x float> [[TMP15]])
 ; IF-EVL-NEXT:    br label [[FOR_BODY:%.*]]
 ; IF-EVL:       for.end:
 ; IF-EVL-NEXT:    ret float [[TMP18]]
@@ -1129,13 +1129,13 @@ define float @fmax(ptr %a, i64 %n, float %start) {
 ; NO-VP-NEXT:    [[VEC_PHI:%.*]] = phi <vscale x 4 x float> [ [[BROADCAST_SPLAT]], [[VECTOR_PH]] ], [ [[TMP10:%.*]], [[VECTOR_BODY]] ]
 ; NO-VP-NEXT:    [[TMP7:%.*]] = getelementptr inbounds float, ptr [[A:%.*]], i64 [[INDEX]]
 ; NO-VP-NEXT:    [[WIDE_LOAD:%.*]] = load <vscale x 4 x float>, ptr [[TMP7]], align 4
-; NO-VP-NEXT:    [[TMP9:%.*]] = fcmp fast ogt <vscale x 4 x float> [[WIDE_LOAD]], [[VEC_PHI]]
-; NO-VP-NEXT:    [[TMP10]] = select nnan nsz <vscale x 4 x i1> [[TMP9]], <vscale x 4 x float> [[WIDE_LOAD]], <vscale x 4 x float> [[VEC_PHI]]
+; NO-VP-NEXT:    [[TMP9:%.*]] = fcmp reassoc nsz arcp contract afn ogt <vscale x 4 x float> [[WIDE_LOAD]], [[VEC_PHI]]
+; NO-VP-NEXT:    [[TMP10]] = select nsz <vscale x 4 x i1> [[TMP9]], <vscale x 4 x float> [[WIDE_LOAD]], <vscale x 4 x float> [[VEC_PHI]]
 ; NO-VP-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP1]]
 ; NO-VP-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; NO-VP-NEXT:    br i1 [[TMP11]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP26:![0-9]+]]
 ; NO-VP:       middle.block:
-; NO-VP-NEXT:    [[TMP12:%.*]] = call fast float @llvm.vector.reduce.fmax.nxv4f32(<vscale x 4 x float> [[TMP10]])
+; NO-VP-NEXT:    [[TMP12:%.*]] = call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmax.nxv4f32(<vscale x 4 x float> [[TMP10]])
 ; NO-VP-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; NO-VP-NEXT:    br i1 [[CMP_N]], label [[FOR_END:%.*]], label [[SCALAR_PH]]
 ; NO-VP:       scalar.ph:

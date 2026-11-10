@@ -223,17 +223,17 @@ define float @PR35538(ptr nocapture readonly %a, i32 %N) {
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i8, ptr [[TMP2]], i64 16
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP2]], align 4
 ; CHECK-NEXT:    [[WIDE_LOAD2:%.*]] = load <4 x float>, ptr [[TMP5]], align 4
-; CHECK-NEXT:    [[TMP6:%.*]] = fcmp nnan ninf nsz oge <4 x float> [[WIDE_LOAD]], [[VEC_PHI]]
-; CHECK-NEXT:    [[TMP7:%.*]] = fcmp nnan ninf nsz oge <4 x float> [[WIDE_LOAD2]], [[VEC_PHI1]]
-; CHECK-NEXT:    [[TMP8]] = select nnan ninf nsz <4 x i1> [[TMP6]], <4 x float> [[WIDE_LOAD]], <4 x float> [[VEC_PHI]]
-; CHECK-NEXT:    [[TMP9]] = select nnan ninf nsz <4 x i1> [[TMP7]], <4 x float> [[WIDE_LOAD2]], <4 x float> [[VEC_PHI1]]
+; CHECK-NEXT:    [[TMP6:%.*]] = fcmp nsz oge <4 x float> [[WIDE_LOAD]], [[VEC_PHI]]
+; CHECK-NEXT:    [[TMP7:%.*]] = fcmp nsz oge <4 x float> [[WIDE_LOAD2]], [[VEC_PHI1]]
+; CHECK-NEXT:    [[TMP8]] = select nsz <4 x i1> [[TMP6]], <4 x float> [[WIDE_LOAD]], <4 x float> [[VEC_PHI]]
+; CHECK-NEXT:    [[TMP9]] = select nsz <4 x i1> [[TMP7]], <4 x float> [[WIDE_LOAD2]], <4 x float> [[VEC_PHI1]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP10]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       middle.block:
-; CHECK-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp nnan ninf nsz ogt <4 x float> [[TMP8]], [[TMP9]]
-; CHECK-NEXT:    [[RDX_MINMAX_SELECT:%.*]] = select nnan ninf nsz <4 x i1> [[RDX_MINMAX_CMP]], <4 x float> [[TMP8]], <4 x float> [[TMP9]]
-; CHECK-NEXT:    [[TMP11:%.*]] = call nnan ninf nsz float @llvm.vector.reduce.fmax.v4f32(<4 x float> [[RDX_MINMAX_SELECT]])
+; CHECK-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp nsz ogt <4 x float> [[TMP8]], [[TMP9]]
+; CHECK-NEXT:    [[RDX_MINMAX_SELECT:%.*]] = select nsz <4 x i1> [[RDX_MINMAX_CMP]], <4 x float> [[TMP8]], <4 x float> [[TMP9]]
+; CHECK-NEXT:    [[TMP11:%.*]] = call nsz float @llvm.vector.reduce.fmax.v4f32(<4 x float> [[RDX_MINMAX_SELECT]])
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[WIDE_TRIP_COUNT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label [[FOR_COND_CLEANUP_LOOPEXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK:       scalar.ph:
@@ -304,17 +304,17 @@ define float @PR35538_more_FMF(ptr nocapture readonly %a, i32 %N) {
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i8, ptr [[TMP2]], i64 16
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP2]], align 4
 ; CHECK-NEXT:    [[WIDE_LOAD2:%.*]] = load <4 x float>, ptr [[TMP5]], align 4
-; CHECK-NEXT:    [[TMP6:%.*]] = fcmp nnan ninf nsz oge <4 x float> [[WIDE_LOAD]], [[VEC_PHI]]
-; CHECK-NEXT:    [[TMP7:%.*]] = fcmp nnan ninf nsz oge <4 x float> [[WIDE_LOAD2]], [[VEC_PHI1]]
-; CHECK-NEXT:    [[TMP8]] = select nnan ninf nsz <4 x i1> [[TMP6]], <4 x float> [[WIDE_LOAD]], <4 x float> [[VEC_PHI]]
-; CHECK-NEXT:    [[TMP9]] = select nnan ninf nsz <4 x i1> [[TMP7]], <4 x float> [[WIDE_LOAD2]], <4 x float> [[VEC_PHI1]]
+; CHECK-NEXT:    [[TMP6:%.*]] = fcmp nsz oge <4 x float> [[WIDE_LOAD]], [[VEC_PHI]]
+; CHECK-NEXT:    [[TMP7:%.*]] = fcmp nsz oge <4 x float> [[WIDE_LOAD2]], [[VEC_PHI1]]
+; CHECK-NEXT:    [[TMP8]] = select nsz <4 x i1> [[TMP6]], <4 x float> [[WIDE_LOAD]], <4 x float> [[VEC_PHI]]
+; CHECK-NEXT:    [[TMP9]] = select nsz <4 x i1> [[TMP7]], <4 x float> [[WIDE_LOAD2]], <4 x float> [[VEC_PHI1]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP10]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:       middle.block:
-; CHECK-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp nnan ninf nsz ogt <4 x float> [[TMP8]], [[TMP9]]
-; CHECK-NEXT:    [[RDX_MINMAX_SELECT:%.*]] = select nnan ninf nsz <4 x i1> [[RDX_MINMAX_CMP]], <4 x float> [[TMP8]], <4 x float> [[TMP9]]
-; CHECK-NEXT:    [[TMP11:%.*]] = call nnan ninf nsz float @llvm.vector.reduce.fmax.v4f32(<4 x float> [[RDX_MINMAX_SELECT]])
+; CHECK-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp nsz ogt <4 x float> [[TMP8]], [[TMP9]]
+; CHECK-NEXT:    [[RDX_MINMAX_SELECT:%.*]] = select nsz <4 x i1> [[RDX_MINMAX_CMP]], <4 x float> [[TMP8]], <4 x float> [[TMP9]]
+; CHECK-NEXT:    [[TMP11:%.*]] = call nsz float @llvm.vector.reduce.fmax.v4f32(<4 x float> [[RDX_MINMAX_SELECT]])
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[WIDE_TRIP_COUNT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label [[FOR_COND_CLEANUP_LOOPEXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK:       scalar.ph:

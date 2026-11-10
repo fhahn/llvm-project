@@ -101,10 +101,10 @@ define float @cond_cmp_sel(ptr noalias %a, ptr noalias %cond, i64 %N) vscale_ran
 ; CHECK-NEXT:    [[TMP9:%.*]] = fcmp une <vscale x 4 x float> [[WIDE_LOAD]], splat (float 3.000000e+00)
 ; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr float, ptr [[A:%.*]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <vscale x 4 x float> @llvm.masked.load.nxv4f32.p0(ptr align 4 [[TMP10]], <vscale x 4 x i1> [[TMP9]], <vscale x 4 x float> poison)
-; CHECK-NEXT:    [[TMP12:%.*]] = select fast <vscale x 4 x i1> [[TMP9]], <vscale x 4 x float> [[WIDE_MASKED_LOAD]], <vscale x 4 x float> splat (float f0x7F7FFFFF)
-; CHECK-NEXT:    [[TMP13:%.*]] = call fast float @llvm.vector.reduce.fmin.nxv4f32(<vscale x 4 x float> [[TMP12]])
-; CHECK-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp fast olt float [[TMP13]], [[VEC_PHI]]
-; CHECK-NEXT:    [[RDX_MINMAX_SELECT]] = select fast i1 [[RDX_MINMAX_CMP]], float [[TMP13]], float [[VEC_PHI]]
+; CHECK-NEXT:    [[TMP12:%.*]] = select reassoc nsz arcp contract afn <vscale x 4 x i1> [[TMP9]], <vscale x 4 x float> [[WIDE_MASKED_LOAD]], <vscale x 4 x float> splat (float +qnan)
+; CHECK-NEXT:    [[TMP13:%.*]] = call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmin.nxv4f32(<vscale x 4 x float> [[TMP12]])
+; CHECK-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp reassoc nsz arcp contract afn olt float [[TMP13]], [[VEC_PHI]]
+; CHECK-NEXT:    [[RDX_MINMAX_SELECT]] = select reassoc nsz arcp contract afn i1 [[RDX_MINMAX_CMP]], float [[TMP13]], float [[VEC_PHI]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP1]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP14]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]

@@ -251,14 +251,14 @@ define float @fmin_fast(ptr noalias nocapture readonly %a, i64 %n) vscale_range(
 ; CHECK: vector.body:
 ; CHECK: %[[LOAD1:.*]] = load <vscale x 8 x float>
 ; CHECK: %[[LOAD2:.*]] = load <vscale x 8 x float>
-; CHECK: %[[FCMP1:.*]] = fcmp fast olt <vscale x 8 x float> %[[LOAD1]]
-; CHECK: %[[FCMP2:.*]] = fcmp fast olt <vscale x 8 x float> %[[LOAD2]]
-; CHECK: %[[SEL1:.*]] = select nnan nsz <vscale x 8 x i1> %[[FCMP1]], <vscale x 8 x float> %[[LOAD1]]
-; CHECK: %[[SEL2:.*]] = select nnan nsz <vscale x 8 x i1> %[[FCMP2]], <vscale x 8 x float> %[[LOAD2]]
+; CHECK: %[[FCMP1:.*]] = fcmp reassoc nsz arcp contract afn olt <vscale x 8 x float> %[[LOAD1]]
+; CHECK: %[[FCMP2:.*]] = fcmp reassoc nsz arcp contract afn olt <vscale x 8 x float> %[[LOAD2]]
+; CHECK: %[[SEL1:.*]] = select nsz <vscale x 8 x i1> %[[FCMP1]], <vscale x 8 x float> %[[LOAD1]]
+; CHECK: %[[SEL2:.*]] = select nsz <vscale x 8 x i1> %[[FCMP2]], <vscale x 8 x float> %[[LOAD2]]
 ; CHECK: middle.block:
-; CHECK: %[[FCMP:.*]] = fcmp fast olt <vscale x 8 x float> %[[SEL1]], %[[SEL2]]
-; CHECK-NEXT: %[[SEL:.*]] = select fast <vscale x 8 x i1> %[[FCMP]], <vscale x 8 x float> %[[SEL1]], <vscale x 8 x float> %[[SEL2]]
-; CHECK-NEXT: call fast float @llvm.vector.reduce.fmin.nxv8f32(<vscale x 8 x float> %[[SEL]])
+; CHECK: %[[FCMP:.*]] = fcmp reassoc nsz arcp contract afn olt <vscale x 8 x float> %[[SEL1]], %[[SEL2]]
+; CHECK-NEXT: %[[SEL:.*]] = select reassoc nsz arcp contract afn <vscale x 8 x i1> %[[FCMP]], <vscale x 8 x float> %[[SEL1]], <vscale x 8 x float> %[[SEL2]]
+; CHECK-NEXT: call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmin.nxv8f32(<vscale x 8 x float> %[[SEL]])
 entry:
   br label %for.body
 
@@ -285,14 +285,14 @@ define float @fmax_fast(ptr noalias nocapture readonly %a, i64 %n) vscale_range(
 ; CHECK: vector.body:
 ; CHECK: %[[LOAD1:.*]] = load <vscale x 8 x float>
 ; CHECK: %[[LOAD2:.*]] = load <vscale x 8 x float>
-; CHECK: %[[FCMP1:.*]] = fcmp fast ogt <vscale x 8 x float> %[[LOAD1]]
-; CHECK: %[[FCMP2:.*]] = fcmp fast ogt <vscale x 8 x float> %[[LOAD2]]
-; CHECK: %[[SEL1:.*]] = select nnan nsz <vscale x 8 x i1> %[[FCMP1]], <vscale x 8 x float> %[[LOAD1]]
-; CHECK: %[[SEL2:.*]] = select nnan nsz <vscale x 8 x i1> %[[FCMP2]], <vscale x 8 x float> %[[LOAD2]]
+; CHECK: %[[FCMP1:.*]] = fcmp reassoc nsz arcp contract afn ogt <vscale x 8 x float> %[[LOAD1]]
+; CHECK: %[[FCMP2:.*]] = fcmp reassoc nsz arcp contract afn ogt <vscale x 8 x float> %[[LOAD2]]
+; CHECK: %[[SEL1:.*]] = select nsz <vscale x 8 x i1> %[[FCMP1]], <vscale x 8 x float> %[[LOAD1]]
+; CHECK: %[[SEL2:.*]] = select nsz <vscale x 8 x i1> %[[FCMP2]], <vscale x 8 x float> %[[LOAD2]]
 ; CHECK: middle.block:
-; CHECK: %[[FCMP:.*]] = fcmp fast ogt <vscale x 8 x float> %[[SEL1]], %[[SEL2]]
-; CHECK-NEXT: %[[SEL:.*]] = select fast <vscale x 8 x i1> %[[FCMP]], <vscale x 8 x float> %[[SEL1]], <vscale x 8 x float> %[[SEL2]]
-; CHECK-NEXT: call fast float @llvm.vector.reduce.fmax.nxv8f32(<vscale x 8 x float> %[[SEL]])
+; CHECK: %[[FCMP:.*]] = fcmp reassoc nsz arcp contract afn ogt <vscale x 8 x float> %[[SEL1]], %[[SEL2]]
+; CHECK-NEXT: %[[SEL:.*]] = select reassoc nsz arcp contract afn <vscale x 8 x i1> %[[FCMP]], <vscale x 8 x float> %[[SEL1]], <vscale x 8 x float> %[[SEL2]]
+; CHECK-NEXT: call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmax.nxv8f32(<vscale x 8 x float> %[[SEL]])
 entry:
   br label %for.body
 

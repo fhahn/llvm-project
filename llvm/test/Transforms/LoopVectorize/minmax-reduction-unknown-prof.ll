@@ -24,17 +24,17 @@ define float @fmax_reduction_profiled(ptr %a, i64 %n) !prof !0 {
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i8, ptr [[TMP0]], i64 8
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x float>, ptr [[TMP0]], align 4
 ; CHECK-NEXT:    [[WIDE_LOAD2:%.*]] = load <2 x float>, ptr [[TMP1]], align 4
-; CHECK-NEXT:    [[TMP2:%.*]] = fcmp fast ogt <2 x float> [[WIDE_LOAD]], [[VEC_PHI]]
-; CHECK-NEXT:    [[TMP3:%.*]] = fcmp fast ogt <2 x float> [[WIDE_LOAD2]], [[VEC_PHI1]]
-; CHECK-NEXT:    [[TMP4]] = select nnan nsz <2 x i1> [[TMP2]], <2 x float> [[WIDE_LOAD]], <2 x float> [[VEC_PHI]]
-; CHECK-NEXT:    [[TMP5]] = select nnan nsz <2 x i1> [[TMP3]], <2 x float> [[WIDE_LOAD2]], <2 x float> [[VEC_PHI1]]
+; CHECK-NEXT:    [[TMP2:%.*]] = fcmp reassoc nsz arcp contract afn ogt <2 x float> [[WIDE_LOAD]], [[VEC_PHI]]
+; CHECK-NEXT:    [[TMP3:%.*]] = fcmp reassoc nsz arcp contract afn ogt <2 x float> [[WIDE_LOAD2]], [[VEC_PHI1]]
+; CHECK-NEXT:    [[TMP4]] = select nsz <2 x i1> [[TMP2]], <2 x float> [[WIDE_LOAD]], <2 x float> [[VEC_PHI]]
+; CHECK-NEXT:    [[TMP5]] = select nsz <2 x i1> [[TMP3]], <2 x float> [[WIDE_LOAD2]], <2 x float> [[VEC_PHI1]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP1:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp fast ogt <2 x float> [[TMP4]], [[TMP5]]
-; CHECK-NEXT:    [[RDX_MINMAX_SELECT:%.*]] = select fast <2 x i1> [[RDX_MINMAX_CMP]], <2 x float> [[TMP4]], <2 x float> [[TMP5]], !prof [[PROF4:![0-9]+]]
-; CHECK-NEXT:    [[TMP7:%.*]] = call fast float @llvm.vector.reduce.fmax.v2f32(<2 x float> [[RDX_MINMAX_SELECT]])
+; CHECK-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp reassoc nsz arcp contract afn ogt <2 x float> [[TMP4]], [[TMP5]]
+; CHECK-NEXT:    [[RDX_MINMAX_SELECT:%.*]] = select reassoc nsz arcp contract afn <2 x i1> [[RDX_MINMAX_CMP]], <2 x float> [[TMP4]], <2 x float> [[TMP5]], !prof [[PROF4:![0-9]+]]
+; CHECK-NEXT:    [[TMP7:%.*]] = call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmax.v2f32(<2 x float> [[RDX_MINMAX_SELECT]])
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
@@ -93,17 +93,17 @@ define float @fmax_reduction_not_profiled(ptr %a, i64 %n) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i8, ptr [[TMP0]], i64 8
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x float>, ptr [[TMP0]], align 4
 ; CHECK-NEXT:    [[WIDE_LOAD2:%.*]] = load <2 x float>, ptr [[TMP1]], align 4
-; CHECK-NEXT:    [[TMP2:%.*]] = fcmp fast ogt <2 x float> [[WIDE_LOAD]], [[VEC_PHI]]
-; CHECK-NEXT:    [[TMP3:%.*]] = fcmp fast ogt <2 x float> [[WIDE_LOAD2]], [[VEC_PHI1]]
-; CHECK-NEXT:    [[TMP4]] = select nnan nsz <2 x i1> [[TMP2]], <2 x float> [[WIDE_LOAD]], <2 x float> [[VEC_PHI]]
-; CHECK-NEXT:    [[TMP5]] = select nnan nsz <2 x i1> [[TMP3]], <2 x float> [[WIDE_LOAD2]], <2 x float> [[VEC_PHI1]]
+; CHECK-NEXT:    [[TMP2:%.*]] = fcmp reassoc nsz arcp contract afn ogt <2 x float> [[WIDE_LOAD]], [[VEC_PHI]]
+; CHECK-NEXT:    [[TMP3:%.*]] = fcmp reassoc nsz arcp contract afn ogt <2 x float> [[WIDE_LOAD2]], [[VEC_PHI1]]
+; CHECK-NEXT:    [[TMP4]] = select nsz <2 x i1> [[TMP2]], <2 x float> [[WIDE_LOAD]], <2 x float> [[VEC_PHI]]
+; CHECK-NEXT:    [[TMP5]] = select nsz <2 x i1> [[TMP3]], <2 x float> [[WIDE_LOAD2]], <2 x float> [[VEC_PHI1]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp fast ogt <2 x float> [[TMP4]], [[TMP5]]
-; CHECK-NEXT:    [[RDX_MINMAX_SELECT:%.*]] = select fast <2 x i1> [[RDX_MINMAX_CMP]], <2 x float> [[TMP4]], <2 x float> [[TMP5]]
-; CHECK-NEXT:    [[TMP7:%.*]] = call fast float @llvm.vector.reduce.fmax.v2f32(<2 x float> [[RDX_MINMAX_SELECT]])
+; CHECK-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp reassoc nsz arcp contract afn ogt <2 x float> [[TMP4]], [[TMP5]]
+; CHECK-NEXT:    [[RDX_MINMAX_SELECT:%.*]] = select reassoc nsz arcp contract afn <2 x i1> [[RDX_MINMAX_CMP]], <2 x float> [[TMP4]], <2 x float> [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = call reassoc nsz arcp contract afn float @llvm.vector.reduce.fmax.v2f32(<2 x float> [[RDX_MINMAX_SELECT]])
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
