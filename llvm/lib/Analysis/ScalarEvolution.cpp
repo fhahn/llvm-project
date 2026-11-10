@@ -15901,11 +15901,24 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
           EnqueueOperands(SMax);
         break;
       case CmpInst::ICMP_UGT:
-      case CmpInst::ICMP_UGE:
-        To = SE.getUMaxExpr(FromRewritten, RHS);
+      case CmpInst::ICMP_UGE: {
+        // From u>= RHS implies RHS u<= max(From). Clamp RHS accordingly, so
+        // the range of the umax is not wider than the range of From. Skip
+        // clamping if RHS u> max(From), i.e. the condition is always false;
+        // the unclamped umax is more precise then.
+        const SCEV *ClampedRHS = RHS;
+        if (!RHS->getType()->isPointerTy()) {
+          APInt FromMax = SE.getUnsignedRangeMax(FromRewritten);
+          ConstantRange RHSRange = SE.getUnsignedRange(RHS);
+          if (RHSRange.getUnsignedMax().ugt(FromMax) &&
+              RHSRange.getUnsignedMin().ule(FromMax))
+            ClampedRHS = SE.getUMinExpr(RHS, SE.getConstant(FromMax));
+        }
+        To = SE.getUMaxExpr(FromRewritten, ClampedRHS);
         if (auto *UMin = dyn_cast<SCEVUMinExpr>(FromRewritten))
           EnqueueOperands(UMin);
         break;
+      }
       case CmpInst::ICMP_SGT:
       case CmpInst::ICMP_SGE: {
         // From s>= RHS s>= 0 implies From u>= RHS, so an earlier
@@ -16191,13 +16204,8 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(
              Bitwidth > Op->getType()->getScalarSizeInBits()) {
         Type *NarrowTy = IntegerType::get(SE.getContext(), Bitwidth);
         auto *NarrowExt = SE.getZeroExtendExpr(Op, NarrowTy);
-        if (const SCEV *S = lookup(NarrowExt)) {
-          APInt OpMax = APInt::getLowBitsSet(
-              Bitwidth, Op->getType()->getScalarSizeInBits());
-          if (SE.getUnsignedRangeMax(S).ugt(OpMax))
-            S = SE.getUMinExpr(S, SE.getConstant(OpMax));
+        if (const SCEV *S = lookup(NarrowExt))
           return SE.getZeroExtendExpr(S, Ty);
-        }
         Bitwidth = Bitwidth / 2;
       }
 
