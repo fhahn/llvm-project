@@ -1290,6 +1290,10 @@ public:
     return import_range(import_iterator(FirstLocalImport), import_iterator());
   }
 
+  /// Incremented whenever a using directive is added to, made visible in or
+  /// removed from a DeclContext.
+  unsigned UsingDirectiveGeneration = 0;
+
   Decl *getPrimaryMergedDecl(Decl *D) {
     Decl *Result = MergedDecls.lookup(D);
     return Result ? Result : D;
