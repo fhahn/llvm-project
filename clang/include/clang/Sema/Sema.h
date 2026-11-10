@@ -13886,6 +13886,15 @@ public:
   /// getLookupModules() to get a complete set.
   llvm::DenseSet<Module *> LookupModulesCache;
 
+  /// The using directives (nominated namespace, common ancestor) of the last
+  /// unqualified lookup that considered them, with the inputs they were
+  /// computed from.
+  struct {
+    unsigned Generation = 0;
+    SmallVector<const void *> Key;
+    SmallVector<std::pair<const DeclContext *, const DeclContext *>> List;
+  } UnqualUsingDirectiveCache;
+
   /// Map from the most recent declaration of a namespace to the most
   /// recent visible declaration of that namespace.
   llvm::DenseMap<NamedDecl *, NamedDecl *> VisibleNamespaceCache;
