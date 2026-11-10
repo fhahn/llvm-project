@@ -173,6 +173,99 @@ for.end:
   ret void
 }
 
+; Make sure FP compares are also covered
+; CHECK: Checking a loop in 'fcmp_select'
+; CHECK: Loop passed LoopVectorizationLegality checks!
+; LINUX-NOT: Potentially unsafe FP op prevents vectorization
+define void @fcmp_select(ptr noalias nocapture readonly %A, ptr noalias nocapture readonly %B, ptr noalias nocapture %C, i32 %N) {
+entry:
+  br label %for.body
+
+for.body:
+  %i.06 = phi i32 [ %inc, %for.body ], [ 0, %entry ]
+  %arrayidx = getelementptr inbounds float, ptr %A, i32 %i.06
+  %0 = load float, ptr %arrayidx, align 4
+  %arrayidx1 = getelementptr inbounds float, ptr %B, i32 %i.06
+  %1 = load float, ptr %arrayidx1, align 4
+  %cmp = fcmp olt float %0, %1
+  %sel = select i1 %cmp, float %0, float %1
+  %arrayidx2 = getelementptr inbounds float, ptr %C, i32 %i.06
+  store float %sel, ptr %arrayidx2, align 4
+  %inc = add nuw nsw i32 %i.06, 1
+  %exitcond = icmp eq i32 %inc, %N
+  br i1 %exitcond, label %for.end, label %for.body
+
+for.end:
+  ret void
+}
+
+; Make sure FP min/max reductions without full fast-math are also covered
+; CHECK: Checking a loop in 'fmax_select'
+; CHECK: Loop passed LoopVectorizationLegality checks!
+; LINUX-NOT: Potentially unsafe FP op prevents vectorization
+define float @fmax_select(ptr noalias nocapture readonly %a, i32 %N) {
+entry:
+  br label %for.body
+
+for.body:
+  %i.07 = phi i32 [ %inc, %for.body ], [ 0, %entry ]
+  %Red.06 = phi float [ %sel, %for.body ], [ 0.0e+00, %entry ]
+  %arrayidx = getelementptr inbounds float, ptr %a, i32 %i.07
+  %0 = load float, ptr %arrayidx, align 4
+  %cmp = fcmp nnan nsz ogt float %Red.06, %0
+  %sel = select nnan nsz i1 %cmp, float %Red.06, float %0
+  %inc = add nuw nsw i32 %i.07, 1
+  %exitcond = icmp eq i32 %inc, %N
+  br i1 %exitcond, label %for.end, label %for.body
+
+for.end:
+  ret float %sel
+}
+
+; Also without any fast-math flags
+; CHECK: Checking a loop in 'fmax_select_no_fmf'
+; CHECK: Found an unidentified PHI
+define float @fmax_select_no_fmf(ptr noalias nocapture readonly %a, i32 %N) {
+entry:
+  br label %for.body
+
+for.body:
+  %i.07 = phi i32 [ %inc, %for.body ], [ 0, %entry ]
+  %Red.06 = phi float [ %sel, %for.body ], [ 0.0e+00, %entry ]
+  %arrayidx = getelementptr inbounds float, ptr %a, i32 %i.07
+  %0 = load float, ptr %arrayidx, align 4
+  %cmp = fcmp ogt float %Red.06, %0
+  %sel = select i1 %cmp, float %Red.06, float %0
+  %inc = add nuw nsw i32 %i.07, 1
+  %exitcond = icmp eq i32 %inc, %N
+  br i1 %exitcond, label %for.end, label %for.body
+
+for.end:
+  ret float %sel
+}
+
+; Also with a fast compare, but no fast-math flags on the select
+; CHECK: Checking a loop in 'fmax_select_fast_fcmp'
+; CHECK: Found an unidentified PHI
+define float @fmax_select_fast_fcmp(ptr noalias nocapture readonly %a, i32 %N) {
+entry:
+  br label %for.body
+
+for.body:
+  %i.07 = phi i32 [ %inc, %for.body ], [ 0, %entry ]
+  %Red.06 = phi float [ %sel, %for.body ], [ 0.0e+00, %entry ]
+  %arrayidx = getelementptr inbounds float, ptr %a, i32 %i.07
+  %0 = load float, ptr %arrayidx, align 4
+  %cmp = fcmp fast ogt float %Red.06, %0
+  %sel = select i1 %cmp, float %Red.06, float %0
+  %inc = add nuw nsw i32 %i.07, 1
+  %exitcond = icmp eq i32 %inc, %N
+  br i1 %exitcond, label %for.end, label %for.body
+
+for.end:
+  ret float %sel
+}
+
 ; Integer loops are always vectorizeable
 ; CHECK: Checking a loop in 'sumi_fast'
 ; CHECK: Loop passed LoopVectorizationLegality checks!
@@ -318,6 +411,32 @@ for.body:
   %arrayidx4 = getelementptr inbounds float, ptr %C, i32 %i.011
   store float %conv3, ptr %arrayidx4, align 4
   %inc = add nuw nsw i32 %i.011, 1
+  %exitcond = icmp eq i32 %inc, %N
+  br i1 %exitcond, label %for.end, label %for.body
+
+for.end:
+  ret void
+}
+
+; FP compares can be vectorizeable with fast-math
+; CHECK: Checking a loop in 'fcmp_select_fast'
+; CHECK: Loop passed LoopVectorizationLegality checks!
+; LINUX-NOT: Potentially unsafe FP op prevents vectorization
+define void @fcmp_select_fast(ptr noalias nocapture readonly %A, ptr noalias nocapture readonly %B, ptr noalias nocapture %C, i32 %N) {
+entry:
+  br label %for.body
+
+for.body:
+  %i.06 = phi i32 [ %inc, %for.body ], [ 0, %entry ]
+  %arrayidx = getelementptr inbounds float, ptr %A, i32 %i.06
+  %0 = load float, ptr %arrayidx, align 4
+  %arrayidx1 = getelementptr inbounds float, ptr %B, i32 %i.06
+  %1 = load float, ptr %arrayidx1, align 4
+  %cmp = fcmp fast olt float %0, %1
+  %sel = select i1 %cmp, float %0, float %1
+  %arrayidx2 = getelementptr inbounds float, ptr %C, i32 %i.06
+  store float %sel, ptr %arrayidx2, align 4
+  %inc = add nuw nsw i32 %i.06, 1
   %exitcond = icmp eq i32 %inc, %N
   br i1 %exitcond, label %for.end, label %for.body
 
