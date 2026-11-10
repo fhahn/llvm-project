@@ -9109,13 +9109,56 @@ void Sema::AddMemberOperatorCandidates(OverloadedOperatorKind Op,
   }
 }
 
-void Sema::AddBuiltinCandidate(QualType *ParamTys, ArrayRef<Expr *> Args,
-                               OverloadCandidateSet& CandidateSet,
-                               bool IsAssignmentOperator,
-                               unsigned NumContextualBoolArguments) {
-  // Overload resolution is always an unevaluated context.
-  EnterExpressionEvaluationContext Unevaluated(
-      *this, Sema::ExpressionEvaluationContext::Unevaluated);
+/// Conversions of the arguments of builtin operator candidates, keyed by
+/// argument, parameter type and whether user conversions are suppressed (an
+/// unsigned, as DenseMapInfo<bool> is ill-formed).
+using BuiltinConversionMap =
+    llvm::DenseMap<std::tuple<Expr *, QualType, unsigned>,
+                   ImplicitConversionSequence>;
+
+/// Whether computing a conversion of \p Arg again always gives the same
+/// result. Reference binding skips conversion functions whose type is not
+/// deduced yet, while other conversions deduce it, so a conversion of an
+/// argument with such a conversion function can change once another one was
+/// computed. Conservatively treat conversion function templates and classes
+/// that aren't complete yet alike.
+static bool hasStableConversions(const Expr *Arg) {
+  const CXXRecordDecl *RD = Arg->getType()->getAsCXXRecordDecl();
+  if (!RD)
+    return true;
+  RD = RD->getDefinition();
+  if (!RD || RD->isBeingDefined())
+    return false;
+  return llvm::none_of(
+      RD->getVisibleConversionFunctions(), [](const NamedDecl *D) {
+        D = D->getUnderlyingDecl();
+        return isa<FunctionTemplateDecl>(D) ||
+               cast<CXXConversionDecl>(D)->getReturnType()->isUndeducedType();
+      });
+}
+
+/// Implements Sema::AddBuiltinCandidate. \p Conversions, if given, is used to
+/// share conversions between the candidates of one operator.
+static void addBuiltinCandidate(Sema &S, QualType *ParamTys,
+                                ArrayRef<Expr *> Args,
+                                OverloadCandidateSet &CandidateSet,
+                                bool IsAssignmentOperator,
+                                unsigned NumContextualBoolArguments,
+                                BuiltinConversionMap *Conversions) {
+  // Overload resolution is always an unevaluated context. Only computing a
+  // conversion needs it.
+  std::optional<EnterExpressionEvaluationContext> Unevaluated;
+
+  // Only conversions whose diagnostics can be counted are shared (see below);
+  // SFINAE traps diagnostics, CUDA may defer them, and suppressed ones or ones
+  // reported to a client excluded from the counts are not counted. The key
+  // doesn't distinguish a contextual conversion to bool from a
+  // copy-initialization of bool, so don't share the former.
+  if (S.isSFINAEContext() || S.getLangOpts().CUDA ||
+      S.Diags.getSuppressAllDiagnostics() ||
+      !S.Diags.getClient()->IncludeInDiagnosticCounts() ||
+      NumContextualBoolArguments)
+    Conversions = nullptr;
 
   // Add this candidate
   OverloadCandidate &Candidate = CandidateSet.addCandidate(Args.size());
@@ -9140,25 +9183,50 @@ void Sema::AddBuiltinCandidate(QualType *ParamTys, ArrayRef<Expr *> Args,
     // conversions, since that is the only way that initialization of
     // a reference to a non-class type can occur from something that
     // is not of the same type.
-    if (ArgIdx < NumContextualBoolArguments) {
-      assert(ParamTys[ArgIdx] == Context.BoolTy &&
-             "Contextual conversion to bool requires bool type");
-      Candidate.Conversions[ArgIdx]
-        = TryContextuallyConvertToBool(*this, Args[ArgIdx]);
-    } else {
-      Candidate.Conversions[ArgIdx]
-        = TryCopyInitialization(*this, Args[ArgIdx], ParamTys[ArgIdx],
-                                ArgIdx == 0 && IsAssignmentOperator,
-                                /*InOverloadResolution=*/false,
-                                /*AllowObjCWritebackConversion=*/
-                                  getLangOpts().ObjCAutoRefCount);
+    ImplicitConversionSequence &ICS = Candidate.Conversions[ArgIdx];
+    bool SuppressUserConversions = ArgIdx == 0 && IsAssignmentOperator;
+    BuiltinConversionMap::key_type Key(Args[ArgIdx], ParamTys[ArgIdx],
+                                       SuppressUserConversions);
+    if (Conversions)
+      if (auto It = Conversions->find(Key); It != Conversions->end())
+        ICS = It->second;
+    if (!ICS.isInitialized()) {
+      if (!Unevaluated)
+        Unevaluated.emplace(S, Sema::ExpressionEvaluationContext::Unevaluated);
+      unsigned NumDiags = S.Diags.getNumErrors() + S.Diags.getNumWarnings();
+      if (ArgIdx < NumContextualBoolArguments) {
+        assert(ParamTys[ArgIdx] == S.Context.BoolTy &&
+               "Contextual conversion to bool requires bool type");
+        ICS = TryContextuallyConvertToBool(S, Args[ArgIdx]);
+      } else {
+        ICS = TryCopyInitialization(S, Args[ArgIdx], ParamTys[ArgIdx],
+                                    SuppressUserConversions,
+                                    /*InOverloadResolution=*/false,
+                                    /*AllowObjCWritebackConversion=*/
+                                    S.getLangOpts().ObjCAutoRefCount);
+      }
+      // Without sharing, the conversion is computed for every candidate and
+      // emits its diagnostics each time. Only share a conversion whose
+      // computation had no observable side effect, i.e. emitted no errors or
+      // warnings.
+      if (Conversions &&
+          S.Diags.getNumErrors() + S.Diags.getNumWarnings() == NumDiags)
+        Conversions->try_emplace(Key, ICS);
     }
-    if (Candidate.Conversions[ArgIdx].isBad()) {
+    if (ICS.isBad()) {
       Candidate.Viable = false;
       Candidate.FailureKind = ovl_fail_bad_conversion;
       break;
     }
   }
+}
+
+void Sema::AddBuiltinCandidate(QualType *ParamTys, ArrayRef<Expr *> Args,
+                               OverloadCandidateSet &CandidateSet,
+                               bool IsAssignmentOperator,
+                               unsigned NumContextualBoolArguments) {
+  addBuiltinCandidate(*this, ParamTys, Args, CandidateSet, IsAssignmentOperator,
+                      NumContextualBoolArguments, /*Conversions=*/nullptr);
 }
 
 namespace {
@@ -9616,6 +9684,12 @@ class BuiltinOperatorOverloadBuilder {
   bool ArithmeticCandidatesMayBeViable;
   SmallVectorImpl<BuiltinCandidateTypeSet> &CandidateTypes;
   OverloadCandidateSet &CandidateSet;
+  /// Conversions shared between the candidates of this operator. The
+  /// candidates pair each parameter type with many others, so they repeat.
+  BuiltinConversionMap Conversions;
+  /// Whether to share conversions. Decided up front: an argument whose
+  /// conversions are stable stays so.
+  bool ShareConversions;
 
   static constexpr int ArithmeticTypesCap = 26;
   SmallVector<CanQualType, ArithmeticTypesCap> ArithmeticTypes;
@@ -9711,7 +9785,7 @@ class BuiltinOperatorOverloadBuilder {
     };
 
     // Non-volatile version.
-    S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
+    AddCandidate(ParamTypes);
 
     // Use a heuristic to reduce number of builtin candidates in the set:
     // add volatile version only if there are conversions to a volatile type.
@@ -9719,7 +9793,7 @@ class BuiltinOperatorOverloadBuilder {
       ParamTypes[0] =
         S.Context.getLValueReferenceType(
           S.Context.getVolatileType(CandidateTy));
-      S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
+      AddCandidate(ParamTypes);
     }
 
     // Add restrict version only if there are conversions to a restrict type
@@ -9729,7 +9803,7 @@ class BuiltinOperatorOverloadBuilder {
       ParamTypes[0]
         = S.Context.getLValueReferenceType(
             S.Context.getCVRQualifiedType(CandidateTy, Qualifiers::Restrict));
-      S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
+      AddCandidate(ParamTypes);
 
       if (HasVolatile) {
         ParamTypes[0]
@@ -9737,17 +9811,25 @@ class BuiltinOperatorOverloadBuilder {
               S.Context.getCVRQualifiedType(CandidateTy,
                                             (Qualifiers::Volatile |
                                              Qualifiers::Restrict)));
-        S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
+        AddCandidate(ParamTypes);
       }
     }
 
+  }
+
+  /// Helper to add an overload candidate with the parameter types \p ParamTys.
+  void AddCandidate(QualType *ParamTys, bool IsAssignmentOperator = false,
+                    unsigned NumContextualBoolArguments = 0) {
+    addBuiltinCandidate(S, ParamTys, Args, CandidateSet, IsAssignmentOperator,
+                        NumContextualBoolArguments,
+                        ShareConversions ? &Conversions : nullptr);
   }
 
   /// Helper to add an overload candidate for a binary builtin with types \p L
   /// and \p R.
   void AddCandidate(QualType L, QualType R) {
     QualType LandR[2] = {L, R};
-    S.AddBuiltinCandidate(LandR, Args, CandidateSet);
+    AddCandidate(LandR);
   }
 
 public:
@@ -9765,7 +9847,8 @@ public:
                          [](const BuiltinCandidateTypeSet &Types) {
                            return Types.mayConvertToArithmetic();
                          })),
-        CandidateTypes(CandidateTypes), CandidateSet(CandidateSet) {
+        CandidateTypes(CandidateTypes), CandidateSet(CandidateSet),
+        ShareConversions(llvm::all_of(Args, hasStableConversions)) {
     InitArithmeticTypes();
   }
 
@@ -9852,7 +9935,7 @@ public:
         if (Proto->getMethodQuals() || Proto->getRefQualifier())
           continue;
 
-      S.AddBuiltinCandidate(&ParamTy, Args, CandidateSet);
+      AddCandidate(&ParamTy);
     }
   }
 
@@ -9869,12 +9952,12 @@ public:
     for (unsigned Arith = FirstPromotedArithmeticType;
          Arith < LastPromotedArithmeticType; ++Arith) {
       QualType ArithTy = ArithmeticTypes[Arith];
-      S.AddBuiltinCandidate(&ArithTy, Args, CandidateSet);
+      AddCandidate(&ArithTy);
     }
 
     // Extension: We also add these operators for vector types.
     for (QualType VecTy : CandidateTypes[0].vector_types())
-      S.AddBuiltinCandidate(&VecTy, Args, CandidateSet);
+      AddCandidate(&VecTy);
   }
 
   // C++ [over.built]p8:
@@ -9884,7 +9967,7 @@ public:
   //       T*         operator+(T*);
   void addUnaryPlusPointerOverloads() {
     for (QualType ParamTy : CandidateTypes[0].pointer_types())
-      S.AddBuiltinCandidate(&ParamTy, Args, CandidateSet);
+      AddCandidate(&ParamTy);
   }
 
   // C++ [over.built]p10:
@@ -9899,12 +9982,12 @@ public:
     for (unsigned Int = FirstPromotedIntegralType;
          Int < LastPromotedIntegralType; ++Int) {
       QualType IntTy = ArithmeticTypes[Int];
-      S.AddBuiltinCandidate(&IntTy, Args, CandidateSet);
+      AddCandidate(&IntTy);
     }
 
     // Extension: We also add this operator for vector types.
     for (QualType VecTy : CandidateTypes[0].vector_types())
-      S.AddBuiltinCandidate(&VecTy, Args, CandidateSet);
+      AddCandidate(&VecTy);
   }
 
   // C++ [over.match.oper]p16:
@@ -9924,14 +10007,14 @@ public:
           continue;
 
         QualType ParamTypes[2] = {MemPtrTy, MemPtrTy};
-        S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
+        AddCandidate(ParamTypes);
       }
 
       if (CandidateTypes[ArgIdx].hasNullPtrType()) {
         CanQualType NullPtrTy = S.Context.getCanonicalType(S.Context.NullPtrTy);
         if (AddedTypes.insert(NullPtrTy).second) {
           QualType ParamTypes[2] = { NullPtrTy, NullPtrTy };
-          S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
+          AddCandidate(ParamTypes);
         }
       }
 
@@ -9939,7 +10022,7 @@ public:
         CanQualType MetaInfoTy = S.Context.MetaInfoTy;
         if (AddedTypes.insert(MetaInfoTy).second) {
           QualType ParamTypes[2] = {MetaInfoTy, MetaInfoTy};
-          S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
+          AddCandidate(ParamTypes);
         }
       }
     }
@@ -10020,7 +10103,7 @@ public:
           continue;
 
         QualType ParamTypes[2] = {PtrTy, PtrTy};
-        S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
+        AddCandidate(ParamTypes);
       }
       for (QualType EnumTy : CandidateTypes[ArgIdx].enumeration_types()) {
         CanQualType CanonType = S.Context.getCanonicalType(EnumTy);
@@ -10032,7 +10115,7 @@ public:
                                                             CanonType)))
           continue;
         QualType ParamTypes[2] = {EnumTy, EnumTy};
-        S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
+        AddCandidate(ParamTypes);
       }
     }
   }
@@ -10072,7 +10155,7 @@ public:
         if (Arg == 0 || Op == OO_Plus) {
           // operator+(T*, ptrdiff_t) or operator-(T*, ptrdiff_t)
           // T* operator+(ptrdiff_t, T*);
-          S.AddBuiltinCandidate(AsymmetricParamTypes, Args, CandidateSet);
+          AddCandidate(AsymmetricParamTypes);
         }
         if (Op == OO_Minus) {
           // ptrdiff_t operator-(T, T);
@@ -10080,7 +10163,7 @@ public:
             continue;
 
           QualType ParamTypes[2] = {PtrTy, PtrTy};
-          S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
+          AddCandidate(ParamTypes);
         }
       }
     }
@@ -10125,7 +10208,7 @@ public:
            Right < LastPromotedArithmeticType; ++Right) {
         QualType LandR[2] = { ArithmeticTypes[Left],
                               ArithmeticTypes[Right] };
-        S.AddBuiltinCandidate(LandR, Args, CandidateSet);
+        AddCandidate(LandR);
       }
     }
 
@@ -10134,7 +10217,7 @@ public:
     for (QualType Vec1Ty : CandidateTypes[0].vector_types())
       for (QualType Vec2Ty : CandidateTypes[1].vector_types()) {
         QualType LandR[2] = {Vec1Ty, Vec2Ty};
-        S.AddBuiltinCandidate(LandR, Args, CandidateSet);
+        AddCandidate(LandR);
       }
   }
 
@@ -10218,7 +10301,7 @@ public:
            Right < LastPromotedIntegralType; ++Right) {
         QualType LandR[2] = { ArithmeticTypes[Left],
                               ArithmeticTypes[Right] };
-        S.AddBuiltinCandidate(LandR, Args, CandidateSet);
+        AddCandidate(LandR);
       }
     }
   }
@@ -10283,8 +10366,7 @@ public:
           S.Context.getLValueReferenceType(PtrTy),
           isEqualOp ? PtrTy : S.Context.getPointerDiffType(),
       };
-      S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet,
-                            /*IsAssignmentOperator=*/ isEqualOp);
+      AddCandidate(ParamTypes, /*IsAssignmentOperator=*/isEqualOp);
 
       bool NeedVolatile = !PtrTy.isVolatileQualified() &&
                           VisibleTypeConversionsQuals.hasVolatile();
@@ -10292,8 +10374,7 @@ public:
         // volatile version
         ParamTypes[0] =
             S.Context.getLValueReferenceType(S.Context.getVolatileType(PtrTy));
-        S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet,
-                              /*IsAssignmentOperator=*/isEqualOp);
+        AddCandidate(ParamTypes, /*IsAssignmentOperator=*/isEqualOp);
       }
 
       if (!PtrTy.isRestrictQualified() &&
@@ -10301,16 +10382,14 @@ public:
         // restrict version
         ParamTypes[0] =
             S.Context.getLValueReferenceType(S.Context.getRestrictType(PtrTy));
-        S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet,
-                              /*IsAssignmentOperator=*/isEqualOp);
+        AddCandidate(ParamTypes, /*IsAssignmentOperator=*/isEqualOp);
 
         if (NeedVolatile) {
           // volatile restrict version
           ParamTypes[0] =
               S.Context.getLValueReferenceType(S.Context.getCVRQualifiedType(
                   PtrTy, (Qualifiers::Volatile | Qualifiers::Restrict)));
-          S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet,
-                                /*IsAssignmentOperator=*/isEqualOp);
+          AddCandidate(ParamTypes, /*IsAssignmentOperator=*/isEqualOp);
         }
       }
     }
@@ -10327,8 +10406,7 @@ public:
         };
 
         // non-volatile version
-        S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet,
-                              /*IsAssignmentOperator=*/true);
+        AddCandidate(ParamTypes, /*IsAssignmentOperator=*/true);
 
         bool NeedVolatile = !PtrTy.isVolatileQualified() &&
                             VisibleTypeConversionsQuals.hasVolatile();
@@ -10336,8 +10414,7 @@ public:
           // volatile version
           ParamTypes[0] = S.Context.getLValueReferenceType(
               S.Context.getVolatileType(PtrTy));
-          S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet,
-                                /*IsAssignmentOperator=*/true);
+          AddCandidate(ParamTypes, /*IsAssignmentOperator=*/true);
         }
 
         if (!PtrTy.isRestrictQualified() &&
@@ -10345,16 +10422,14 @@ public:
           // restrict version
           ParamTypes[0] = S.Context.getLValueReferenceType(
               S.Context.getRestrictType(PtrTy));
-          S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet,
-                                /*IsAssignmentOperator=*/true);
+          AddCandidate(ParamTypes, /*IsAssignmentOperator=*/true);
 
           if (NeedVolatile) {
             // volatile restrict version
             ParamTypes[0] =
                 S.Context.getLValueReferenceType(S.Context.getCVRQualifiedType(
                     PtrTy, (Qualifiers::Volatile | Qualifiers::Restrict)));
-            S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet,
-                                  /*IsAssignmentOperator=*/true);
+            AddCandidate(ParamTypes, /*IsAssignmentOperator=*/true);
           }
         }
       }
@@ -10389,8 +10464,7 @@ public:
             VisibleTypeConversionsQuals, [&](QualifiersAndAtomic Quals) {
               ParamTypes[0] =
                   makeQualifiedLValueReferenceType(LeftBaseTy, Quals, S);
-              S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet,
-                                    /*IsAssignmentOperator=*/isEqualOp);
+              AddCandidate(ParamTypes, /*IsAssignmentOperator=*/isEqualOp);
             });
       }
     }
@@ -10402,15 +10476,13 @@ public:
         ParamTypes[1] = Vec2Ty;
         // Add this built-in operator as a candidate (VQ is empty).
         ParamTypes[0] = S.Context.getLValueReferenceType(Vec1Ty);
-        S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet,
-                              /*IsAssignmentOperator=*/isEqualOp);
+        AddCandidate(ParamTypes, /*IsAssignmentOperator=*/isEqualOp);
 
         // Add this built-in operator as a candidate (VQ is 'volatile').
         if (VisibleTypeConversionsQuals.hasVolatile()) {
           ParamTypes[0] = S.Context.getVolatileType(Vec1Ty);
           ParamTypes[0] = S.Context.getLValueReferenceType(ParamTypes[0]);
-          S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet,
-                                /*IsAssignmentOperator=*/isEqualOp);
+          AddCandidate(ParamTypes, /*IsAssignmentOperator=*/isEqualOp);
         }
       }
   }
@@ -10443,7 +10515,7 @@ public:
             VisibleTypeConversionsQuals, [&](QualifiersAndAtomic Quals) {
               ParamTypes[0] =
                   makeQualifiedLValueReferenceType(LeftBaseTy, Quals, S);
-              S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
+              AddCandidate(ParamTypes);
             });
       }
     }
@@ -10458,15 +10530,13 @@ public:
   //        bool        operator||(bool, bool);
   void addExclaimOverload() {
     QualType ParamTy = S.Context.BoolTy;
-    S.AddBuiltinCandidate(&ParamTy, Args, CandidateSet,
-                          /*IsAssignmentOperator=*/false,
-                          /*NumContextualBoolArguments=*/1);
+    AddCandidate(&ParamTy, /*IsAssignmentOperator=*/false,
+                 /*NumContextualBoolArguments=*/1);
   }
   void addAmpAmpOrPipePipeOverload() {
     QualType ParamTypes[2] = { S.Context.BoolTy, S.Context.BoolTy };
-    S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet,
-                          /*IsAssignmentOperator=*/false,
-                          /*NumContextualBoolArguments=*/2);
+    AddCandidate(ParamTypes, /*IsAssignmentOperator=*/false,
+                 /*NumContextualBoolArguments=*/2);
   }
 
   // C++ [over.built]p13:
@@ -10487,7 +10557,7 @@ public:
         continue;
 
       // T& operator[](T*, ptrdiff_t)
-      S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
+      AddCandidate(ParamTypes);
     }
 
     for (QualType PtrTy : CandidateTypes[1].pointer_types()) {
@@ -10497,7 +10567,7 @@ public:
         continue;
 
       // T& operator[](ptrdiff_t, T*)
-      S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
+      AddCandidate(ParamTypes);
     }
   }
 
@@ -10542,7 +10612,7 @@ public:
             T.isRestrictQualified())
           continue;
         T = Q1.apply(S.Context, T);
-        S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
+        AddCandidate(ParamTypes);
       }
     }
   }
@@ -10567,7 +10637,7 @@ public:
           continue;
 
         QualType ParamTypes[2] = {PtrTy, PtrTy};
-        S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
+        AddCandidate(ParamTypes);
       }
 
       for (QualType MemPtrTy : CandidateTypes[ArgIdx].member_pointer_types()) {
@@ -10575,7 +10645,7 @@ public:
           continue;
 
         QualType ParamTypes[2] = {MemPtrTy, MemPtrTy};
-        S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
+        AddCandidate(ParamTypes);
       }
 
       if (S.getLangOpts().CPlusPlus11) {
@@ -10587,7 +10657,7 @@ public:
             continue;
 
           QualType ParamTypes[2] = {EnumTy, EnumTy};
-          S.AddBuiltinCandidate(ParamTypes, Args, CandidateSet);
+          AddCandidate(ParamTypes);
         }
       }
     }
