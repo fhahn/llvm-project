@@ -105,6 +105,11 @@ namespace {
   public:
     UnqualUsingDirectiveSet(Sema &SemaRef) : SemaRef(SemaRef) {}
 
+    /// Collect the using directives of \p Ctx and its enclosing contexts, if
+    /// \p Ctx is not null, and of the scope chain from \p Initial, reusing the
+    /// result of the last lookup if its inputs are the same.
+    void compute(DeclContext *Ctx, Scope *Initial, Scope *InnermostFileScope);
+
     void visitScopeChain(Scope *S, Scope *InnermostFileScope) {
       // C++ [namespace.udir]p1:
       //   During unqualified name lookup, the names appear as if they
@@ -208,6 +213,51 @@ namespace {
     }
   };
 } // end anonymous namespace
+
+void UnqualUsingDirectiveSet::compute(DeclContext *Ctx, Scope *Initial,
+                                      Scope *InnermostFileScope) {
+  // Without an external source or modules, all using directives are visible
+  // and those of a DeclContext only change when UsingDirectiveGeneration is
+  // bumped. The result then only depends on Ctx, the innermost file context,
+  // and the file contexts and block-scope using directives along the scope
+  // chain.
+  ASTContext &C = SemaRef.Context;
+  const LangOptions &LO = SemaRef.getLangOpts();
+  bool Cacheable = !C.getExternalSource() && !LO.Modules &&
+                   !LO.CPlusPlusModules && !LO.ModulesLocalVisibility;
+  auto &Cache = SemaRef.UnqualUsingDirectiveCache;
+  unsigned Generation = C.UsingDirectiveGeneration;
+  SmallVector<const void *> Key;
+  if (Cacheable) {
+    Key = {Ctx, InnermostFileScope->getEntity()};
+    for (Scope *S = Initial; S; S = S->getParent()) {
+      DeclContext *Entity = S->getEntity();
+      if (Entity && Entity->isFileContext())
+        Key.push_back(Entity);
+      else if (!Entity || Entity->isFunctionOrMethod())
+        llvm::append_range(Key, S->using_directives());
+    }
+    if (Cache.Generation == Generation && Cache.Key == Key) {
+      for (auto [Nominated, Common] : Cache.List)
+        list.emplace_back(Nominated, Common);
+      return;
+    }
+  }
+
+  for (DeclContext *UCtx = Ctx; UCtx; UCtx = UCtx->getParent())
+    if (!UCtx->isTransparentContext())
+      visit(UCtx, UCtx);
+  visitScopeChain(Initial, InnermostFileScope);
+  done();
+
+  if (Cacheable) {
+    Cache.Generation = Generation;
+    Cache.Key = std::move(Key);
+    Cache.List.clear();
+    for (const UnqualUsingEntry &E : list)
+      Cache.List.emplace_back(E.getNominatedNamespace(), E.getCommonAncestor());
+  }
+}
 
 // Retrieve the set of identifier namespaces that correspond to a
 // specific kind of name lookup.
@@ -1438,23 +1488,15 @@ bool Sema::CppLookupName(LookupResult &R, Scope *S) {
         if (Ctx->isFileContext()) {
           // If we haven't handled using directives yet, do so now.
           if (!VisitedUsingDirectives) {
-            // Add using directives from this context up to the top level.
-            for (DeclContext *UCtx = Ctx; UCtx; UCtx = UCtx->getParent()) {
-              if (UCtx->isTransparentContext())
-                continue;
-
-              UDirs.visit(UCtx, UCtx);
-            }
-
             // Find the innermost file scope, so we can add using directives
             // from local scopes.
             Scope *InnermostFileScope = S;
             while (InnermostFileScope &&
                    !isNamespaceOrTranslationUnitScope(InnermostFileScope))
               InnermostFileScope = InnermostFileScope->getParent();
-            UDirs.visitScopeChain(Initial, InnermostFileScope);
-
-            UDirs.done();
+            // Add using directives from this context up to the top level and
+            // from the scope chain.
+            UDirs.compute(Ctx, Initial, InnermostFileScope);
 
             VisitedUsingDirectives = true;
           }
@@ -1489,13 +1531,8 @@ bool Sema::CppLookupName(LookupResult &R, Scope *S) {
 
   // Collect UsingDirectiveDecls in all scopes, and recursively all
   // nominated namespaces by those using-directives.
-  //
-  // FIXME: Cache this sorted list in Scope structure, and DeclContext, so we
-  // don't build it for each lookup!
-  if (!VisitedUsingDirectives) {
-    UDirs.visitScopeChain(Initial, S);
-    UDirs.done();
-  }
+  if (!VisitedUsingDirectives)
+    UDirs.compute(/*Ctx=*/nullptr, Initial, S);
 
   // If we're not performing redeclaration lookup, do not look for local
   // extern declarations outside of a function scope.

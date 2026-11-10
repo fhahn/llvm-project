@@ -1746,6 +1746,8 @@ static bool shouldBeHidden(NamedDecl *D) {
 }
 
 void DeclContext::removeDecl(Decl *D) {
+  if (isa<UsingDirectiveDecl>(D))
+    ++getParentASTContext().UsingDirectiveGeneration;
   assert(D->getLexicalDeclContext() == this &&
          "decl being removed from non-lexical context");
   assert((D->NextInContextAndBits.getPointer() || D == LastDecl) &&
@@ -1832,6 +1834,9 @@ void DeclContext::addHiddenDecl(Decl *D) {
     if (auto *Import = dyn_cast<ImportDecl>(D))
       D->getASTContext().addedLocalImportDecl(Import);
   }
+
+  if (isa<UsingDirectiveDecl>(D))
+    ++getParentASTContext().UsingDirectiveGeneration;
 }
 
 void DeclContext::addDecl(Decl *D) {
@@ -2134,6 +2139,8 @@ bool DeclContext::InEnclosingNamespaceSetOf(const DeclContext *O) const {
 }
 
 void DeclContext::makeDeclVisibleInContext(NamedDecl *D) {
+  if (isa<UsingDirectiveDecl>(D))
+    ++getParentASTContext().UsingDirectiveGeneration;
   DeclContext *PrimaryDC = this->getPrimaryContext();
   DeclContext *DeclDC = D->getDeclContext()->getPrimaryContext();
   // If the decl is being added outside of its semantic decl context, we
