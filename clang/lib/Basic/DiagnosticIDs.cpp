@@ -20,7 +20,9 @@
 #include "llvm/ADT/StringTable.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
+#include <array>
 #include <map>
+#include <numeric>
 #include <optional>
 using namespace clang;
 
@@ -227,44 +229,46 @@ static const StaticDiagInfoRec *GetDiagInfo(unsigned DiagID) {
   if (DiagID >= DIAG_UPPER_LIMIT || DiagID <= DIAG_START_COMMON)
     return nullptr;
 
-  // Compute the index of the requested diagnostic in the static table.
-  // 1. Add the number of diagnostics in each category preceding the
-  //    diagnostic and of the category the diagnostic is in. This gives us
-  //    the offset of the category in the table.
-  // 2. Subtract the number of IDs in each category from our ID. This gives us
-  //    the offset of the diagnostic in the category.
-  // This is cheaper than a binary search on the table as it doesn't touch
-  // memory at all.
-  unsigned Offset = 0;
-  unsigned ID = DiagID - DIAG_START_COMMON - 1;
-#define CATEGORY(NAME, PREV) \
-  if (DiagID > DIAG_START_##NAME) { \
-    Offset += NUM_BUILTIN_##PREV##_DIAGNOSTICS - DIAG_START_##PREV - 1; \
-    ID -= DIAG_START_##NAME - DIAG_START_##PREV; \
-  }
-CATEGORY(DRIVER, COMMON)
-CATEGORY(FRONTEND, DRIVER)
-CATEGORY(CODEGEN, FRONTEND)
-CATEGORY(SERIALIZATION, CODEGEN)
-CATEGORY(LEX, SERIALIZATION)
-CATEGORY(PARSE, LEX)
-CATEGORY(AST, PARSE)
-CATEGORY(COMMENT, AST)
-CATEGORY(CROSSTU, COMMENT)
-CATEGORY(SEMA, CROSSTU)
-CATEGORY(ANALYSIS, SEMA)
-CATEGORY(REFACTORING, ANALYSIS)
-CATEGORY(INSTALLAPI, REFACTORING)
-CATEGORY(TRAP, INSTALLAPI)
+  // Compute the index of the requested diagnostic in the static table by
+  // subtracting the number of IDs before it that are not in the table. That
+  // number only changes at category starts, which are multiples of BlockSize,
+  // so it is looked up per block of IDs.
+  struct CategoryIDs {
+    unsigned Start, Size, End;
+  };
+  static constexpr CategoryIDs Categories[] = {
+#define CATEGORY(NAME)                                                         \
+  {DIAG_START_##NAME, DIAG_SIZE_##NAME, NUM_BUILTIN_##NAME##_DIAGNOSTICS}
+      CATEGORY(COMMON),      CATEGORY(DRIVER),        CATEGORY(FRONTEND),
+      CATEGORY(CODEGEN),     CATEGORY(SERIALIZATION), CATEGORY(LEX),
+      CATEGORY(PARSE),       CATEGORY(AST),           CATEGORY(COMMENT),
+      CATEGORY(CROSSTU),     CATEGORY(SEMA),          CATEGORY(ANALYSIS),
+      CATEGORY(REFACTORING), CATEGORY(INSTALLAPI),    CATEGORY(TRAP),
 #undef CATEGORY
+  };
+  static constexpr unsigned BlockSize = [] {
+    unsigned GCD = 0;
+    for (const CategoryIDs &C : Categories)
+      GCD = std::gcd(GCD, C.Size);
+    return GCD;
+  }();
+  static constexpr auto NumSkipped = [] {
+    std::array<uint16_t, DIAG_UPPER_LIMIT / BlockSize> Table{};
+    unsigned Index = 0;
+    for (const CategoryIDs &C : Categories) {
+      for (unsigned ID = C.Start; ID != C.Start + C.Size; ID += BlockSize)
+        Table[ID / BlockSize] = C.Start + 1 - Index;
+      Index += C.End - C.Start - 1;
+    }
+    return Table;
+  }();
+  unsigned Index = DiagID - NumSkipped[DiagID / BlockSize];
 
   // Avoid out of bounds reads.
-  if (ID + Offset >= StaticDiagInfoSize)
+  if (Index >= StaticDiagInfoSize)
     return nullptr;
 
-  assert(ID < StaticDiagInfoSize && Offset < StaticDiagInfoSize);
-
-  const StaticDiagInfoRec *Found = &StaticDiagInfo[ID + Offset];
+  const StaticDiagInfoRec *Found = &StaticDiagInfo[Index];
   // If the diag id doesn't match we found a different diag, abort. This can
   // happen when this function is called with an ID that points into a hole in
   // the diagID space.
