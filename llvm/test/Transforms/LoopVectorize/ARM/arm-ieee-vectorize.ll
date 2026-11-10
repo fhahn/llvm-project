@@ -173,6 +173,50 @@ for.end:
   ret void
 }
 
+; FP max reduction without fast-math flags
+; CHECK: Checking a loop in 'fmax_select_no_fmf'
+; CHECK: Found an unidentified PHI
+define float @fmax_select_no_fmf(ptr noalias nocapture readonly %a, i32 %N) {
+entry:
+  br label %for.body
+
+for.body:
+  %i.07 = phi i32 [ %inc, %for.body ], [ 0, %entry ]
+  %Red.06 = phi float [ %sel, %for.body ], [ 0.0e+00, %entry ]
+  %arrayidx = getelementptr inbounds float, ptr %a, i32 %i.07
+  %0 = load float, ptr %arrayidx, align 4
+  %cmp = fcmp ogt float %Red.06, %0
+  %sel = select i1 %cmp, float %Red.06, float %0
+  %inc = add nuw nsw i32 %i.07, 1
+  %exitcond = icmp eq i32 %inc, %N
+  br i1 %exitcond, label %for.end, label %for.body
+
+for.end:
+  ret float %sel
+}
+
+; FP max reduction with a fast compare, but no fast-math flags on the select
+; CHECK: Checking a loop in 'fmax_select_fast_fcmp'
+; CHECK: Found an unidentified PHI
+define float @fmax_select_fast_fcmp(ptr noalias nocapture readonly %a, i32 %N) {
+entry:
+  br label %for.body
+
+for.body:
+  %i.07 = phi i32 [ %inc, %for.body ], [ 0, %entry ]
+  %Red.06 = phi float [ %sel, %for.body ], [ 0.0e+00, %entry ]
+  %arrayidx = getelementptr inbounds float, ptr %a, i32 %i.07
+  %0 = load float, ptr %arrayidx, align 4
+  %cmp = fcmp fast ogt float %Red.06, %0
+  %sel = select i1 %cmp, float %Red.06, float %0
+  %inc = add nuw nsw i32 %i.07, 1
+  %exitcond = icmp eq i32 %inc, %N
+  br i1 %exitcond, label %for.end, label %for.body
+
+for.end:
+  ret float %sel
+}
+
 ; Integer loops are always vectorizeable
 ; CHECK: Checking a loop in 'sumi_fast'
 ; CHECK: Loop passed LoopVectorizationLegality checks!
