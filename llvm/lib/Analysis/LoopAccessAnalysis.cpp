@@ -1749,6 +1749,20 @@ private:
     return ScopeList;
   }
 
+  /// Put the accesses of \p Leader's class in RtCheck.UnknownDepCands back
+  /// into DepCands: AddRecs as runs at most a step apart, without unknown
+  /// dependences between them, and all other accesses as classes of their
+  /// own. Accesses of a run need no checks against each other and are checked
+  /// as one group. For example, for two rows of an RGB image, r0 = img and
+  /// r1 = img + S:
+  ///
+  ///   r0[3*x] = ..;  r0[3*x+1] = ..;  r0[3*x+2] = ..;
+  ///   r1[3*x] = ..;  r1[3*x+1] = ..;  r1[3*x+2] = ..;
+  ///
+  /// all pairs across rows are unknown, and each row becomes a run, so a single
+  /// check between the rows replaces nine.
+  void splitClass(const RuntimePointerChecking &RtCheck, MemAccessInfo Leader);
+
   const AnalysisOptions &Opts;
 
   /// Map of all accesses. Values are the types used to access memory pointed to
@@ -2213,41 +2227,25 @@ bool AccessAnalysis::createCheckForAccess(RuntimePointerChecking &RtCheck,
   return true;
 }
 
-/// Put \p Members, the accesses of a class erased from \p DepCands, back into
-/// DepCands as runs of AddRecs at most a step apart, without unknown
-/// dependences in \p UnknownDepPtrPairs between them. Accesses of a run need no
-/// checks against each other and are checked as one group. For example, for
-/// two rows of an RGB image, r0 = img and r1 = img + S:
-///
-///   r0[3*x] = ..;  r0[3*x+1] = ..;  r0[3*x+2] = ..;
-///   r1[3*x] = ..;  r1[3*x+1] = ..;  r1[3*x+2] = ..;
-///
-/// all pairs across rows are unknown, and each row becomes a run, so a single
-/// check between the rows replaces nine.
-static void
-splitClass(MemoryDepChecker::DepCandidates &DepCands,
-           iterator_range<MemoryDepChecker::DepCandidates::member_iterator>
-               Members,
-           const DenseSet<std::pair<const Value *, const Value *>>
-               &UnknownDepPtrPairs,
-           PredicatedScalarEvolution &PSE, const Loop *L) {
+void AccessAnalysis::splitClass(const RuntimePointerChecking &RtCheck,
+                                MemAccessInfo Leader) {
   // Only AddRecs with the same step, whose starts differ by a constant, are at
   // constant distances from each other.
   struct Bucket {
     const SCEV *Start;
     const SCEVConstant *Step;
-    SmallVector<std::pair<APInt, MemoryDepChecker::MemAccessInfo>> Members;
+    SmallVector<std::pair<APInt, MemAccessInfo>> Members;
   };
   SmallVector<Bucket> Buckets;
   ScalarEvolution &SE = *PSE.getSE();
-  for (MemoryDepChecker::MemAccessInfo Access : Members) {
+  for (MemAccessInfo Access : RtCheck.UnknownDepCands.members(Leader)) {
     const SCEV *Start;
     const SCEVConstant *Step;
     // We can't tell where the range of such a pointer lies, so it gets a
     // sub-class of its own.
     if (!match(PSE.getSCEV(Access.getPointer()),
                m_scev_AffineAddRec(m_SCEV(Start), m_SCEVConstant(Step),
-                                   m_SpecificLoop(L)))) {
+                                   m_SpecificLoop(TheLoop)))) {
       DepCands.insert(Access);
       continue;
     }
@@ -2266,7 +2264,7 @@ splitClass(MemoryDepChecker::DepCandidates &DepCands,
       return X.first.slt(Y.first);
     });
     SmallPtrSet<Value *, 4> RunPtrs;
-    MemoryDepChecker::MemAccessInfo RunLeader;
+    MemAccessInfo RunLeader;
     const APInt *PrevOffset = nullptr;
     for (const auto &[Offset, Access] : B.Members) {
       Value *Ptr = Access.getPointer();
@@ -2277,7 +2275,7 @@ splitClass(MemoryDepChecker::DepCandidates &DepCands,
       // with an unknown dependence on the run.
       if (!PrevOffset || (Offset - *PrevOffset).ugt(Step) ||
           any_of(RunPtrs, [&](Value *Other) {
-            return UnknownDepPtrPairs.contains({Ptr, Other});
+            return RtCheck.UnknownDepPtrPairs.contains({Ptr, Other});
           })) {
         RunLeader = Access;
         RunPtrs.clear();
@@ -2327,12 +2325,10 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
       DepCands.eraseClass(Src);
     }
 
-    // Put the accesses of the erased classes back into DepCands as runs that
-    // can be grouped.
+    // Split the erased classes into runs that can be grouped.
     for (const auto *Class : RtCheck.UnknownDepCands)
       if (Class->isLeader())
-        splitClass(DepCands, RtCheck.UnknownDepCands.members(*Class),
-                   RtCheck.UnknownDepPtrPairs, PSE, TheLoop);
+        splitClass(RtCheck, Class->getData());
   } else {
     CheckDeps.clear();
     DepCands = {};
