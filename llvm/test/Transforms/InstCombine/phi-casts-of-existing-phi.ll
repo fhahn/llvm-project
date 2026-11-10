@@ -22,11 +22,11 @@ define void @ptrtoint_twin_iv(ptr %start) {
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi ptr [ [[START]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[IV_INT:%.*]] = phi i64 [ [[START_INT]], %[[ENTRY]] ], [ [[IV_NEXT_INT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV_INT:%.*]] = ptrtoint ptr [[IV]] to i64
 ; CHECK-NEXT:    [[OFF:%.*]] = sub i64 [[IV_INT]], [[START_INT]]
 ; CHECK-NEXT:    call void @use(i64 [[OFF]])
 ; CHECK-NEXT:    [[IV_NEXT]] = getelementptr inbounds nuw i8, ptr [[IV]], i64 8
-; CHECK-NEXT:    [[IV_NEXT_INT]] = ptrtoint ptr [[IV_NEXT]] to i64
+; CHECK-NEXT:    [[IV_NEXT_INT:%.*]] = ptrtoint ptr [[IV_NEXT]] to i64
 ; CHECK-NEXT:    call void @use(i64 [[IV_NEXT_INT]])
 ; CHECK-NEXT:    [[C:%.*]] = call i1 @cond()
 ; CHECK-NEXT:    br i1 [[C]], label %[[LOOP]], label %[[EXIT:.*]]
@@ -257,10 +257,10 @@ define void @ptrtoaddr_twin_iv(ptr %start) {
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi ptr [ [[START]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[IV_ADDR:%.*]] = phi i64 [ [[START_ADDR]], %[[ENTRY]] ], [ [[IV_NEXT_ADDR:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV_ADDR:%.*]] = ptrtoaddr ptr [[IV]] to i64
 ; CHECK-NEXT:    call void @use(i64 [[IV_ADDR]])
 ; CHECK-NEXT:    [[IV_NEXT]] = getelementptr i8, ptr [[IV]], i64 4
-; CHECK-NEXT:    [[IV_NEXT_ADDR]] = ptrtoaddr ptr [[IV_NEXT]] to i64
+; CHECK-NEXT:    [[IV_NEXT_ADDR:%.*]] = ptrtoaddr ptr [[IV_NEXT]] to i64
 ; CHECK-NEXT:    call void @use(i64 [[IV_NEXT_ADDR]])
 ; CHECK-NEXT:    [[C:%.*]] = call i1 @cond()
 ; CHECK-NEXT:    br i1 [[C]], label %[[LOOP]], label %[[EXIT:.*]]
@@ -304,7 +304,7 @@ define void @switch_duplicate_edges(i32 %s, ptr %a, ptr %b) {
 ; CHECK-NEXT:    br label %[[JOIN]]
 ; CHECK:       [[JOIN]]:
 ; CHECK-NEXT:    [[X:%.*]] = phi ptr [ [[B]], %[[OTHER]] ], [ [[A]], %[[ENTRY]] ], [ [[A]], %[[ENTRY]] ]
-; CHECK-NEXT:    [[X_INT:%.*]] = phi i64 [ [[B_INT]], %[[OTHER]] ], [ [[A_INT]], %[[ENTRY]] ], [ [[A_INT]], %[[ENTRY]] ]
+; CHECK-NEXT:    [[X_INT:%.*]] = ptrtoint ptr [[X]] to i64
 ; CHECK-NEXT:    call void @use(i64 [[X_INT]])
 ; CHECK-NEXT:    call void @use.ptr(ptr [[X]])
 ; CHECK-NEXT:    ret void
@@ -346,9 +346,9 @@ define void @landingpad_block(ptr %a, ptr %b) personality ptr @__gxx_personality
 ; CHECK-NEXT:            to label %[[EXIT:.*]] unwind label %[[LPAD]]
 ; CHECK:       [[LPAD]]:
 ; CHECK-NEXT:    [[X:%.*]] = phi ptr [ [[A]], %[[ENTRY]] ], [ [[B]], %[[CONT]] ]
-; CHECK-NEXT:    [[X_INT:%.*]] = phi i64 [ [[A_INT]], %[[ENTRY]] ], [ [[B_INT]], %[[CONT]] ]
 ; CHECK-NEXT:    [[LP:%.*]] = landingpad { ptr, i32 }
 ; CHECK-NEXT:            cleanup
+; CHECK-NEXT:    [[X_INT:%.*]] = ptrtoint ptr [[X]] to i64
 ; CHECK-NEXT:    call void @use(i64 [[X_INT]])
 ; CHECK-NEXT:    call void @use.ptr(ptr [[X]])
 ; CHECK-NEXT:    ret void
@@ -480,11 +480,11 @@ define void @i2p_other_as(ptr %start) {
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi ptr [ [[START]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[IV_INT:%.*]] = phi i64 [ [[START_INT]], %[[ENTRY]] ], [ [[IV_NEXT_INT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV_INT:%.*]] = ptrtoint ptr [[IV]] to i64
 ; CHECK-NEXT:    [[P:%.*]] = inttoptr i64 [[IV_INT]] to ptr addrspace(3)
 ; CHECK-NEXT:    store i8 0, ptr addrspace(3) [[P]], align 1
 ; CHECK-NEXT:    [[IV_NEXT]] = getelementptr inbounds nuw i8, ptr [[IV]], i64 8
-; CHECK-NEXT:    [[IV_NEXT_INT]] = ptrtoint ptr [[IV_NEXT]] to i64
+; CHECK-NEXT:    [[IV_NEXT_INT:%.*]] = ptrtoint ptr [[IV_NEXT]] to i64
 ; CHECK-NEXT:    call void @use(i64 [[IV_NEXT_INT]])
 ; CHECK-NEXT:    [[C:%.*]] = call i1 @cond()
 ; CHECK-NEXT:    br i1 [[C]], label %[[LOOP]], label %[[EXIT:.*]]

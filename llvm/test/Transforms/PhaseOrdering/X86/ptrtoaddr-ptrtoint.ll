@@ -8,45 +8,33 @@ declare void @llvm.memmove.p0.p0.i64(ptr writeonly captures(none), ptr readonly 
 
 define void @redundant_int_iv(ptr %first) {
 ; CHECK-LABEL: define void @redundant_int_iv(
-; CHECK-SAME: ptr [[FIRST:%.*]]) local_unnamed_addr #[[ATTR1:[0-9]+]] {
+; CHECK-SAME: ptr [[FIRST:%.*]]) local_unnamed_addr #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[PTR_INT1:%.*]] = ptrtoint ptr [[FIRST]] to i64
 ; CHECK-NEXT:    [[OFF2:%.*]] = add i64 [[PTR_INT1]], 1
 ; CHECK-NEXT:    [[EC_OUTER3:%.*]] = icmp slt i64 [[OFF2]], 0
 ; CHECK-NEXT:    br i1 [[EC_OUTER3]], label %[[INNER_PH:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[INNER_PH]]:
-; CHECK-NEXT:    [[PTR_INT5:%.*]] = phi i64 [ [[PTR_INT:%.*]], %[[INNER_PH]] ], [ [[PTR_INT1]], %[[ENTRY]] ]
 ; CHECK-NEXT:    [[PTR_IV4:%.*]] = phi ptr [ [[LAST:%.*]], %[[INNER_PH]] ], [ [[FIRST]], %[[ENTRY]] ]
 ; CHECK-NEXT:    [[LAST]] = getelementptr i8, ptr [[PTR_IV4]], i64 7
 ; CHECK-NEXT:    [[CUR_NEXT:%.*]] = getelementptr i8, ptr [[PTR_IV4]], i64 1
-; CHECK-NEXT:    [[CUR_INT:%.*]] = ptrtoint ptr [[CUR_NEXT]] to i64
-; CHECK-NEXT:    [[LEN:%.*]] = sub i64 [[CUR_INT]], [[PTR_INT5]]
-; CHECK-NEXT:    tail call void @llvm.memmove.p0.p0.i64(ptr align 1 [[CUR_NEXT]], ptr align 1 [[PTR_IV4]], i64 [[LEN]], i1 false)
+; CHECK-NEXT:    [[TMP0:%.*]] = load i8, ptr [[PTR_IV4]], align 1
+; CHECK-NEXT:    store i8 [[TMP0]], ptr [[CUR_NEXT]], align 1
 ; CHECK-NEXT:    [[CUR_NEXT_1:%.*]] = getelementptr i8, ptr [[PTR_IV4]], i64 2
-; CHECK-NEXT:    [[CUR_INT_1:%.*]] = ptrtoint ptr [[CUR_NEXT_1]] to i64
-; CHECK-NEXT:    [[LEN_1:%.*]] = sub i64 [[CUR_INT_1]], [[PTR_INT5]]
-; CHECK-NEXT:    tail call void @llvm.memmove.p0.p0.i64(ptr align 1 [[CUR_NEXT_1]], ptr align 1 [[PTR_IV4]], i64 [[LEN_1]], i1 false)
+; CHECK-NEXT:    [[TMP1:%.*]] = load i16, ptr [[PTR_IV4]], align 1
+; CHECK-NEXT:    store i16 [[TMP1]], ptr [[CUR_NEXT_1]], align 1
 ; CHECK-NEXT:    [[CUR_NEXT_2:%.*]] = getelementptr i8, ptr [[PTR_IV4]], i64 3
-; CHECK-NEXT:    [[CUR_INT_2:%.*]] = ptrtoint ptr [[CUR_NEXT_2]] to i64
-; CHECK-NEXT:    [[LEN_2:%.*]] = sub i64 [[CUR_INT_2]], [[PTR_INT5]]
-; CHECK-NEXT:    tail call void @llvm.memmove.p0.p0.i64(ptr align 1 [[CUR_NEXT_2]], ptr align 1 [[PTR_IV4]], i64 [[LEN_2]], i1 false)
+; CHECK-NEXT:    tail call void @llvm.memcpy.p0.p0.i64(ptr noundef nonnull align 1 dereferenceable(3) [[CUR_NEXT_2]], ptr noundef nonnull align 1 dereferenceable(3) [[PTR_IV4]], i64 3, i1 false)
 ; CHECK-NEXT:    [[CUR_NEXT_3:%.*]] = getelementptr i8, ptr [[PTR_IV4]], i64 4
-; CHECK-NEXT:    [[CUR_INT_3:%.*]] = ptrtoint ptr [[CUR_NEXT_3]] to i64
-; CHECK-NEXT:    [[LEN_3:%.*]] = sub i64 [[CUR_INT_3]], [[PTR_INT5]]
-; CHECK-NEXT:    tail call void @llvm.memmove.p0.p0.i64(ptr align 1 [[CUR_NEXT_3]], ptr align 1 [[PTR_IV4]], i64 [[LEN_3]], i1 false)
+; CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[PTR_IV4]], align 1
+; CHECK-NEXT:    store i32 [[TMP2]], ptr [[CUR_NEXT_3]], align 1
 ; CHECK-NEXT:    [[CUR_NEXT_4:%.*]] = getelementptr i8, ptr [[PTR_IV4]], i64 5
-; CHECK-NEXT:    [[CUR_INT_4:%.*]] = ptrtoint ptr [[CUR_NEXT_4]] to i64
-; CHECK-NEXT:    [[LEN_4:%.*]] = sub i64 [[CUR_INT_4]], [[PTR_INT5]]
-; CHECK-NEXT:    tail call void @llvm.memmove.p0.p0.i64(ptr align 1 [[CUR_NEXT_4]], ptr align 1 [[PTR_IV4]], i64 [[LEN_4]], i1 false)
+; CHECK-NEXT:    tail call void @llvm.memcpy.p0.p0.i64(ptr noundef nonnull align 1 dereferenceable(5) [[CUR_NEXT_4]], ptr noundef nonnull align 1 dereferenceable(5) [[PTR_IV4]], i64 5, i1 false)
 ; CHECK-NEXT:    [[CUR_NEXT_5:%.*]] = getelementptr i8, ptr [[PTR_IV4]], i64 6
-; CHECK-NEXT:    [[CUR_INT_5:%.*]] = ptrtoint ptr [[CUR_NEXT_5]] to i64
-; CHECK-NEXT:    [[LEN_5:%.*]] = sub i64 [[CUR_INT_5]], [[PTR_INT5]]
-; CHECK-NEXT:    tail call void @llvm.memmove.p0.p0.i64(ptr align 1 [[CUR_NEXT_5]], ptr align 1 [[PTR_IV4]], i64 [[LEN_5]], i1 false)
+; CHECK-NEXT:    tail call void @llvm.memcpy.p0.p0.i64(ptr noundef nonnull align 1 dereferenceable(6) [[CUR_NEXT_5]], ptr noundef nonnull align 1 dereferenceable(6) [[PTR_IV4]], i64 6, i1 false)
 ; CHECK-NEXT:    [[CUR_NEXT_6:%.*]] = getelementptr i8, ptr [[PTR_IV4]], i64 7
-; CHECK-NEXT:    [[CUR_INT_6:%.*]] = ptrtoint ptr [[CUR_NEXT_6]] to i64
-; CHECK-NEXT:    [[LEN_6:%.*]] = sub i64 [[CUR_INT_6]], [[PTR_INT5]]
-; CHECK-NEXT:    tail call void @llvm.memmove.p0.p0.i64(ptr align 1 [[CUR_NEXT_6]], ptr align 1 [[PTR_IV4]], i64 [[LEN_6]], i1 false)
-; CHECK-NEXT:    [[PTR_INT]] = ptrtoint ptr [[LAST]] to i64
+; CHECK-NEXT:    tail call void @llvm.memcpy.p0.p0.i64(ptr noundef nonnull align 1 dereferenceable(7) [[CUR_NEXT_6]], ptr noundef nonnull align 1 dereferenceable(7) [[PTR_IV4]], i64 7, i1 false)
+; CHECK-NEXT:    [[PTR_INT:%.*]] = ptrtoint ptr [[LAST]] to i64
 ; CHECK-NEXT:    [[OFF:%.*]] = add i64 [[PTR_INT]], 1
 ; CHECK-NEXT:    [[EC_OUTER:%.*]] = icmp slt i64 [[OFF]], 0
 ; CHECK-NEXT:    br i1 [[EC_OUTER]], label %[[INNER_PH]], label %[[EXIT]]
@@ -86,7 +74,7 @@ exit:
 
 define ptr @cancel_out_of_range(ptr %p) {
 ; CHECK-LABEL: define noalias noundef ptr @cancel_out_of_range(
-; CHECK-SAME: ptr [[P:%.*]]) local_unnamed_addr #[[ATTR2:[0-9]+]] {
+; CHECK-SAME: ptr [[P:%.*]]) local_unnamed_addr #[[ATTR1:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    store ptr [[P]], ptr [[P]], align 8
 ; CHECK-NEXT:    [[P1:%.*]] = ptrtoint ptr [[P]] to i64
@@ -121,7 +109,7 @@ loop.dec:
 
 define i64 @cse_two_guards(ptr %base, i64 %n, ptr %cmp) {
 ; CHECK-LABEL: define i64 @cse_two_guards(
-; CHECK-SAME: ptr [[BASE:%.*]], i64 [[N:%.*]], ptr nofree readonly captures(none) [[CMP:%.*]]) local_unnamed_addr #[[ATTR1]] {
+; CHECK-SAME: ptr [[BASE:%.*]], i64 [[N:%.*]], ptr nofree readonly captures(none) [[CMP:%.*]]) local_unnamed_addr #[[ATTR0]] {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[N_FR:%.*]] = freeze i64 [[N]]
 ; CHECK-NEXT:    store ptr [[BASE]], ptr [[BASE]], align 8
@@ -284,7 +272,7 @@ loop2.inc:
 
 define i1 @iter_ne(ptr %it) {
 ; CHECK-LABEL: define i1 @iter_ne(
-; CHECK-SAME: ptr nofree readonly captures(none) [[IT:%.*]]) local_unnamed_addr #[[ATTR3:[0-9]+]] {
+; CHECK-SAME: ptr nofree readonly captures(none) [[IT:%.*]]) local_unnamed_addr #[[ATTR2:[0-9]+]] {
 ; CHECK-NEXT:    [[CUR:%.*]] = load ptr, ptr [[IT]], align 8
 ; CHECK-NEXT:    [[NE:%.*]] = icmp ne ptr [[CUR]], @end
 ; CHECK-NEXT:    ret i1 [[NE]]
@@ -296,7 +284,7 @@ define i1 @iter_ne(ptr %it) {
 
 define ptr @iter_inc(ptr %it) {
 ; CHECK-LABEL: define noalias noundef ptr @iter_inc(
-; CHECK-SAME: ptr nofree captures(none) [[IT:%.*]]) local_unnamed_addr #[[ATTR4:[0-9]+]] {
+; CHECK-SAME: ptr nofree captures(none) [[IT:%.*]]) local_unnamed_addr #[[ATTR3:[0-9]+]] {
 ; CHECK-NEXT:    [[CUR:%.*]] = load ptr, ptr [[IT]], align 8
 ; CHECK-NEXT:    [[NEXT:%.*]] = getelementptr nusw nuw i8, ptr [[CUR]], i64 48
 ; CHECK-NEXT:    store ptr [[NEXT]], ptr [[IT]], align 8
@@ -310,7 +298,7 @@ define ptr @iter_inc(ptr %it) {
 
 define i1 @lambda(ptr %lam, ptr %cmp) {
 ; CHECK-LABEL: define i1 @lambda(
-; CHECK-SAME: ptr nofree readonly captures(none) [[LAM:%.*]], ptr nofree readonly captures(none) [[CMP:%.*]]) local_unnamed_addr #[[ATTR3]] {
+; CHECK-SAME: ptr nofree readonly captures(none) [[LAM:%.*]], ptr nofree readonly captures(none) [[CMP:%.*]]) local_unnamed_addr #[[ATTR2]] {
 ; CHECK-NEXT:    [[CMP_VAL:%.*]] = load i64, ptr [[CMP]], align 8
 ; CHECK-NEXT:    [[CMP_F:%.*]] = uitofp i64 [[CMP_VAL]] to double
 ; CHECK-NEXT:    [[LAM_VAL:%.*]] = load i64, ptr [[LAM]], align 8
@@ -330,7 +318,7 @@ define i1 @lambda(ptr %lam, ptr %cmp) {
 
 define ptr @gep_base_cancel(ptr %p, ptr %end, ptr noalias %a) {
 ; CHECK-LABEL: define noundef ptr @gep_base_cancel(
-; CHECK-SAME: ptr nofree readonly captures(address) [[P:%.*]], ptr nofree readnone captures(address) [[END:%.*]], ptr noalias nofree captures(address, ret: address, provenance) [[A:%.*]]) local_unnamed_addr #[[ATTR5:[0-9]+]] {
+; CHECK-SAME: ptr nofree readonly captures(address) [[P:%.*]], ptr nofree readnone captures(address) [[END:%.*]], ptr noalias nofree captures(address, ret: address, provenance) [[A:%.*]]) local_unnamed_addr #[[ATTR4:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[IN_BOUNDS6:%.*]] = icmp ult ptr [[P]], [[END]]
 ; CHECK-NEXT:    br i1 [[IN_BOUNDS6]], label %[[BODY_PREHEADER:.*]], label %[[COMMON_RET:.*]]

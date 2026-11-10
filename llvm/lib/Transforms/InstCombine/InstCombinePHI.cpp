@@ -972,6 +972,49 @@ Instruction *InstCombinerImpl::foldPHIArgOpIntoPHI(PHINode &PN) {
   return NewCI;
 }
 
+/// If all incoming values of PN are the same ptrtoint/ptrtoaddr and PN's block
+/// already has a PHI merging the cast operands, replace PN with a cast of that
+/// PHI:
+///   %a.int = ptrtoint ptr %a to i64
+///   %b.int = ptrtoint ptr %b to i64
+///   %p = phi ptr [ %a, %bb0 ], [ %b, %bb1 ]
+///   %i = phi i64 [ %a.int, %bb0 ], [ %b.int, %bb1 ]
+/// -->
+///   %i = ptrtoint ptr %p to i64
+/// Unlike foldPHIArgOpIntoPHI this creates no new PHI, so the casts may have
+/// other users. Only ptrtoint/ptrtoaddr are handled:
+///  * ptr->int casts merely reinterpret an existing pointer, and SCEV handles
+///    ptrtoint of a pointer recurrence.
+///  * Integer casts (zext/sext) can carry induction variable information, and
+///    folding them pessimized C/C++ code.
+///  * inttoptr would lose provenance and runs counter to foldIntegerTypedPHI.
+Instruction *InstCombinerImpl::foldPHIArgPtrToIntIntoExistingPHI(PHINode &PN) {
+  if (!isa<PtrToIntInst, PtrToAddrInst>(PN.getIncomingValue(0)) ||
+      !PN.getParent()->hasInsertionPt())
+    return nullptr;
+  auto *FirstCI = cast<CastInst>(PN.getIncomingValue(0));
+  // The new cast is an additional dynamic cast of the pointer, which is not
+  // allowed for unstable pointer representations.
+  if (DL.mustNotIntroducePtrToInt(FirstCI->getSrcTy()))
+    return nullptr;
+  SmallVector<Value *> CastSrcs;
+  for (Value *V : PN.incoming_values()) {
+    auto *CI = dyn_cast<CastInst>(V);
+    if (!CI || !CI->isSameOperationAs(FirstCI))
+      return nullptr;
+    CastSrcs.push_back(CI->getOperand(0));
+  }
+
+  std::optional<PHINode *> SrcPN =
+      findPHIWithIncomingValues(PN, FirstCI->getSrcTy(), CastSrcs,
+                                CLOpts.max_num_phis);
+  if (!SrcPN || !*SrcPN)
+    return nullptr;
+  auto *NewCI = CastInst::Create(FirstCI->getOpcode(), *SrcPN, PN.getType());
+  PHIArgMergedDebugLoc(NewCI, PN);
+  return NewCI;
+}
+
 /// Return true if this phi node is always equal to NonPhiInVal.
 /// This happens with mutually cyclic phi nodes like:
 ///   z = some value; x = phi (y, z); y = phi (x, z)
@@ -1438,11 +1481,16 @@ Instruction *InstCombinerImpl::visitPHINode(PHINode &PN) {
   if (foldDeadPhiWeb(PN))
     return nullptr;
 
+  if (foldIntegerTypedPHI(PN))
+    return nullptr;
+
+  // Run after foldIntegerTypedPHI, which replaces an inttoptr user of PN with
+  // an existing pointer PHI directly.
+  if (Instruction *Result = foldPHIArgPtrToIntIntoExistingPHI(PN))
+    return Result;
+
   // Optimization when the phi only has one use
   if (PN.hasOneUse()) {
-    if (foldIntegerTypedPHI(PN))
-      return nullptr;
-
     // If this phi has a single use, and if that use just computes a value for
     // the next iteration of a loop, delete the phi.  This occurs with unused
     // induction variables, e.g. "for (int j = 0; ; ++j);".  Detecting this
