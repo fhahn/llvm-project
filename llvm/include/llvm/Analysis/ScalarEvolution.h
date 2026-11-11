@@ -2564,11 +2564,14 @@ private:
   /// Preconditions:
   /// * the induction variable is known to be positive.
   /// * the induction variable is assumed not to overflow (i.e. either it
-  ///   actually doesn't, or we'd have to immediately execute UB)
+  ///   actually doesn't, or we'd have to immediately execute UB), unless
+  ///   \p IVMayOverflow is set, e.g. because the loop may exit abnormally
+  ///   before executing UB.
   /// We *don't* assert these preconditions so please be careful.
   const SCEV *computeMaxBECountForLT(const SCEV *Start, const SCEV *Stride,
                                      const SCEV *End, unsigned BitWidth,
-                                     bool IsSigned, bool Invert);
+                                     bool IsSigned, bool Invert,
+                                     bool IVMayOverflow);
 
   /// Verify if a linear IV with positive \p Stride can overflow when compared
   /// against the invariant \p RHS with a less-than. If \p Invert is true, both

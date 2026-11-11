@@ -367,10 +367,10 @@ define void @pr28012(i32 %n) {
 ; CHECK-NEXT:    %iv = phi i32 [ 0, %entry ], [ %iv.inc, %loop ]
 ; CHECK-NEXT:    --> {0,+,7}<nuw><nsw><%loop> U: [0,-2147483648) S: [0,-2147483648) Exits: (7 * ((-1 + (7 umax %n)) /u 7))<nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.inc = add nsw i32 %iv, 7
-; CHECK-NEXT:    --> {7,+,7}<nuw><%loop> U: [7,-3) S: [7,-3) Exits: (7 + (7 * ((-1 + (7 umax %n)) /u 7))<nuw>)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {7,+,7}<nuw><%loop> U: [7,-3) S: [7,0) Exits: (7 + (7 * ((-1 + (7 umax %n)) /u 7))<nuw>)<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @pr28012
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-1 + (7 umax %n)) /u 7)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 613566755
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 613566756
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-1 + (7 umax %n)) /u 7)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;

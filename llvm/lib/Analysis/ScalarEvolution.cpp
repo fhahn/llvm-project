@@ -13168,7 +13168,8 @@ const SCEV *ScalarEvolution::getUDivCeilSCEV(const SCEV *N, const SCEV *D) {
 const SCEV *
 ScalarEvolution::computeMaxBECountForLT(const SCEV *Start, const SCEV *Stride,
                                         const SCEV *End, unsigned BitWidth,
-                                        bool IsSigned, bool Invert) {
+                                        bool IsSigned, bool Invert,
+                                        bool IVMayOverflow) {
   // The logic in this function assumes we can represent a positive stride.
   // If we can't, the backedge-taken count must be zero.
   if (IsSigned && BitWidth == 1)
@@ -13196,7 +13197,8 @@ ScalarEvolution::computeMaxBECountForLT(const SCEV *Start, const SCEV *Stride,
 
   APInt MaxValue = IsSigned ? APInt::getSignedMaxValue(BitWidth)
                             : APInt::getMaxValue(BitWidth);
-  APInt Limit = MaxValue - (StrideForMaxBECount - 1);
+  // If the IV cannot overflow, End is at most MaxValue - (Stride - 1).
+  APInt Limit = IVMayOverflow ? MaxValue : MaxValue - (StrideForMaxBECount - 1);
 
   // Although End can be a MAX expression we estimate MaxEnd considering only
   // the case End = RHS of the loop termination condition. This is safe because
@@ -13742,7 +13744,7 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
   } else {
     ConstantMaxBECount = computeMaxBECountForLT(
         Start, Stride, RHS, getTypeSizeInBits(LHS->getType()), IsSigned,
-        Invert);
+        Invert, IVMayOverflowWithoutUB);
     // If we know exactly how many times the backedge will be taken if it's
     // taken at least once, then the backedge count will either be that or
     // zero. If that count exceeds the range-based bound, the backedge can

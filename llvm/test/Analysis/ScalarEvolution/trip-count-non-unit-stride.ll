@@ -216,17 +216,16 @@ declare void @may_exit()
 ; The backedge is taken 3 times for %n = 127 (IV values 0, 60 and 120), if
 ; @may_exit leaves the loop on the fourth iteration, before the branch on the
 ; overflowed (poison) IV.
-; FIXME: The constant max backedge-taken count of 2 is too small.
 define void @test_preinc_slt_abnormal_exit(i8 %n) {
 ; CHECK-LABEL: 'test_preinc_slt_abnormal_exit'
 ; CHECK-NEXT:  Classifying expressions for: @test_preinc_slt_abnormal_exit
 ; CHECK-NEXT:    %iv = phi i8 [ 0, %start ], [ %iv.next, %loop ]
-; CHECK-NEXT:    --> {0,+,60}<nuw><nsw><%loop> U: [0,121) S: [0,121) Exits: (60 * ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n)))) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,60}<nuw><nsw><%loop> U: [0,-128) S: [0,125) Exits: (60 * ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n)))) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nsw i8 %iv, 60
-; CHECK-NEXT:    --> {60,+,60}<nuw><%loop> U: [60,-75) S: [-128,125) Exits: (60 + (60 * ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n))))<u nuw>)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {60,+,60}<nuw><%loop> U: [60,-15) S: [-128,125) Exits: (60 + (60 * ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n))))<u nuw>)<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_preinc_slt_abnormal_exit
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n)))
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 2
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 3
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n)))
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -246,7 +245,6 @@ exit:
 
 ; The backedge is taken 3 times for %n = 255 (IV values 0, 100 and 200), if
 ; @may_exit leaves the loop on the fourth iteration.
-; FIXME: The constant max backedge-taken count of 2 is too small.
 define void @test_preinc_ult_abnormal_exit(i8 %n) {
 ; CHECK-LABEL: 'test_preinc_ult_abnormal_exit'
 ; CHECK-NEXT:  Classifying expressions for: @test_preinc_ult_abnormal_exit
@@ -256,7 +254,7 @@ define void @test_preinc_ult_abnormal_exit(i8 %n) {
 ; CHECK-NEXT:    --> {100,+,100}<nw><%loop> U: [0,-3) S: [-128,125) Exits: (100 + (100 * ((((-1 * (1 umin %n))<nuw><nsw> + %n) /u 100) + (1 umin %n)))) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_preinc_ult_abnormal_exit
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((((-1 * (1 umin %n))<nuw><nsw> + %n) /u 100) + (1 umin %n))
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 2
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 3
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((((-1 * (1 umin %n))<nuw><nsw> + %n) /u 100) + (1 umin %n))
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -276,17 +274,16 @@ exit:
 
 ; The backedge is taken 3 times for %n = -128 (IV values 0, -60 and -120), if
 ; @may_exit leaves the loop on the fourth iteration.
-; FIXME: The constant max backedge-taken count of 2 is too small.
 define void @test_preinc_sgt_abnormal_exit(i8 %n) {
 ; CHECK-LABEL: 'test_preinc_sgt_abnormal_exit'
 ; CHECK-NEXT:  Classifying expressions for: @test_preinc_sgt_abnormal_exit
 ; CHECK-NEXT:    %iv = phi i8 [ 0, %start ], [ %iv.next, %loop ]
-; CHECK-NEXT:    --> {0,+,-60}<nsw><%loop> U: [0,-3) S: [-120,1) Exits: (-60 * ((((-1 * (1 umin (-1 * (0 smin %n))))<nuw><nsw> + (-1 * (0 smin %n))) /u 60) + (1 umin (-1 * (0 smin %n))))) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,-60}<nsw><%loop> U: [0,-3) S: [-128,1) Exits: (-60 * ((((-1 * (1 umin (-1 * (0 smin %n))))<nuw><nsw> + (-1 * (0 smin %n))) /u 60) + (1 umin (-1 * (0 smin %n))))) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nsw i8 %iv, -60
-; CHECK-NEXT:    --> {-60,+,-60}<nw><%loop> U: [76,-59) S: [-128,125) Exits: (-60 + (-60 * ((((-1 * (1 umin (-1 * (0 smin %n))))<nuw><nsw> + (-1 * (0 smin %n))) /u 60) + (1 umin (-1 * (0 smin %n)))))) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {-60,+,-60}<nw><%loop> U: [16,-59) S: [-128,125) Exits: (-60 + (-60 * ((((-1 * (1 umin (-1 * (0 smin %n))))<nuw><nsw> + (-1 * (0 smin %n))) /u 60) + (1 umin (-1 * (0 smin %n)))))) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_preinc_sgt_abnormal_exit
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((((-1 * (1 umin (-1 * (0 smin %n))))<nuw><nsw> + (-1 * (0 smin %n))) /u 60) + (1 umin (-1 * (0 smin %n))))
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 2
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 3
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((((-1 * (1 umin (-1 * (0 smin %n))))<nuw><nsw> + (-1 * (0 smin %n))) /u 60) + (1 umin (-1 * (0 smin %n))))
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -346,7 +343,7 @@ define void @test_preinc_slt_pow2_abnormal_exit_after_exiting_branch(i8 %n) {
 ; CHECK-NEXT:    --> {-64,+,64}<nw><%loop> U: [0,-63) S: [-128,65) Exits: (-64 + (64 * ((-65 + %n) /u 64))<nuw>) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_preinc_slt_pow2_abnormal_exit_after_exiting_branch
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-65 + %n) /u 64)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 3
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 4
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-65 + %n) /u 64)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;

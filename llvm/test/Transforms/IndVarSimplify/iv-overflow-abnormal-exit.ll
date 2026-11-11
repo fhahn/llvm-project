@@ -5,7 +5,6 @@ declare void @use(i8, i1)
 
 ; The backedge is taken 3 times for %n = 127 (%iv 0, 60 and 120), if @use exits
 ; on the fourth call, before the branch on the overflowed (poison) %iv.
-; FIXME: %c is folded to true, but it is false on the fourth call.
 define void @slt_nsw_iv_abnormal_exit(i8 %n) {
 ; CHECK-LABEL: define void @slt_nsw_iv_abnormal_exit(
 ; CHECK-SAME: i8 [[N:%.*]]) {
@@ -14,7 +13,8 @@ define void @slt_nsw_iv_abnormal_exit(i8 %n) {
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    [[J:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[J_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    call void @use(i8 [[J]], i1 true)
+; CHECK-NEXT:    [[C:%.*]] = icmp samesign ult i8 [[J]], 3
+; CHECK-NEXT:    call void @use(i8 [[J]], i1 [[C]])
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i8 [[IV]], 60
 ; CHECK-NEXT:    [[J_NEXT]] = add nuw nsw i8 [[J]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp slt i8 [[IV]], [[N]]
