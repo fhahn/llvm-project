@@ -241,17 +241,24 @@ for.cond.cleanup:
 ; The backedge is taken 3 times for %N = 65 (%iv.next 64, 128 and 192) and
 ; %m = 3: the inner loop does not terminate on the fourth iteration, before the
 ; branch on the overflowed (poison) %iv.next.
-; FIXME: The backedge-taken count is 0 for %N = 65.
 define void @test_nuw_inner_loop(i8 %N, i8 %m) {
 ; CHECK-LABEL: 'test_nuw_inner_loop'
 ; CHECK-NEXT:  Determining loop execution counts for: @test_nuw_inner_loop
 ; CHECK-NEXT:  Loop %inner: Unpredictable backedge-taken count.
 ; CHECK-NEXT:  Loop %inner: Unpredictable constant max backedge-taken count.
 ; CHECK-NEXT:  Loop %inner: Unpredictable symbolic max backedge-taken count.
-; CHECK-NEXT:  Loop %for.body: backedge-taken count is ((-64 + %N) /u 64)
-; CHECK-NEXT:  Loop %for.body: constant max backedge-taken count is i8 3
-; CHECK-NEXT:  Loop %for.body: symbolic max backedge-taken count is ((-64 + %N) /u 64)
-; CHECK-NEXT:  Loop %for.body: Trip multiple is 1
+; CHECK-NEXT:  Loop %for.body: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %for.body: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %for.body: Unpredictable symbolic max backedge-taken count.
+; CHECK-NEXT:  Loop %for.body: Predicated backedge-taken count is ((-64 + %N) /u 64)
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      Equal predicate: (zext i6 (trunc i8 %N to i6) to i8) == 0
+; CHECK-NEXT:  Loop %for.body: Predicated constant max backedge-taken count is i8 3
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      Equal predicate: (zext i6 (trunc i8 %N to i6) to i8) == 0
+; CHECK-NEXT:  Loop %for.body: Predicated symbolic max backedge-taken count is ((-64 + %N) /u 64)
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      Equal predicate: (zext i6 (trunc i8 %N to i6) to i8) == 0
 ;
 entry:
   br label %for.body

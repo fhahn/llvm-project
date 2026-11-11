@@ -10764,7 +10764,7 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(const SCEV *V,
   // distance, but we don't care because if the condition is "missed" the loop
   // will have undefined behavior due to wrapping.
   if (ControlsOnlyExit && AddRec->hasNoSelfWrap() &&
-      loopHasNoAbnormalExits(AddRec->getLoop())) {
+      loopIterationsMustComplete(AddRec->getLoop())) {
 
     // If the stride is zero and the start is non-zero, the loop must be
     // infinite. In C++, most loops are finite by assumption, in which case the

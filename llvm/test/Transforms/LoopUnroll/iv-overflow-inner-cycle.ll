@@ -87,17 +87,24 @@ exit:
 
 ; The backedge is taken 3 times (%iv.next 64, 128 and 192), before the inner
 ; loop spins forever on the fourth iteration (%j == 3).
-; FIXME: The loop is unrolled to a single iteration.
 define void @ne_nuw_iv_inner_loop() {
 ; CHECK-LABEL: define void @ne_nuw_iv_inner_loop() {
-; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LATCH:.*]] ]
+; CHECK-NEXT:    [[J:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[J_NEXT:%.*]], %[[LATCH]] ]
 ; CHECK-NEXT:    br label %[[INNER:.*]]
 ; CHECK:       [[INNER]]:
-; CHECK-NEXT:    call void @print(i8 0)
-; CHECK-NEXT:    br i1 false, label %[[INNER]], label %[[LATCH:.*]]
+; CHECK-NEXT:    call void @print(i8 [[J]])
+; CHECK-NEXT:    [[SPIN:%.*]] = icmp eq i8 [[J]], 3
+; CHECK-NEXT:    br i1 [[SPIN]], label %[[INNER]], label %[[LATCH]]
 ; CHECK:       [[LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw i8 [[IV]], 64
+; CHECK-NEXT:    [[J_NEXT]] = add i8 [[J]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp ne i8 [[IV_NEXT]], 65
+; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP]], label %[[EXIT:.*]]
+; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;
 entry:
