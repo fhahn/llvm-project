@@ -9591,20 +9591,14 @@ ScalarEvolution::ExitLimit ScalarEvolution::computeShiftCompareExitLimit(
     unsigned BitWidth = getTypeSizeInBits(RHS->getType());
     unsigned MaxBTC = BitWidth;
 
-    // For right-shift recurrences (lshr/ashr with non-negative start), we can
-    // compute a tighter max backedge-taken count from the range of the start
-    // value. After k shifts by C, value = start >> (k * C). The value reaches
-    // 0 (the stable value) when k * C >= activeBits(start), so max BTC =
-    // ceil(activeBits(maxStart) / C).
+    // A right shift by C shifts out C bits, so the recurrence reaches its
+    // stable value after at most ceil(activeBits(MaxStart) / C) shifts.
+    // Negative ashr starts have all bits active and reach -1 within that bound.
     if (OpCode == Instruction::LShr || OpCode == Instruction::AShr) {
       Value *StartValue = PN->getIncomingValueForBlock(Predecessor);
       const SCEV *StartSCEV = getSCEV(StartValue);
       APInt MaxStart = getUnsignedRangeMax(StartSCEV);
-      if (MaxStart.isStrictlyPositive()) {
-        unsigned ActiveBits = MaxStart.getActiveBits();
-        unsigned RangeBTC = divideCeil(ActiveBits, C->getZExtValue());
-        MaxBTC = std::min(MaxBTC, RangeBTC);
-      }
+      MaxBTC = divideCeil(MaxStart.getActiveBits(), C->getZExtValue());
     }
 
     // Each division divides the magnitude by at least C, so count the

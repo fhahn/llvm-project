@@ -344,8 +344,8 @@ define void @test_lshr_shift3(i32 %init) {
 ; CHECK-LABEL: 'test_lshr_shift3'
 ; CHECK-NEXT:  Determining loop execution counts for: @test_lshr_shift3
 ; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 32
-; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 32
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 11
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 11
 ;
  entry:
   br label %loop
@@ -366,8 +366,8 @@ define void @test_lshr_shift7_shifted_cond(i64 %init) {
 ; CHECK-LABEL: 'test_lshr_shift7_shifted_cond'
 ; CHECK-NEXT:  Determining loop execution counts for: @test_lshr_shift7_shifted_cond
 ; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 64
-; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i64 64
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 10
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i64 10
 ;
  entry:
   br label %loop
@@ -388,8 +388,8 @@ define void @test_lshr_shift3_test_shift1(i32 %init) {
 ; CHECK-LABEL: 'test_lshr_shift3_test_shift1'
 ; CHECK-NEXT:  Determining loop execution counts for: @test_lshr_shift3_test_shift1
 ; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 32
-; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 32
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 11
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 11
 ;
  entry:
   br label %loop
@@ -409,9 +409,10 @@ define void @test_lshr_shift3_test_shift1(i32 %init) {
 define void @test_lshr_zero_start(ptr %init.ptr) {
 ; CHECK-LABEL: 'test_lshr_zero_start'
 ; CHECK-NEXT:  Determining loop execution counts for: @test_lshr_zero_start
-; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 32
-; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 32
+; CHECK-NEXT:  Loop %loop: backedge-taken count is i32 0
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 0
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 0
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
  entry:
   %init = load i32, ptr %init.ptr, !range !3
@@ -433,8 +434,8 @@ define void @test_ashr_shift2_negative(ptr %init.ptr) {
 ; CHECK-LABEL: 'test_ashr_shift2_negative'
 ; CHECK-NEXT:  Determining loop execution counts for: @test_ashr_shift2_negative
 ; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 32
-; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 32
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 16
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 16
 ;
  entry:
   %init = load i32, ptr %init.ptr, !range !1
@@ -456,8 +457,8 @@ define void @test_ashr_shift3_assume_nonneg(i32 %init) {
 ; CHECK-LABEL: 'test_ashr_shift3_assume_nonneg'
 ; CHECK-NEXT:  Determining loop execution counts for: @test_ashr_shift3_assume_nonneg
 ; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 32
-; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 32
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 11
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 11
 ;
  entry:
   %nonneg = icmp sgt i32 %init, -1
