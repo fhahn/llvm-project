@@ -5,14 +5,24 @@ declare void @use(i8)
 
 ; The backedge is taken twice for %n = 0 (%iv 1 and -2), if @use exits on the
 ; third call, before the branch on the poison %iv.
-; FIXME: The loop is replaced by a single call of @use.
 define void @ugt_nuw_iv_abnormal_exit(i8 %n) {
 ; CHECK-LABEL: define void @ugt_nuw_iv_abnormal_exit(
 ; CHECK-SAME: i8 [[N:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    call void @use(i8 0)
+; CHECK-NEXT:    [[IV:%.*]] = phi i8 [ 1, %[[ENTRY]] ], [ [[IV_NEXT_1:%.*]], %[[LOOP_1:.*]] ]
+; CHECK-NEXT:    [[J:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[J_NEXT_1:%.*]], %[[LOOP_1]] ]
+; CHECK-NEXT:    call void @use(i8 [[J]])
+; CHECK-NEXT:    [[J_NEXT:%.*]] = add nuw nsw i8 [[J]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp ugt i8 [[IV]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP_1]], label %[[EXIT:.*]]
+; CHECK:       [[LOOP_1]]:
+; CHECK-NEXT:    call void @use(i8 [[J_NEXT]])
+; CHECK-NEXT:    [[IV_NEXT_1]] = add nuw i8 [[IV]], -6
+; CHECK-NEXT:    [[J_NEXT_1]] = add i8 [[J]], 2
+; CHECK-NEXT:    br i1 true, label %[[LOOP]], label %[[EXIT]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;
 entry:
@@ -33,3 +43,7 @@ exit:
 
 !0 = distinct !{!0, !1}
 !1 = !{!"llvm.loop.unroll.count", i32 2}
+;.
+; CHECK: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]]}
+; CHECK: [[META1]] = !{!"llvm.loop.unroll.disable"}
+;.

@@ -479,14 +479,12 @@ declare void @may_exit()
 ; The backedge is taken twice for %n = 0 (IV values 1 and -2), if @may_exit
 ; leaves the loop on the third iteration, before the branch on the poison IV:
 ; the IV is only poison on the iteration after it wrapped below 0.
-; FIXME: The backedge-taken count is 0 for %n = 0.
 define void @ugt_stride_3_abnormal_exit(i32 %n) {
 ; CHECK-LABEL: 'ugt_stride_3_abnormal_exit'
 ; CHECK-NEXT:  Determining loop execution counts for: @ugt_stride_3_abnormal_exit
-; CHECK-NEXT:  Loop %loop: backedge-taken count is i32 0
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 0
-; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 0
-; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
 ;
 entry:
   br label %loop
@@ -504,14 +502,12 @@ exit:
 
 ; The backedge is taken at most once: the third iteration branches on the
 ; poison IV, before @may_exit can leave the loop.
-; FIXME: The backedge-taken count is 0 for %n = 0.
 define void @ugt_stride_3_abnormal_exit_after_exiting_branch(i32 %n) {
 ; CHECK-LABEL: 'ugt_stride_3_abnormal_exit_after_exiting_branch'
 ; CHECK-NEXT:  Determining loop execution counts for: @ugt_stride_3_abnormal_exit_after_exiting_branch
-; CHECK-NEXT:  Loop %loop.header: backedge-taken count is i32 0
-; CHECK-NEXT:  Loop %loop.header: constant max backedge-taken count is i32 0
-; CHECK-NEXT:  Loop %loop.header: symbolic max backedge-taken count is i32 0
-; CHECK-NEXT:  Loop %loop.header: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop.header: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop.header: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %loop.header: Unpredictable symbolic max backedge-taken count.
 ;
 entry:
   br label %loop.header

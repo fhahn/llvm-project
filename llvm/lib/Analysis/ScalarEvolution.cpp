@@ -13440,8 +13440,19 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
   //   1) We can show overflow doesn't occur before the exiting iteration
   //      1a) canIVOverflowOnLT, and b) step of one
   //   2) We can show that if overflow occurs, the loop must execute UB
-  //      before any possible exit.
+  //      before taking the exit.
   // Note that we have not yet proved RHS invariant (in general).
+
+  // In case 2), the loop may still exit abnormally before executing UB. Then
+  // the IV cannot be assumed to reach RHS without overflowing.
+  bool IVMayOverflowWithoutUB = IVMayOverflow && !loopHasNoAbnormalExits(L);
+
+  // Adding a negative step to a decreasing IV has no unsigned wrap exactly
+  // when the IV wraps below zero, i.e. ~IV overflows; only the IV of the
+  // following iteration is poison. If the loop may exit abnormally before
+  // branching on it, the backedge may be taken once more than computed below.
+  if (Invert && !IsSigned && IVMayOverflowWithoutUB)
+    return getCouldNotCompute();
 
   const SCEV *Start = IV->getStart();
 
