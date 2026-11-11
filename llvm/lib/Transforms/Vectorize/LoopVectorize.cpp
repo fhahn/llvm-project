@@ -2165,11 +2165,14 @@ bool LoopVectorizationCostModel::interleavedAccessCanBeWidened(
 
   // Check if masking is required.
   // A Group may need masking for one of two reasons: it resides in a block that
-  // needs predication, or it was decided to use masking to deal with gaps
+  // needs predication and one of its members needs a mask, or it was decided
+  // to use masking to deal with gaps
   // (either a gap at the end of a load-access that may result in a speculative
   // load, or any gaps in a store-access).
   bool PredicatedAccessRequiresMasking =
-      blockNeedsPredicationForAnyReason(I->getParent()) && isMaskRequired(I);
+      blockNeedsPredicationForAnyReason(I->getParent()) &&
+      any_of(Group->members(),
+             [this](Instruction *M) { return isMaskRequired(M); });
   bool LoadAccessWithGapsRequiresEpilogMasking =
       isa<LoadInst>(I) && Group->requiresScalarEpilogue() &&
       !isEpilogueAllowed();
@@ -4114,19 +4117,19 @@ LoopVectorizationCostModel::getInterleaveGroupCost(Instruction *I,
     if (Group->getMember(IF))
       Indices.push_back(IF);
 
+  bool NeedsMask = any_of(Group->members(),
+                          [this](Instruction *M) { return isMaskRequired(M); });
   // Calculate the cost of the whole interleaved group.
   bool UseMaskForGaps =
       (Group->requiresScalarEpilogue() && !isEpilogueAllowed()) ||
       (isa<StoreInst>(I) && !Group->isFull());
   InstructionCost Cost = TTI.getInterleavedMemoryOpCost(
       InsertPos->getOpcode(), WideVecTy, Group->getFactor(), Indices,
-      Group->getAlign(), AS, Config.CostKind, isMaskRequired(I),
-      UseMaskForGaps);
+      Group->getAlign(), AS, Config.CostKind, NeedsMask, UseMaskForGaps);
 
   if (Group->isReverse()) {
     // TODO: Add support for reversed masked interleaved access.
-    assert(!isMaskRequired(I) &&
-           "Reverse masked interleaved access not supported.");
+    assert(!NeedsMask && "Reverse masked interleaved access not supported.");
     Cost += Group->getNumMembers() *
             TTI.getShuffleCost(TargetTransformInfo::SK_Reverse, VectorTy,
                                VectorTy, Config.CostKind, {}, 0);

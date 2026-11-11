@@ -3632,20 +3632,17 @@ define i32 @masked_strided2_reverse_member_accessed_unconditionally(ptr noalias 
 ; ENABLED_MASKED_STRIDED-NEXT:    [[TMP16:%.*]] = extractelement <8 x i32> [[TMP15]], i64 0
 ; ENABLED_MASKED_STRIDED-NEXT:    [[TMP17:%.*]] = shl nuw nsw <8 x i32> [[TMP15]], splat (i32 1)
 ; ENABLED_MASKED_STRIDED-NEXT:    [[WIDE_GEP:%.*]] = getelementptr inbounds [4 x i8], ptr [[A]], <8 x i32> [[TMP17]]
-; ENABLED_MASKED_STRIDED-NEXT:    [[TMP18:%.*]] = extractelement <8 x ptr> [[WIDE_GEP]], i64 0
 ; ENABLED_MASKED_STRIDED-NEXT:    call void @llvm.masked.scatter.v8i32.v8p0(<8 x i32> zeroinitializer, <8 x ptr> align 4 [[WIDE_GEP]], <8 x i1> splat (i1 true))
 ; ENABLED_MASKED_STRIDED-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i8, ptr [[C]], i32 [[TMP16]]
 ; ENABLED_MASKED_STRIDED-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i8, ptr [[TMP19]], i32 -7
 ; ENABLED_MASKED_STRIDED-NEXT:    [[WIDE_LOAD:%.*]] = load <8 x i8>, ptr [[TMP20]], align 1
 ; ENABLED_MASKED_STRIDED-NEXT:    [[REVERSE:%.*]] = shufflevector <8 x i8> [[WIDE_LOAD]], <8 x i8> poison, <8 x i32> <i32 7, i32 6, i32 5, i32 4, i32 3, i32 2, i32 1, i32 0>
 ; ENABLED_MASKED_STRIDED-NEXT:    [[TMP21:%.*]] = icmp ne <8 x i8> [[REVERSE]], zeroinitializer
-; ENABLED_MASKED_STRIDED-NEXT:    [[TMP22:%.*]] = getelementptr inbounds i8, ptr [[TMP18]], i32 -56
-; ENABLED_MASKED_STRIDED-NEXT:    [[WIDE_VEC:%.*]] = load <16 x i32>, ptr [[TMP22]], align 4
-; ENABLED_MASKED_STRIDED-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <16 x i32> [[WIDE_VEC]], <16 x i32> poison, <8 x i32> <i32 0, i32 2, i32 4, i32 6, i32 8, i32 10, i32 12, i32 14>
-; ENABLED_MASKED_STRIDED-NEXT:    [[REVERSE2:%.*]] = shufflevector <8 x i32> [[STRIDED_VEC]], <8 x i32> poison, <8 x i32> <i32 7, i32 6, i32 5, i32 4, i32 3, i32 2, i32 1, i32 0>
-; ENABLED_MASKED_STRIDED-NEXT:    [[STRIDED_VEC3:%.*]] = shufflevector <16 x i32> [[WIDE_VEC]], <16 x i32> poison, <8 x i32> <i32 1, i32 3, i32 5, i32 7, i32 9, i32 11, i32 13, i32 15>
-; ENABLED_MASKED_STRIDED-NEXT:    [[REVERSE4:%.*]] = shufflevector <8 x i32> [[STRIDED_VEC3]], <8 x i32> poison, <8 x i32> <i32 7, i32 6, i32 5, i32 4, i32 3, i32 2, i32 1, i32 0>
-; ENABLED_MASKED_STRIDED-NEXT:    [[TMP23:%.*]] = add <8 x i32> [[REVERSE2]], [[REVERSE4]]
+; ENABLED_MASKED_STRIDED-NEXT:    [[WIDE_MASKED_GATHER:%.*]] = call <8 x i32> @llvm.masked.gather.v8i32.v8p0(<8 x ptr> align 4 [[WIDE_GEP]], <8 x i1> splat (i1 true), <8 x i32> poison)
+; ENABLED_MASKED_STRIDED-NEXT:    [[TMP22:%.*]] = or disjoint <8 x i32> [[TMP17]], splat (i32 1)
+; ENABLED_MASKED_STRIDED-NEXT:    [[WIDE_GEP2:%.*]] = getelementptr inbounds [4 x i8], ptr [[A]], <8 x i32> [[TMP22]]
+; ENABLED_MASKED_STRIDED-NEXT:    [[WIDE_MASKED_GATHER3:%.*]] = call <8 x i32> @llvm.masked.gather.v8i32.v8p0(<8 x ptr> align 4 [[WIDE_GEP2]], <8 x i1> [[TMP21]], <8 x i32> poison)
+; ENABLED_MASKED_STRIDED-NEXT:    [[TMP23:%.*]] = add <8 x i32> [[WIDE_MASKED_GATHER]], [[WIDE_MASKED_GATHER3]]
 ; ENABLED_MASKED_STRIDED-NEXT:    [[PREDPHI:%.*]] = select <8 x i1> [[TMP21]], <8 x i32> [[TMP23]], <8 x i32> zeroinitializer
 ; ENABLED_MASKED_STRIDED-NEXT:    [[TMP24]] = add <8 x i32> [[VEC_PHI]], [[PREDPHI]]
 ; ENABLED_MASKED_STRIDED-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 8
