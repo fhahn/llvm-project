@@ -22,14 +22,15 @@ define i8 @masked_strided2_member_accessed_unconditionally(ptr noalias %a, ptr n
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <vscale x 16 x i64> [ [[TMP2]], %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <vscale x 16 x i8> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP10:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw nsw <vscale x 16 x i64> [[VEC_IND]], splat (i64 1)
-; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr inbounds i8, ptr [[A]], <vscale x 16 x i64> [[TMP3]]
+; CHECK-NEXT:    [[TMP3:%.*]] = shl <vscale x 16 x i64> [[VEC_IND]], splat (i64 1)
+; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr i8, ptr [[A]], <vscale x 16 x i64> [[TMP3]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <vscale x 16 x ptr> [[WIDE_GEP]], i64 0
 ; CHECK-NEXT:    call void @llvm.masked.scatter.nxv16i8.nxv16p0(<vscale x 16 x i8> zeroinitializer, <vscale x 16 x ptr> align 1 [[WIDE_GEP]], <vscale x 16 x i1> splat (i1 true))
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i8, ptr [[C]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <vscale x 16 x i8>, ptr [[TMP5]], align 1
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp ne <vscale x 16 x i8> [[WIDE_LOAD]], zeroinitializer
-; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <vscale x 32 x i8>, ptr [[TMP4]], align 1
+; CHECK-NEXT:    [[INTERLEAVED_MASK:%.*]] = call <vscale x 32 x i1> @llvm.vector.interleave2.nxv32i1(<vscale x 16 x i1> [[TMP6]], <vscale x 16 x i1> [[TMP6]])
+; CHECK-NEXT:    [[WIDE_VEC:%.*]] = call <vscale x 32 x i8> @llvm.masked.load.nxv32i8.p0(ptr align 1 [[TMP4]], <vscale x 32 x i1> [[INTERLEAVED_MASK]], <vscale x 32 x i8> poison)
 ; CHECK-NEXT:    [[STRIDED_VEC:%.*]] = call { <vscale x 16 x i8>, <vscale x 16 x i8> } @llvm.vector.deinterleave2.nxv32i8(<vscale x 32 x i8> [[WIDE_VEC]])
 ; CHECK-NEXT:    [[TMP7:%.*]] = extractvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[STRIDED_VEC]], 0
 ; CHECK-NEXT:    [[TMP8:%.*]] = extractvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[STRIDED_VEC]], 1

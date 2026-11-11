@@ -3227,13 +3227,14 @@ define i32 @masked_strided2_member_accessed_unconditionally(ptr noalias %a, ptr 
 ; ENABLED_MASKED_STRIDED:       [[VECTOR_BODY]]:
 ; ENABLED_MASKED_STRIDED-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; ENABLED_MASKED_STRIDED-NEXT:    [[VEC_PHI:%.*]] = phi <8 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP10:%.*]], %[[VECTOR_BODY]] ]
-; ENABLED_MASKED_STRIDED-NEXT:    [[TMP5:%.*]] = shl nuw nsw i32 [[INDEX]], 1
-; ENABLED_MASKED_STRIDED-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[A]], i32 [[TMP5]]
+; ENABLED_MASKED_STRIDED-NEXT:    [[TMP5:%.*]] = shl i32 [[INDEX]], 1
+; ENABLED_MASKED_STRIDED-NEXT:    [[TMP6:%.*]] = getelementptr i32, ptr [[A]], i32 [[TMP5]]
 ; ENABLED_MASKED_STRIDED-NEXT:    call void @llvm.masked.store.v16i32.p0(<16 x i32> <i32 0, i32 poison, i32 0, i32 poison, i32 0, i32 poison, i32 0, i32 poison, i32 0, i32 poison, i32 0, i32 poison, i32 0, i32 poison, i32 0, i32 poison>, ptr align 4 [[TMP6]], <16 x i1> <i1 true, i1 false, i1 true, i1 false, i1 true, i1 false, i1 true, i1 false, i1 true, i1 false, i1 true, i1 false, i1 true, i1 false, i1 true, i1 false>)
 ; ENABLED_MASKED_STRIDED-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i8, ptr [[C]], i32 [[INDEX]]
 ; ENABLED_MASKED_STRIDED-NEXT:    [[WIDE_LOAD:%.*]] = load <8 x i8>, ptr [[TMP7]], align 1
 ; ENABLED_MASKED_STRIDED-NEXT:    [[TMP8:%.*]] = icmp ne <8 x i8> [[WIDE_LOAD]], zeroinitializer
-; ENABLED_MASKED_STRIDED-NEXT:    [[WIDE_VEC:%.*]] = load <16 x i32>, ptr [[TMP6]], align 4
+; ENABLED_MASKED_STRIDED-NEXT:    [[INTERLEAVED_MASK:%.*]] = shufflevector <8 x i1> [[TMP8]], <8 x i1> poison, <16 x i32> <i32 0, i32 0, i32 1, i32 1, i32 2, i32 2, i32 3, i32 3, i32 4, i32 4, i32 5, i32 5, i32 6, i32 6, i32 7, i32 7>
+; ENABLED_MASKED_STRIDED-NEXT:    [[WIDE_VEC:%.*]] = call <16 x i32> @llvm.masked.load.v16i32.p0(ptr align 4 [[TMP6]], <16 x i1> [[INTERLEAVED_MASK]], <16 x i32> poison)
 ; ENABLED_MASKED_STRIDED-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <16 x i32> [[WIDE_VEC]], <16 x i32> poison, <8 x i32> <i32 0, i32 2, i32 4, i32 6, i32 8, i32 10, i32 12, i32 14>
 ; ENABLED_MASKED_STRIDED-NEXT:    [[STRIDED_VEC2:%.*]] = shufflevector <16 x i32> [[WIDE_VEC]], <16 x i32> poison, <8 x i32> <i32 1, i32 3, i32 5, i32 7, i32 9, i32 11, i32 13, i32 15>
 ; ENABLED_MASKED_STRIDED-NEXT:    [[TMP9:%.*]] = add <8 x i32> [[STRIDED_VEC]], [[STRIDED_VEC2]]

@@ -3010,6 +3010,13 @@ void VPlanTransforms::createInterleaveGroups(
       continue;
     VPIRMetadata InterleaveMD(*Start);
     SmallVector<VPValue *, 4> StoredValues;
+    // Members that need a mask share the same mask: InterleavedAccessInfo
+    // only groups predicated accesses within one block and blocks dominating
+    // the latch use the header mask with tail folding or the uncountable-exit
+    // mask for uncountable exits with side effects. Other members may be
+    // unmasked if their address is safe to access unconditionally.
+    // TODO: Dead members that need a mask are not considered yet.
+    VPValue *Mask = nullptr;
     for (unsigned I = 0; I < IG->getFactor(); ++I) {
       Instruction *MemberI = IG->getMember(I);
       if (!MemberI)
@@ -3018,6 +3025,11 @@ void VPlanTransforms::createInterleaveGroups(
         if (auto *StoreR = dyn_cast<VPWidenStoreRecipe>(MemoryR->getAsRecipe()))
           StoredValues.push_back(StoreR->getStoredValue());
         InterleaveMD.intersect(*MemoryR);
+        if (VPValue *MemberMask = MemoryR->getMask()) {
+          assert((!Mask || Mask == MemberMask) &&
+                 "Masked members must share the same mask");
+          Mask = MemberMask;
+        }
       } else {
         InterleaveMD.intersect(VPIRMetadata(*MemberI));
       }
@@ -3042,6 +3054,10 @@ void VPlanTransforms::createInterleaveGroups(
       IRInsertPos = &InsertPos->getIngredient();
     }
     VPRecipeBase *InsertPosR = InsertPos->getAsRecipe();
+    [[maybe_unused]] VPRecipeBase *MaskDef =
+        Mask ? Mask->getDefiningRecipe() : nullptr;
+    assert((!MaskDef || VPDT.properlyDominates(MaskDef, InsertPosR)) &&
+           "Mask must dominate the insert position");
 
     GEPNoWrapFlags NW = GEPNoWrapFlags::none();
     if (auto *Gep = dyn_cast<GetElementPtrInst>(
@@ -3081,9 +3097,9 @@ void VPlanTransforms::createInterleaveGroups(
       ReversePtr->insertBefore(InsertPosR);
       Addr = ReversePtr;
     }
-    auto *VPIG = new VPInterleaveRecipe(
-        IG, Addr, StoredValues, InsertPos->getMask(), NeedsMaskForGaps,
-        InterleaveMD, InsertPosR->getDebugLoc());
+    auto *VPIG =
+        new VPInterleaveRecipe(IG, Addr, StoredValues, Mask, NeedsMaskForGaps,
+                               InterleaveMD, InsertPosR->getDebugLoc());
     VPIG->insertBefore(InsertPosR);
 
     unsigned J = 0;
