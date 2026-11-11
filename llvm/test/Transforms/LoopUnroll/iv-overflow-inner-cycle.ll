@@ -85,6 +85,44 @@ exit:
   ret void
 }
 
+; The backedge is taken 3 times (%iv.next 64, 128 and 192), before the inner
+; loop spins forever on the fourth iteration (%j == 3).
+; FIXME: The loop is unrolled to a single iteration.
+define void @ne_nuw_iv_inner_loop() {
+; CHECK-LABEL: define void @ne_nuw_iv_inner_loop() {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    br label %[[INNER:.*]]
+; CHECK:       [[INNER]]:
+; CHECK-NEXT:    call void @print(i8 0)
+; CHECK-NEXT:    br i1 false, label %[[INNER]], label %[[LATCH:.*]]
+; CHECK:       [[LATCH]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i8 [ 0, %entry ], [ %iv.next, %latch ]
+  %j = phi i8 [ 0, %entry ], [ %j.next, %latch ]
+  br label %inner
+
+inner:
+  call void @print(i8 %j)
+  %spin = icmp eq i8 %j, 3
+  br i1 %spin, label %inner, label %latch
+
+latch:
+  %iv.next = add nuw i8 %iv, 64
+  %j.next = add i8 %j, 1
+  %ec = icmp ne i8 %iv.next, 65
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  ret void
+}
+
 !0 = distinct !{!0, !1}
 !1 = !{!"llvm.loop.unroll.count", i32 2}
 ;.

@@ -238,6 +238,43 @@ for.cond.cleanup:
   ret void
 }
 
+; The backedge is taken 3 times for %N = 65 (%iv.next 64, 128 and 192) and
+; %m = 3: the inner loop does not terminate on the fourth iteration, before the
+; branch on the overflowed (poison) %iv.next.
+; FIXME: The backedge-taken count is 0 for %N = 65.
+define void @test_nuw_inner_loop(i8 %N, i8 %m) {
+; CHECK-LABEL: 'test_nuw_inner_loop'
+; CHECK-NEXT:  Determining loop execution counts for: @test_nuw_inner_loop
+; CHECK-NEXT:  Loop %inner: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %inner: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %inner: Unpredictable symbolic max backedge-taken count.
+; CHECK-NEXT:  Loop %for.body: backedge-taken count is ((-64 + %N) /u 64)
+; CHECK-NEXT:  Loop %for.body: constant max backedge-taken count is i8 3
+; CHECK-NEXT:  Loop %for.body: symbolic max backedge-taken count is ((-64 + %N) /u 64)
+; CHECK-NEXT:  Loop %for.body: Trip multiple is 1
+;
+entry:
+  br label %for.body
+
+for.body:
+  %iv = phi i8 [ %iv.next, %latch ], [ 0, %entry ]
+  %j = phi i8 [ %j.next, %latch ], [ 0, %entry ]
+  %spin = icmp eq i8 %j, %m
+  br label %inner
+
+inner:
+  br i1 %spin, label %inner, label %latch
+
+latch:
+  %iv.next = add nuw i8 %iv, 64
+  %j.next = add i8 %j, 1
+  %cmp = icmp ne i8 %iv.next, %N
+  br i1 %cmp, label %for.body, label %for.cond.cleanup
+
+for.cond.cleanup:
+  ret void
+}
+
 
 define void @test_other_exit(i32 %N) mustprogress {
 ; CHECK-LABEL: 'test_other_exit'
