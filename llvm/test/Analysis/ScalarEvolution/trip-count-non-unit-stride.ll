@@ -363,3 +363,34 @@ latch:
 exit:
   ret void
 }
+
+; The backedge is taken 4 times for %n = 255 (IV values 0, 64, 128 and 192), if
+; @may_exit leaves the loop on the fifth iteration, before the branch on the
+; overflowed (poison) IV.
+; FIXME: The backedge-taken count is 0 for %n = 255.
+define void @test_preinc_ult_pow2_abnormal_exit(i8 %n) {
+; CHECK-LABEL: 'test_preinc_ult_pow2_abnormal_exit'
+; CHECK-NEXT:  Classifying expressions for: @test_preinc_ult_pow2_abnormal_exit
+; CHECK-NEXT:    %iv = phi i8 [ 0, %start ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {0,+,64}<nuw><%loop> U: [0,-63) S: [-128,65) Exits: (64 * ((63 + %n) /u 64))<nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nuw i8 %iv, 64
+; CHECK-NEXT:    --> {64,+,64}<nw><%loop> U: [0,-63) S: [-128,65) Exits: (64 + (64 * ((63 + %n) /u 64))<nuw>) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @test_preinc_ult_pow2_abnormal_exit
+; CHECK-NEXT:  Loop %loop: backedge-taken count is ((63 + %n) /u 64)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 4
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((63 + %n) /u 64)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+start:
+  br label %loop
+
+loop:
+  %iv = phi i8 [ 0, %start ], [ %iv.next, %loop ]
+  call void @may_exit()
+  %iv.next = add nuw i8 %iv, 64
+  %cmp = icmp ult i8 %iv, %n
+  br i1 %cmp, label %loop, label %exit
+
+exit:
+  ret void
+}

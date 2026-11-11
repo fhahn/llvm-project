@@ -41,9 +41,72 @@ exit:
   ret void
 }
 
+; The backedge is taken 4 times for %n = 255 (%iv 0, 64, 128 and 192), if @use
+; exits on the fifth call, before the branch on the overflowed (poison) %iv.
+; FIXME: The trip count is computed as 1 for %n = 255.
+define void @ult_nuw_pow2_stride_abnormal_exit(i8 %n) {
+; CHECK-LABEL: define void @ult_nuw_pow2_stride_abnormal_exit(
+; CHECK-SAME: i8 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = add i8 [[N]], 63
+; CHECK-NEXT:    [[TMP1:%.*]] = lshr i8 [[TMP0]], 6
+; CHECK-NEXT:    [[TMP2:%.*]] = add nuw nsw i8 [[TMP1]], 1
+; CHECK-NEXT:    [[TMP3:%.*]] = freeze i8 [[TMP2]]
+; CHECK-NEXT:    [[TMP4:%.*]] = add i8 [[TMP3]], -1
+; CHECK-NEXT:    [[XTRAITER:%.*]] = and i8 [[TMP3]], 1
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp ult i8 [[TMP4]], 1
+; CHECK-NEXT:    br i1 [[TMP5]], label %[[LOOP_EPIL_PREHEADER:.*]], label %[[ENTRY_NEW:.*]]
+; CHECK:       [[ENTRY_NEW]]:
+; CHECK-NEXT:    [[UNROLL_ITER:%.*]] = sub i8 [[TMP3]], [[XTRAITER]]
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i8 [ 0, %[[ENTRY_NEW]] ], [ [[IV_NEXT_1:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[J:%.*]] = phi i8 [ 0, %[[ENTRY_NEW]] ], [ [[J_NEXT_1:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[NITER:%.*]] = phi i8 [ 0, %[[ENTRY_NEW]] ], [ [[NITER_NEXT_1:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    call void @use(i8 [[J]])
+; CHECK-NEXT:    [[J_NEXT:%.*]] = add nuw nsw i8 [[J]], 1
+; CHECK-NEXT:    call void @use(i8 [[J_NEXT]])
+; CHECK-NEXT:    [[IV_NEXT_1]] = add nuw i8 [[IV]], -128
+; CHECK-NEXT:    [[J_NEXT_1]] = add i8 [[J]], 2
+; CHECK-NEXT:    [[NITER_NEXT_1]] = add i8 [[NITER]], 2
+; CHECK-NEXT:    [[NITER_NCMP_1:%.*]] = icmp ne i8 [[NITER_NEXT_1]], [[UNROLL_ITER]]
+; CHECK-NEXT:    br i1 [[NITER_NCMP_1]], label %[[LOOP]], label %[[EXIT_UNR_LCSSA:.*]], !llvm.loop [[LOOP2:![0-9]+]]
+; CHECK:       [[EXIT_UNR_LCSSA]]:
+; CHECK-NEXT:    [[J_UNR:%.*]] = phi i8 [ [[J_NEXT_1]], %[[LOOP]] ]
+; CHECK-NEXT:    [[LCMP_MOD:%.*]] = icmp ne i8 [[XTRAITER]], 0
+; CHECK-NEXT:    br i1 [[LCMP_MOD]], label %[[LOOP_EPIL_PREHEADER]], label %[[EXIT:.*]]
+; CHECK:       [[LOOP_EPIL_PREHEADER]]:
+; CHECK-NEXT:    [[J_EPIL_INIT:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[J_UNR]], %[[EXIT_UNR_LCSSA]] ]
+; CHECK-NEXT:    [[LCMP_MOD1:%.*]] = icmp ne i8 [[XTRAITER]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[LCMP_MOD1]])
+; CHECK-NEXT:    br label %[[LOOP_EPIL:.*]]
+; CHECK:       [[LOOP_EPIL]]:
+; CHECK-NEXT:    call void @use(i8 [[J_EPIL_INIT]])
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i8 [ 0, %entry ], [ %iv.next, %loop ]
+  %j = phi i8 [ 0, %entry ], [ %j.next, %loop ]
+  call void @use(i8 %j)
+  %iv.next = add nuw i8 %iv, 64
+  %j.next = add i8 %j, 1
+  %ec = icmp ult i8 %iv, %n
+  br i1 %ec, label %loop, label %exit, !llvm.loop !2
+
+exit:
+  ret void
+}
+
 !0 = distinct !{!0, !1}
 !1 = !{!"llvm.loop.unroll.count", i32 2}
+!2 = distinct !{!2, !1}
 ;.
 ; CHECK: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]]}
 ; CHECK: [[META1]] = !{!"llvm.loop.unroll.disable"}
+; CHECK: [[LOOP2]] = distinct !{[[LOOP2]], [[META1]]}
 ;.
