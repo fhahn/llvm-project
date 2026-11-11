@@ -338,6 +338,142 @@ define void @test_gpu_reduction(ptr %blockdim.ptr) {
   ret void
 }
 
+; lshr by 3 with an unknown start, which may have the top bit set: %iv is 0
+; after at most ceil(32 / 3) = 11 shifts.
+define void @test_lshr_shift3(i32 %init) {
+; CHECK-LABEL: 'test_lshr_shift3'
+; CHECK-NEXT:  Determining loop execution counts for: @test_lshr_shift3
+; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 32
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 32
+;
+ entry:
+  br label %loop
+
+ loop:
+  %iv = phi i32 [ %init, %entry ], [ %iv.shift, %loop ]
+  %iv.shift = lshr i32 %iv, 3
+  %exit.cond = icmp eq i32 %iv, 0
+  br i1 %exit.cond, label %leave, label %loop
+
+ leave:
+  ret void
+}
+
+; Varint-style loop comparing the shifted value: an i64 is 0 after at most
+; ceil(64 / 7) = 10 shifts.
+define void @test_lshr_shift7_shifted_cond(i64 %init) {
+; CHECK-LABEL: 'test_lshr_shift7_shifted_cond'
+; CHECK-NEXT:  Determining loop execution counts for: @test_lshr_shift7_shifted_cond
+; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 64
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i64 64
+;
+ entry:
+  br label %loop
+
+ loop:
+  %iv = phi i64 [ %init, %entry ], [ %iv.shift, %loop ]
+  %iv.shift = lshr i64 %iv, 7
+  %exit.cond = icmp eq i64 %iv.shift, 0
+  br i1 %exit.cond, label %leave, label %loop
+
+ leave:
+  ret void
+}
+
+; The tested value is shifted by a different amount than the recurrence. It is
+; 0 no later than %iv, after at most ceil(32 / 3) = 11 shifts.
+define void @test_lshr_shift3_test_shift1(i32 %init) {
+; CHECK-LABEL: 'test_lshr_shift3_test_shift1'
+; CHECK-NEXT:  Determining loop execution counts for: @test_lshr_shift3_test_shift1
+; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 32
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 32
+;
+ entry:
+  br label %loop
+
+ loop:
+  %iv = phi i32 [ %init, %entry ], [ %iv.shift, %loop ]
+  %iv.shift = lshr i32 %iv, 3
+  %iv.test = lshr i32 %iv, 1
+  %exit.cond = icmp eq i32 %iv.test, 0
+  br i1 %exit.cond, label %leave, label %loop
+
+ leave:
+  ret void
+}
+
+; The start is known to be 0, so the backedge is never taken.
+define void @test_lshr_zero_start(ptr %init.ptr) {
+; CHECK-LABEL: 'test_lshr_zero_start'
+; CHECK-NEXT:  Determining loop execution counts for: @test_lshr_zero_start
+; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 32
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 32
+;
+ entry:
+  %init = load i32, ptr %init.ptr, !range !3
+  br label %loop
+
+ loop:
+  %iv = phi i32 [ %init, %entry ], [ %iv.shift, %loop ]
+  %iv.shift = lshr i32 %iv, 1
+  %exit.cond = icmp eq i32 %iv, 0
+  br i1 %exit.cond, label %leave, label %loop
+
+ leave:
+  ret void
+}
+
+; A negative start has all 32 bits active and stabilizes to -1 after at most
+; ceil(32 / 2) = 16 shifts.
+define void @test_ashr_shift2_negative(ptr %init.ptr) {
+; CHECK-LABEL: 'test_ashr_shift2_negative'
+; CHECK-NEXT:  Determining loop execution counts for: @test_ashr_shift2_negative
+; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 32
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 32
+;
+ entry:
+  %init = load i32, ptr %init.ptr, !range !1
+  br label %loop
+
+ loop:
+  %iv = phi i32 [ %init, %entry ], [ %iv.shift, %loop ]
+  %iv.shift = ashr i32 %iv, 2
+  %exit.cond = icmp eq i32 %iv, -1
+  br i1 %exit.cond, label %leave, label %loop
+
+ leave:
+  ret void
+}
+
+; The start is only known to be non-negative via the assume, so %iv stabilizes
+; to 0. Its range is unknown, giving at most ceil(32 / 3) = 11 shifts.
+define void @test_ashr_shift3_assume_nonneg(i32 %init) {
+; CHECK-LABEL: 'test_ashr_shift3_assume_nonneg'
+; CHECK-NEXT:  Determining loop execution counts for: @test_ashr_shift3_assume_nonneg
+; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 32
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 32
+;
+ entry:
+  %nonneg = icmp sgt i32 %init, -1
+  call void @llvm.assume(i1 %nonneg)
+  br label %loop
+
+ loop:
+  %iv = phi i32 [ %init, %entry ], [ %iv.shift, %loop ]
+  %iv.shift = ashr i32 %iv, 3
+  %exit.cond = icmp eq i32 %iv, 0
+  br i1 %exit.cond, label %leave, label %loop
+
+ leave:
+  ret void
+}
+
 ; Dividing by 10 reaches 0 after at most 10 steps, as in digit-counting loops.
 define void @test_udiv(i32 %init) {
 ; CHECK-LABEL: 'test_udiv'
@@ -472,3 +608,4 @@ define void @test_udiv_i128(i128 %init) {
 !0 = !{i32 0, i32 50000}
 !1 = !{i32 -5000, i32 -1}
 !2 = !{i32 1, i32 1025}
+!3 = !{i32 0, i32 1}
