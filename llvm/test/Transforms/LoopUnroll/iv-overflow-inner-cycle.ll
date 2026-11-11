@@ -14,11 +14,13 @@ define void @ult_nuw_pow2_stride_inner_loop(i8 %n) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = lshr i8 [[TMP0]], 6
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i8 [[UMIN]], [[TMP1]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i8 [[TMP4]], 1
-; CHECK-NEXT:    [[XTRAITER:%.*]] = and i8 [[TMP2]], 1
-; CHECK-NEXT:    [[TMP3:%.*]] = icmp ult i8 [[TMP4]], 1
+; CHECK-NEXT:    [[TMP6:%.*]] = freeze i8 [[TMP2]]
+; CHECK-NEXT:    [[TMP5:%.*]] = add i8 [[TMP6]], -1
+; CHECK-NEXT:    [[XTRAITER:%.*]] = and i8 [[TMP6]], 1
+; CHECK-NEXT:    [[TMP3:%.*]] = icmp ult i8 [[TMP5]], 1
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[LOOP_EPIL_PREHEADER:.*]], label %[[ENTRY_NEW:.*]]
 ; CHECK:       [[ENTRY_NEW]]:
-; CHECK-NEXT:    [[UNROLL_ITER:%.*]] = sub i8 [[TMP2]], [[XTRAITER]]
+; CHECK-NEXT:    [[UNROLL_ITER:%.*]] = sub i8 [[TMP6]], [[XTRAITER]]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i8 [ 0, %[[ENTRY_NEW]] ], [ [[IV_NEXT_1:%.*]], %[[LATCH_1:.*]] ]

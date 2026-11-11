@@ -4,17 +4,17 @@
 ; The inner loop may not terminate, so the exiting branch on %n may never
 ; execute. If %n is poison, the runtime check on the trip count must not branch
 ; on it either.
-; FIXME: The trip count is not frozen.
 define void @inner_loop(i64 %n, i1 %c) {
 ; CHECK-LABEL: @inner_loop(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[UMAX:%.*]] = call i64 @llvm.umax.i64(i64 [[N:%.*]], i64 1)
-; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[N]], i64 1)
-; CHECK-NEXT:    [[XTRAITER:%.*]] = and i64 [[UMAX]], 1
+; CHECK-NEXT:    [[TMP2:%.*]] = freeze i64 [[UMAX]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[TMP2]], -1
+; CHECK-NEXT:    [[XTRAITER:%.*]] = and i64 [[TMP2]], 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ult i64 [[TMP0]], 1
 ; CHECK-NEXT:    br i1 [[TMP1]], label [[LOOP_EPIL_PREHEADER:%.*]], label [[ENTRY_NEW:%.*]]
 ; CHECK:       entry.new:
-; CHECK-NEXT:    [[UNROLL_ITER:%.*]] = sub i64 [[UMAX]], [[XTRAITER]]
+; CHECK-NEXT:    [[UNROLL_ITER:%.*]] = sub i64 [[TMP2]], [[XTRAITER]]
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, [[ENTRY_NEW]] ], [ [[IV_NEXT_1:%.*]], [[LATCH_1:%.*]] ]
@@ -67,17 +67,17 @@ exit:
 }
 
 ; Same with an irreducible cycle in an innermost loop.
-; FIXME: The trip count is not frozen.
 define void @irreducible_cycle(i64 %n, i1 %c, i1 %d) {
 ; CHECK-LABEL: @irreducible_cycle(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[UMAX:%.*]] = call i64 @llvm.umax.i64(i64 [[N:%.*]], i64 1)
-; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[N]], i64 1)
-; CHECK-NEXT:    [[XTRAITER:%.*]] = and i64 [[UMAX]], 1
+; CHECK-NEXT:    [[TMP2:%.*]] = freeze i64 [[UMAX]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[TMP2]], -1
+; CHECK-NEXT:    [[XTRAITER:%.*]] = and i64 [[TMP2]], 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ult i64 [[TMP0]], 1
 ; CHECK-NEXT:    br i1 [[TMP1]], label [[LOOP_EPIL_PREHEADER:%.*]], label [[ENTRY_NEW:%.*]]
 ; CHECK:       entry.new:
-; CHECK-NEXT:    [[UNROLL_ITER:%.*]] = sub i64 [[UMAX]], [[XTRAITER]]
+; CHECK-NEXT:    [[UNROLL_ITER:%.*]] = sub i64 [[TMP2]], [[XTRAITER]]
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, [[ENTRY_NEW]] ], [ [[IV_NEXT_1:%.*]], [[LATCH_1:%.*]] ]

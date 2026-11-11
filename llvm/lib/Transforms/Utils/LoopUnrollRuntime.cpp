@@ -866,13 +866,14 @@ bool llvm::UnrollRuntimeLoopRemainder(
   Value *TripCount = Expander.expandCodeFor(TripCountSC, TripCountSC->getType(),
                                             PreHeaderBR);
   Value *BECount;
-  // If there are other exits before the latch, that may cause the latch exit
-  // branch to never be executed, and the latch exit count may be poison.
+  // If there are other exits before the latch, or the latch may not be reached
+  // at all, the latch exit branch may never be executed, and the latch exit
+  // count may be poison.
   // In this case, freeze the TripCount and base BECount on the frozen
   // TripCount. We will introduce two branches using these values, and it's
   // important that they see a consistent value (which would not be guaranteed
   // if were frozen independently.)
-  if ((!OtherExits.empty() || !SE->loopHasNoAbnormalExits(L)) &&
+  if ((!OtherExits.empty() || !SE->loopIterationsMustComplete(L)) &&
       !isGuaranteedNotToBeUndefOrPoison(TripCount, AC, PreHeaderBR, DT)) {
     TripCount = B.CreateFreeze(TripCount);
     BECount =
