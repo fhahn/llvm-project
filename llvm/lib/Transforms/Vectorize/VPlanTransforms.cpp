@@ -2906,65 +2906,68 @@ void VPlanTransforms::replaceSymbolicStrides(
   }
 }
 
-void VPlanTransforms::dropPoisonGeneratingRecipes(VPlan &Plan) {
-  // Collect recipes in the backward slice of `Root` that may generate a poison
-  // value that is used after vectorization.
-  SmallPtrSet<VPRecipeBase *, 16> Visited;
-  auto CollectPoisonGeneratingInstrsInBackwardSlice([&](VPRecipeBase *Root) {
-    SmallVector<VPRecipeBase *, 16> Worklist;
-    Worklist.push_back(Root);
+/// Drop poison-generating flags of the recipes in the backward slice of \p Root
+/// that may generate a poison value that is used after vectorization. Recipes
+/// in \p Visited are skipped.
+static void dropPoisonGeneratingFlagsInBackwardSlice(
+    VPRecipeBase *Root, SmallPtrSetImpl<VPRecipeBase *> &Visited) {
+  SmallVector<VPRecipeBase *, 16> Worklist;
+  Worklist.push_back(Root);
 
-    // Traverse the backward slice of Root through its use-def chain.
-    while (!Worklist.empty()) {
-      VPRecipeBase *CurRec = Worklist.pop_back_val();
+  // Traverse the backward slice of Root through its use-def chain.
+  while (!Worklist.empty()) {
+    VPRecipeBase *CurRec = Worklist.pop_back_val();
 
-      if (!Visited.insert(CurRec).second)
-        continue;
+    if (!Visited.insert(CurRec).second)
+      continue;
 
-      // Prune search if we find another recipe generating a widen memory
-      // instruction. Widen memory instructions involved in address computation
-      // will lead to gather/scatter instructions, which don't need to be
-      // handled.
-      if (isa<VPWidenMemoryRecipe, VPInterleaveRecipe, VPScalarIVStepsRecipe,
-              VPHeaderPHIRecipe>(CurRec))
-        continue;
+    // Prune search if we find another recipe generating a widen memory
+    // instruction. Widen memory instructions involved in address computation
+    // will lead to gather/scatter instructions, which don't need to be
+    // handled.
+    if (isa<VPWidenMemoryRecipe, VPInterleaveRecipe, VPScalarIVStepsRecipe,
+            VPHeaderPHIRecipe>(CurRec))
+      continue;
 
-      // This recipe contributes to the address computation of a widen
-      // load/store. If the underlying instruction has poison-generating flags,
-      // drop them directly.
-      if (auto *RecWithFlags = dyn_cast<VPRecipeWithIRFlags>(CurRec)) {
-        VPValue *A, *B;
-        // Dropping disjoint from an OR may yield incorrect results, as some
-        // analysis may have converted it to an Add implicitly (e.g. SCEV used
-        // for dependence analysis). Instead, replace it with an equivalent Add.
-        // This is possible as all users of the disjoint OR only access lanes
-        // where the operands are disjoint or poison otherwise.
-        if (match(RecWithFlags, m_BinaryOr(m_VPValue(A), m_VPValue(B))) &&
-            RecWithFlags->isDisjoint()) {
-          VPBuilder Builder(RecWithFlags);
-          VPInstruction *New =
-              Builder.createAdd(A, B, RecWithFlags->getDebugLoc());
-          New->setUnderlyingValue(RecWithFlags->getUnderlyingValue());
-          RecWithFlags->replaceAllUsesWith(New);
-          RecWithFlags->eraseFromParent();
-          CurRec = New;
-        } else
-          RecWithFlags->dropPoisonGeneratingFlags();
-      } else {
-        Instruction *Instr = dyn_cast_or_null<Instruction>(
-            CurRec->getVPSingleValue()->getUnderlyingValue());
-        (void)Instr;
-        assert((!Instr || !Instr->hasPoisonGeneratingFlags()) &&
-               "found instruction with poison generating flags not covered by "
-               "VPRecipeWithIRFlags");
-      }
-
-      // Add new definitions to the worklist.
-      for (VPValue *Operand : CurRec->operands())
-        if (VPRecipeBase *OpDef = Operand->getDefiningRecipe())
-          Worklist.push_back(OpDef);
+    // This recipe contributes to the address computation of a widen
+    // load/store. If the underlying instruction has poison-generating flags,
+    // drop them directly.
+    if (auto *RecWithFlags = dyn_cast<VPRecipeWithIRFlags>(CurRec)) {
+      VPValue *A, *B;
+      // Dropping disjoint from an OR may yield incorrect results, as some
+      // analysis may have converted it to an Add implicitly (e.g. SCEV used
+      // for dependence analysis). Instead, replace it with an equivalent Add.
+      // This is possible as all users of the disjoint OR only access lanes
+      // where the operands are disjoint or poison otherwise.
+      if (match(RecWithFlags, m_BinaryOr(m_VPValue(A), m_VPValue(B))) &&
+          RecWithFlags->isDisjoint()) {
+        VPBuilder Builder(RecWithFlags);
+        VPInstruction *New =
+            Builder.createAdd(A, B, RecWithFlags->getDebugLoc());
+        New->setUnderlyingValue(RecWithFlags->getUnderlyingValue());
+        RecWithFlags->replaceAllUsesWith(New);
+        RecWithFlags->eraseFromParent();
+        CurRec = New;
+      } else
+        RecWithFlags->dropPoisonGeneratingFlags();
+    } else {
+      Instruction *Instr = dyn_cast_or_null<Instruction>(
+          CurRec->getVPSingleValue()->getUnderlyingValue());
+      (void)Instr;
+      assert((!Instr || !Instr->hasPoisonGeneratingFlags()) &&
+             "found instruction with poison generating flags not covered by "
+             "VPRecipeWithIRFlags");
     }
-  });
+
+    // Add new definitions to the worklist.
+    for (VPValue *Operand : CurRec->operands())
+      if (VPRecipeBase *OpDef = Operand->getDefiningRecipe())
+        Worklist.push_back(OpDef);
+  }
+}
+
+void VPlanTransforms::dropPoisonGeneratingRecipes(VPlan &Plan) {
+  SmallPtrSet<VPRecipeBase *, 16> Visited;
 
   // We want to exclude the tail folding case, as we don't need to drop flags
   // for operations computing the first lane in this case: the first lane of the
@@ -2986,12 +2989,12 @@ void VPlanTransforms::dropPoisonGeneratingRecipes(VPlan &Plan) {
         VPRecipeBase *AddrDef = WidenRec->getAddr()->getDefiningRecipe();
         if (AddrDef && WidenRec->isConsecutive() && WidenRec->getMask() &&
             match(WidenRec->getMask(), m_UnlessHdrMask))
-          CollectPoisonGeneratingInstrsInBackwardSlice(AddrDef);
+          dropPoisonGeneratingFlagsInBackwardSlice(AddrDef, Visited);
       } else if (auto *InterleaveRec = dyn_cast<VPInterleaveRecipe>(&Recipe)) {
         VPRecipeBase *AddrDef = InterleaveRec->getAddr()->getDefiningRecipe();
         if (AddrDef && InterleaveRec->getMask() &&
             match(InterleaveRec->getMask(), m_UnlessHdrMask))
-          CollectPoisonGeneratingInstrsInBackwardSlice(AddrDef);
+          dropPoisonGeneratingFlagsInBackwardSlice(AddrDef, Visited);
       }
     }
   }
