@@ -8,7 +8,7 @@ target triple = "x86_64-unknown-linux-gnu"
 ; CHECK: remark: {{.*}}: unrolled loop by a factor of 2 with run-time trip count
 ; CHECK: @widget
 ; CHECK: ret void
-define void @widget(ptr %arg, ptr %arg1, ptr %p, ptr %q1, ptr %q2, i1 %c) local_unnamed_addr {
+define void @widget(ptr %arg, ptr %arg1, ptr %p, ptr %q1, ptr %q2, i1 %c) local_unnamed_addr mustprogress {
 entry:
   br label %header.outer
 
