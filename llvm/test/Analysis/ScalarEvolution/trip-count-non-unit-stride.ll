@@ -396,24 +396,23 @@ exit:
 ; The backedge is taken 3 times for %n = 127 (IV values 0, 60 and 120) and
 ; %m = 3: the inner loop does not terminate on the fourth iteration, before the
 ; branch on the overflowed (poison) IV.
-; FIXME: The constant max backedge-taken count of 2 is too small.
 define void @test_preinc_slt_inner_loop(i8 %n, i8 %m) {
 ; CHECK-LABEL: 'test_preinc_slt_inner_loop'
 ; CHECK-NEXT:  Classifying expressions for: @test_preinc_slt_inner_loop
 ; CHECK-NEXT:    %iv = phi i8 [ 0, %start ], [ %iv.next, %latch ]
-; CHECK-NEXT:    --> {0,+,60}<nuw><nsw><%loop> U: [0,121) S: [0,121) Exits: (60 * ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n)))) LoopDispositions: { %loop: Computable, %inner: Invariant }
+; CHECK-NEXT:    --> {0,+,60}<nuw><nsw><%loop> U: [0,-128) S: [0,125) Exits: (60 * ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n)))) LoopDispositions: { %loop: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %j = phi i8 [ 0, %start ], [ %j.next, %latch ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,3) S: [0,3) Exits: ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n))) LoopDispositions: { %loop: Computable, %inner: Invariant }
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,4) S: [0,4) Exits: ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n))) LoopDispositions: { %loop: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %iv.next = add nsw i8 %iv, 60
-; CHECK-NEXT:    --> {60,+,60}<nuw><%loop> U: [60,-75) S: [-128,125) Exits: (60 + (60 * ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n))))<u nuw>)<u nuw> LoopDispositions: { %loop: Computable, %inner: Invariant }
+; CHECK-NEXT:    --> {60,+,60}<nuw><%loop> U: [60,-15) S: [-128,125) Exits: (60 + (60 * ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n))))<u nuw>)<u nuw> LoopDispositions: { %loop: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %j.next = add i8 %j, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,4) S: [1,4) Exits: (1 + (((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n))) LoopDispositions: { %loop: Computable, %inner: Invariant }
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,5) S: [1,5) Exits: (1 + (((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n))) LoopDispositions: { %loop: Computable, %inner: Invariant }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_preinc_slt_inner_loop
 ; CHECK-NEXT:  Loop %inner: Unpredictable backedge-taken count.
 ; CHECK-NEXT:  Loop %inner: Unpredictable constant max backedge-taken count.
 ; CHECK-NEXT:  Loop %inner: Unpredictable symbolic max backedge-taken count.
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n)))
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 2
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 3
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n)))
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -440,21 +439,20 @@ exit:
 }
 
 ; Same as above, with an irreducible cycle instead of an inner loop.
-; FIXME: The constant max backedge-taken count of 2 is too small.
 define void @test_preinc_slt_irreducible_cycle(i8 %n, i8 %m, i1 %c) {
 ; CHECK-LABEL: 'test_preinc_slt_irreducible_cycle'
 ; CHECK-NEXT:  Classifying expressions for: @test_preinc_slt_irreducible_cycle
 ; CHECK-NEXT:    %iv = phi i8 [ 0, %start ], [ %iv.next, %latch ]
-; CHECK-NEXT:    --> {0,+,60}<nuw><nsw><%loop> U: [0,121) S: [0,121) Exits: (60 * ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n)))) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,60}<nuw><nsw><%loop> U: [0,-128) S: [0,125) Exits: (60 * ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n)))) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %j = phi i8 [ 0, %start ], [ %j.next, %latch ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,3) S: [0,3) Exits: ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n))) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,4) S: [0,4) Exits: ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n))) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nsw i8 %iv, 60
-; CHECK-NEXT:    --> {60,+,60}<nuw><%loop> U: [60,-75) S: [-128,125) Exits: (60 + (60 * ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n))))<u nuw>)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {60,+,60}<nuw><%loop> U: [60,-15) S: [-128,125) Exits: (60 + (60 * ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n))))<u nuw>)<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %j.next = add i8 %j, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,4) S: [1,4) Exits: (1 + (((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n))) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,5) S: [1,5) Exits: (1 + (((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n))) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_preinc_slt_irreducible_cycle
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n)))
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 2
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 3
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((((-1 * (1 umin (0 smax %n)))<nuw><nsw> + (0 smax %n)) /u 60) + (1 umin (0 smax %n)))
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -485,25 +483,24 @@ exit:
 
 ; The backedge is taken 4 times for %n = 255 (IV values 0, 64, 128 and 192) and
 ; %m = 4: the inner loop does not terminate on the fifth iteration.
-; FIXME: The backedge-taken count is 0 for %n = 255.
 define void @test_preinc_ult_pow2_inner_loop(i8 %n, i8 %m) {
 ; CHECK-LABEL: 'test_preinc_ult_pow2_inner_loop'
 ; CHECK-NEXT:  Classifying expressions for: @test_preinc_ult_pow2_inner_loop
 ; CHECK-NEXT:    %iv = phi i8 [ 0, %start ], [ %iv.next, %latch ]
-; CHECK-NEXT:    --> {0,+,64}<nuw><%loop> U: [0,-63) S: [-128,65) Exits: (64 * ((63 + %n) /u 64))<nuw> LoopDispositions: { %loop: Computable, %inner: Invariant }
+; CHECK-NEXT:    --> {0,+,64}<nuw><%loop> U: [0,-63) S: [-128,65) Exits: (64 * ((((-1 * (1 umin %n))<nuw><nsw> + %n) /u 64) + (1 umin %n))) LoopDispositions: { %loop: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %j = phi i8 [ 0, %start ], [ %j.next, %latch ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,4) S: [0,4) Exits: ((63 + %n) /u 64) LoopDispositions: { %loop: Computable, %inner: Invariant }
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,5) S: [0,5) Exits: ((((-1 * (1 umin %n))<nuw><nsw> + %n) /u 64) + (1 umin %n)) LoopDispositions: { %loop: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %iv.next = add nuw i8 %iv, 64
-; CHECK-NEXT:    --> {64,+,64}<nw><%loop> U: [0,-63) S: [-128,65) Exits: (64 + (64 * ((63 + %n) /u 64))<nuw>) LoopDispositions: { %loop: Computable, %inner: Invariant }
+; CHECK-NEXT:    --> {64,+,64}<nw><%loop> U: [0,-63) S: [-128,65) Exits: (64 + (64 * ((((-1 * (1 umin %n))<nuw><nsw> + %n) /u 64) + (1 umin %n)))) LoopDispositions: { %loop: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %j.next = add i8 %j, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,5) S: [1,5) Exits: (1 + ((63 + %n) /u 64))<nuw><nsw> LoopDispositions: { %loop: Computable, %inner: Invariant }
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,6) S: [1,6) Exits: (1 + (((-1 * (1 umin %n))<nuw><nsw> + %n) /u 64) + (1 umin %n)) LoopDispositions: { %loop: Computable, %inner: Invariant }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_preinc_ult_pow2_inner_loop
 ; CHECK-NEXT:  Loop %inner: Unpredictable backedge-taken count.
 ; CHECK-NEXT:  Loop %inner: Unpredictable constant max backedge-taken count.
 ; CHECK-NEXT:  Loop %inner: Unpredictable symbolic max backedge-taken count.
-; CHECK-NEXT:  Loop %loop: backedge-taken count is ((63 + %n) /u 64)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 3
-; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((63 + %n) /u 64)
+; CHECK-NEXT:  Loop %loop: backedge-taken count is ((((-1 * (1 umin %n))<nuw><nsw> + %n) /u 64) + (1 umin %n))
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 4
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((((-1 * (1 umin %n))<nuw><nsw> + %n) /u 64) + (1 umin %n))
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
 start:

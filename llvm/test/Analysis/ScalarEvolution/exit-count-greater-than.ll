@@ -529,17 +529,15 @@ exit:
 ; The backedge is taken twice for %n = 0 (IV values 1 and -2) and %m = 2: the
 ; inner loop does not terminate on the third iteration, before the branch on
 ; the poison IV.
-; FIXME: The backedge-taken count is 0 for %n = 0.
 define void @ugt_stride_3_inner_loop(i32 %n, i32 %m) {
 ; CHECK-LABEL: 'ugt_stride_3_inner_loop'
 ; CHECK-NEXT:  Determining loop execution counts for: @ugt_stride_3_inner_loop
 ; CHECK-NEXT:  Loop %inner: Unpredictable backedge-taken count.
 ; CHECK-NEXT:  Loop %inner: Unpredictable constant max backedge-taken count.
 ; CHECK-NEXT:  Loop %inner: Unpredictable symbolic max backedge-taken count.
-; CHECK-NEXT:  Loop %loop: backedge-taken count is i32 0
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 0
-; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 0
-; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
 ;
 entry:
   br label %loop

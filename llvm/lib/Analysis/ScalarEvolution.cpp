@@ -73,9 +73,11 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/AssumptionCache.h"
+#include "llvm/Analysis/CFG.h"
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/LoopIterator.h"
 #include "llvm/Analysis/MemoryBuiltins.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
@@ -7419,6 +7421,22 @@ bool ScalarEvolution::loopIsFiniteByAssumption(const Loop *L) {
   return isFinite(L) || (isMustProgress(L) && loopHasNoSideEffects(L));
 }
 
+bool ScalarEvolution::loopIterationsMustComplete(const Loop *L) {
+  if (!loopHasNoAbnormalExits(L))
+    return false;
+  // A non-terminating cycle is UB in a loop that is finite by assumption.
+  if (loopIsFiniteByAssumption(L))
+    return true;
+  // Otherwise, the only cycles must be through the header and through subloops
+  // that terminate.
+  LoopBlocksRPO RPOT(const_cast<Loop *>(L));
+  RPOT.perform(&LI);
+  return !containsIrreducibleCFG<const BasicBlock *>(RPOT, LI) &&
+         all_of(*L, [&](Loop *SubL) {
+           return isLoopNestFinite(SubL, *this, LI);
+         });
+}
+
 const SCEV *ScalarEvolution::createSCEVIter(Value *V) {
   // Worklist item with a Value and a bool indicating whether all operands have
   // been visited already.
@@ -13445,9 +13463,10 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
   //      before taking the exit.
   // Note that we have not yet proved RHS invariant (in general).
 
-  // In case 2), the loop may still exit abnormally before executing UB. Then
-  // the IV cannot be assumed to reach RHS without overflowing.
-  bool IVMayOverflowWithoutUB = IVMayOverflow && !loopHasNoAbnormalExits(L);
+  // In case 2), the loop may still exit abnormally, or not reach the exiting
+  // branch at all, before executing UB. Then the IV cannot be assumed to reach
+  // RHS without overflowing.
+  bool IVMayOverflowWithoutUB = IVMayOverflow && !loopIterationsMustComplete(L);
 
   // Adding a negative step to a decreasing IV has no unsigned wrap exactly
   // when the IV wraps below zero, i.e. ~IV overflows; only the IV of the

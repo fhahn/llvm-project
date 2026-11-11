@@ -5,16 +5,17 @@ declare void @print(i8) willreturn nounwind
 
 ; The backedge is taken 4 times for %n = 255 (%iv 0, 64, 128 and 192), before
 ; the inner loop spins forever on the fifth iteration (%j == 4).
-; FIXME: The trip count is computed as 1 for %n = 255.
 define void @ult_nuw_pow2_stride_inner_loop(i8 %n) {
 ; CHECK-LABEL: define void @ult_nuw_pow2_stride_inner_loop(
 ; CHECK-SAME: i8 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = add i8 [[N]], 63
+; CHECK-NEXT:    [[UMIN:%.*]] = call i8 @llvm.umin.i8(i8 [[N]], i8 1)
+; CHECK-NEXT:    [[TMP0:%.*]] = sub i8 [[N]], [[UMIN]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = lshr i8 [[TMP0]], 6
-; CHECK-NEXT:    [[TMP2:%.*]] = add nuw nsw i8 [[TMP1]], 1
+; CHECK-NEXT:    [[TMP4:%.*]] = add i8 [[UMIN]], [[TMP1]]
+; CHECK-NEXT:    [[TMP2:%.*]] = add i8 [[TMP4]], 1
 ; CHECK-NEXT:    [[XTRAITER:%.*]] = and i8 [[TMP2]], 1
-; CHECK-NEXT:    [[TMP3:%.*]] = icmp ult i8 [[TMP1]], 1
+; CHECK-NEXT:    [[TMP3:%.*]] = icmp ult i8 [[TMP4]], 1
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[LOOP_EPIL_PREHEADER:.*]], label %[[ENTRY_NEW:.*]]
 ; CHECK:       [[ENTRY_NEW]]:
 ; CHECK-NEXT:    [[UNROLL_ITER:%.*]] = sub i8 [[TMP2]], [[XTRAITER]]

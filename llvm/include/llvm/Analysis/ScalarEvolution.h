@@ -1645,6 +1645,12 @@ public:
     return getLoopProperties(L).HasNoAbnormalExits;
   }
 
+  /// Return true if every iteration of \p L either leaves it through an exit
+  /// edge or reaches its latch, unless it executes UB. That is, the loop has no
+  /// abnormal exits, and it is finite by assumption or its only cycles are
+  /// through the header and through subloops that terminate.
+  LLVM_ABI bool loopIterationsMustComplete(const Loop *L);
+
   /// Return true if this loop is finite by assumption.  That is,
   /// to be infinite, it must also be undefined.
   LLVM_ABI bool loopIsFiniteByAssumption(const Loop *L);
