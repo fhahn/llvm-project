@@ -634,6 +634,10 @@ struct VPlanTransforms {
   static void createPartialReductions(VPlan &Plan, VPCostContext &CostCtx,
                                       VFRange &Range);
 
+  /// Remove the masks of load VPInstructions in \p Plan that are known to be
+  /// safe to execute unconditionally.
+  static void removeUnneededLoadMasks(VPlan &Plan, VPCostContext &CostCtx);
+
   /// Convert load/store VPInstructions in \p Plan into widened or replicate
   /// recipes. Non load/store input instructions are left unchanged.
   static void makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,

@@ -5809,10 +5809,6 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   return ExpandedSCEVs;
 }
 
-bool VPRecipeBuilder::isPredicatedInst(Instruction *I) const {
-  return CM.isPredicatedInst(I);
-}
-
 bool VPRecipeBuilder::prefersVectorizedAddressing() const {
   return CM.TTI.prefersVectorizedAddressing();
 }
@@ -6473,6 +6469,8 @@ LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan, VFRange &Range,
                  Range.Start);
 
   VPCostContext CostCtx(*TLI, *Plan, PlanCM, Config);
+
+  RUN_VPLAN_PASS(VPlanTransforms::removeUnneededLoadMasks, *Plan, CostCtx);
 
   RUN_VPLAN_PASS(VPlanTransforms::makeMemOpWideningDecisions, *Plan, Range,
                  RecipeBuilder, CostCtx);

@@ -6001,6 +6001,38 @@ void VPlanTransforms::createPartialReductions(VPlan &Plan,
   }
 }
 
+/// Returns true if the masked load \p Load can execute unconditionally.
+static bool canExecuteUnconditionally(VPInstruction *Load,
+                                      VPCostContext &CostCtx) {
+  // TODO: Replace the legacy check below with VPlan-based reasoning.
+  if (!CostCtx.isMaskRequired(Load->getUnderlyingInstr()))
+    return true;
+  // The header mask has its first lane active, so loads only masked by it can
+  // execute unconditionally if their address is uniform.
+  return match(Load->getMask(), m_HeaderMask()) &&
+         vputils::isUniformAcrossVFsAndUFs(Load->getOperand(0));
+}
+
+void VPlanTransforms::removeUnneededLoadMasks(VPlan &Plan,
+                                              VPCostContext &CostCtx) {
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_shallow(Plan.getVectorLoopRegion()->getEntry()))) {
+    for (VPInstruction &VPI :
+         make_early_inc_range(make_isa_range<VPInstruction>(*VPBB))) {
+      if (VPI.getOpcode() != Instruction::Load || !VPI.isMasked() ||
+          !canExecuteUnconditionally(&VPI, CostCtx))
+        continue;
+      VPInstruction *Unmasked = VPI.cloneWithOperands(VPI.operandsWithoutMask(),
+                                                      VPI.getScalarType());
+      // Unmasked loads always execute, so drop their execution frequency.
+      Unmasked->clearExecutionFrequency();
+      Unmasked->insertBefore(&VPI);
+      VPI.replaceAllUsesWith(Unmasked);
+      VPI.eraseFromParent();
+    }
+  }
+}
+
 void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
                                                  VPRecipeBuilder &RecipeBuilder,
                                                  VPCostContext &CostCtx) {
@@ -6090,7 +6122,7 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         "makeVPlanMemOpDecision", ProcessSubset, Plan, [&](VPInstruction *VPI) {
           Instruction *I = VPI->getUnderlyingInstr();
           bool IsLoad = VPI->getOpcode() == Instruction::Load;
-          if (RecipeBuilder.isPredicatedInst(I) || !IsLoad ||
+          if (VPI->isMasked() || !IsLoad ||
               !vputils::isUsedByLoadStoreAddress(VPI))
             return false;
 
@@ -6128,12 +6160,11 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
           return false;
         bool Reverse = Stride == -1;
 
-        // A predicated access can only be widened (rather than scalarized) if
-        // the target supports a masked load/store for it.
-        // TODO: Determine if a load/store needs predication directly in VPlan.
-        bool IsPredicated = RecipeBuilder.isPredicatedInst(I);
+        // A masked access can only be widened (rather than scalarized) if the
+        // target supports a masked load/store for it.
+        VPValue *Mask = VPI->getMask();
         Align Alignment = getLoadStoreAlignment(I);
-        if (IsPredicated &&
+        if (Mask &&
             !CostCtx.Config.isLegalMaskedLoadOrStore(
                 IsLoad, ScalarTy, Alignment, getLoadStoreAddressSpace(I)))
           return false;
@@ -6142,7 +6173,6 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         VPSingleDefRecipe *VectorPtr = Builder.createConsecutiveVectorPointer(
             Ptr, ScalarTy, Reverse, VPI->getDebugLoc());
 
-        VPValue *Mask = IsPredicated ? VPI->getMask() : nullptr;
         // Reverse the mask so it matches the reversed access order.
         if (Reverse && Mask)
           Mask = Builder.createNaryOp(VPInstruction::Reverse, Mask,
