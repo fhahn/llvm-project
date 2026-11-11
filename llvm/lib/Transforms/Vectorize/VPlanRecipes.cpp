@@ -288,13 +288,12 @@ bool VPRecipeBase::isSafeToSpeculativelyExecute() const {
     unsigned Opcode = cast<VPInstruction>(this)->getOpcode();
     if (Instruction::isCast(Opcode))
       return true;
+    if (Instruction::isBinaryOp(Opcode))
+      return !Instruction::isIntDivRem(Opcode);
 
     switch (Opcode) {
     default:
       return false;
-    case Instruction::Add:
-    case Instruction::Sub:
-    case Instruction::Mul:
     case Instruction::GetElementPtr:
       return true;
     case Instruction::Call:

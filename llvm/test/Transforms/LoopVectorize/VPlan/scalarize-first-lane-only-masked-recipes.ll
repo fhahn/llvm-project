@@ -18,11 +18,11 @@ define void @masked_shift_and_logic_ops_only_first_lane_used(ptr noalias %src, p
 ; CHECK-NEXT:    Successor(s): then
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    then:
-; CHECK-NEXT:      EMIT ir<%shl> = shl ir<%n>, ir<2>, ir<%c> (!vplan.execution.frequency 6917529027641081855 (37.5%, estimated))
-; CHECK-NEXT:      EMIT ir<%or> = or disjoint ir<%shl>, ir<1>, ir<%c> (!vplan.execution.frequency 6917529027641081855 (37.5%, estimated))
-; CHECK-NEXT:      EMIT ir<%and> = and ir<%or>, ir<255>, ir<%c> (!vplan.execution.frequency 6917529027641081855 (37.5%, estimated))
-; CHECK-NEXT:      EMIT ir<%lshr> = lshr ir<%and>, ir<1>, ir<%c> (!vplan.execution.frequency 6917529027641081855 (37.5%, estimated))
-; CHECK-NEXT:      EMIT ir<%not> = xor ir<%lshr>, ir<-1>, ir<%c> (!vplan.execution.frequency 6917529027641081855 (37.5%, estimated))
+; CHECK-NEXT:      CLONE ir<%shl> = shl ir<%n>, ir<2> (!vplan.execution.frequency 6917529027641081855 (37.5%, estimated))
+; CHECK-NEXT:      CLONE ir<%or> = or disjoint ir<%shl>, ir<1> (!vplan.execution.frequency 6917529027641081855 (37.5%, estimated))
+; CHECK-NEXT:      CLONE ir<%and> = and ir<%or>, ir<255> (!vplan.execution.frequency 6917529027641081855 (37.5%, estimated))
+; CHECK-NEXT:      CLONE ir<%lshr> = lshr ir<%and>, ir<1> (!vplan.execution.frequency 6917529027641081855 (37.5%, estimated))
+; CHECK-NEXT:      CLONE ir<%not> = xor ir<%lshr>, ir<-1> (!vplan.execution.frequency 6917529027641081855 (37.5%, estimated))
 ; CHECK-NEXT:      CLONE ir<%gep.off> = getelementptr ir<%dst>, ir<%not>
 ; CHECK-NEXT:      CLONE ir<%gep.dst> = getelementptr ir<%gep.off>, ir<%iv>
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer i32, ir<%gep.dst>, ir<1>
