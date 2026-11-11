@@ -3001,7 +3001,7 @@ void VPlanTransforms::createInterleaveGroups(
     VPlan &Plan,
     const SmallPtrSetImpl<const InterleaveGroup<Instruction> *>
         &InterleaveGroups,
-    const bool &EpilogueAllowed) {
+    const bool &EpilogueAllowed, const VPCostContext &CostCtx) {
   if (InterleaveGroups.empty())
     return;
 
@@ -3038,8 +3038,8 @@ void VPlanTransforms::createInterleaveGroups(
     // the latch use the header mask with tail folding or the uncountable-exit
     // mask for uncountable exits with side effects. Other members may be
     // unmasked if their address is safe to access unconditionally.
-    // TODO: Dead members that need a mask are not considered yet.
     VPValue *Mask = nullptr;
+    bool DeadMemberNeedsMask = false;
     for (unsigned I = 0; I < IG->getFactor(); ++I) {
       Instruction *MemberI = IG->getMember(I);
       if (!MemberI)
@@ -3055,8 +3055,16 @@ void VPlanTransforms::createInterleaveGroups(
         }
       } else {
         InterleaveMD.intersect(VPIRMetadata(*MemberI));
+        // TODO: Use VPlan masks once dead members are kept until groups are
+        // formed.
+        DeadMemberNeedsMask |= CostCtx.isMaskRequired(MemberI);
       }
     }
+
+    // Dead members have no recipe but are loaded by the group. Without a mask,
+    // don't form the group if a dead member needs one.
+    if (!Mask && DeadMemberNeedsMask)
+      continue;
 
     bool NeedsMaskForGaps =
         (IG->requiresScalarEpilogue() && !EpilogueAllowed) ||

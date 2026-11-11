@@ -367,12 +367,13 @@ struct VPlanTransforms {
 
   // For each Interleave Group in \p InterleaveGroups replace the Recipes
   // widening its memory instructions with a single VPInterleaveRecipe at its
-  // insertion point.
+  // insertion point. Groups without a mask are not formed if one of their dead
+  // members needs a mask according to \p CostCtx.
   static void createInterleaveGroups(
       VPlan &Plan,
       const SmallPtrSetImpl<const InterleaveGroup<Instruction> *>
           &InterleaveGroups,
-      const bool &EpilogueAllowed);
+      const bool &EpilogueAllowed, const VPCostContext &CostCtx);
 
   /// Transform widen memory recipes into strided access recipes when legal
   /// and profitable. Clamps \p Range to maintain consistency with widen
