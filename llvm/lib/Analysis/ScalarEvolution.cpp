@@ -13544,14 +13544,14 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
     // the (Stride - 1) addition below cannot overflow.
     const SCEV *One = getOne(Stride->getType());
     bool AddingStrideMinusOneMayOverflow = IVMayOverflow && [&] {
-      if (isKnownToBeAPowerOfTwo(Stride)) {
+      if (!IVMayOverflowWithoutUB && isKnownToBeAPowerOfTwo(Stride)) {
         // Suppose Stride is a power of two, and Start/End are unsigned
         // integers.  Let UMAX be the largest representable unsigned
         // integer.
         //
         // By the preconditions of this function, we know
-        // "(Start + Stride * N) >= End", and this doesn't overflow.
-        // As a formula:
+        // "(Start + Stride * N) >= End", and this doesn't overflow, unless
+        // the loop exits abnormally before. As a formula:
         //
         //   End <= (Start + Stride * N) <= UMAX
         //

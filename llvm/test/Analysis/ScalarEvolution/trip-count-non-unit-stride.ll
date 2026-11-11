@@ -333,18 +333,17 @@ exit:
 ; The backedge is taken 3 times for %n = 127, if @may_exit leaves the loop on the
 ; fourth iteration (IV values -128, -64, 0 and 64). Only the fifth iteration
 ; would branch on the overflowed (poison) IV.
-; FIXME: The backedge-taken count is 0 for %n = 127.
 define void @test_preinc_slt_pow2_abnormal_exit_after_exiting_branch(i8 %n) {
 ; CHECK-LABEL: 'test_preinc_slt_pow2_abnormal_exit_after_exiting_branch'
 ; CHECK-NEXT:  Classifying expressions for: @test_preinc_slt_pow2_abnormal_exit_after_exiting_branch
 ; CHECK-NEXT:    %iv = phi i8 [ -128, %start ], [ %iv.next, %latch ]
-; CHECK-NEXT:    --> {-128,+,64}<nsw><%loop> U: [0,-63) S: [-128,65) Exits: (-128 + (64 * ((-65 + %n) /u 64))<nuw>) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {-128,+,64}<nsw><%loop> U: [0,-63) S: [-128,65) Exits: (-128 + (64 * (((-128 + (-1 * (1 umin (-128 + %n)))<nuw><nsw> + %n) /u 64) + (1 umin (-128 + %n))))) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nsw i8 %iv, 64
-; CHECK-NEXT:    --> {-64,+,64}<nw><%loop> U: [0,-63) S: [-128,65) Exits: (-64 + (64 * ((-65 + %n) /u 64))<nuw>) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {-64,+,64}<nw><%loop> U: [0,-63) S: [-128,65) Exits: (-64 + (64 * (((-128 + (-1 * (1 umin (-128 + %n)))<nuw><nsw> + %n) /u 64) + (1 umin (-128 + %n))))) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_preinc_slt_pow2_abnormal_exit_after_exiting_branch
-; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-65 + %n) /u 64)
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (((-128 + (-1 * (1 umin (-128 + %n)))<nuw><nsw> + %n) /u 64) + (1 umin (-128 + %n)))
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 4
-; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-65 + %n) /u 64)
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (((-128 + (-1 * (1 umin (-128 + %n)))<nuw><nsw> + %n) /u 64) + (1 umin (-128 + %n)))
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
 start:
@@ -367,18 +366,17 @@ exit:
 ; The backedge is taken 4 times for %n = 255 (IV values 0, 64, 128 and 192), if
 ; @may_exit leaves the loop on the fifth iteration, before the branch on the
 ; overflowed (poison) IV.
-; FIXME: The backedge-taken count is 0 for %n = 255.
 define void @test_preinc_ult_pow2_abnormal_exit(i8 %n) {
 ; CHECK-LABEL: 'test_preinc_ult_pow2_abnormal_exit'
 ; CHECK-NEXT:  Classifying expressions for: @test_preinc_ult_pow2_abnormal_exit
 ; CHECK-NEXT:    %iv = phi i8 [ 0, %start ], [ %iv.next, %loop ]
-; CHECK-NEXT:    --> {0,+,64}<nuw><%loop> U: [0,-63) S: [-128,65) Exits: (64 * ((63 + %n) /u 64))<nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,64}<nuw><%loop> U: [0,-63) S: [-128,65) Exits: (64 * ((((-1 * (1 umin %n))<nuw><nsw> + %n) /u 64) + (1 umin %n))) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nuw i8 %iv, 64
-; CHECK-NEXT:    --> {64,+,64}<nw><%loop> U: [0,-63) S: [-128,65) Exits: (64 + (64 * ((63 + %n) /u 64))<nuw>) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {64,+,64}<nw><%loop> U: [0,-63) S: [-128,65) Exits: (64 + (64 * ((((-1 * (1 umin %n))<nuw><nsw> + %n) /u 64) + (1 umin %n)))) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_preinc_ult_pow2_abnormal_exit
-; CHECK-NEXT:  Loop %loop: backedge-taken count is ((63 + %n) /u 64)
+; CHECK-NEXT:  Loop %loop: backedge-taken count is ((((-1 * (1 umin %n))<nuw><nsw> + %n) /u 64) + (1 umin %n))
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 4
-; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((63 + %n) /u 64)
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((((-1 * (1 umin %n))<nuw><nsw> + %n) /u 64) + (1 umin %n))
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
 start:
