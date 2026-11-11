@@ -1714,7 +1714,8 @@ void LoopVectorizationPlanner::updateLoopMetadataAndProfileInfo(
     bool VectorizingEpilogue, MDNode *OrigLoopID,
     std::optional<unsigned> OrigAverageTripCount,
     unsigned OrigLoopInvocationWeight, unsigned EstimatedVFxUF,
-    bool DisableRuntimeUnroll, bool UnrollVectorizedLoop) {
+    bool RequiresScalarEpilogue, bool DisableRuntimeUnroll,
+    bool UnrollVectorizedLoop) {
   // Update the metadata of the scalar loop. Skip the update when vectorizing
   // the epilogue loop to ensure it is updated only once. Also skip the update
   // when the scalar loop became unreachable.
@@ -1770,9 +1771,9 @@ void LoopVectorizationPlanner::updateLoopMetadataAndProfileInfo(
   // loop iterations are now distributed among them. Note that original loop
   // becomes the scalar remainder loop after vectorization.
   //
-  // For cases like foldTailByMasking() and requiresScalarEpiloque() we may
-  // end up getting slightly roughened result but that should be OK since
-  // profile is not inherently precise anyway. Note also possible bypass of
+  // For cases like foldTailByMasking() we may end up getting slightly
+  // roughened result but that should be OK since profile is not inherently
+  // precise anyway. Note also possible bypass of
   // vector code caused by legality checks is ignored, assigning all the weight
   // to the vector loop, optimistically.
   //
@@ -1790,9 +1791,14 @@ void LoopVectorizationPlanner::updateLoopMetadataAndProfileInfo(
     AverageVectorTripCount = SE.getSmallConstantTripCount(VectorLoop);
     if (ProfcheckDisableMetadataFixes || !AverageVectorTripCount)
       return;
-    if (ScalarPH)
+    if (ScalarPH) {
       RemainderAverageTripCount =
           SE.getSmallConstantTripCount(OrigLoop) % EstimatedVFxUF;
+      // The vector trip count already reserves EstimatedVFxUF iterations for a
+      // required scalar epilogue when the trip count is a multiple of it.
+      if (RequiresScalarEpilogue && RemainderAverageTripCount == 0)
+        RemainderAverageTripCount = EstimatedVFxUF;
+    }
     // Setting to 1 should be sufficient to generate the correct branch weights.
     OrigLoopInvocationWeight = 1;
   } else {
@@ -1800,6 +1806,14 @@ void LoopVectorizationPlanner::updateLoopMetadataAndProfileInfo(
     AverageVectorTripCount = *OrigAverageTripCount / EstimatedVFxUF;
     // Calculate number of iterations for remainder loop.
     RemainderAverageTripCount = *OrigAverageTripCount % EstimatedVFxUF;
+    // A required scalar epilogue runs between 1 and EstimatedVFxUF iterations,
+    // so a multiple of EstimatedVFxUF leaves the last vector iteration's worth
+    // to it.
+    if (RequiresScalarEpilogue && RemainderAverageTripCount == 0 &&
+        AverageVectorTripCount != 0) {
+      --AverageVectorTripCount;
+      RemainderAverageTripCount = EstimatedVFxUF;
+    }
   }
   if (HeaderVPBB) {
     setLoopEstimatedTripCount(VectorLoop, AverageVectorTripCount,

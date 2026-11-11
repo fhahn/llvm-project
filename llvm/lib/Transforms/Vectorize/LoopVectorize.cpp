@@ -5758,7 +5758,7 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
       EpilogueVecKind == EpilogueVectorizationKind::Epilogue, LID,
       OrigAverageTripCount, OrigLoopInvocationWeight,
       estimateElementCount(BestVF * BestUF, Config.getVScaleForTuning()),
-      DisableRuntimeUnroll, UnrollVectorizedLoop);
+      RequiresScalarEpilogue, DisableRuntimeUnroll, UnrollVectorizedLoop);
 
   // 3. Remove redundant induction instructions, if a vector loop remains.
   if (HeaderVPBB)
