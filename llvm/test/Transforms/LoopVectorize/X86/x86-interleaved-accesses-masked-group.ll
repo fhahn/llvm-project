@@ -3343,7 +3343,7 @@ define i32 @masked_strided2_member_accessed_unconditionally_via_phi(ptr noalias 
 ; DISABLED_MASKED_STRIDED-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i8, ptr [[C]], i32 [[INDEX]]
 ; DISABLED_MASKED_STRIDED-NEXT:    [[WIDE_LOAD:%.*]] = load <8 x i8>, ptr [[TMP6]], align 1
 ; DISABLED_MASKED_STRIDED-NEXT:    [[TMP7:%.*]] = icmp ne <8 x i8> [[WIDE_LOAD]], zeroinitializer
-; DISABLED_MASKED_STRIDED-NEXT:    [[WIDE_MASKED_GATHER:%.*]] = call <8 x i32> @llvm.masked.gather.v8i32.v8p0(<8 x ptr> align 4 [[WIDE_GEP]], <8 x i1> [[TMP7]], <8 x i32> poison)
+; DISABLED_MASKED_STRIDED-NEXT:    [[WIDE_MASKED_GATHER:%.*]] = call <8 x i32> @llvm.masked.gather.v8i32.v8p0(<8 x ptr> align 4 [[WIDE_GEP]], <8 x i1> splat (i1 true), <8 x i32> poison)
 ; DISABLED_MASKED_STRIDED-NEXT:    [[TMP8:%.*]] = or disjoint <8 x i32> [[TMP5]], splat (i32 1)
 ; DISABLED_MASKED_STRIDED-NEXT:    [[WIDE_GEP2:%.*]] = getelementptr inbounds [4 x i8], ptr [[A]], <8 x i32> [[TMP8]]
 ; DISABLED_MASKED_STRIDED-NEXT:    [[WIDE_MASKED_GATHER3:%.*]] = call <8 x i32> @llvm.masked.gather.v8i32.v8p0(<8 x ptr> align 4 [[WIDE_GEP2]], <8 x i1> [[TMP7]], <8 x i32> poison)

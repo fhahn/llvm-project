@@ -18,7 +18,7 @@ define void @combined_exit_conditions(ptr align 4 dereferenceable(80) readonly %
 ; CHECK-NEXT:    [[TMP3:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v8i1(<8 x i1> [[TMP7]], i1 false)
 ; CHECK-NEXT:    [[UNCOUNTABLE_EXIT_MASK:%.*]] = call <8 x i1> @llvm.get.active.lane.mask.v8i1.i64(i64 0, i64 [[TMP3]])
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr [4 x i8], ptr [[SRC]], i64 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <8 x i32> @llvm.masked.load.v8i32.p0(ptr align 4 [[TMP4]], <8 x i1> [[UNCOUNTABLE_EXIT_MASK]], <8 x i32> poison)
+; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = load <8 x i32>, ptr [[TMP4]], align 4
 ; CHECK-NEXT:    [[TMP5:%.*]] = add nsw <8 x i32> [[WIDE_MASKED_LOAD]], splat (i32 1)
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr [4 x i8], ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v8i32.p0(<8 x i32> [[TMP5]], ptr align 4 [[TMP6]], <8 x i1> [[UNCOUNTABLE_EXIT_MASK]])

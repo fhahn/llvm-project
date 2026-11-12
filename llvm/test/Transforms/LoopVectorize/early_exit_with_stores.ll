@@ -360,7 +360,7 @@ define void @loop_contains_store_to_pointer_with_no_deref_info(ptr align 2 deref
 ; CHECK-NEXT:    [[TMP6:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP40]], i1 false)
 ; CHECK-NEXT:    [[UNCOUNTABLE_EXIT_MASK:%.*]] = call <4 x i1> @llvm.get.active.lane.mask.v4i1.i64(i64 0, i64 [[TMP6]])
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr i16, ptr [[LOAD_ARRAY]], i64 [[INDEX]]
-; CHECK-NEXT:    [[TMP26:%.*]] = call <4 x i16> @llvm.masked.load.v4i16.p0(ptr align 2 [[TMP0]], <4 x i1> [[UNCOUNTABLE_EXIT_MASK]], <4 x i16> poison)
+; CHECK-NEXT:    [[TMP26:%.*]] = load <4 x i16>, ptr [[TMP0]], align 2
 ; CHECK-NEXT:    [[TMP27:%.*]] = add nsw <4 x i16> [[TMP26]], splat (i16 1)
 ; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr i16, ptr [[ARRAY]], i64 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i16.p0(<4 x i16> [[TMP27]], ptr align 2 [[TMP29]], <4 x i1> [[UNCOUNTABLE_EXIT_MASK]])

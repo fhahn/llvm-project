@@ -299,7 +299,7 @@ define void @combined_exit_conditions(ptr align 4 dereferenceable(80) readonly %
 ; CHECK-NEXT:      EMIT vp<%uncountable.exit.mask> = active lane mask ir<0>, vp<[[VP8]]>
 ; CHECK-NEXT:      CLONE ir<%src.ptr> = getelementptr ir<%src>, vp<[[VP4]]>
 ; CHECK-NEXT:      vp<[[VP9:%[0-9]+]]> = vector-pointer i32, ir<%src.ptr>, ir<1>
-; CHECK-NEXT:      WIDEN ir<%data> = load vp<[[VP9]]>, vp<%uncountable.exit.mask>, align 4
+; CHECK-NEXT:      WIDEN ir<%data> = load vp<[[VP9]]>, align 4
 ; CHECK-NEXT:      WIDEN ir<%add> = add nsw ir<%data>, ir<1>
 ; CHECK-NEXT:      CLONE ir<%dst.ptr> = getelementptr ir<%dst>, vp<[[VP4]]>
 ; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = vector-pointer i32, ir<%dst.ptr>, ir<1>

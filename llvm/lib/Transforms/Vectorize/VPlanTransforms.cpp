@@ -33,6 +33,7 @@
 #include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/Analysis/ScopedNoAliasAA.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Analysis/VectorUtils.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/MDBuilder.h"
@@ -6010,27 +6011,92 @@ void VPlanTransforms::createPartialReductions(VPlan &Plan,
   }
 }
 
-/// Returns true if the masked load \p Load can execute unconditionally.
-static bool canExecuteUnconditionally(VPInstruction *Load,
-                                      VPCostContext &CostCtx) {
-  // TODO: Replace the legacy check below with VPlan-based reasoning.
-  if (!CostCtx.isMaskRequired(Load->getUnderlyingInstr()))
-    return true;
+/// Returns true if the masked load \p Load can execute unconditionally, as its
+/// address is accessed in all lanes anyway.
+static bool canExecuteUnconditionally(VPInstruction *Load) {
   // The header mask has its first lane active, so loads only masked by it can
   // execute unconditionally if their address is uniform.
-  return match(Load->getMask(), m_HeaderMask()) &&
-         vputils::isUniformAcrossVFsAndUFs(Load->getOperand(0));
+  VPValue *Addr = Load->getOperand(0);
+  if (match(Load->getMask(), m_HeaderMask()) &&
+      vputils::isUniformAcrossVFsAndUFs(Addr))
+    return true;
+
+  // Check for an unmasked load or store of at least the load's size and
+  // alignment to the same address.
+  const DataLayout &DL = Load->getParent()->getPlan()->getDataLayout();
+  Align LoadAlign = getLoadStoreAlignment(Load->getUnderlyingInstr());
+  TypeSize LoadSize = DL.getTypeStoreSize(Load->getScalarType());
+  return any_of(Addr->users(), [&](VPUser *U) {
+    auto *Other = dyn_cast<VPInstruction>(U);
+    if (!Other || Other->isMasked() || !Other->getUnderlyingValue() ||
+        !match(Other,
+               m_CombineOr(m_VPInstruction<Instruction::Load>(m_Specific(Addr)),
+                           m_VPInstruction<Instruction::Store>(
+                               m_VPValue(), m_Specific(Addr)))))
+      return false;
+    return getLoadStoreAlignment(Other->getUnderlyingInstr()) >= LoadAlign &&
+           TypeSize::isKnownGE(
+               DL.getTypeStoreSize(vputils::getLoadStoreValueType(Other)),
+               LoadSize);
+  });
+}
+
+/// Returns true if the address of \p Load is only computed by speculatable
+/// recipes and phis from live-ins that are not poison, and is dereferenceable
+/// and aligned in all iterations of the loop.
+static bool isDereferenceableInLoop(VPInstruction *Load,
+                                    PredicatedScalarEvolution &PSE, Loop *L,
+                                    DominatorTree &DT, AssumptionCache *AC) {
+  VPValue *Addr = Load->getOperand(0);
+  Instruction *CtxI = &*L->getHeader()->getFirstNonPHIIt();
+  SetVector<VPValue *> Worklist;
+  Worklist.insert(Addr);
+  for (unsigned I = 0; I != Worklist.size(); ++I) {
+    if (auto *IRV = dyn_cast<VPIRValue>(Worklist[I])) {
+      if (!isGuaranteedNotToBePoison(IRV->getValue(), AC, CtxI, &DT))
+        return false;
+    } else if (VPRecipeBase *R = Worklist[I]->getDefiningRecipe()) {
+      if (!R->isPhi() && !R->isSafeToSpeculativelyExecute())
+        return false;
+      // Masks are not part of the address.
+      auto *VPI = dyn_cast<VPInstruction>(R);
+      Worklist.insert_range(VPI ? VPI->operandsWithoutMask() : R->operands());
+    }
+  }
+  // Live-in addresses are the same in all lanes, also with a folded tail.
+  VPlan &Plan = *Load->getParent()->getPlan();
+  if (isa<VPIRValue>(Addr) &&
+      isDereferenceableAndAlignedPointer(
+          Addr->getLiveInIRValue(), Load->getScalarType(),
+          getLoadStoreAlignment(Load->getUnderlyingInstr()),
+          SimplifyQuery(Plan.getDataLayout(), &DT, AC, CtxI)))
+    return true;
+  // Lanes of a folded tail may be past the trip count, where the address may
+  // not be dereferenceable. The address SCEV may rely on PSE's predicates,
+  // which hold in the vector loop.
+  return !Plan.hasTailFolded() &&
+         vputils::isLoadDereferenceableAndAlignedInLoop(*Load, L, PSE, DT, AC);
 }
 
 void VPlanTransforms::removeUnneededLoadMasks(VPlan &Plan,
-                                              VPCostContext &CostCtx) {
+                                              PredicatedScalarEvolution &PSE,
+                                              Loop *L, DominatorTree &DT,
+                                              AssumptionCache *AC) {
+  SmallPtrSet<VPRecipeBase *, 16> Visited;
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_shallow(Plan.getVectorLoopRegion()->getEntry()))) {
     for (VPInstruction &VPI :
          make_early_inc_range(make_isa_range<VPInstruction>(*VPBB))) {
-      if (VPI.getOpcode() != Instruction::Load || !VPI.isMasked() ||
-          !canExecuteUnconditionally(&VPI, CostCtx))
+      if (VPI.getOpcode() != Instruction::Load || !VPI.isMasked())
         continue;
+      if (!canExecuteUnconditionally(&VPI)) {
+        if (!isDereferenceableInLoop(&VPI, PSE, L, DT, AC))
+          continue;
+        // The address is now also computed in lanes where the load didn't
+        // execute, in which its poison-generating flags may not hold.
+        if (VPRecipeBase *AddrDef = VPI.getOperand(0)->getDefiningRecipe())
+          dropPoisonGeneratingFlagsInBackwardSlice(AddrDef, Visited);
+      }
       VPInstruction *Unmasked = VPI.cloneWithOperands(VPI.operandsWithoutMask(),
                                                       VPI.getScalarType());
       // Unmasked loads always execute, so drop their execution frequency.

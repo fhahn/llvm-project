@@ -1665,8 +1665,8 @@ define i32 @masked_strided2_dead_member_first(ptr noalias %c) {
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i8, ptr [[C]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <vscale x 4 x i8>, ptr [[TMP2]], align 1
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp ne <vscale x 4 x i8> [[WIDE_LOAD]], zeroinitializer
-; CHECK-NEXT:    [[TMP4:%.*]] = shl nuw nsw i64 [[INDEX]], 1
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i32, ptr @AB, i64 [[TMP4]]
+; CHECK-NEXT:    [[TMP4:%.*]] = shl i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i32, ptr @AB, i64 [[TMP4]]
 ; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <vscale x 8 x i32>, ptr [[TMP5]], align 4
 ; CHECK-NEXT:    [[STRIDED_VEC:%.*]] = call { <vscale x 4 x i32>, <vscale x 4 x i32> } @llvm.vector.deinterleave2.nxv8i32(<vscale x 8 x i32> [[WIDE_VEC]])
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractvalue { <vscale x 4 x i32>, <vscale x 4 x i32> } [[STRIDED_VEC]], 0
@@ -1733,9 +1733,9 @@ define i32 @masked_strided2_dead_member_first_abs_index(ptr noalias %c) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i8, ptr [[C]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <vscale x 4 x i8>, ptr [[TMP3]], align 1
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp ne <vscale x 4 x i8> [[WIDE_LOAD]], zeroinitializer
-; CHECK-NEXT:    [[TMP5:%.*]] = shl nuw nsw i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP5:%.*]] = shl i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP7:%.*]] = call i64 @llvm.abs.i64(i64 [[TMP5]], i1 true)
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i32, ptr @AB, i64 [[TMP7]]
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i32, ptr @AB, i64 [[TMP7]]
 ; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <vscale x 8 x i32>, ptr [[TMP8]], align 4
 ; CHECK-NEXT:    [[STRIDED_VEC:%.*]] = call { <vscale x 4 x i32>, <vscale x 4 x i32> } @llvm.vector.deinterleave2.nxv8i32(<vscale x 8 x i32> [[WIDE_VEC]])
 ; CHECK-NEXT:    [[TMP9:%.*]] = extractvalue { <vscale x 4 x i32>, <vscale x 4 x i32> } [[STRIDED_VEC]], 0

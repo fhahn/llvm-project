@@ -635,8 +635,11 @@ struct VPlanTransforms {
                                       VFRange &Range);
 
   /// Remove the masks of load VPInstructions in \p Plan that are known to be
-  /// safe to execute unconditionally.
-  static void removeUnneededLoadMasks(VPlan &Plan, VPCostContext &CostCtx);
+  /// safe to execute unconditionally, dropping poison-generating flags of their
+  /// address computations where needed.
+  static void removeUnneededLoadMasks(VPlan &Plan,
+                                      PredicatedScalarEvolution &PSE, Loop *L,
+                                      DominatorTree &DT, AssumptionCache *AC);
 
   /// Convert load/store VPInstructions in \p Plan into widened or replicate
   /// recipes. Non load/store input instructions are left unchanged.

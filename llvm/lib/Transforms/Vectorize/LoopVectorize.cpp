@@ -6470,7 +6470,8 @@ LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan, VFRange &Range,
 
   VPCostContext CostCtx(*TLI, *Plan, PlanCM, Config);
 
-  RUN_VPLAN_PASS(VPlanTransforms::removeUnneededLoadMasks, *Plan, CostCtx);
+  RUN_VPLAN_PASS(VPlanTransforms::removeUnneededLoadMasks, *Plan, PSE, OrigLoop,
+                 *DT, Legal->getAssumptionCache());
 
   RUN_VPLAN_PASS(VPlanTransforms::makeMemOpWideningDecisions, *Plan, Range,
                  RecipeBuilder, CostCtx);

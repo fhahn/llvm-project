@@ -16,7 +16,7 @@ define i64 @single_exit_in_conditional_block() {
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i8, ptr @A, i64 [[IV]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i8>, ptr [[TMP0]], align 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp slt <4 x i8> [[WIDE_LOAD]], zeroinitializer
-; CHECK-NEXT:    [[GEP_B:%.*]] = getelementptr inbounds i8, ptr @B, i64 [[IV]]
+; CHECK-NEXT:    [[GEP_B:%.*]] = getelementptr i8, ptr @B, i64 [[IV]]
 ; CHECK-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x i8>, ptr [[GEP_B]], align 1
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq <4 x i8> [[WIDE_LOAD]], [[WIDE_LOAD1]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = select <4 x i1> [[TMP1]], <4 x i1> [[TMP3]], <4 x i1> zeroinitializer
@@ -131,7 +131,7 @@ define i64 @single_exit_in_conditional_block2() {
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i8, ptr @A, i64 [[IV]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i8>, ptr [[TMP0]], align 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp slt <4 x i8> [[WIDE_LOAD]], zeroinitializer
-; CHECK-NEXT:    [[GEP_B:%.*]] = getelementptr inbounds i8, ptr @B, i64 [[IV]]
+; CHECK-NEXT:    [[GEP_B:%.*]] = getelementptr i8, ptr @B, i64 [[IV]]
 ; CHECK-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x i8>, ptr [[GEP_B]], align 1
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq <4 x i8> [[WIDE_LOAD]], [[WIDE_LOAD1]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = select <4 x i1> [[TMP1]], <4 x i1> [[TMP3]], <4 x i1> zeroinitializer
@@ -353,10 +353,10 @@ define i64 @diamond_with_join_then_exit() {
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i8, ptr @A, i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i8>, ptr [[TMP0]], align 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp slt <4 x i8> [[WIDE_LOAD]], zeroinitializer
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i8, ptr @C, i64 [[INDEX]]
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr @C, i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x i8>, ptr [[TMP2]], align 1
 ; CHECK-NEXT:    [[TMP3:%.*]] = zext <4 x i8> [[WIDE_LOAD1]] to <4 x i64>
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i8, ptr @B, i64 [[INDEX]]
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr @B, i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD2:%.*]] = load <4 x i8>, ptr [[TMP4]], align 1
 ; CHECK-NEXT:    [[TMP5:%.*]] = zext <4 x i8> [[WIDE_LOAD2]] to <4 x i64>
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP1]], <4 x i64> [[TMP5]], <4 x i64> [[TMP3]]

@@ -43,7 +43,7 @@ define void @foo() #0 {
 ; CHECK-NEXT:    [[TMP4:%.*]] = tail call i64 @llvm.experimental.cttz.elts.i64.nxv4i1(<vscale x 4 x i1> [[TMP3]], i1 false)
 ; CHECK-NEXT:    [[UNCOUNTABLE_EXIT_MASK:%.*]] = tail call <vscale x 4 x i1> @llvm.get.active.lane.mask.nxv4i1.i64(i64 0, i64 [[TMP4]])
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr [4 x i8], ptr @src, i64 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = tail call <vscale x 4 x i32> @llvm.masked.load.nxv4i32.p0(ptr align 4 [[TMP5]], <vscale x 4 x i1> [[UNCOUNTABLE_EXIT_MASK]], <vscale x 4 x i32> poison)
+; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = load <vscale x 4 x i32>, ptr [[TMP5]], align 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = add nsw <vscale x 4 x i32> [[WIDE_MASKED_LOAD]], splat (i32 42)
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr [4 x i8], ptr @dst, i64 [[INDEX]]
 ; CHECK-NEXT:    tail call void @llvm.masked.store.nxv4i32.p0(<vscale x 4 x i32> [[TMP6]], ptr align 4 [[TMP7]], <vscale x 4 x i1> [[UNCOUNTABLE_EXIT_MASK]])

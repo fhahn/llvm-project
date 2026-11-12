@@ -272,18 +272,30 @@ define void @interleaved_load_dead_member_after_early_exit(ptr noalias align 4 d
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE6:.*]] ]
+; CHECK-NEXT:    [[TMP10:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP16:%.*]] = add i64 [[INDEX]], 2
+; CHECK-NEXT:    [[TMP22:%.*]] = add i64 [[INDEX]], 3
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i8, ptr [[C]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i8>, ptr [[TMP0]], align 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp eq <4 x i8> [[WIDE_LOAD]], splat (i8 2)
 ; CHECK-NEXT:    [[TMP2:%.*]] = freeze <4 x i1> [[TMP1]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP2]], i1 false)
 ; CHECK-NEXT:    [[UNCOUNTABLE_EXIT_MASK:%.*]] = call <4 x i1> @llvm.get.active.lane.mask.v4i1.i64(i64 0, i64 [[TMP3]])
+; CHECK-NEXT:    [[TMP17:%.*]] = shl i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP18:%.*]] = shl i64 [[TMP10]], 1
+; CHECK-NEXT:    [[TMP23:%.*]] = shl i64 [[TMP16]], 1
+; CHECK-NEXT:    [[TMP24:%.*]] = shl i64 [[TMP22]], 1
+; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i32, ptr [[A]], i64 [[TMP17]]
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr i32, ptr [[A]], i64 [[TMP18]]
+; CHECK-NEXT:    [[TMP32:%.*]] = getelementptr i32, ptr [[A]], i64 [[TMP23]]
+; CHECK-NEXT:    [[TMP33:%.*]] = getelementptr i32, ptr [[A]], i64 [[TMP24]]
+; CHECK-NEXT:    [[TMP7:%.*]] = load i32, ptr [[TMP11]], align 4
+; CHECK-NEXT:    [[TMP13:%.*]] = load i32, ptr [[TMP12]], align 4
+; CHECK-NEXT:    [[TMP19:%.*]] = load i32, ptr [[TMP32]], align 4
+; CHECK-NEXT:    [[TMP25:%.*]] = load i32, ptr [[TMP33]], align 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <4 x i1> [[UNCOUNTABLE_EXIT_MASK]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP4]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; CHECK:       [[PRED_STORE_IF]]:
-; CHECK-NEXT:    [[TMP5:%.*]] = shl nuw nsw i64 [[INDEX]], 1
-; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP5]]
-; CHECK-NEXT:    [[TMP7:%.*]] = load i32, ptr [[TMP6]], align 4
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    store i32 [[TMP7]], ptr [[TMP8]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
@@ -291,10 +303,6 @@ define void @interleaved_load_dead_member_after_early_exit(ptr noalias align 4 d
 ; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <4 x i1> [[UNCOUNTABLE_EXIT_MASK]], i64 1
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2:.*]]
 ; CHECK:       [[PRED_STORE_IF1]]:
-; CHECK-NEXT:    [[TMP10:%.*]] = add i64 [[INDEX]], 1
-; CHECK-NEXT:    [[TMP11:%.*]] = shl nuw nsw i64 [[TMP10]], 1
-; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP11]]
-; CHECK-NEXT:    [[TMP13:%.*]] = load i32, ptr [[TMP12]], align 4
 ; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP10]]
 ; CHECK-NEXT:    store i32 [[TMP13]], ptr [[TMP14]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
@@ -302,10 +310,6 @@ define void @interleaved_load_dead_member_after_early_exit(ptr noalias align 4 d
 ; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <4 x i1> [[UNCOUNTABLE_EXIT_MASK]], i64 2
 ; CHECK-NEXT:    br i1 [[TMP15]], label %[[PRED_STORE_IF3:.*]], label %[[PRED_STORE_CONTINUE4:.*]]
 ; CHECK:       [[PRED_STORE_IF3]]:
-; CHECK-NEXT:    [[TMP16:%.*]] = add i64 [[INDEX]], 2
-; CHECK-NEXT:    [[TMP17:%.*]] = shl nuw nsw i64 [[TMP16]], 1
-; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP17]]
-; CHECK-NEXT:    [[TMP19:%.*]] = load i32, ptr [[TMP18]], align 4
 ; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP16]]
 ; CHECK-NEXT:    store i32 [[TMP19]], ptr [[TMP20]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE4]]
@@ -313,10 +317,6 @@ define void @interleaved_load_dead_member_after_early_exit(ptr noalias align 4 d
 ; CHECK-NEXT:    [[TMP21:%.*]] = extractelement <4 x i1> [[UNCOUNTABLE_EXIT_MASK]], i64 3
 ; CHECK-NEXT:    br i1 [[TMP21]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6]]
 ; CHECK:       [[PRED_STORE_IF5]]:
-; CHECK-NEXT:    [[TMP22:%.*]] = add i64 [[INDEX]], 3
-; CHECK-NEXT:    [[TMP23:%.*]] = shl nuw nsw i64 [[TMP22]], 1
-; CHECK-NEXT:    [[TMP24:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP23]]
-; CHECK-NEXT:    [[TMP25:%.*]] = load i32, ptr [[TMP24]], align 4
 ; CHECK-NEXT:    [[TMP26:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP22]]
 ; CHECK-NEXT:    store i32 [[TMP25]], ptr [[TMP26]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE6]]
@@ -340,6 +340,9 @@ define void @interleaved_load_dead_member_after_early_exit(ptr noalias align 4 d
 ; MASKED-IG-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; MASKED-IG:       [[VECTOR_BODY]]:
 ; MASKED-IG-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; MASKED-IG-NEXT:    [[TMP19:%.*]] = add i64 [[INDEX]], 1
+; MASKED-IG-NEXT:    [[TMP20:%.*]] = add i64 [[INDEX]], 2
+; MASKED-IG-NEXT:    [[TMP21:%.*]] = add i64 [[INDEX]], 3
 ; MASKED-IG-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i8, ptr [[C]], i64 [[INDEX]]
 ; MASKED-IG-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i8>, ptr [[TMP0]], align 1
 ; MASKED-IG-NEXT:    [[TMP1:%.*]] = icmp eq <4 x i8> [[WIDE_LOAD]], splat (i8 2)
@@ -347,11 +350,18 @@ define void @interleaved_load_dead_member_after_early_exit(ptr noalias align 4 d
 ; MASKED-IG-NEXT:    [[TMP3:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP2]], i1 false)
 ; MASKED-IG-NEXT:    [[UNCOUNTABLE_EXIT_MASK:%.*]] = call <4 x i1> @llvm.get.active.lane.mask.v4i1.i64(i64 0, i64 [[TMP3]])
 ; MASKED-IG-NEXT:    [[TMP4:%.*]] = shl i64 [[INDEX]], 1
+; MASKED-IG-NEXT:    [[TMP22:%.*]] = shl i64 [[TMP19]], 1
+; MASKED-IG-NEXT:    [[TMP23:%.*]] = shl i64 [[TMP20]], 1
+; MASKED-IG-NEXT:    [[TMP24:%.*]] = shl i64 [[TMP21]], 1
 ; MASKED-IG-NEXT:    [[TMP5:%.*]] = getelementptr i32, ptr [[A]], i64 [[TMP4]]
-; MASKED-IG-NEXT:    [[INTERLEAVED_MASK:%.*]] = shufflevector <4 x i1> [[UNCOUNTABLE_EXIT_MASK]], <4 x i1> poison, <8 x i32> <i32 0, i32 0, i32 1, i32 1, i32 2, i32 2, i32 3, i32 3>
-; MASKED-IG-NEXT:    [[WIDE_MASKED_VEC:%.*]] = call <8 x i32> @llvm.masked.load.v8i32.p0(ptr align 4 [[TMP5]], <8 x i1> [[INTERLEAVED_MASK]], <8 x i32> poison)
-; MASKED-IG-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <8 x i32> [[WIDE_MASKED_VEC]], <8 x i32> poison, <4 x i32> <i32 0, i32 2, i32 4, i32 6>
-; MASKED-IG-NEXT:    [[STRIDED_VEC1:%.*]] = shufflevector <8 x i32> [[WIDE_MASKED_VEC]], <8 x i32> poison, <4 x i32> <i32 1, i32 3, i32 5, i32 7>
+; MASKED-IG-NEXT:    [[TMP12:%.*]] = getelementptr i32, ptr [[A]], i64 [[TMP22]]
+; MASKED-IG-NEXT:    [[TMP13:%.*]] = getelementptr i32, ptr [[A]], i64 [[TMP23]]
+; MASKED-IG-NEXT:    [[TMP14:%.*]] = getelementptr i32, ptr [[A]], i64 [[TMP24]]
+; MASKED-IG-NEXT:    [[TMP15:%.*]] = insertelement <4 x ptr> poison, ptr [[TMP5]], i64 0
+; MASKED-IG-NEXT:    [[TMP16:%.*]] = insertelement <4 x ptr> [[TMP15]], ptr [[TMP12]], i64 1
+; MASKED-IG-NEXT:    [[TMP17:%.*]] = insertelement <4 x ptr> [[TMP16]], ptr [[TMP13]], i64 2
+; MASKED-IG-NEXT:    [[TMP18:%.*]] = insertelement <4 x ptr> [[TMP17]], ptr [[TMP14]], i64 3
+; MASKED-IG-NEXT:    [[STRIDED_VEC:%.*]] = call <4 x i32> @llvm.masked.gather.v4i32.v4p0(<4 x ptr> align 4 [[TMP18]], <4 x i1> splat (i1 true), <4 x i32> poison)
 ; MASKED-IG-NEXT:    [[TMP6:%.*]] = getelementptr i32, ptr [[DST]], i64 [[INDEX]]
 ; MASKED-IG-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[STRIDED_VEC]], ptr align 4 [[TMP6]], <4 x i1> [[UNCOUNTABLE_EXIT_MASK]])
 ; MASKED-IG-NEXT:    [[TMP7:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP2]])
