@@ -42,5 +42,172 @@ exit:
   ret void
 }
 
+; The guard %a u>= 16 rewrites the exit count (%a + %y)<nuw> of %loop.1 to
+; ((16 umax %a) + %y), the SCEV of %n. The nuw only holds under the guard: the
+; exit value (1 umax %n) of %iv.2.next is 1, not %n, for %a = 0 and %y = -16.
+define i32 @rewrite_flags_only_hold_under_guard(i32 %a, i32 %y) {
+; CHECK-LABEL: define i32 @rewrite_flags_only_hold_under_guard(
+; CHECK-SAME: i32 [[A:%.*]], i32 [[Y:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[ADD:%.*]] = add nuw i32 [[A]], [[Y]]
+; CHECK-NEXT:    call void @use(i32 noundef [[ADD]])
+; CHECK-NEXT:    [[PRE:%.*]] = icmp uge i32 [[A]], 16
+; CHECK-NEXT:    br i1 [[PRE]], label [[LOOP_1_PREHEADER:%.*]], label [[LOOP_2_PH:%.*]]
+; CHECK:       loop.1.preheader:
+; CHECK-NEXT:    br label [[LOOP_1:%.*]]
+; CHECK:       loop.1:
+; CHECK-NEXT:    br i1 true, label [[LOOP_2_PH_LOOPEXIT:%.*]], label [[LOOP_1]]
+; CHECK:       loop.2.ph.loopexit:
+; CHECK-NEXT:    br label [[LOOP_2_PH]]
+; CHECK:       loop.2.ph:
+; CHECK-NEXT:    br label [[LOOP_2:%.*]]
+; CHECK:       loop.2:
+; CHECK-NEXT:    br i1 false, label [[LOOP_2]], label [[EXIT:%.*]]
+; CHECK:       exit:
+; CHECK-NEXT:    [[UMAX:%.*]] = call i32 @llvm.umax.i32(i32 [[A]], i32 16)
+; CHECK-NEXT:    [[N:%.*]] = add i32 [[UMAX]], [[Y]]
+; CHECK-NEXT:    ret i32 [[N]]
+;
+entry:
+  %add = add nuw i32 %a, %y
+  call void @use(i32 noundef %add)
+  %pre = icmp uge i32 %a, 16
+  br i1 %pre, label %loop.1, label %loop.2.ph
+
+loop.1:
+  %iv.1 = phi i32 [ 0, %entry ], [ %iv.1.next, %loop.1 ]
+  %iv.1.next = add i32 %iv.1, 1
+  %ec.1 = icmp eq i32 %iv.1, %add
+  br i1 %ec.1, label %loop.2.ph, label %loop.1
+
+loop.2.ph:
+  %umax = call i32 @llvm.umax.i32(i32 %a, i32 16)
+  %n = add i32 %umax, %y
+  br label %loop.2
+
+loop.2:
+  %iv.2 = phi i32 [ 0, %loop.2.ph ], [ %iv.2.next, %loop.2 ]
+  %iv.2.next = add i32 %iv.2, 1
+  %ec.2 = icmp ult i32 %iv.2.next, %n
+  br i1 %ec.2, label %loop.2, label %exit
+
+exit:
+  ret i32 %iv.2.next
+}
+
+; Same as @rewrite_flags_only_hold_under_guard, but %k.next is (%umax + %y),
+; which is expanded as exit value. The nuw only holds under the guard and must
+; not be added to the expansion: for %a = 0 and %y = -16, it would be poison.
+define i32 @rewrite_flags_only_hold_under_guard_exit_value(i32 %a, i32 %y) {
+; CHECK-LABEL: define i32 @rewrite_flags_only_hold_under_guard_exit_value(
+; CHECK-SAME: i32 [[A:%.*]], i32 [[Y:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[ADD:%.*]] = add nuw i32 [[A]], [[Y]]
+; CHECK-NEXT:    call void @use(i32 noundef [[ADD]])
+; CHECK-NEXT:    [[PRE:%.*]] = icmp uge i32 [[A]], 16
+; CHECK-NEXT:    br i1 [[PRE]], label [[LOOP_1_PREHEADER:%.*]], label [[LOOP_2_PH:%.*]]
+; CHECK:       loop.1.preheader:
+; CHECK-NEXT:    br label [[LOOP_1:%.*]]
+; CHECK:       loop.1:
+; CHECK-NEXT:    br i1 true, label [[LOOP_2_PH_LOOPEXIT:%.*]], label [[LOOP_1]]
+; CHECK:       loop.2.ph.loopexit:
+; CHECK-NEXT:    br label [[LOOP_2_PH]]
+; CHECK:       loop.2.ph:
+; CHECK-NEXT:    br label [[LOOP_2:%.*]]
+; CHECK:       loop.2:
+; CHECK-NEXT:    br i1 true, label [[EXIT:%.*]], label [[LOOP_2]]
+; CHECK:       exit:
+; CHECK-NEXT:    [[UMAX:%.*]] = call i32 @llvm.umax.i32(i32 [[A]], i32 16)
+; CHECK-NEXT:    [[TMP0:%.*]] = add nuw i32 [[Y]], [[UMAX]]
+; CHECK-NEXT:    ret i32 [[TMP0]]
+;
+entry:
+  %add = add nuw i32 %a, %y
+  call void @use(i32 noundef %add)
+  %pre = icmp uge i32 %a, 16
+  br i1 %pre, label %loop.1, label %loop.2.ph
+
+loop.1:
+  %iv.1 = phi i32 [ 0, %entry ], [ %iv.1.next, %loop.1 ]
+  %iv.1.next = add i32 %iv.1, 1
+  %ec.1 = icmp eq i32 %iv.1, %add
+  br i1 %ec.1, label %loop.2.ph, label %loop.1
+
+loop.2.ph:
+  %umax = call i32 @llvm.umax.i32(i32 %a, i32 16)
+  br label %loop.2
+
+loop.2:
+  %iv.2 = phi i32 [ 0, %loop.2.ph ], [ %iv.2.next, %loop.2 ]
+  %k = phi i32 [ %umax, %loop.2.ph ], [ %k.next, %loop.2 ]
+  %k.next = add i32 %k, %y
+  %iv.2.next = add i32 %iv.2, 1
+  %ec.2 = icmp eq i32 %iv.2, 0
+  br i1 %ec.2, label %exit, label %loop.2
+
+exit:
+  ret i32 %k.next
+}
+
+; The guard %a == -1 rewrites the exit count (%a + %p)<nuw> of %inner to
+; (-1 + %p), which is also the SCEV of %r. The nuw only holds under the guard
+; and must not be added to %r, which wraps for %p != 0.
+define i32 @rewrite_flags_only_hold_under_guard_strengthen(i32 %a, i32 %start) {
+; CHECK-LABEL: define i32 @rewrite_flags_only_hold_under_guard_strengthen(
+; CHECK-SAME: i32 [[A:%.*]], i32 [[START:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br label [[OUTER_HEADER:%.*]]
+; CHECK:       outer.header:
+; CHECK-NEXT:    [[P:%.*]] = phi i32 [ [[START]], [[ENTRY:%.*]] ], [ [[P_NEXT:%.*]], [[OUTER_LATCH:%.*]] ]
+; CHECK-NEXT:    [[ADD:%.*]] = add nuw i32 [[A]], [[P]]
+; CHECK-NEXT:    call void @use(i32 noundef [[ADD]])
+; CHECK-NEXT:    [[R:%.*]] = add nuw i32 [[P]], -1
+; CHECK-NEXT:    [[PRE:%.*]] = icmp eq i32 [[A]], -1
+; CHECK-NEXT:    br i1 [[PRE]], label [[INNER_PREHEADER:%.*]], label [[OUTER_LATCH]]
+; CHECK:       inner.preheader:
+; CHECK-NEXT:    br label [[INNER:%.*]]
+; CHECK:       inner:
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[IV_NEXT:%.*]], [[INNER]] ], [ 0, [[INNER_PREHEADER]] ]
+; CHECK-NEXT:    call void @clobber()
+; CHECK-NEXT:    [[IV_NEXT]] = add i32 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i32 [[IV]], [[ADD]]
+; CHECK-NEXT:    br i1 [[EC]], label [[OUTER_LATCH_LOOPEXIT:%.*]], label [[INNER]]
+; CHECK:       outer.latch.loopexit:
+; CHECK-NEXT:    br label [[OUTER_LATCH]]
+; CHECK:       outer.latch:
+; CHECK-NEXT:    [[P_NEXT]] = udiv i32 [[P]], 3
+; CHECK-NEXT:    [[OUTER_EC:%.*]] = icmp ult i32 [[P]], 3
+; CHECK-NEXT:    br i1 [[OUTER_EC]], label [[EXIT:%.*]], label [[OUTER_HEADER]]
+; CHECK:       exit:
+; CHECK-NEXT:    [[R_LCSSA:%.*]] = phi i32 [ [[R]], [[OUTER_LATCH]] ]
+; CHECK-NEXT:    ret i32 [[R_LCSSA]]
+;
+entry:
+  br label %outer.header
+
+outer.header:
+  %p = phi i32 [ %start, %entry ], [ %p.next, %outer.latch ]
+  %add = add nuw i32 %a, %p
+  call void @use(i32 noundef %add)
+  %r = add i32 %p, -1
+  %pre = icmp eq i32 %a, -1
+  br i1 %pre, label %inner, label %outer.latch
+
+inner:
+  %iv = phi i32 [ 0, %outer.header ], [ %iv.next, %inner ]
+  call void @clobber()
+  %iv.next = add i32 %iv, 1
+  %ec = icmp eq i32 %iv, %add
+  br i1 %ec, label %outer.latch, label %inner
+
+outer.latch:
+  %p.next = udiv i32 %p, 3
+  %outer.ec = icmp ult i32 %p, 3
+  br i1 %outer.ec, label %exit, label %outer.header
+
+exit:
+  ret i32 %r
+}
+
 declare void @clobber()
 declare void @use(i32)
