@@ -16236,16 +16236,9 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(
         // sure we don't lose information when rewriting expressions based on
         // back-edge taken counts in some cases.
         if (Expr->getNumOperands() == 2) {
-          const SCEV *S = nullptr;
-          // Handle (-1 + 1 + A) without constructing SCEVs.
-          if (match(Expr->getOperand(0), m_scev_AllOnes())) {
-            S = lookup(Expr->getOperand(1));
-          } else {
-            const SCEV *NewC =
-                SE.getAddExpr(Expr->getOperand(0), SE.getOne(Expr->getType()));
-            S = lookup(SE.getAddExpr(NewC, Expr->getOperand(1)));
-          }
-          if (S)
+          const SCEV *NewC =
+              SE.getAddExpr(Expr->getOperand(0), SE.getOne(Expr->getType()));
+          if (const SCEV *S = lookup(SE.getAddExpr(NewC, Expr->getOperand(1))))
             return SE.getAddExpr(S, SE.getMinusOne(Expr->getType()));
         }
       }
