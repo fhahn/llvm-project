@@ -1584,8 +1584,6 @@ public:
   class LoopGuards {
     DenseMap<const SCEV *, const SCEV *> RewriteMap;
     SmallDenseSet<std::pair<const SCEV *, const SCEV *>> NotEqual;
-    bool PreserveNUW = false;
-    bool PreserveNSW = false;
     /// The loop to collect guards for on first use by applyLoopGuards, if not
     /// collected yet.
     const Loop *PendingLoop = nullptr;
