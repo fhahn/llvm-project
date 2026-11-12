@@ -417,6 +417,46 @@ exit:
   ret i32 %res.next
 }
 
+; The selects picking the first active lane among the parts of an early exit,
+; and the value at that lane.
+define i64 @early_exit_first_active_lane_interleaved(ptr dereferenceable(1024) %a) !prof !0 {
+; CHECK-LABEL: define i64 @early_exit_first_active_lane_interleaved(
+; CHECK-SAME: ptr dereferenceable(1024) [[A:%.*]]) !prof [[PROF0]] {
+; CHECK:  [[ENTRY:.*:]]
+; CHECK:  [[VECTOR_PH:.*:]]
+; CHECK:  [[VECTOR_BODY:.*]]:
+; CHECK:    br i1 [[TMP7:%.*]], label %[[VECTOR_EARLY_EXIT:.*]], label %[[VECTOR_BODY_INTERIM:.*]]
+; CHECK:  [[VECTOR_BODY_INTERIM]]:
+; CHECK:    br i1 [[TMP8:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP36:![0-9]+]]
+; CHECK:  [[MIDDLE_BLOCK]]:
+; CHECK:  [[VECTOR_EARLY_EXIT]]:
+; CHECK:    [[TMP12:%.*]] = select i1 [[TMP11:%.*]], i64 [[TMP10:%.*]], i64 [[TMP9:%.*]], !prof [[PROF4]]
+; CHECK:    [[TMP18:%.*]] = select i1 [[TMP17:%.*]], i8 [[TMP16:%.*]], i8 [[TMP14:%.*]], !prof [[PROF4]]
+; CHECK:  [[EXIT:.*:]]
+;
+entry:
+  br label %loop.header
+
+loop.header:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  %gep = getelementptr inbounds i8, ptr %a, i64 %iv
+  %l = load i8, ptr %gep, align 1
+  %c = icmp eq i8 %l, 42
+  br i1 %c, label %exit, label %loop.latch
+
+loop.latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 1024
+  br i1 %ec, label %exit, label %loop.header, !llvm.loop !6
+
+exit:
+  %r.iv = phi i64 [ %iv, %loop.header ], [ -1, %loop.latch ]
+  %r.l = phi i8 [ %l, %loop.header ], [ 0, %loop.latch ]
+  %r.l.ext = zext i8 %r.l to i64
+  %r = add i64 %r.iv, %r.l.ext
+  ret i64 %r
+}
+
 ; The select picking the value to store when sinking complementary predicated
 ; stores to the same address, when only interleaving. Its condition is the mask
 ; of one of the stores, which has no tracked probability.
@@ -431,7 +471,7 @@ define void @sink_complementary_predicated_stores(ptr %a, ptr %b, i64 %n) !prof 
 ; CHECK:  [[VECTOR_BODY:.*]]:
 ; CHECK:    [[TMP13:%.*]] = select i1 [[TMP11:%.*]], i32 1, i32 0, !prof [[PROF4]]
 ; CHECK:    [[TMP14:%.*]] = select i1 [[TMP12:%.*]], i32 1, i32 0, !prof [[PROF4]]
-; CHECK:    br i1 [[TMP15:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP41:![0-9]+]]
+; CHECK:    br i1 [[TMP15:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP42:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
 ; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:  [[SCALAR_PH]]:
@@ -440,7 +480,7 @@ define void @sink_complementary_predicated_stores(ptr %a, ptr %b, i64 %n) !prof 
 ; CHECK:  [[THEN]]:
 ; CHECK:  [[ELSE]]:
 ; CHECK:  [[LOOP_LATCH:.*:]]
-; CHECK:    br i1 [[EC:%.*]], label %[[EXIT]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP42:![0-9]+]]
+; CHECK:    br i1 [[EC:%.*]], label %[[EXIT]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP43:![0-9]+]]
 ; CHECK:  [[EXIT]]:
 ;
 entry:
@@ -471,12 +511,55 @@ exit:
   ret void
 }
 
+; The selects extracting the last active value of a find-last reduction when
+; only interleaving.
+define i32 @find_last_interleave_only(ptr %a, i64 %n, i32 %start) !prof !0 {
+; CHECK-LABEL: define i32 @find_last_interleave_only(
+; CHECK-SAME: ptr [[A:%.*]], i64 [[N:%.*]], i32 [[START:%.*]]) !prof [[PROF0]] {
+; CHECK:  [[ENTRY:.*:]]
+; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:  [[VECTOR_PH]]:
+; CHECK:  [[VECTOR_BODY:.*]]:
+; CHECK:    [[TMP13:%.*]] = select i1 [[TMP12:%.*]], i1 [[TMP10:%.*]], i1 [[TMP1:%.*]], !prof [[PROF4]]
+; CHECK:    [[TMP14:%.*]] = select i1 [[TMP12]], i1 [[TMP11:%.*]], i1 [[TMP2:%.*]], !prof [[PROF4]]
+; CHECK:    [[TMP15:%.*]] = select i1 [[TMP12]], i32 [[TMP6:%.*]], i32 [[VEC_PHI:%.*]], !prof [[PROF4]]
+; CHECK:    [[TMP16:%.*]] = select i1 [[TMP12]], i32 [[TMP7:%.*]], i32 [[VEC_PHI1:%.*]], !prof [[PROF4]]
+; CHECK:    br i1 [[TMP17:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP44:![0-9]+]]
+; CHECK:  [[MIDDLE_BLOCK]]:
+; CHECK:    [[TMP18:%.*]] = select i1 [[TMP13]], i32 [[TMP15]], i32 [[START]], !prof [[PROF4]]
+; CHECK:    [[TMP19:%.*]] = select i1 [[TMP14]], i32 [[TMP16]], i32 [[TMP18]], !prof [[PROF4]]
+; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:  [[SCALAR_PH]]:
+; CHECK:  [[LOOP:.*]]:
+; CHECK:    [[RES_NEXT:%.*]] = select i1 [[C:%.*]], i32 [[L:%.*]], i32 [[RES:%.*]]
+; CHECK:    br i1 [[EC:%.*]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP45:![0-9]+]]
+; CHECK:  [[EXIT]]:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %res = phi i32 [ %start, %entry ], [ %res.next, %loop ]
+  %gep = getelementptr inbounds i32, ptr %a, i64 %iv
+  %l = load i32, ptr %gep, align 4
+  %c = icmp sgt i32 %l, 42
+  %res.next = select i1 %c, i32 %l, i32 %res
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop, !llvm.loop !3
+
+exit:
+  ret i32 %res.next
+}
+
 !0 = !{!"function_entry_count", i64 1000}
 !1 = !{!"branch_weights", i32 999, i32 1}
 !2 = !{!"branch_weights", i32 998, i32 1}
 !3 = distinct !{!3, !4, !5}
 !4 = !{!"llvm.loop.interleave.count", i32 2}
 !5 = !{!"llvm.loop.vectorize.width", i32 1}
+!6 = distinct !{!6, !4}
 ;.
 ; CHECK: [[PROF0]] = !{!"function_entry_count", i64 1000}
 ; CHECK: [[LOOP1]] = distinct !{[[LOOP1]], [[META2:![0-9]+]], [[META3:![0-9]+]]}
@@ -514,6 +597,9 @@ exit:
 ; CHECK: [[LOOP33]] = distinct !{[[LOOP33]], [[META3]], [[META2]], [[META24]]}
 ; CHECK: [[LOOP34]] = distinct !{[[LOOP34]], [[META2]], [[META3]]}
 ; CHECK: [[LOOP35]] = distinct !{[[LOOP35]], [[META3]], [[META2]]}
-; CHECK: [[LOOP41]] = distinct !{[[LOOP41]], [[META2]], [[META3]]}
-; CHECK: [[LOOP42]] = distinct !{[[LOOP42]], [[META2]]}
+; CHECK: [[LOOP36]] = distinct !{[[LOOP36]], [[META2]], [[META3]]}
+; CHECK: [[LOOP42]] = distinct !{[[LOOP42]], [[META2]], [[META3]]}
+; CHECK: [[LOOP43]] = distinct !{[[LOOP43]], [[META2]]}
+; CHECK: [[LOOP44]] = distinct !{[[LOOP44]], [[META2]], [[META3]]}
+; CHECK: [[LOOP45]] = distinct !{[[LOOP45]], [[META2]]}
 ;.
