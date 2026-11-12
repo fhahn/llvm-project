@@ -1209,11 +1209,6 @@ public:
       Metadata.emplace_back(Kind, Node);
   }
 
-  /// Remove the metadata of kind \p Kind, if present.
-  void eraseMetadata(unsigned Kind) {
-    erase_if(Metadata, [Kind](const auto &P) { return P.first == Kind; });
-  }
-
   /// Intersect this VPIRMetadata object with \p MD, keeping only metadata
   /// nodes that are common to both.
   void intersect(const VPIRMetadata &MD);

@@ -2209,8 +2209,12 @@ void VPIRMetadata::applyMetadata(Instruction &I) const {
   // reach IR.
   unsigned ExecFreqKind = getMDKindID(ExecutionFrequencyMDName);
   unsigned EstProfKind = getMDKindID(EstimatedProfileMDName);
+  // Branch weights cannot describe a select with a vector condition.
+  auto *Sel = dyn_cast<SelectInst>(&I);
+  bool DropProf = Sel && Sel->getCondition()->getType()->isVectorTy();
   for (const auto &[Kind, Node] : Metadata)
-    if (Kind != ExecFreqKind && Kind != EstProfKind)
+    if (Kind != ExecFreqKind && Kind != EstProfKind &&
+        (!DropProf || Kind != LLVMContext::MD_prof))
       I.setMetadata(Kind, Node);
 }
 
