@@ -15827,93 +15827,51 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
     //  'max(a, b) <= c'   ->   '(a <= c) and (b <= c)',
     //  'max(a, b) <  c'   ->   '(a <  c) and (b <  c)'.
 
+    bool IsUpperBound = ICmpInst::isLT(Predicate) || ICmpInst::isLE(Predicate);
     // We cannot express strict predicates in SCEV, so instead we replace them
     // with non-strict ones against plus or minus one of RHS depending on the
     // predicate.
-    switch (Predicate) {
-    case CmpInst::ICMP_ULT:
+    if (Predicate == CmpInst::ICMP_ULT) {
       if (RHS->getType()->isPointerTy())
         return;
       RHS = SE.getUMaxExpr(RHS, One);
-      [[fallthrough]];
-    case CmpInst::ICMP_SLT: {
+    }
+    if (ICmpInst::isLT(Predicate))
       RHS = SE.getMinusSCEV(RHS, One);
-      RHS = getPreviousSCEVDivisibleByDivisor(RHS, DividesBy, SE);
-      break;
-    }
-    case CmpInst::ICMP_UGT:
-    case CmpInst::ICMP_SGT:
+    else if (ICmpInst::isGT(Predicate))
       RHS = SE.getAddExpr(RHS, One);
-      RHS = getNextSCEVDivisibleByDivisor(RHS, DividesBy, SE);
-      break;
-    case CmpInst::ICMP_ULE:
-    case CmpInst::ICMP_SLE:
-      RHS = getPreviousSCEVDivisibleByDivisor(RHS, DividesBy, SE);
-      break;
-    case CmpInst::ICMP_UGE:
-    case CmpInst::ICMP_SGE:
-      RHS = getNextSCEVDivisibleByDivisor(RHS, DividesBy, SE);
-      break;
-    default:
-      llvm_unreachable("EQ and NE are handled above");
-    }
+    RHS = IsUpperBound ? getPreviousSCEVDivisibleByDivisor(RHS, DividesBy, SE)
+                       : getNextSCEVDivisibleByDivisor(RHS, DividesBy, SE);
+
+    // An upper bound is applied with a min expression, a lower bound with a
+    // max expression.
+    SCEVTypes BoundKind = ICmpInst::isUnsigned(Predicate)
+                              ? (IsUpperBound ? scUMinExpr : scUMaxExpr)
+                              : (IsUpperBound ? scSMinExpr : scSMaxExpr);
 
     SmallVector<SCEVUse, 16> Worklist(1, LHS);
     SmallPtrSet<const SCEV *, 16> Visited;
-
-    auto EnqueueOperands = [&Worklist](const SCEVNAryExpr *S) {
-      append_range(Worklist, S->operands());
-    };
-
     while (!Worklist.empty()) {
       const SCEV *From = Worklist.pop_back_val();
-      if (isa<SCEVConstant>(From))
-        continue;
-      if (!Visited.insert(From).second)
+      if (isa<SCEVConstant>(From) || !Visited.insert(From).second)
         continue;
       const SCEV *FromRewritten = GetMaybeRewritten(From);
-      const SCEV *To = nullptr;
 
-      switch (Predicate) {
-      case CmpInst::ICMP_ULT:
-      case CmpInst::ICMP_ULE:
-        To = SE.getUMinExpr(FromRewritten, RHS);
-        if (auto *UMax = dyn_cast<SCEVUMaxExpr>(FromRewritten))
-          EnqueueOperands(UMax);
-        break;
-      case CmpInst::ICMP_SLT:
-      case CmpInst::ICMP_SLE:
-        To = SE.getSMinExpr(FromRewritten, RHS);
-        if (auto *SMax = dyn_cast<SCEVSMaxExpr>(FromRewritten))
-          EnqueueOperands(SMax);
-        break;
-      case CmpInst::ICMP_UGT:
-      case CmpInst::ICMP_UGE:
-        To = SE.getUMaxExpr(FromRewritten, RHS);
-        if (auto *UMin = dyn_cast<SCEVUMinExpr>(FromRewritten))
-          EnqueueOperands(UMin);
-        break;
-      case CmpInst::ICMP_SGT:
-      case CmpInst::ICMP_SGE: {
-        // From s>= RHS s>= 0 implies From u>= RHS, so an earlier
-        // umax(C, From) with C u<= RHS is redundant. Drop it, as the range of
-        // the umax may be much less precise than the one of From.
-        const APInt *C, *RHSC;
-        if (match(RHS, m_scev_APInt(RHSC)) && RHSC->isNonNegative() &&
-            match(FromRewritten,
-                  m_scev_UMax(m_scev_APInt(C), m_scev_Specific(From))) &&
-            C->ule(*RHSC))
-          FromRewritten = From;
-        To = SE.getSMaxExpr(FromRewritten, RHS);
-        if (auto *SMin = dyn_cast<SCEVSMinExpr>(FromRewritten))
-          EnqueueOperands(SMin);
-        break;
-      }
-      default:
-        llvm_unreachable("EQ and NE are handled above");
-      }
+      // From s>= RHS s>= 0 implies From u>= RHS, so an earlier
+      // umax(C, From) with C u<= RHS is redundant. Drop it, as the range of
+      // the umax may be much less precise than the one of From.
+      const APInt *C, *RHSC;
+      if (BoundKind == scSMaxExpr && match(RHS, m_scev_APInt(RHSC)) &&
+          RHSC->isNonNegative() &&
+          match(FromRewritten,
+                m_scev_UMax(m_scev_APInt(C), m_scev_Specific(From))) &&
+          C->ule(*RHSC))
+        FromRewritten = From;
 
-      AddRewrite(From, FromRewritten, To);
+      SmallVector<SCEVUse, 2> Ops = {FromRewritten, RHS};
+      AddRewrite(From, FromRewritten, SE.getMinMaxExpr(BoundKind, Ops));
+      if (FromRewritten->getSCEVType() == SCEVMinMaxExpr::negate(BoundKind))
+        append_range(Worklist, FromRewritten->operands());
     }
   };
 
