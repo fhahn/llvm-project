@@ -1423,6 +1423,19 @@ struct VPCombineInserter {
 using VPCombineBuilder = VPBuilderBase<VPCombineInserter>;
 } // namespace
 
+/// Create a LogicalAnd of \p LHS and \p RHS replacing \p Sel, a select with
+/// condition \p LHS. The LogicalAnd is a select with condition \p LHS as well,
+/// so it inherits the branch weights of \p Sel, if any.
+static VPInstruction *createLogicalAndWithWeightsOf(VPCombineBuilder &Builder,
+                                                    VPValue *LHS, VPValue *RHS,
+                                                    VPRecipeBase &Sel) {
+  VPInstruction *And = Builder.createLogicalAnd(LHS, RHS);
+  if (auto *MD = dyn_cast<VPIRMetadata>(&Sel))
+    if (MDNode *Prof = MD->getMetadata(LLVMContext::MD_prof))
+      And->setMetadata(LLVMContext::MD_prof, Prof);
+  return And;
+}
+
 /// Combine \p Def into a simpler recipe. May modify or create new recipes via
 /// \p Builder.
 static VPSingleDefRecipe *combineRecipe(VPlan &Plan, VPSingleDefRecipe *Def,
@@ -1465,7 +1478,7 @@ static VPSingleDefRecipe *combineRecipe(VPlan &Plan, VPSingleDefRecipe *Def,
   if (CanCreateNewRecipe &&
       match(Def, m_LogicalAnd(m_VPValue(X),
                               m_LogicalAnd(m_VPValue(Y), m_Deferred(X)))))
-    return Builder.createLogicalAnd(X, Y);
+    return createLogicalAndWithWeightsOf(Builder, X, Y, *Def);
 
   // (X && Y) | (X && Z) -> X && (Y | Z)
   if (CanCreateNewRecipe &&
@@ -1505,9 +1518,12 @@ static VPSingleDefRecipe *combineRecipe(VPlan &Plan, VPSingleDefRecipe *Def,
                           m_OneUse(m_c_BinaryOr(m_VPValue(Y), m_VPValue(Z))),
                           m_Deferred(Y))) &&
       Y->getScalarType()->isIntegerTy(1))
-    return Builder.createOr(Y, Builder.createLogicalAnd(X, Z));
+    return Builder.createOr(Y,
+                            createLogicalAndWithWeightsOf(Builder, X, Z, *Def));
 
   // select M0, (select M1, X, Y), Y -> select (M0 && M1), X, Y
+  // The probability of the combined condition is not known, so mark the new
+  // select unknown.
   VPValue *Mask0, *Mask1;
   if (CanCreateNewRecipe &&
       match(Def,
@@ -1515,8 +1531,9 @@ static VPSingleDefRecipe *combineRecipe(VPlan &Plan, VPSingleDefRecipe *Def,
                          m_OneUse(m_SelectLike(m_VPValue(Mask1), m_VPValue(X),
                                                m_VPValue(Y))),
                          m_Deferred(Y))))
-    return Builder.createSelect(Builder.createLogicalAnd(Mask0, Mask1), X, Y,
-                                Def->getDebugLoc());
+    return Builder.createSelectWithUnknownProfile(
+        createLogicalAndWithWeightsOf(Builder, Mask0, Mask1, *Def), X, Y,
+        Def->getDebugLoc());
 
   if (match(Def, m_Trunc(m_VPValue(Y, m_ZExtOrSExt(m_VPValue(X)))))) {
     // Don't replace a non-widened cast recipe with a widened cast.

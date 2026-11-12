@@ -714,8 +714,145 @@ exit:
   ret i8 %sel
 }
 
+; Folding select M0, (select M1, X, Y), Y to select (M0 && M1), X, Y. The
+; probability of the combined condition is not known. M0 is the header mask
+; when tail folding, whose probability is not tracked either.
+define i64 @argmin_fold_nested_selects(ptr %a, i64 %n) !prof !0 {
+; VF4-LABEL: define i64 @argmin_fold_nested_selects(
+; VF4-SAME: ptr [[A:%.*]], i64 [[N:%.*]]) !prof [[PROF0]] {
+; VF4:  [[ENTRY:.*:]]
+; VF4:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; VF4:  [[VECTOR_PH]]:
+; VF4:  [[VECTOR_BODY:.*]]:
+; VF4:    [[TMP4:%.*]] = select <4 x i1> [[TMP2:%.*]], <4 x i64> [[VEC_IND:%.*]], <4 x i64> [[VEC_PHI1:%.*]]
+; VF4:    br i1 [[TMP5:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP33:![0-9]+]]
+; VF4:  [[MIDDLE_BLOCK]]:
+; VF4:    [[TMP8:%.*]] = select <4 x i1> [[TMP7:%.*]], <4 x i64> [[TMP4]], <4 x i64> splat (i64 -1)
+; VF4:    [[TMP11:%.*]] = select i1 [[TMP10:%.*]], i64 0, i64 [[TMP9:%.*]], !prof [[PROF34:![0-9]+]]
+; VF4:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; VF4:  [[SCALAR_PH]]:
+; VF4:  [[LOOP:.*]]:
+; VF4:    [[IDX_NEXT:%.*]] = select i1 [[CMP:%.*]], i64 [[IV:%.*]], i64 [[IDX:%.*]], !prof [[PROF1]]
+; VF4:    br i1 [[EC:%.*]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP35:![0-9]+]]
+; VF4:  [[EXIT]]:
+;
+; VF1IC2-LABEL: define i64 @argmin_fold_nested_selects(
+; VF1IC2-SAME: ptr [[A:%.*]], i64 [[N:%.*]]) !prof [[PROF0]] {
+; VF1IC2:  [[ENTRY:.*:]]
+; VF1IC2:  [[VECTOR_PH:.*:]]
+; VF1IC2:  [[VECTOR_BODY:.*]]:
+; VF1IC2:    br i1 [[TMP3:%.*]], label %[[PRED_LOAD_IF:.*]], label %[[PRED_LOAD_CONTINUE:.*]]
+; VF1IC2:  [[PRED_LOAD_IF]]:
+; VF1IC2:  [[PRED_LOAD_CONTINUE]]:
+; VF1IC2:    br i1 [[TMP4:%.*]], label %[[PRED_LOAD_IF4:.*]], label %[[PRED_LOAD_CONTINUE5:.*]]
+; VF1IC2:  [[PRED_LOAD_IF4]]:
+; VF1IC2:  [[PRED_LOAD_CONTINUE5]]:
+; VF1IC2:    [[TMP15:%.*]] = select i1 [[TMP3]], i32 [[TMP13:%.*]], i32 [[VEC_PHI:%.*]], !prof [[PROF10]]
+; VF1IC2:    [[TMP16:%.*]] = select i1 [[TMP4]], i32 [[TMP14:%.*]], i32 [[VEC_PHI1:%.*]], !prof [[PROF10]]
+; VF1IC2:    [[TMP17:%.*]] = select i1 [[TMP3]], i1 [[TMP11:%.*]], i1 false, !prof [[PROF10]]
+; VF1IC2:    [[TMP18:%.*]] = select i1 [[TMP4]], i1 [[TMP12:%.*]], i1 false, !prof [[PROF10]]
+; VF1IC2:    [[TMP19:%.*]] = select i1 [[TMP17]], i64 [[TMP1:%.*]], i64 [[VEC_PHI2:%.*]], !prof [[PROF10]]
+; VF1IC2:    [[TMP20:%.*]] = select i1 [[TMP18]], i64 [[TMP2:%.*]], i64 [[VEC_PHI3:%.*]], !prof [[PROF10]]
+; VF1IC2:    br i1 [[TMP21:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP22:![0-9]+]]
+; VF1IC2:  [[MIDDLE_BLOCK]]:
+; VF1IC2:    [[TMP24:%.*]] = select i1 [[TMP22:%.*]], i64 [[TMP19]], i64 -1, !prof [[PROF10]]
+; VF1IC2:    [[TMP25:%.*]] = select i1 [[TMP23:%.*]], i64 [[TMP20]], i64 -1, !prof [[PROF10]]
+; VF1IC2:    [[TMP27:%.*]] = select i1 [[TMP26:%.*]], i64 0, i64 [[RDX_MINMAX6:%.*]], !prof [[PROF23:![0-9]+]]
+; VF1IC2:  [[EXIT:.*:]]
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %min = phi i32 [ 2147483647, %entry ], [ %min.next, %loop ]
+  %idx = phi i64 [ 0, %entry ], [ %idx.next, %loop ]
+  %gep = getelementptr inbounds i32, ptr %a, i64 %iv
+  %l = load i32, ptr %gep, align 4
+  %cmp = icmp slt i32 %l, %min
+  %min.next = call i32 @llvm.smin.i32(i32 %min, i32 %l)
+  %idx.next = select i1 %cmp, i64 %iv, i64 %idx, !prof !1
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret i64 %idx.next
+}
+
+; Folding select M0, (select M1, X, Y), Y to select (M0 && M1), X, Y. The
+; LogicalAnd M0 && M1 has condition M0 like the outer select, so it keeps its
+; weights, while the probability of the combined condition is not known.
+define void @fold_nested_selects(ptr noalias %a, ptr noalias %b, ptr noalias %dst, i64 %n) !prof !0 {
+; VF4-LABEL: define void @fold_nested_selects(
+; VF4-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], ptr noalias [[DST:%.*]], i64 [[N:%.*]]) !prof [[PROF0]] {
+; VF4:  [[ENTRY:.*:]]
+; VF4:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; VF4:  [[VECTOR_PH]]:
+; VF4:  [[VECTOR_BODY:.*]]:
+; VF4:    [[TMP5:%.*]] = select <4 x i1> [[TMP3:%.*]], <4 x i1> [[TMP4:%.*]], <4 x i1> zeroinitializer
+; VF4:    [[TMP6:%.*]] = select <4 x i1> [[TMP5]], <4 x i32> [[WIDE_LOAD:%.*]], <4 x i32> [[WIDE_LOAD1:%.*]]
+; VF4:    br i1 [[TMP8:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP36:![0-9]+]]
+; VF4:  [[MIDDLE_BLOCK]]:
+; VF4:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; VF4:  [[SCALAR_PH]]:
+; VF4:  [[LOOP:.*]]:
+; VF4:    [[S1:%.*]] = select i1 [[C1:%.*]], i32 [[LA:%.*]], i32 [[LB:%.*]], !prof [[PROF37:![0-9]+]]
+; VF4:    [[S2:%.*]] = select i1 [[C0:%.*]], i32 [[S1]], i32 [[LB]], !prof [[PROF1]]
+; VF4:    br i1 [[EC:%.*]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP38:![0-9]+]]
+; VF4:  [[EXIT]]:
+;
+; VF1IC2-LABEL: define void @fold_nested_selects(
+; VF1IC2-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], ptr noalias [[DST:%.*]], i64 [[N:%.*]]) !prof [[PROF0]] {
+; VF1IC2:  [[ENTRY:.*:]]
+; VF1IC2:  [[VECTOR_PH:.*:]]
+; VF1IC2:  [[VECTOR_BODY:.*]]:
+; VF1IC2:    br i1 [[TMP2:%.*]], label %[[PRED_LOAD_IF:.*]], label %[[PRED_LOAD_CONTINUE:.*]]
+; VF1IC2:  [[PRED_LOAD_IF]]:
+; VF1IC2:  [[PRED_LOAD_CONTINUE]]:
+; VF1IC2:    br i1 [[TMP3:%.*]], label %[[PRED_LOAD_IF1:.*]], label %[[PRED_LOAD_CONTINUE2:.*]]
+; VF1IC2:  [[PRED_LOAD_IF1]]:
+; VF1IC2:  [[PRED_LOAD_CONTINUE2]]:
+; VF1IC2:    [[TMP20:%.*]] = select i1 [[TMP16:%.*]], i1 [[TMP18:%.*]], i1 false, !prof [[PROF1]]
+; VF1IC2:    [[TMP21:%.*]] = select i1 [[TMP17:%.*]], i1 [[TMP19:%.*]], i1 false, !prof [[PROF1]]
+; VF1IC2:    [[TMP22:%.*]] = select i1 [[TMP20]], i32 [[TMP8:%.*]], i32 [[TMP9:%.*]], !prof [[PROF10]]
+; VF1IC2:    [[TMP23:%.*]] = select i1 [[TMP21]], i32 [[TMP14:%.*]], i32 [[TMP15:%.*]], !prof [[PROF10]]
+; VF1IC2:    br i1 [[TMP2]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
+; VF1IC2:  [[PRED_STORE_IF]]:
+; VF1IC2:  [[PRED_STORE_CONTINUE]]:
+; VF1IC2:    br i1 [[TMP3]], label %[[PRED_STORE_IF3:.*]], label %[[PRED_STORE_CONTINUE4:.*]]
+; VF1IC2:  [[PRED_STORE_IF3]]:
+; VF1IC2:  [[PRED_STORE_CONTINUE4]]:
+; VF1IC2:    br i1 [[TMP26:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP24:![0-9]+]]
+; VF1IC2:  [[MIDDLE_BLOCK]]:
+; VF1IC2:  [[EXIT:.*:]]
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
+  %la = load i32, ptr %gep.a, align 4
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
+  %lb = load i32, ptr %gep.b, align 4
+  %c0 = icmp sgt i32 %la, 0
+  %c1 = icmp sgt i32 %lb, 0
+  %s1 = select i1 %c1, i32 %la, i32 %lb, !prof !2
+  %s2 = select i1 %c0, i32 %s1, i32 %lb, !prof !1
+  %gep.dst = getelementptr inbounds i32, ptr %dst, i64 %iv
+  store i32 %s2, ptr %gep.dst, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
 !0 = !{!"function_entry_count", i64 1000}
 !1 = !{!"branch_weights", i32 3, i32 5}
+!2 = !{!"branch_weights", i32 7, i32 11}
 ;.
 ; VF4: [[PROF0]] = !{!"function_entry_count", i64 1000}
 ; VF4: [[PROF1]] = !{!"branch_weights", i32 3, i32 5}
@@ -750,6 +887,12 @@ exit:
 ; VF4: [[PROF30]] = !{!"branch_weights", i32 1, i32 1}
 ; VF4: [[LOOP31]] = distinct !{[[LOOP31]], [[META4]], [[META3]], [[META32:![0-9]+]]}
 ; VF4: [[META32]] = !{!"llvm.loop.estimated_trip_count", i32 2}
+; VF4: [[LOOP33]] = distinct !{[[LOOP33]], [[META3]], [[META4]]}
+; VF4: [[PROF34]] = !{!"unknown", !"vplan"}
+; VF4: [[LOOP35]] = distinct !{[[LOOP35]], [[META4]], [[META3]]}
+; VF4: [[LOOP36]] = distinct !{[[LOOP36]], [[META3]], [[META4]]}
+; VF4: [[PROF37]] = !{!"branch_weights", i32 7, i32 11}
+; VF4: [[LOOP38]] = distinct !{[[LOOP38]], [[META4]], [[META3]]}
 ;.
 ; VF1IC2: [[PROF0]] = !{!"function_entry_count", i64 1000}
 ; VF1IC2: [[PROF1]] = !{!"branch_weights", i32 3, i32 5}
@@ -773,4 +916,7 @@ exit:
 ; VF1IC2: [[PROF19]] = !{!"branch_weights", i32 1, i32 126}
 ; VF1IC2: [[LOOP20]] = distinct !{[[LOOP20]], [[META3]], [[META4]], [[META21:![0-9]+]]}
 ; VF1IC2: [[META21]] = !{!"llvm.loop.estimated_trip_count", i32 127}
+; VF1IC2: [[LOOP22]] = distinct !{[[LOOP22]], [[META3]], [[META4]]}
+; VF1IC2: [[PROF23]] = !{!"unknown", !"vplan"}
+; VF1IC2: [[LOOP24]] = distinct !{[[LOOP24]], [[META3]], [[META4]]}
 ;.

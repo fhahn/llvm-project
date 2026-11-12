@@ -806,13 +806,18 @@ Value *VPInstruction::generate(VPTransformState &State,
     Value *Res = getOpcode() == VPInstruction::LogicalAnd
                      ? Builder.CreateLogicalAnd(A, B, Name)
                      : Builder.CreateLogicalOr(A, B, Name);
-    // Only a scalar condition can carry branch weights. For scalar operands,
-    // the probability of the first operand could be derived from the execution
-    // frequency of the block it masks, but it is not recorded on the recipe
-    // yet, so mark it explicitly unknown.
+    // Only a scalar condition can carry branch weights. Use the weights
+    // recorded on the recipe, if any. Otherwise, the probability of the first
+    // operand could be derived from the execution frequency of the block it
+    // masks, but it is not recorded on the recipe yet, so mark it explicitly
+    // unknown.
     auto *Sel = dyn_cast<SelectInst>(Res);
-    if (Sel && !A->getType()->isVectorTy())
-      setExplicitlyUnknownBranchWeightsIfProfiled(*Sel, DEBUG_TYPE);
+    if (Sel && !A->getType()->isVectorTy()) {
+      if (MDNode *Prof = getMetadata(LLVMContext::MD_prof))
+        Sel->setMetadata(LLVMContext::MD_prof, Prof);
+      else
+        setExplicitlyUnknownBranchWeightsIfProfiled(*Sel, DEBUG_TYPE);
+    }
     return Res;
   }
   case Instruction::ExtractElement: {
