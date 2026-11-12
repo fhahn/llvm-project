@@ -41,3 +41,54 @@ header:
 exit:
   ret void
 }
+
+; Tail folding masks %sel. Only its first lane is used, by the uniform store
+; via %div, so it must be scalarized together with %iv.ext instead of being
+; widened with a single-scalar operand.
+define void @scalarize_masked_select(ptr %dst) {
+; CHECK-LABEL: define void @scalarize_masked_select(
+; CHECK-SAME: ptr [[DST:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = icmp ule i32 [[INDEX]], 8
+; CHECK-NEXT:    [[TMP1:%.*]] = trunc i32 [[INDEX]] to i8
+; CHECK-NEXT:    [[TMP2:%.*]] = add i8 [[TMP1]], 1
+; CHECK-NEXT:    [[TMP3:%.*]] = icmp slt i8 [[TMP1]], 0
+; CHECK-NEXT:    [[TMP4:%.*]] = zext i8 [[TMP1]] to i32
+; CHECK-NEXT:    [[TMP5:%.*]] = select i1 [[TMP3]], i32 [[TMP4]], i32 0
+; CHECK-NEXT:    [[TMP6:%.*]] = trunc i32 [[TMP5]] to i8
+; CHECK-NEXT:    [[TMP7:%.*]] = select i1 [[TMP0]], i8 [[TMP2]], i8 1
+; CHECK-NEXT:    [[TMP8:%.*]] = udiv i8 [[TMP6]], [[TMP7]]
+; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr i32, ptr [[DST]], i8 [[TMP8]]
+; CHECK-NEXT:    store i32 0, ptr [[TMP9]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i32 [[INDEX_NEXT]], 12
+; CHECK-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br label %[[EXIT:.*]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i8 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.next = add i8 %iv, 1
+  %iv.neg = icmp slt i8 %iv, 0
+  %iv.ext = zext i8 %iv to i32
+  %sel = select i1 %iv.neg, i32 %iv.ext, i32 0
+  %sel.trunc = trunc i32 %sel to i8
+  %div = udiv i8 %sel.trunc, %iv.next
+  %gep = getelementptr i32, ptr %dst, i8 %div
+  store i32 0, ptr %gep, align 4
+  %ec = icmp eq i8 %iv, 8
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
