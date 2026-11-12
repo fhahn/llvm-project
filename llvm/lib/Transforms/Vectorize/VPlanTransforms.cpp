@@ -2907,8 +2907,9 @@ void VPlanTransforms::replaceSymbolicStrides(
 }
 
 /// Drop poison-generating flags of the recipes in the backward slice of \p Root
-/// that may generate a poison value that is used after vectorization. Recipes
-/// in \p Visited are skipped.
+/// that may generate a poison value that is used after vectorization. The masks
+/// of VPInstructions are not part of the slice. Recipes in \p Visited are
+/// skipped.
 static void dropPoisonGeneratingFlagsInBackwardSlice(
     VPRecipeBase *Root, SmallPtrSetImpl<VPRecipeBase *> &Visited) {
   SmallVector<VPRecipeBase *, 16> Worklist;
@@ -2959,8 +2960,10 @@ static void dropPoisonGeneratingFlagsInBackwardSlice(
              "VPRecipeWithIRFlags");
     }
 
-    // Add new definitions to the worklist.
-    for (VPValue *Operand : CurRec->operands())
+    // Add new definitions to the worklist. Masks are not part of the address.
+    auto *VPI = dyn_cast<VPInstruction>(CurRec);
+    for (VPValue *Operand :
+         VPI ? VPI->operandsWithoutMask() : CurRec->operands())
       if (VPRecipeBase *OpDef = Operand->getDefiningRecipe())
         Worklist.push_back(OpDef);
   }
