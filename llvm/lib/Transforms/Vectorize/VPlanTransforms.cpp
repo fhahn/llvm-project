@@ -2945,7 +2945,10 @@ static void dropPoisonGeneratingFlagsInBackwardSlice(
         VPBuilder Builder(RecWithFlags);
         VPInstruction *New =
             Builder.createAdd(A, B, RecWithFlags->getDebugLoc());
-        New->setUnderlyingValue(RecWithFlags->getUnderlyingValue());
+        // VPInstructions with an underlying value are still to be converted to
+        // recipes created from the underlying instruction, i.e. the or.
+        if (!isa<VPInstruction>(RecWithFlags))
+          New->setUnderlyingValue(RecWithFlags->getUnderlyingValue());
         RecWithFlags->replaceAllUsesWith(New);
         RecWithFlags->eraseFromParent();
         CurRec = New;
