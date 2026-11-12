@@ -2154,6 +2154,13 @@ bool LoopVectorizationCostModel::interleavedAccessCanBeWidened(
         ScalarTy->getPointerAddressSpace() !=
             MemberTy->getPointerAddressSpace())
       return false;
+    // With an uncountable exit with side effects, all memory accesses except
+    // the exit condition load are masked by a mask computed from that load. A
+    // group mixing the condition load with masked members can neither be
+    // masked nor unmasked.
+    if (Legal->hasUncountableExitWithSideEffects() &&
+        isMaskRequired(Member) != isMaskRequired(I))
+      return false;
   }
 
   // Check if masking is required.

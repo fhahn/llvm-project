@@ -1518,15 +1518,16 @@ define void @interleaved_load_group_member_after_early_exit_condition(ptr noalia
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr nuw i8, ptr [[SRC]], i64 2
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <32 x i16>, ptr [[SRC]], align 2
-; CHECK-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <32 x i16> [[WIDE_VEC]], <32 x i16> poison, <16 x i32> <i32 0, i32 2, i32 4, i32 6, i32 8, i32 10, i32 12, i32 14, i32 16, i32 18, i32 20, i32 22, i32 24, i32 26, i32 28, i32 30>
-; CHECK-NEXT:    [[STRIDED_VEC1:%.*]] = shufflevector <32 x i16> [[WIDE_VEC]], <32 x i16> poison, <16 x i32> <i32 1, i32 3, i32 5, i32 7, i32 9, i32 11, i32 13, i32 15, i32 17, i32 19, i32 21, i32 23, i32 25, i32 27, i32 29, i32 31>
+; CHECK-NEXT:    [[STRIDED_VEC:%.*]] = call <16 x i16> @llvm.experimental.vp.strided.load.v16i16.p0.i64(ptr align 2 [[SRC]], i64 4, <16 x i1> splat (i1 true), i32 16)
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp sgt <16 x i16> [[STRIDED_VEC]], splat (i16 500)
 ; CHECK-NEXT:    [[TMP1:%.*]] = freeze <16 x i1> [[TMP0]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v16i1(<16 x i1> [[TMP1]], i1 false)
 ; CHECK-NEXT:    [[UNCOUNTABLE_EXIT_MASK:%.*]] = call <16 x i1> @llvm.get.active.lane.mask.v16i1.i64(i64 0, i64 [[TMP2]])
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[TMP4]], i64 0
+; CHECK-NEXT:    [[STRIDED_VEC1:%.*]] = call <16 x i16> @llvm.experimental.vp.strided.load.v16i16.p0.i64(ptr align 2 [[TMP5]], i64 4, <16 x i1> [[UNCOUNTABLE_EXIT_MASK]], i32 16)
 ; CHECK-NEXT:    call void @llvm.masked.store.v16i16.p0(<16 x i16> [[STRIDED_VEC1]], ptr align 2 [[DST]], <16 x i1> [[UNCOUNTABLE_EXIT_MASK]])
 ; CHECK-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -1568,6 +1569,73 @@ loop.latch:
   %off.1 = or disjoint i64 %off.0, 1
   %gep.src.1 = getelementptr i16, ptr %src, i64 %off.1
   %l.1 = load i16, ptr %gep.src.1
+  %gep.dst = getelementptr i16, ptr %dst, i64 %iv
+  store i16 %l.1, ptr %gep.dst
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 16
+  br i1 %ec, label %exit, label %loop.header
+
+exit:
+  ret void
+}
+
+define void @interleaved_load_group_member_before_early_exit_condition(ptr noalias %dst, ptr align 2 dereferenceable(62) %src) {
+; CHECK-LABEL: define void @interleaved_load_group_member_before_early_exit_condition(
+; CHECK-SAME: ptr noalias [[DST:%.*]], ptr align 2 dereferenceable(62) [[SRC:%.*]]) #[[ATTR0]] {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr nuw i8, ptr [[SRC]], i64 2
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[TMP1:%.*]] = call <16 x i16> @llvm.experimental.vp.strided.load.v16i16.p0.i64(ptr align 2 [[SRC]], i64 4, <16 x i1> splat (i1 true), i32 16)
+; CHECK-NEXT:    [[TMP2:%.*]] = icmp sgt <16 x i16> [[TMP1]], splat (i16 500)
+; CHECK-NEXT:    [[TMP3:%.*]] = freeze <16 x i1> [[TMP2]]
+; CHECK-NEXT:    [[TMP4:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v16i1(<16 x i1> [[TMP3]], i1 false)
+; CHECK-NEXT:    [[UNCOUNTABLE_EXIT_MASK:%.*]] = call <16 x i1> @llvm.get.active.lane.mask.v16i1.i64(i64 0, i64 [[TMP4]])
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[TMP0]], i64 0
+; CHECK-NEXT:    [[TMP6:%.*]] = call <16 x i16> @llvm.experimental.vp.strided.load.v16i16.p0.i64(ptr align 2 [[TMP5]], i64 4, <16 x i1> [[UNCOUNTABLE_EXIT_MASK]], i32 16)
+; CHECK-NEXT:    call void @llvm.masked.store.v16i16.p0(<16 x i16> [[TMP6]], ptr align 2 [[DST]], <16 x i1> [[UNCOUNTABLE_EXIT_MASK]])
+; CHECK-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[TMP4]], 16
+; CHECK-NEXT:    br i1 [[TMP7]], label %[[EXIT:.*]], label %[[SCALAR_PH:.*]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[TMP4]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    [[OFF_0:%.*]] = shl i64 [[IV]], 1
+; CHECK-NEXT:    [[OFF_1:%.*]] = or disjoint i64 [[OFF_0]], 1
+; CHECK-NEXT:    [[GEP_SRC_1:%.*]] = getelementptr i16, ptr [[SRC]], i64 [[OFF_1]]
+; CHECK-NEXT:    [[L_1:%.*]] = load i16, ptr [[GEP_SRC_1]], align 2
+; CHECK-NEXT:    [[GEP_SRC_0:%.*]] = getelementptr [2 x i16], ptr [[SRC]], i64 [[IV]]
+; CHECK-NEXT:    [[L_0:%.*]] = load i16, ptr [[GEP_SRC_0]], align 2
+; CHECK-NEXT:    [[C:%.*]] = icmp sgt i16 [[L_0]], 500
+; CHECK-NEXT:    br i1 [[C]], label %[[EXIT]], label %[[LOOP_LATCH]]
+; CHECK:       [[LOOP_LATCH]]:
+; CHECK-NEXT:    [[GEP_DST:%.*]] = getelementptr i16, ptr [[DST]], i64 [[IV]]
+; CHECK-NEXT:    store i16 [[L_1]], ptr [[GEP_DST]], align 2
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 16
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP18:![0-9]+]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop.header
+
+loop.header:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  %off.0 = shl i64 %iv, 1
+  %off.1 = or disjoint i64 %off.0, 1
+  %gep.src.1 = getelementptr i16, ptr %src, i64 %off.1
+  %l.1 = load i16, ptr %gep.src.1
+  %gep.src.0 = getelementptr [2 x i16], ptr %src, i64 %iv
+  %l.0 = load i16, ptr %gep.src.0
+  %c = icmp sgt i16 %l.0, 500
+  br i1 %c, label %exit, label %loop.latch
+
+loop.latch:
   %gep.dst = getelementptr i16, ptr %dst, i64 %iv
   store i16 %l.1, ptr %gep.dst
   %iv.next = add nuw nsw i64 %iv, 1
