@@ -1272,6 +1272,14 @@ static VPValue *simplifyRecipe(VPlan &Plan, VPSingleDefRecipe *Def) {
   if (match(Def, m_ICmp(Pred, m_VPValue(A), m_Deferred(A))))
     return ICmpInst::isTrueWhenEqual(Pred) ? Plan.getTrue() : Plan.getFalse();
 
+  // icmp ult X, 0 -> false and icmp uge X, 0 -> true.
+  if (match(Def, m_ICmp(Pred, m_VPValue(), m_ZeroInt()))) {
+    if (Pred == CmpInst::ICMP_ULT)
+      return Plan.getFalse();
+    if (Pred == CmpInst::ICMP_UGE)
+      return Plan.getTrue();
+  }
+
   if (match(Def, m_c_Add(m_VPValue(A), m_ZeroInt())))
     return A;
 
