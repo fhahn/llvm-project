@@ -15562,11 +15562,10 @@ void ScalarEvolution::LoopGuards::collectPending() {
   if (!Pred)
     return;
   SmallPtrSet<const BasicBlock *, 8> VisitedBlocks;
-  collectFromBlock(SE, *this, L->getHeader(), Pred, VisitedBlocks);
+  collectFromBlock(L->getHeader(), Pred, VisitedBlocks);
 }
 
 void ScalarEvolution::LoopGuards::collectFromPHI(
-    ScalarEvolution &SE, ScalarEvolution::LoopGuards &Guards,
     const PHINode &Phi, SmallPtrSetImpl<const BasicBlock *> &VisitedBlocks,
     unsigned Depth) {
   if (!SE.isSCEVable(Phi.getType()))
@@ -15586,7 +15585,7 @@ void ScalarEvolution::LoopGuards::collectFromPHI(
       return;
 
     LoopGuards G(SE);
-    collectFromBlock(SE, G, Phi.getParent(), InBlock, VisitedBlocks, Depth + 1);
+    G.collectFromBlock(Phi.getParent(), InBlock, VisitedBlocks, Depth + 1);
     if (G.RewriteMap.empty())
       return;
     auto *SM =
@@ -15602,7 +15601,7 @@ void ScalarEvolution::LoopGuards::collectFromPHI(
   const SCEV *LHS = SE.getSCEV(const_cast<PHINode *>(&Phi));
   const SCEV *Bound = SE.getMinMaxExpr(SCEVMinMaxExpr::negate(Kind), Bounds);
   SmallVector<SCEVUse, 2> Ops = {Bound, LHS};
-  Guards.RewriteMap.insert({LHS, SE.getMinMaxExpr(Kind, Ops)});
+  RewriteMap.insert({LHS, SE.getMinMaxExpr(Kind, Ops)});
 }
 
 // Round \p Expr down (\p RM is DOWN) or up (\p RM is UP) to the closest
@@ -15669,7 +15668,6 @@ static const SCEV *applyDivisibilityOnMinMaxExpr(const SCEV *MinMaxExpr,
 }
 
 void ScalarEvolution::LoopGuards::collectFromBlock(
-    ScalarEvolution &SE, ScalarEvolution::LoopGuards &Guards,
     const BasicBlock *Block, const BasicBlock *Pred,
     SmallPtrSetImpl<const BasicBlock *> &VisitedBlocks, unsigned Depth) {
 
@@ -15677,9 +15675,7 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
 
   SmallVector<SCEVUse> ExprsToRewrite;
   auto CollectCondition = [&](ICmpInst::Predicate Predicate, const SCEV *LHS,
-                              const SCEV *RHS,
-                              DenseMap<const SCEV *, const SCEV *> &RewriteMap,
-                              const LoopGuards &DivGuards) {
+                              const SCEV *RHS, const LoopGuards &DivGuards) {
     // WARNING: It is generally unsound to apply any wrap flags to the proposed
     // replacement SCEV which isn't directly implied by the structure of that
     // SCEV.  In particular, using contextual facts to imply flags is *NOT*
@@ -15783,7 +15779,7 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       }
       if (LHS > RHS)
         std::swap(LHS, RHS);
-      Guards.NotEqual.insert({LHS, RHS});
+      NotEqual.insert({LHS, RHS});
       return;
     }
 
@@ -15881,7 +15877,7 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       if (!NumDomTreeSteps &&
           Depth < SE.Opts.scalar_evolution_max_loop_guard_collection_depth)
         for (auto &Phi : Pair.second->phis())
-          collectFromPHI(SE, Guards, Phi, VisitedBlocks, Depth);
+          collectFromPHI(Phi, VisitedBlocks, Depth);
       const DomTreeNode *IDom = SE.DT.getNode(Pair.second)->getIDom();
       if (!IDom ||
           ++NumDomTreeSteps > SE.Opts.scalar_evolution_max_guard_dom_tree_steps)
@@ -15906,7 +15902,7 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   }
 
   // Now apply the information from the collected conditions to
-  // Guards.RewriteMap. Conditions are processed in reverse order, so the
+  // RewriteMap. Conditions are processed in reverse order, so the
   // earliest conditions is processed first, except guards with divisibility
   // information, which are moved to the back. This ensures the SCEVs with the
   // shortest dependency chains are constructed first.
@@ -15957,30 +15953,29 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   }
 
   for (const auto &[Predicate, LHS, RHS] : GuardsToProcess)
-    CollectCondition(Predicate, LHS, RHS, Guards.RewriteMap, DivGuards);
+    CollectCondition(Predicate, LHS, RHS, DivGuards);
 
   // Apply divisibility information last. This ensures it is applied to the
   // outermost expression after other rewrites for the given value.
   for (const auto &[K, Divisor] : Multiples) {
     const SCEV *DivisorSCEV = SE.getConstant(Divisor);
-    Guards.RewriteMap[K] =
-        SE.getMulExpr(SE.getUDivExpr(applyDivisibilityOnMinMaxExpr(
-                                         Guards.rewrite(K), Divisor, SE),
-                                     DivisorSCEV),
-                      DivisorSCEV);
+    RewriteMap[K] = SE.getMulExpr(
+        SE.getUDivExpr(applyDivisibilityOnMinMaxExpr(rewrite(K), Divisor, SE),
+                       DivisorSCEV),
+        DivisorSCEV);
     ExprsToRewrite.push_back(K);
   }
 
   // Let the rewriter preserve NUW/NSW flags if the unsigned/signed ranges of
   // the replacement expressions are contained in the ranges of the replaced
   // expressions.
-  Guards.PreserveNUW = true;
-  Guards.PreserveNSW = true;
+  PreserveNUW = true;
+  PreserveNSW = true;
   for (const SCEV *Expr : ExprsToRewrite) {
-    const SCEV *RewriteTo = Guards.RewriteMap[Expr];
-    Guards.PreserveNUW &=
+    const SCEV *RewriteTo = RewriteMap[Expr];
+    PreserveNUW &=
         SE.getUnsignedRange(Expr).contains(SE.getUnsignedRange(RewriteTo));
-    Guards.PreserveNSW &=
+    PreserveNSW &=
         SE.getSignedRange(Expr).contains(SE.getSignedRange(RewriteTo));
   }
 
@@ -15995,12 +15990,12 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
     SmallPtrSet<const SCEV *, 16> ToRewrite(llvm::from_range, ExprsToRewrite);
     std::function<const SCEV *(const SCEV *)> Lookup = [&](const SCEV *Expr) {
       if (Depth < MaxDepth && ToRewrite.erase(Expr)) {
-        const SCEV *RewriteTo = Guards.RewriteMap[Expr];
-        Guards.RewriteMap.erase(Expr);
+        const SCEV *RewriteTo = RewriteMap[Expr];
+        RewriteMap.erase(Expr);
         SaveAndRestore Nest(Depth, Depth + 1);
-        Guards.RewriteMap[Expr] = Guards.rewrite(RewriteTo, Lookup);
+        RewriteMap[Expr] = rewrite(RewriteTo, Lookup);
       }
-      return Guards.RewriteMap.lookup(Expr);
+      return RewriteMap.lookup(Expr);
     };
     for (const SCEV *Expr : ExprsToRewrite)
       Lookup(Expr);

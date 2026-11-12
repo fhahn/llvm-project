@@ -1598,23 +1598,19 @@ public:
     /// Collect the guards for PendingLoop.
     void collectPending();
 
-    /// Recursively collect loop guards in \p Guards, starting from
-    /// block \p Block with predecessor \p Pred. The intended starting point
-    /// is to collect from a loop header and its predecessor.
-    static void
-    collectFromBlock(ScalarEvolution &SE, ScalarEvolution::LoopGuards &Guards,
-                     const BasicBlock *Block, const BasicBlock *Pred,
-                     SmallPtrSetImpl<const BasicBlock *> &VisitedBlocks,
-                     unsigned Depth = 0);
+    /// Recursively collect loop guards, starting from block \p Block with
+    /// predecessor \p Pred. The intended starting point is to collect from a
+    /// loop header and its predecessor.
+    void collectFromBlock(const BasicBlock *Block, const BasicBlock *Pred,
+                          SmallPtrSetImpl<const BasicBlock *> &VisitedBlocks,
+                          unsigned Depth = 0);
 
-    /// Collect loop guards in \p Guards, starting from PHINode \p
-    /// Phi, by calling \p collectFromBlock on the incoming blocks of
-    /// \Phi and trying to merge the found constraints into a single
-    /// combined one for \p Phi.
-    static void collectFromPHI(
-        ScalarEvolution &SE, ScalarEvolution::LoopGuards &Guards,
-        const PHINode &Phi, SmallPtrSetImpl<const BasicBlock *> &VisitedBlocks,
-        unsigned Depth);
+    /// Collect loop guards for PHINode \p Phi, by calling collectFromBlock
+    /// on the incoming blocks of \p Phi and trying to merge the found
+    /// constraints into a single combined one for \p Phi.
+    void collectFromPHI(const PHINode &Phi,
+                        SmallPtrSetImpl<const BasicBlock *> &VisitedBlocks,
+                        unsigned Depth);
 
     /// Like rewrite(Expr), but look up rewrites with \p Lookup if set.
     const SCEV *rewrite(const SCEV *Expr,
