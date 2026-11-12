@@ -5649,7 +5649,10 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
          "loops not exiting via the latch without required epilogue?");
   RUN_VPLAN_PASS(VPlanTransforms::materializeVectorTripCount, BestVPlan,
                  VectorPH, HasTailFolded, RequiresScalarEpilogue,
-                 &BestVPlan.getVFxUF(), MaxRuntimeStep);
+                 &BestVPlan.getVFxUF(), MaxRuntimeStep,
+                 HasBranchWeights ? std::optional<unsigned>(EstimatedVFxUF)
+                                  : std::nullopt,
+                 OrigAverageTripCount);
   RUN_VPLAN_PASS(VPlanTransforms::materializeFactors, BestVPlan, VectorPH,
                  BestVF);
   // Limit expansions to VPInstruction to when not vectorizing the epilogue.

@@ -856,7 +856,9 @@ void VPlanTransforms::materializeUnpacks(VPlan &Plan) {
 void VPlanTransforms::materializeVectorTripCount(
     VPlan &Plan, VPBasicBlock *VectorPHVPBB, bool TailByMasking,
     bool RequiresScalarEpilogue, VPValue *Step,
-    std::optional<uint64_t> MaxRuntimeStep) {
+    std::optional<uint64_t> MaxRuntimeStep,
+    std::optional<unsigned> EstimatedVFxUF,
+    std::optional<unsigned> EstimatedTripCount) {
   VPSymbolicValue &VectorTC = Plan.getVectorTripCount();
   // There's nothing to do if there are no users of the vector trip count or its
   // IR value has already been set.
@@ -916,7 +918,21 @@ void VPlanTransforms::materializeVectorTripCount(
            "requiring scalar epilogue is not supported with fail folding");
     VPValue *IsZero =
         Builder.createICmp(CmpInst::ICMP_EQ, R, Plan.getZero(TCTy));
-    R = Builder.createSelect(IsZero, Step, R);
+    // The select tests whether the trip count is a multiple of the step, the
+    // same event as the middle block's terminator without a required scalar
+    // epilogue, so weight it the same way. Without an estimate for the original
+    // loop, there is nothing to derive the weights from.
+    if (EstimatedVFxUF) {
+      VPInstruction *Sel = Builder.createSelect(IsZero, Step, R);
+      MDBuilder MDB(Plan.getContext());
+      Sel->setMetadata(
+          LLVMContext::MD_prof,
+          MDB.createBranchWeights(vputils::getRemainderBranchWeights(
+              *EstimatedVFxUF, EstimatedTripCount)));
+      R = Sel;
+    } else {
+      R = Builder.createSelectWithUnknownProfile(IsZero, Step, R);
+    }
   }
 
   VPValue *Res =

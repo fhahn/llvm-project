@@ -8,15 +8,15 @@ define void @header_exiting(ptr %p, i32 %n) !prof !0 {
 ; CHECK:  [[ENTRY:.*:]]
 ; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:  [[VECTOR_PH]]:
-; CHECK:    [[TMP4:%.*]] = select i1 [[TMP3:%.*]], i32 4, i32 [[TMP2:%.*]]
+; CHECK:    [[TMP4:%.*]] = select i1 [[TMP3:%.*]], i32 4, i32 [[TMP2:%.*]], !prof [[PROF1:![0-9]+]]
 ; CHECK:  [[VECTOR_BODY:.*]]:
-; CHECK:    br i1 [[TMP7:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP1:![0-9]+]]
+; CHECK:    br i1 [[TMP7:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP2:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
 ; CHECK:  [[SCALAR_PH]]:
 ; CHECK:  [[LOOP_HEADER:.*]]:
 ; CHECK:    br i1 [[EC:%.*]], label %[[LOOP_LATCH:.*]], label %[[EXIT:.*]]
 ; CHECK:  [[LOOP_LATCH]]:
-; CHECK:    br label %[[LOOP_HEADER]], !llvm.loop [[LOOP4:![0-9]+]]
+; CHECK:    br label %[[LOOP_HEADER]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:  [[EXIT]]:
 ;
 entry:
@@ -47,15 +47,15 @@ define void @header_exiting_with_runtime_checks(ptr %dst, ptr %src, i32 %n) !pro
 ; CHECK:  [[VECTOR_MEMCHECK]]:
 ; CHECK:    br i1 [[DIFF_CHECK:%.*]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:  [[VECTOR_PH]]:
-; CHECK:    [[TMP6:%.*]] = select i1 [[TMP5:%.*]], i32 4, i32 [[TMP4:%.*]]
+; CHECK:    [[TMP6:%.*]] = select i1 [[TMP5:%.*]], i32 4, i32 [[TMP4:%.*]], !prof [[PROF1]]
 ; CHECK:  [[VECTOR_BODY:.*]]:
-; CHECK:    br i1 [[TMP10:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
+; CHECK:    br i1 [[TMP10:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
 ; CHECK:  [[SCALAR_PH]]:
 ; CHECK:  [[LOOP_HEADER:.*]]:
 ; CHECK:    br i1 [[EC:%.*]], label %[[LOOP_LATCH:.*]], label %[[EXIT:.*]]
 ; CHECK:  [[LOOP_LATCH]]:
-; CHECK:    br label %[[LOOP_HEADER]], !llvm.loop [[LOOP6:![0-9]+]]
+; CHECK:    br label %[[LOOP_HEADER]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:  [[EXIT]]:
 ;
 entry:
@@ -87,13 +87,13 @@ define void @header_exiting_not_profiled(ptr %p, i32 %n) {
 ; CHECK:  [[VECTOR_PH]]:
 ; CHECK:    [[TMP4:%.*]] = select i1 [[TMP3:%.*]], i32 4, i32 [[TMP2:%.*]]
 ; CHECK:  [[VECTOR_BODY:.*]]:
-; CHECK:    br i1 [[TMP7:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
+; CHECK:    br i1 [[TMP7:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
 ; CHECK:  [[SCALAR_PH]]:
 ; CHECK:  [[LOOP_HEADER:.*]]:
 ; CHECK:    br i1 [[EC:%.*]], label %[[LOOP_LATCH:.*]], label %[[EXIT:.*]]
 ; CHECK:  [[LOOP_LATCH]]:
-; CHECK:    br label %[[LOOP_HEADER]], !llvm.loop [[LOOP8:![0-9]+]]
+; CHECK:    br label %[[LOOP_HEADER]], !llvm.loop [[LOOP9:![0-9]+]]
 ; CHECK:  [[EXIT]]:
 ;
 entry:
@@ -118,12 +118,13 @@ exit:
 !0 = !{!"function_entry_count", i64 1000}
 ;.
 ; CHECK: [[PROF0]] = !{!"function_entry_count", i64 1000}
-; CHECK: [[LOOP1]] = distinct !{[[LOOP1]], [[META2:![0-9]+]], [[META3:![0-9]+]]}
-; CHECK: [[META2]] = !{!"llvm.loop.isvectorized", i32 1}
-; CHECK: [[META3]] = !{!"llvm.loop.unroll.runtime.disable"}
-; CHECK: [[LOOP4]] = distinct !{[[LOOP4]], [[META3]], [[META2]]}
-; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META2]], [[META3]]}
-; CHECK: [[LOOP6]] = distinct !{[[LOOP6]], [[META2]]}
-; CHECK: [[LOOP7]] = distinct !{[[LOOP7]], [[META2]], [[META3]]}
-; CHECK: [[LOOP8]] = distinct !{[[LOOP8]], [[META3]], [[META2]]}
+; CHECK: [[PROF1]] = !{!"unknown", !"loop-vectorize"}
+; CHECK: [[LOOP2]] = distinct !{[[LOOP2]], [[META3:![0-9]+]], [[META4:![0-9]+]]}
+; CHECK: [[META3]] = !{!"llvm.loop.isvectorized", i32 1}
+; CHECK: [[META4]] = !{!"llvm.loop.unroll.runtime.disable"}
+; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META4]], [[META3]]}
+; CHECK: [[LOOP6]] = distinct !{[[LOOP6]], [[META3]], [[META4]]}
+; CHECK: [[LOOP7]] = distinct !{[[LOOP7]], [[META3]]}
+; CHECK: [[LOOP8]] = distinct !{[[LOOP8]], [[META3]], [[META4]]}
+; CHECK: [[LOOP9]] = distinct !{[[LOOP9]], [[META4]], [[META3]]}
 ;.
