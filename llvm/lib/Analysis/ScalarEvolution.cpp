@@ -15574,63 +15574,37 @@ void ScalarEvolution::LoopGuards::collectFromPHI(
   if (!SE.isSCEVable(Phi.getType()))
     return;
 
-  using MinMaxPattern = std::pair<const SCEVConstant *, SCEVTypes>;
-  auto GetMinMaxConst = [&](unsigned IncomingIdx) -> MinMaxPattern {
-    const BasicBlock *InBlock = Phi.getIncomingBlock(IncomingIdx);
+  // The guards of each incoming block must rewrite the incoming value to a
+  // min/max expression of the same kind with a constant operand.
+  SCEVTypes Kind = scCouldNotCompute;
+  SmallVector<SCEVUse> Bounds;
+  for (auto [V, InBlock] : zip_equal(Phi.incoming_values(), Phi.blocks())) {
     if (!VisitedBlocks.insert(InBlock).second)
-      return {nullptr, scCouldNotCompute};
+      return;
 
     // Avoid analyzing unreachable blocks so that we don't get trapped
     // traversing cycles with ill-formed dominance or infinite cycles
     if (!SE.DT.isReachableFromEntry(InBlock))
-      return {nullptr, scCouldNotCompute};
+      return;
 
     LoopGuards G(SE);
     collectFromBlock(SE, G, Phi.getParent(), InBlock, VisitedBlocks, Depth + 1);
-    auto &RewriteMap = G.RewriteMap;
-    if (RewriteMap.empty())
-      return {nullptr, scCouldNotCompute};
-    auto S = RewriteMap.find(SE.getSCEV(Phi.getIncomingValue(IncomingIdx)));
-    if (S == RewriteMap.end())
-      return {nullptr, scCouldNotCompute};
-    auto *SM = dyn_cast_if_present<SCEVMinMaxExpr>(S->second);
-    if (!SM)
-      return {nullptr, scCouldNotCompute};
-    if (const SCEVConstant *C0 = dyn_cast<SCEVConstant>(SM->getOperand(0)))
-      return {C0, SM->getSCEVType()};
-    return {nullptr, scCouldNotCompute};
-  };
-  auto MergeMinMaxConst = [](MinMaxPattern P1,
-                             MinMaxPattern P2) -> MinMaxPattern {
-    auto [C1, T1] = P1;
-    auto [C2, T2] = P2;
-    if (!C1 || !C2 || T1 != T2)
-      return {nullptr, scCouldNotCompute};
-    switch (T1) {
-    case scUMaxExpr:
-      return {C1->getAPInt().ult(C2->getAPInt()) ? C1 : C2, T1};
-    case scSMaxExpr:
-      return {C1->getAPInt().slt(C2->getAPInt()) ? C1 : C2, T1};
-    case scUMinExpr:
-      return {C1->getAPInt().ugt(C2->getAPInt()) ? C1 : C2, T1};
-    case scSMinExpr:
-      return {C1->getAPInt().sgt(C2->getAPInt()) ? C1 : C2, T1};
-    default:
-      llvm_unreachable("Trying to merge non-MinMaxExpr SCEVs.");
-    }
-  };
-  auto P = GetMinMaxConst(0);
-  for (unsigned int In = 1; In < Phi.getNumIncomingValues(); In++) {
-    if (!P.first)
-      break;
-    P = MergeMinMaxConst(P, GetMinMaxConst(In));
+    if (G.RewriteMap.empty())
+      return;
+    auto *SM =
+        dyn_cast_if_present<SCEVMinMaxExpr>(G.RewriteMap.lookup(SE.getSCEV(V)));
+    if (!SM || !isa<SCEVConstant>(SM->getOperand(0)) ||
+        (!Bounds.empty() && SM->getSCEVType() != Kind))
+      return;
+    Kind = SM->getSCEVType();
+    Bounds.push_back(SM->getOperand(0));
   }
-  if (P.first) {
-    const SCEV *LHS = SE.getSCEV(const_cast<PHINode *>(&Phi));
-    SmallVector<SCEVUse, 2> Ops({P.first, LHS});
-    const SCEV *RHS = SE.getMinMaxExpr(P.second, Ops);
-    Guards.RewriteMap.insert({LHS, RHS});
-  }
+
+  // The weakest of the constant bounds holds for the PHI.
+  const SCEV *LHS = SE.getSCEV(const_cast<PHINode *>(&Phi));
+  const SCEV *Bound = SE.getMinMaxExpr(SCEVMinMaxExpr::negate(Kind), Bounds);
+  SmallVector<SCEVUse, 2> Ops = {Bound, LHS};
+  Guards.RewriteMap.insert({LHS, SE.getMinMaxExpr(Kind, Ops)});
 }
 
 // Return a new SCEV that modifies \p Expr to the closest number divides by
