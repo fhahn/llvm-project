@@ -78,6 +78,86 @@ exit:
   ret void
 }
 
+; The guard %a == 16 rewrites the exit count (%a + %y)<nuw> of %loop.2 to
+; (16 + %y), the SCEV of the unguarded %n. The nuw only holds under the guard,
+; so it must not end up on (16 + %y) in the trip count of %loop.1.
+define void @rewrite_flags_only_hold_under_guard(i32 %a, i32 %y) {
+; CHECK-LABEL: 'rewrite_flags_only_hold_under_guard'
+; CHECK-NEXT:  Determining loop execution counts for: @rewrite_flags_only_hold_under_guard
+; CHECK-NEXT:  Loop %loop.2: backedge-taken count is (%a + %y)<nuw>
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (%a + %y)<nuw>
+; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop.1: backedge-taken count is (-1 + (1 umax (16 + %y)<nuw>))
+; CHECK-NEXT:  Loop %loop.1: constant max backedge-taken count is i32 -2
+; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is (-1 + (1 umax (16 + %y)<nuw>))
+; CHECK-NEXT:  Loop %loop.1: Trip multiple is 1
+;
+entry:
+  %add = add nuw i32 %a, %y
+  call void @use(i32 noundef %add)
+  %n = add i32 %y, 16
+  br label %loop.1
+
+loop.1:
+  %iv.1 = phi i32 [ 0, %entry ], [ %iv.1.next, %loop.1 ]
+  %iv.1.next = add i32 %iv.1, 1
+  %ec.1 = icmp ult i32 %iv.1.next, %n
+  br i1 %ec.1, label %loop.1, label %guard
+
+guard:
+  %pre = icmp eq i32 %a, 16
+  br i1 %pre, label %loop.2, label %exit
+
+loop.2:
+  %iv.2 = phi i32 [ 0, %guard ], [ %iv.2.next, %loop.2 ]
+  %iv.2.next = add i32 %iv.2, 1
+  %ec.2 = icmp eq i32 %iv.2, %add
+  br i1 %ec.2, label %exit, label %loop.2
+
+exit:
+  ret void
+}
+
+; Same as @rewrite_flags_only_hold_under_guard, but with a mul.
+define void @rewrite_flags_only_hold_under_guard_mul(i32 %a, i32 %y) {
+; CHECK-LABEL: 'rewrite_flags_only_hold_under_guard_mul'
+; CHECK-NEXT:  Determining loop execution counts for: @rewrite_flags_only_hold_under_guard_mul
+; CHECK-NEXT:  Loop %loop.2: backedge-taken count is (%a * %y)<nuw>
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -16
+; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (%a * %y)<nuw>
+; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop.1: backedge-taken count is (-1 + (1 umax (16 * %y)<nuw>))
+; CHECK-NEXT:  Loop %loop.1: constant max backedge-taken count is i32 -17
+; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is (-1 + (1 umax (16 * %y)<nuw>))
+; CHECK-NEXT:  Loop %loop.1: Trip multiple is 1
+;
+entry:
+  %mul = mul nuw i32 %a, %y
+  call void @use(i32 noundef %mul)
+  %n = mul i32 %y, 16
+  br label %loop.1
+
+loop.1:
+  %iv.1 = phi i32 [ 0, %entry ], [ %iv.1.next, %loop.1 ]
+  %iv.1.next = add i32 %iv.1, 1
+  %ec.1 = icmp ult i32 %iv.1.next, %n
+  br i1 %ec.1, label %loop.1, label %guard
+
+guard:
+  %pre = icmp eq i32 %a, 16
+  br i1 %pre, label %loop.2, label %exit
+
+loop.2:
+  %iv.2 = phi i32 [ 0, %guard ], [ %iv.2.next, %loop.2 ]
+  %iv.2.next = add i32 %iv.2, 1
+  %ec.2 = icmp eq i32 %iv.2, %mul
+  br i1 %ec.2, label %exit, label %loop.2
+
+exit:
+  ret void
+}
+
 declare void @clobber()
 
 
