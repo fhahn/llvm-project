@@ -357,7 +357,9 @@ public:
   }
 
   /// Create an AnyOf reduction pattern: or-reduce \p ChainOp, freeze the
-  /// result, then select between \p TrueVal and \p FalseVal.
+  /// result, then select between \p TrueVal and \p FalseVal. The select's
+  /// condition is whether the condition held in any iteration, for which no
+  /// probability is known, so it is marked unknown.
   VPInstruction *createAnyOfReduction(VPValue *ChainOp, VPValue *TrueVal,
                                       VPValue *FalseVal,
                                       DebugLoc DL = DebugLoc::getUnknown()) {
@@ -368,7 +370,8 @@ public:
     auto *OrReduce = createNaryOp(VPInstruction::ComputeReductionResult,
                                   {ChainOp}, Flags, DL);
     auto *Freeze = createNaryOp(Instruction::Freeze, {OrReduce}, DL);
-    return createSelect(Freeze, TrueVal, FalseVal, DL, "rdx.select");
+    return createSelectWithUnknownProfile(Freeze, TrueVal, FalseVal, DL,
+                                          "rdx.select");
   }
 
   VPInstruction *createPtrAdd(VPValue *Ptr, VPValue *Offset,

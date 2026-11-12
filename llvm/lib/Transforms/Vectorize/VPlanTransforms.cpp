@@ -5123,8 +5123,10 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
       // PhiR is the last operand and include the header mask if needed.
       DebugLoc DL = FindLastSelect->getDefiningRecipe()->getDebugLoc();
       VPBuilder LoopBuilder(FindLastSelect->getDefiningRecipe());
-      if (match(FindLastSelect,
-                m_SelectLike(m_VPValue(Cond), m_Specific(PhiR), m_VPValue())))
+      bool IsNegated =
+          match(FindLastSelect,
+                m_SelectLike(m_VPValue(Cond), m_Specific(PhiR), m_VPValue()));
+      if (IsNegated)
         SelectCond = LoopBuilder.createNot(SelectCond);
 
       // When tail folding, mask the condition with the header mask to prevent
@@ -5133,10 +5135,25 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
         SelectCond = LoopBuilder.createLogicalAnd(HeaderMask, SelectCond);
 
       if (SelectCond != Cond || IVOfExpressionToSink) {
-        NewFindLastSelect = LoopBuilder.createSelect(
-            SelectCond,
-            IVOfExpressionToSink ? IVOfExpressionToSink : FindLastExpression,
-            PhiR, DL);
+        VPValue *TrueVal =
+            IVOfExpressionToSink ? IVOfExpressionToSink : FindLastExpression;
+        // Without a header mask, the new select's condition is the one of
+        // FindLastSelect, possibly negated, so reuse its weights, if any.
+        // Otherwise the probability of the combined condition is not known.
+        auto *OrigMD = dyn_cast<VPIRMetadata>(FindLastSelect);
+        MDNode *Prof =
+            OrigMD ? OrigMD->getMetadata(LLVMContext::MD_prof) : nullptr;
+        if (HeaderMask || !Prof) {
+          NewFindLastSelect = LoopBuilder.createSelectWithUnknownProfile(
+              SelectCond, TrueVal, PhiR, DL);
+        } else {
+          auto *NewSel =
+              LoopBuilder.createSelect(SelectCond, TrueVal, PhiR, DL);
+          NewSel->setMetadata(LLVMContext::MD_prof, Prof);
+          if (IsNegated)
+            swapSelectBranchWeights(*NewSel, Plan);
+          NewFindLastSelect = NewSel;
+        }
       }
     }
 
@@ -5167,11 +5184,13 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
     if (SentinelVal) {
       // Sentinel-based approach: reduce IVs with min/max, compare against
       // sentinel to detect if condition was ever true, select accordingly.
+      // Like for any-of reductions, the probability of the condition having
+      // been true in any iteration is not known.
       VPValue *Sentinel = Plan.getConstantInt(*SentinelVal);
       auto *Cmp = MiddleBuilder.createICmp(CmpInst::ICMP_NE, ReducedIV,
                                            Sentinel, ExitDL);
-      NewRdxResult = MiddleBuilder.createSelect(Cmp, VectorRegionExitingVal,
-                                                StartVPV, ExitDL);
+      NewRdxResult = MiddleBuilder.createSelectWithUnknownProfile(
+          Cmp, VectorRegionExitingVal, StartVPV, ExitDL);
       StartVPV = Sentinel;
     } else {
       // Introduce a boolean AnyOf reduction to track if the condition was ever

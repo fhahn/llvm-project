@@ -7317,10 +7317,12 @@ static void preparePlanForEpilogueVectorLoop(
             }
 
           // Adjust resume: select(icmp eq ResumeVPV, StartV), Sentinel,
-          // ResumeVPV
+          // ResumeVPV. The condition is whether the main vector loop's
+          // result is the start value, whose probability is not known.
           VPValue *Cmp =
               PHBuilder.createICmp(CmpInst::ICMP_EQ, ResumeVPV, StartV);
-          ResumeVPV = PHBuilder.createSelect(Cmp, SentinelVPV, ResumeVPV);
+          ResumeVPV = PHBuilder.createSelectWithUnknownProfile(Cmp, SentinelVPV,
+                                                               ResumeVPV);
         }
         // TODO: materializeBroadcasts does not cover values in the vector
         // preheader.

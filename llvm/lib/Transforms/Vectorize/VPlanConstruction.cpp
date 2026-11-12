@@ -1964,12 +1964,14 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
            "unsupported reduction");
 
     // If we exit early due to NaNs, compute the final reduction result based on
-    // the reduction phi at the beginning of the last vector iteration.
+    // the reduction phi at the beginning of the last vector iteration. The
+    // probability of encountering a NaN is not known, so mark the select
+    // unknown.
     auto *RdxResult = vputils::findComputeReductionResult(RedPhiR);
     assert(RdxResult && "must find a ComputeReductionResult");
 
-    auto *NewSel = MiddleBuilder.createSelect(AnyNaNLane, RedPhiR,
-                                              RdxResult->getOperand(0));
+    auto *NewSel = MiddleBuilder.createSelectWithUnknownProfile(
+        AnyNaNLane, RedPhiR, RdxResult->getOperand(0));
     RdxResult->setOperand(0, NewSel);
     assert(!RdxResults.contains(RdxResult) && "RdxResult already used");
     RdxResults.insert(RdxResult);
@@ -1987,7 +1989,8 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
 
   // Update resume phis for inductions in the scalar preheader. If AnyNaNLane is
   // true, the resume from the start of the last vector iteration via the
-  // canonical IV, otherwise from the original value.
+  // canonical IV, otherwise from the original value. As above, the selects are
+  // marked unknown.
   auto IsTC = [&Plan](VPValue *V) {
     return V == &Plan.getVectorTripCount() || V == Plan.getTripCount();
   };
@@ -1999,7 +2002,7 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
     if (auto *DerivedIV = dyn_cast<VPDerivedIVRecipe>(VecV)) {
       VPValue *DIVTC = DerivedIV->getOperand(1);
       if (DerivedIV->hasOneUse() && IsTC(DIVTC)) {
-        auto *NewSel = MiddleBuilder.createSelect(
+        auto *NewSel = MiddleBuilder.createSelectWithUnknownProfile(
             AnyNaNLane, LoopRegion->getCanonicalIV(), DIVTC);
         DerivedIV->moveAfter(MiddleBuilder.getRecipeAtInsertPoint());
         DerivedIV->setOperand(1, NewSel);
@@ -2013,7 +2016,7 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
                            "FMaxNum/FMinNum reduction.\n");
       return false;
     }
-    auto *NewSel = MiddleBuilder.createSelect(
+    auto *NewSel = MiddleBuilder.createSelectWithUnknownProfile(
         AnyNaNLane, LoopRegion->getCanonicalIV(), VecV);
     ResumeR->setOperand(0, NewSel);
   }
@@ -2141,14 +2144,20 @@ bool VPlanTransforms::handleFindLastReductions(VPlan &Plan) {
     if (HeaderMask)
       Cond = Builder.createLogicalAnd(HeaderMask, Cond);
 
+    // The selects below are conditional on the condition holding for any
+    // lane, whose probability is not known, so mark them unknown.
+    // TODO: Derive the weights from those of SelectR, if any: for a
+    // probability p of the condition in a single iteration, it holds for any
+    // of VF lanes with probability 1 - (1 - p)^VF.
     Cond = Builder.createFreeze(Cond);
     VPValue *AnyOf = Builder.createNaryOp(VPInstruction::AnyOf, Cond);
-    VPValue *MaskSelect = Builder.createSelect(AnyOf, Cond, MaskPHI);
+    VPValue *MaskSelect =
+        Builder.createSelectWithUnknownProfile(AnyOf, Cond, MaskPHI);
     MaskPHI->addIncoming(MaskSelect);
 
     // Replace select for data.
-    VPValue *DataSelect =
-        Builder.createSelect(AnyOf, Op1, Op2, SelectR->getDebugLoc());
+    VPValue *DataSelect = Builder.createSelectWithUnknownProfile(
+        AnyOf, Op1, Op2, SelectR->getDebugLoc());
     SelectR->replaceAllUsesWith(DataSelect);
     PhiR->setBackedgeValue(DataSelect);
     SelectR->eraseFromParent();
@@ -2292,8 +2301,10 @@ static bool handleFirstArgMinOrMax(
   VPValue *LastIVExiting = FindIVRdxResult->getOperand(0);
   VPValue *MaxIV =
       Plan.getConstantInt(APInt::getMaxValue(Ty->getIntegerBitWidth()));
-  auto *FinalIVSelect =
-      Builder.createSelect(FinalMinOrMaxCmp, LastIVExiting, MaxIV);
+  // Whether a lane holds the overall min/max value is not known, so mark the
+  // select unknown.
+  auto *FinalIVSelect = Builder.createSelectWithUnknownProfile(
+      FinalMinOrMaxCmp, LastIVExiting, MaxIV);
   VPIRFlags RdxFlags(RecurKind::UMin, false, false, FastMathFlags());
   VPSingleDefRecipe *FinalCanIV = Builder.createNaryOp(
       VPInstruction::ComputeReductionResult, {FinalIVSelect}, RdxFlags,
@@ -2569,8 +2580,10 @@ bool VPlanTransforms::handleMultiUseReductions(VPlan &Plan,
             : B.createFCmp(CmpInst::FCMP_OEQ, MinOrMaxExiting, MinOrMaxResult);
     VPValue *Sentinel = FindIVCmp->getOperand(1);
     VPValue *LastIVExiting = FindIVRdxResult->getOperand(0);
-    auto *FinalIVSelect =
-        B.createSelect(FinalMinOrMaxCmp, LastIVExiting, Sentinel);
+    // Whether a lane holds the overall min/max value is not known, so mark the
+    // select unknown.
+    auto *FinalIVSelect = B.createSelectWithUnknownProfile(
+        FinalMinOrMaxCmp, LastIVExiting, Sentinel);
     FindIVRdxResult->setOperand(0, FinalIVSelect);
   }
   return true;
