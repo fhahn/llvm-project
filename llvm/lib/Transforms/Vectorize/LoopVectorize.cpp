@@ -2340,6 +2340,14 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
             WideningDecision == CM_Interleave);
   };
 
+  // SCEV only proves Ptr equal across active lanes. For predicated I, lane 0
+  // may be masked off and poison (e.g. via poison-generating flags), so only
+  // use it if Ptr is invariant in IR.
+  auto CanUseLane0Ptr = [&](Instruction *I, Value *Ptr) {
+    return !Legal->blockNeedsPredication(I->getParent()) ||
+           shouldConsiderInvariant(Ptr);
+  };
+
   // Returns true if Ptr is the pointer operand of a memory access instruction
   // I, I is known to not require scalarization, and the pointer is not also
   // stored.
@@ -2347,7 +2355,8 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
     if (isa<StoreInst>(I) && I->getOperand(0) == Ptr)
       return false;
     return getLoadStorePointerOperand(I) == Ptr &&
-           (IsUniformDecision(I, VF) || Legal->isInvariant(Ptr));
+           (IsUniformDecision(I, VF) ||
+            (Legal->isInvariant(Ptr) && CanUseLane0Ptr(I, Ptr)));
   };
 
   // Holds a list of values which are known to have at least one uniform use.
@@ -2392,9 +2401,10 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
       if (!Ptr)
         continue;
 
-      // If the pointer can be proven to be uniform, always add it to the
-      // worklist.
-      if (isa<Instruction>(Ptr) && isUniform(Ptr, VF))
+      // If the pointer can be proven to be uniform and its lane 0 can be used,
+      // add it to the worklist.
+      if (isa<Instruction>(Ptr) && isUniform(Ptr, VF) &&
+          CanUseLane0Ptr(&I, Ptr))
         AddToWorklistIfAllowed(cast<Instruction>(Ptr));
 
       if (IsUniformMemOpUse(&I))
@@ -4454,11 +4464,12 @@ bool LoopVectorizationCostModel::shouldConsiderInvariant(Value *Op) {
   if (!Legal->isInvariant(Op))
     return false;
   // Consider Op invariant, if it or its operands aren't predicated
-  // instruction in the loop. In that case, it is not trivially hoistable.
+  // instructions or phis in the loop. In that case, it is not trivially
+  // hoistable. Phis in the loop depend on branch conditions, which SCEV may
+  // consider invariant even if they differ per lane.
   auto *OpI = dyn_cast<Instruction>(Op);
   return !OpI || !TheLoop->contains(OpI) ||
-         (!isPredicatedInst(OpI) &&
-          (!isa<PHINode>(OpI) || OpI->getParent() != TheLoop->getHeader()) &&
+         (!isPredicatedInst(OpI) && !isa<PHINode>(OpI) &&
           all_of(OpI->operands(),
                  [this](Value *Op) { return shouldConsiderInvariant(Op); }));
 }

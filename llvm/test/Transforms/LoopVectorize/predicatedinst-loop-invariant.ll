@@ -281,32 +281,39 @@ define void @predicated_store_scev_uniform_addr(ptr %dst) {
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_STORE_CONTINUE6]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = and <4 x i64> [[VEC_IND]], splat (i64 1)
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ne <4 x i64> [[TMP0]], zeroinitializer
-; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[INDEX]], 1
-; CHECK-NEXT:    [[TMP3:%.*]] = or disjoint i64 [[TMP2]], 1
-; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[TMP3]], [[TMP2]]
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i32, ptr [[DST]], i64 [[TMP4]]
+; CHECK-NEXT:    [[TMP2:%.*]] = add <4 x i64> [[VEC_IND]], splat (i64 1)
+; CHECK-NEXT:    [[TMP3:%.*]] = or disjoint <4 x i64> [[TMP2]], splat (i64 1)
+; CHECK-NEXT:    [[TMP4:%.*]] = sub <4 x i64> [[TMP3]], [[TMP2]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i1> [[TMP1]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; CHECK:       [[PRED_STORE_IF]]:
+; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <4 x i64> [[TMP4]], i64 0
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i32, ptr [[DST]], i64 [[TMP11]]
 ; CHECK-NEXT:    store i32 7, ptr [[TMP5]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; CHECK:       [[PRED_STORE_CONTINUE]]:
 ; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i1> [[TMP1]], i64 1
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2:.*]]
 ; CHECK:       [[PRED_STORE_IF1]]:
-; CHECK-NEXT:    store i32 7, ptr [[TMP5]], align 4
+; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <4 x i64> [[TMP4]], i64 1
+; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr i32, ptr [[DST]], i64 [[TMP14]]
+; CHECK-NEXT:    store i32 7, ptr [[TMP17]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
 ; CHECK:       [[PRED_STORE_CONTINUE2]]:
 ; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x i1> [[TMP1]], i64 2
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[PRED_STORE_IF3:.*]], label %[[PRED_STORE_CONTINUE4:.*]]
 ; CHECK:       [[PRED_STORE_IF3]]:
-; CHECK-NEXT:    store i32 7, ptr [[TMP5]], align 4
+; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <4 x i64> [[TMP4]], i64 2
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr i32, ptr [[DST]], i64 [[TMP12]]
+; CHECK-NEXT:    store i32 7, ptr [[TMP13]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE4]]
 ; CHECK:       [[PRED_STORE_CONTINUE4]]:
 ; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <4 x i1> [[TMP1]], i64 3
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6]]
 ; CHECK:       [[PRED_STORE_IF5]]:
-; CHECK-NEXT:    store i32 7, ptr [[TMP5]], align 4
+; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <4 x i64> [[TMP4]], i64 3
+; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr i32, ptr [[DST]], i64 [[TMP15]]
+; CHECK-NEXT:    store i32 7, ptr [[TMP16]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE6]]
 ; CHECK:       [[PRED_STORE_CONTINUE6]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
@@ -357,13 +364,14 @@ define void @predicated_load_scev_uniform_addr(ptr noalias %src, ptr noalias %ds
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_LOAD_CONTINUE6]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = and <4 x i64> [[VEC_IND]], splat (i64 1)
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ne <4 x i64> [[TMP0]], zeroinitializer
-; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[INDEX]], 1
-; CHECK-NEXT:    [[TMP3:%.*]] = or disjoint i64 [[TMP2]], 1
-; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[TMP3]], [[TMP2]]
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[TMP4]]
+; CHECK-NEXT:    [[TMP2:%.*]] = add <4 x i64> [[VEC_IND]], splat (i64 1)
+; CHECK-NEXT:    [[TMP3:%.*]] = or disjoint <4 x i64> [[TMP2]], splat (i64 1)
+; CHECK-NEXT:    [[TMP4:%.*]] = sub <4 x i64> [[TMP3]], [[TMP2]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i1> [[TMP1]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[PRED_LOAD_IF:.*]], label %[[PRED_LOAD_CONTINUE:.*]]
 ; CHECK:       [[PRED_LOAD_IF]]:
+; CHECK-NEXT:    [[TMP26:%.*]] = extractelement <4 x i64> [[TMP4]], i64 0
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[TMP26]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = load i32, ptr [[TMP5]], align 4
 ; CHECK-NEXT:    [[TMP8:%.*]] = insertelement <4 x i32> poison, i32 [[TMP7]], i64 0
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE]]
@@ -372,7 +380,9 @@ define void @predicated_load_scev_uniform_addr(ptr noalias %src, ptr noalias %ds
 ; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <4 x i1> [[TMP1]], i64 1
 ; CHECK-NEXT:    br i1 [[TMP10]], label %[[PRED_LOAD_IF1:.*]], label %[[PRED_LOAD_CONTINUE2:.*]]
 ; CHECK:       [[PRED_LOAD_IF1]]:
-; CHECK-NEXT:    [[TMP11:%.*]] = load i32, ptr [[TMP5]], align 4
+; CHECK-NEXT:    [[TMP27:%.*]] = extractelement <4 x i64> [[TMP4]], i64 1
+; CHECK-NEXT:    [[TMP28:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[TMP27]]
+; CHECK-NEXT:    [[TMP11:%.*]] = load i32, ptr [[TMP28]], align 4
 ; CHECK-NEXT:    [[TMP12:%.*]] = insertelement <4 x i32> [[TMP9]], i32 [[TMP11]], i64 1
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE2]]
 ; CHECK:       [[PRED_LOAD_CONTINUE2]]:
@@ -380,7 +390,9 @@ define void @predicated_load_scev_uniform_addr(ptr noalias %src, ptr noalias %ds
 ; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <4 x i1> [[TMP1]], i64 2
 ; CHECK-NEXT:    br i1 [[TMP14]], label %[[PRED_LOAD_IF3:.*]], label %[[PRED_LOAD_CONTINUE4:.*]]
 ; CHECK:       [[PRED_LOAD_IF3]]:
-; CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr [[TMP5]], align 4
+; CHECK-NEXT:    [[TMP29:%.*]] = extractelement <4 x i64> [[TMP4]], i64 2
+; CHECK-NEXT:    [[TMP30:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[TMP29]]
+; CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr [[TMP30]], align 4
 ; CHECK-NEXT:    [[TMP16:%.*]] = insertelement <4 x i32> [[TMP13]], i32 [[TMP15]], i64 2
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE4]]
 ; CHECK:       [[PRED_LOAD_CONTINUE4]]:
@@ -388,7 +400,9 @@ define void @predicated_load_scev_uniform_addr(ptr noalias %src, ptr noalias %ds
 ; CHECK-NEXT:    [[TMP18:%.*]] = extractelement <4 x i1> [[TMP1]], i64 3
 ; CHECK-NEXT:    br i1 [[TMP18]], label %[[PRED_LOAD_IF5:.*]], label %[[PRED_LOAD_CONTINUE6]]
 ; CHECK:       [[PRED_LOAD_IF5]]:
-; CHECK-NEXT:    [[TMP19:%.*]] = load i32, ptr [[TMP5]], align 4
+; CHECK-NEXT:    [[TMP24:%.*]] = extractelement <4 x i64> [[TMP4]], i64 3
+; CHECK-NEXT:    [[TMP25:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[TMP24]]
+; CHECK-NEXT:    [[TMP19:%.*]] = load i32, ptr [[TMP25]], align 4
 ; CHECK-NEXT:    [[TMP20:%.*]] = insertelement <4 x i32> [[TMP17]], i32 [[TMP19]], i64 3
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE6]]
 ; CHECK:       [[PRED_LOAD_CONTINUE6]]:
@@ -451,31 +465,37 @@ define void @predicated_store_scev_uniform_phi_addr(ptr %dst) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = or disjoint <4 x i64> [[TMP2]], splat (i64 1)
 ; CHECK-NEXT:    [[TMP4:%.*]] = sub <4 x i64> [[TMP3]], [[TMP2]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp sgt <4 x i64> [[TMP4]], zeroinitializer
-; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i1> [[TMP5]], i64 0
-; CHECK-NEXT:    [[PREDPHI:%.*]] = select i1 [[TMP6]], i64 1, i64 0
-; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i32, ptr [[DST]], i64 [[PREDPHI]]
+; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP5]], <4 x i64> splat (i64 1), <4 x i64> zeroinitializer
 ; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x i1> [[TMP1]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; CHECK:       [[PRED_STORE_IF]]:
+; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <4 x i64> [[PREDPHI]], i64 0
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i32, ptr [[DST]], i64 [[TMP15]]
 ; CHECK-NEXT:    store i32 7, ptr [[TMP7]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; CHECK:       [[PRED_STORE_CONTINUE]]:
 ; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <4 x i1> [[TMP1]], i64 1
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2:.*]]
 ; CHECK:       [[PRED_STORE_IF1]]:
-; CHECK-NEXT:    store i32 7, ptr [[TMP7]], align 4
+; CHECK-NEXT:    [[TMP18:%.*]] = extractelement <4 x i64> [[PREDPHI]], i64 1
+; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr i32, ptr [[DST]], i64 [[TMP18]]
+; CHECK-NEXT:    store i32 7, ptr [[TMP19]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
 ; CHECK:       [[PRED_STORE_CONTINUE2]]:
 ; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <4 x i1> [[TMP1]], i64 2
 ; CHECK-NEXT:    br i1 [[TMP10]], label %[[PRED_STORE_IF3:.*]], label %[[PRED_STORE_CONTINUE4:.*]]
 ; CHECK:       [[PRED_STORE_IF3]]:
-; CHECK-NEXT:    store i32 7, ptr [[TMP7]], align 4
+; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <4 x i64> [[PREDPHI]], i64 2
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr i32, ptr [[DST]], i64 [[TMP13]]
+; CHECK-NEXT:    store i32 7, ptr [[TMP14]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE4]]
 ; CHECK:       [[PRED_STORE_CONTINUE4]]:
 ; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <4 x i1> [[TMP1]], i64 3
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6]]
 ; CHECK:       [[PRED_STORE_IF5]]:
-; CHECK-NEXT:    store i32 7, ptr [[TMP7]], align 4
+; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <4 x i64> [[PREDPHI]], i64 3
+; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr i32, ptr [[DST]], i64 [[TMP16]]
+; CHECK-NEXT:    store i32 7, ptr [[TMP17]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE6]]
 ; CHECK:       [[PRED_STORE_CONTINUE6]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
