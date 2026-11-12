@@ -15556,10 +15556,8 @@ void PredicatedScalarEvolution::print(raw_ostream &OS, unsigned Depth) const {
 }
 
 void ScalarEvolution::LoopGuards::collectPending() {
-  const Loop *L = PendingLoop;
-  if (!L)
-    return;
-  PendingLoop = nullptr;
+  assert(PendingLoop && "Expected a pending loop");
+  const Loop *L = std::exchange(PendingLoop, nullptr);
   BasicBlock *Pred = L->getLoopPredecessor();
   if (!Pred)
     return;
