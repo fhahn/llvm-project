@@ -15708,43 +15708,33 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
     // Check for a condition of the form (-C1 + X < C2).  InstCombine will
     // create this form when combining two checks of the form (X u< C2 + C1) and
     // (X >=u C1).
-    auto MatchRangeCheckIdiom = [&](ICmpInst::Predicate Pred,
-                                    const SCEV *MatchLHS,
-                                    const SCEV *MatchRHS) {
-      const SCEVConstant *C1;
-      const SCEVUnknown *LHSUnknown;
-      auto *C2 = dyn_cast<SCEVConstant>(MatchRHS);
-      if (!match(MatchLHS,
-                 m_scev_Add(m_SCEVConstant(C1), m_SCEVUnknown(LHSUnknown))) ||
-          !C2)
-        return false;
-
-      auto ExactRegion =
-          ConstantRange::makeExactICmpRegion(Pred, C2->getAPInt())
-              .sub(C1->getAPInt());
-
+    const APInt *C1, *C2;
+    const SCEVUnknown *LHSUnknown;
+    if (match(LHS, m_scev_Add(m_scev_APInt(C1), m_SCEVUnknown(LHSUnknown))) &&
+        match(RHS, m_scev_APInt(C2))) {
       // Tighten the raw range with what we already know about LHSUnknown
       // from prior guards recorded in RewriteMap, or from SCEV's own range
       // analysis.
-      const SCEV *RewrittenLHS = GetMaybeRewritten(LHSUnknown);
-      ExactRegion = ExactRegion.intersectWith(SE.getUnsignedRange(RewrittenLHS),
-                                              ConstantRange::Unsigned);
+      const SCEV *RewrittenUnknown = GetMaybeRewritten(LHSUnknown);
+      ConstantRange ExactRegion =
+          ConstantRange::makeExactICmpRegion(Predicate, *C2)
+              .sub(*C1)
+              .intersectWith(SE.getUnsignedRange(RewrittenUnknown),
+                             ConstantRange::Unsigned);
 
-      // Bail if the guard is inconsistent with prior facts, or if the range
-      // is still not a monotonic non-wrapping interval after tightening.
-      if (ExactRegion.isEmptySet() || ExactRegion.isWrappedSet() ||
-          ExactRegion.isFullSet())
-        return false;
-
-      const SCEV *RegionMin = SE.getConstant(ExactRegion.getUnsignedMin());
-      const SCEV *RegionMax = SE.getConstant(ExactRegion.getUnsignedMax());
-      const SCEV *ClampedLHS =
-          SE.getUMaxExpr(RegionMin, SE.getUMinExpr(RewrittenLHS, RegionMax));
-      AddRewrite(LHSUnknown, RewrittenLHS, ClampedLHS);
-      return true;
-    };
-    if (MatchRangeCheckIdiom(Predicate, LHS, RHS))
-      return;
+      // Use the range, unless the guard is inconsistent with prior facts, or
+      // the range is still not a monotonic non-wrapping interval after
+      // tightening.
+      if (!ExactRegion.isEmptySet() && !ExactRegion.isWrappedSet() &&
+          !ExactRegion.isFullSet()) {
+        const SCEV *RegionMin = SE.getConstant(ExactRegion.getUnsignedMin());
+        const SCEV *RegionMax = SE.getConstant(ExactRegion.getUnsignedMax());
+        const SCEV *ClampedLHS = SE.getUMaxExpr(
+            RegionMin, SE.getUMinExpr(RewrittenUnknown, RegionMax));
+        AddRewrite(LHSUnknown, RewrittenUnknown, ClampedLHS);
+        return;
+      }
+    }
 
     // Do not apply information for constants or if RHS contains an AddRec.
     if (isa<SCEVConstant>(LHS) || SE.containsAddRecurrence(RHS))
