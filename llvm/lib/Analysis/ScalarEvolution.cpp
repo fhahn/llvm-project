@@ -15607,36 +15607,16 @@ void ScalarEvolution::LoopGuards::collectFromPHI(
   Guards.RewriteMap.insert({LHS, SE.getMinMaxExpr(Kind, Ops)});
 }
 
-// Return a new SCEV that modifies \p Expr to the closest number divides by
-// \p Divisor and less or equal than Expr. For now, only handle constant
-// Expr.
-static const SCEV *getPreviousSCEVDivisibleByDivisor(const SCEV *Expr,
-                                                     const APInt &DivisorVal,
-                                                     ScalarEvolution &SE) {
+// Round \p Expr down (\p RM is DOWN) or up (\p RM is UP) to the closest
+// multiple of \p Divisor. For now, only handle constant Expr.
+static const SCEV *roundToMultiple(const SCEV *Expr, const APInt &Divisor,
+                                   APInt::Rounding RM, ScalarEvolution &SE) {
   const APInt *ExprVal;
   if (!match(Expr, m_scev_APInt(ExprVal)) || ExprVal->isNegative() ||
-      DivisorVal.isNonPositive())
+      Divisor.isNonPositive())
     return Expr;
-  APInt Rem = ExprVal->urem(DivisorVal);
-  // return the SCEV: Expr - Expr % Divisor
-  return SE.getConstant(*ExprVal - Rem);
-}
-
-// Return a new SCEV that modifies \p Expr to the closest number divides by
-// \p Divisor and greater or equal than Expr. For now, only handle constant
-// Expr.
-static const SCEV *getNextSCEVDivisibleByDivisor(const SCEV *Expr,
-                                                 const APInt &DivisorVal,
-                                                 ScalarEvolution &SE) {
-  const APInt *ExprVal;
-  if (!match(Expr, m_scev_APInt(ExprVal)) || ExprVal->isNegative() ||
-      DivisorVal.isNonPositive())
-    return Expr;
-  APInt Rem = ExprVal->urem(DivisorVal);
-  if (Rem.isZero())
-    return Expr;
-  // return the SCEV: Expr + Divisor - Expr % Divisor
-  return SE.getConstant(*ExprVal + DivisorVal - Rem);
+  return SE.getConstant(APIntOps::RoundingUDiv(*ExprVal, Divisor, RM) *
+                        Divisor);
 }
 
 static bool collectDivisibilityInformation(
@@ -15682,9 +15662,9 @@ static const SCEV *applyDivisibilityOnMinMaxExpr(const SCEV *MinMaxExpr,
   if (!match(MinMaxExpr, m_scev_MinMax(m_SCEVConstant(C), m_SCEV(Op))) ||
       C->getAPInt().isNegative())
     return MinMaxExpr;
-  auto *DivisibleExpr = isa<SCEVSMinExpr, SCEVUMinExpr>(MinMaxExpr)
-                            ? getPreviousSCEVDivisibleByDivisor(C, Divisor, SE)
-                            : getNextSCEVDivisibleByDivisor(C, Divisor, SE);
+  bool IsMin = isa<SCEVSMinExpr, SCEVUMinExpr>(MinMaxExpr);
+  auto *DivisibleExpr = roundToMultiple(
+      C, Divisor, IsMin ? APInt::Rounding::DOWN : APInt::Rounding::UP, SE);
   SmallVector<SCEVUse> Ops = {applyDivisibilityOnMinMaxExpr(Op, Divisor, SE),
                               DivisibleExpr};
   return SE.getMinMaxExpr(MinMaxExpr->getSCEVType(), Ops);
@@ -15791,7 +15771,7 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
     if (Predicate == CmpInst::ICMP_NE) {
       if (match(RHS, m_scev_Zero())) {
         const SCEV *OneAlignedUp =
-            getNextSCEVDivisibleByDivisor(One, DividesBy, SE);
+            roundToMultiple(One, DividesBy, APInt::Rounding::UP, SE);
         AddRewrite(LHS, RewrittenLHS,
                    SE.getUMaxExpr(RewrittenLHS, OneAlignedUp));
         return;
@@ -15840,8 +15820,9 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       RHS = SE.getMinusSCEV(RHS, One);
     else if (ICmpInst::isGT(Predicate))
       RHS = SE.getAddExpr(RHS, One);
-    RHS = IsUpperBound ? getPreviousSCEVDivisibleByDivisor(RHS, DividesBy, SE)
-                       : getNextSCEVDivisibleByDivisor(RHS, DividesBy, SE);
+    RHS = roundToMultiple(
+        RHS, DividesBy,
+        IsUpperBound ? APInt::Rounding::DOWN : APInt::Rounding::UP, SE);
 
     // An upper bound is applied with a min expression, a lower bound with a
     // max expression.
@@ -16112,8 +16093,9 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(
           if (LHS > RHS)
             std::swap(LHS, RHS);
           if (NotEqual.contains({LHS, RHS})) {
-            const SCEV *OneAlignedUp = getNextSCEVDivisibleByDivisor(
-                SE.getOne(S->getType()), SE.getConstantMultiple(S), SE);
+            const SCEV *OneAlignedUp = roundToMultiple(
+                SE.getOne(S->getType()), SE.getConstantMultiple(S),
+                APInt::Rounding::UP, SE);
             return SE.getUMaxExpr(OneAlignedUp, S);
           }
         }
