@@ -15570,7 +15570,6 @@ void ScalarEvolution::LoopGuards::collectPending() {
 void ScalarEvolution::LoopGuards::collectFromPHI(
     ScalarEvolution &SE, ScalarEvolution::LoopGuards &Guards,
     const PHINode &Phi, SmallPtrSetImpl<const BasicBlock *> &VisitedBlocks,
-    SmallDenseMap<const BasicBlock *, LoopGuards> &IncomingGuards,
     unsigned Depth) {
   if (!SE.isSCEVable(Phi.getType()))
     return;
@@ -15586,11 +15585,9 @@ void ScalarEvolution::LoopGuards::collectFromPHI(
     if (!SE.DT.isReachableFromEntry(InBlock))
       return {nullptr, scCouldNotCompute};
 
-    auto [G, Inserted] = IncomingGuards.try_emplace(InBlock, LoopGuards(SE));
-    if (Inserted)
-      collectFromBlock(SE, G->second, Phi.getParent(), InBlock, VisitedBlocks,
-                       Depth + 1);
-    auto &RewriteMap = G->second.RewriteMap;
+    LoopGuards G(SE);
+    collectFromBlock(SE, G, Phi.getParent(), InBlock, VisitedBlocks, Depth + 1);
+    auto &RewriteMap = G.RewriteMap;
     if (RewriteMap.empty())
       return {nullptr, scCouldNotCompute};
     auto S = RewriteMap.find(SE.getSCEV(Phi.getIncomingValue(IncomingIdx)));
@@ -15979,11 +15976,9 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       // At the first block without a unique predecessor, try to build
       // conditions for its phis by merging those of their incoming blocks.
       if (!NumDomTreeSteps &&
-          Depth < SE.Opts.scalar_evolution_max_loop_guard_collection_depth) {
-        SmallDenseMap<const BasicBlock *, LoopGuards> IncomingGuards;
+          Depth < SE.Opts.scalar_evolution_max_loop_guard_collection_depth)
         for (auto &Phi : Pair.second->phis())
-          collectFromPHI(SE, Guards, Phi, VisitedBlocks, IncomingGuards, Depth);
-      }
+          collectFromPHI(SE, Guards, Phi, VisitedBlocks, Depth);
       const DomTreeNode *IDom = SE.DT.getNode(Pair.second)->getIDom();
       if (!IDom ||
           ++NumDomTreeSteps > SE.Opts.scalar_evolution_max_guard_dom_tree_steps)
