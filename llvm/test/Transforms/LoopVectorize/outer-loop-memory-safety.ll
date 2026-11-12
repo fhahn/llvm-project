@@ -784,8 +784,7 @@ define void @may_alias_load_outer_trip_count_needs_predicate(ptr %A, ptr %B, i32
 ; CHECK-NEXT:    [[TMP7:%.*]] = or i1 [[TMP5]], [[TMP6]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP8:%.*]] = call i32 @llvm.umax.i32(i32 [[N]], i32 1)
-; CHECK-NEXT:    [[TMP9:%.*]] = add i32 [[TMP8]], -1
+; CHECK-NEXT:    [[TMP9:%.*]] = call i32 @llvm.usub.sat.i32(i32 [[N]], i32 1)
 ; CHECK-NEXT:    [[TMP10:%.*]] = zext i32 [[TMP9]] to i64
 ; CHECK-NEXT:    [[TMP11:%.*]] = shl nuw nsw i64 [[TMP10]], 2
 ; CHECK-NEXT:    [[TMP12:%.*]] = add nuw nsw i64 [[TMP11]], 4

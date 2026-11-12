@@ -1128,6 +1128,15 @@ VPValue *VPSCEVExpander::expandImpl(const SCEV *S) {
     if (S->getType()->isPointerTy())
       return expandAsPtrAdd(AddE);
 
+    // -C + umax(C, X) --> usub.sat(X, C), matching SCEVExpander.
+    const SCEV *X;
+    const SCEVConstant *C1, *C2;
+    if (match(S, m_scev_Add(m_SCEVConstant(C1),
+                            m_scev_UMax(m_SCEVConstant(C2), m_SCEV(X)))) &&
+        C1->getAPInt() == -C2->getAPInt())
+      return Builder.createScalarIntrinsic(
+          Intrinsic::usub_sat, {expand(X), expand(C2)}, S->getType(), DL);
+
     // Iterate in reverse so that constants are emitted last.
     SmallVector<const SCEV *, 2> SCEVOps(reverse(AddE->operands()));
     // Sum the invariant operands separately, so the sum can be hoisted.
