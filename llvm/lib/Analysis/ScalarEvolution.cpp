@@ -15780,9 +15780,47 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
     // Apply divisibility information when computing the constant multiple.
     const APInt &DividesBy =
         SE.getConstantMultiple(DivGuards.rewrite(RewrittenLHS));
+    const SCEV *One = SE.getOne(RHS->getType());
 
-    // Collect rewrites for LHS and its transitive operands based on the
-    // condition.
+    if (Predicate == CmpInst::ICMP_EQ) {
+      if (isa<SCEVConstant>(RHS))
+        AddRewrite(LHS, RewrittenLHS, RHS);
+      return;
+    }
+
+    if (Predicate == CmpInst::ICMP_NE) {
+      if (match(RHS, m_scev_Zero())) {
+        const SCEV *OneAlignedUp =
+            getNextSCEVDivisibleByDivisor(One, DividesBy, SE);
+        AddRewrite(LHS, RewrittenLHS,
+                   SE.getUMaxExpr(RewrittenLHS, OneAlignedUp));
+        return;
+      }
+      // LHS != RHS can be rewritten as (LHS - RHS) = UMax(1, LHS - RHS),
+      // but creating the subtraction eagerly is expensive. Track the
+      // inequalities in a separate map, and materialize the rewrite lazily
+      // when encountering a suitable subtraction while re-writing.
+      if (LHS->getType()->isPointerTy()) {
+        LHS = SE.getPtrToAddrExpr(LHS);
+        RHS = SE.getPtrToAddrExpr(RHS);
+        if (isa<SCEVCouldNotCompute>(LHS) || isa<SCEVCouldNotCompute>(RHS))
+          return;
+      }
+      const SCEVConstant *C;
+      const SCEV *A, *B;
+      if (match(RHS, m_scev_Add(m_SCEVConstant(C), m_SCEV(A))) &&
+          match(LHS, m_scev_Add(m_scev_Specific(C), m_SCEV(B)))) {
+        RHS = A;
+        LHS = B;
+      }
+      if (LHS > RHS)
+        std::swap(LHS, RHS);
+      Guards.NotEqual.insert({LHS, RHS});
+      return;
+    }
+
+    // The condition is an upper or lower bound for LHS. Collect rewrites for
+    // LHS and its transitive operands based on it.
     // For min/max expressions, also apply the guard to its operands:
     //  'min(a, b) >= c'   ->   '(a >= c) and (b >= c)',
     //  'min(a, b) >  c'   ->   '(a >  c) and (b >  c)',
@@ -15792,7 +15830,6 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
     // We cannot express strict predicates in SCEV, so instead we replace them
     // with non-strict ones against plus or minus one of RHS depending on the
     // predicate.
-    const SCEV *One = SE.getOne(RHS->getType());
     switch (Predicate) {
     case CmpInst::ICMP_ULT:
       if (RHS->getType()->isPointerTy())
@@ -15818,7 +15855,7 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       RHS = getNextSCEVDivisibleByDivisor(RHS, DividesBy, SE);
       break;
     default:
-      break;
+      llvm_unreachable("EQ and NE are handled above");
     }
 
     SmallVector<SCEVUse, 16> Worklist(1, LHS);
@@ -15872,45 +15909,11 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
           EnqueueOperands(SMin);
         break;
       }
-      case CmpInst::ICMP_EQ:
-        if (isa<SCEVConstant>(RHS))
-          To = RHS;
-        break;
-      case CmpInst::ICMP_NE:
-        if (match(RHS, m_scev_Zero())) {
-          const SCEV *OneAlignedUp =
-              getNextSCEVDivisibleByDivisor(One, DividesBy, SE);
-          To = SE.getUMaxExpr(FromRewritten, OneAlignedUp);
-        } else {
-          // LHS != RHS can be rewritten as (LHS - RHS) = UMax(1, LHS - RHS),
-          // but creating the subtraction eagerly is expensive. Track the
-          // inequalities in a separate map, and materialize the rewrite lazily
-          // when encountering a suitable subtraction while re-writing.
-          if (LHS->getType()->isPointerTy()) {
-            LHS = SE.getPtrToAddrExpr(LHS);
-            RHS = SE.getPtrToAddrExpr(RHS);
-            if (isa<SCEVCouldNotCompute>(LHS) || isa<SCEVCouldNotCompute>(RHS))
-              break;
-          }
-          const SCEVConstant *C;
-          const SCEV *A, *B;
-          if (match(RHS, m_scev_Add(m_SCEVConstant(C), m_SCEV(A))) &&
-              match(LHS, m_scev_Add(m_scev_Specific(C), m_SCEV(B)))) {
-            RHS = A;
-            LHS = B;
-          }
-          if (LHS > RHS)
-            std::swap(LHS, RHS);
-          Guards.NotEqual.insert({LHS, RHS});
-          continue;
-        }
-        break;
       default:
-        break;
+        llvm_unreachable("EQ and NE are handled above");
       }
 
-      if (To)
-        AddRewrite(From, FromRewritten, To);
+      AddRewrite(From, FromRewritten, To);
     }
   };
 
