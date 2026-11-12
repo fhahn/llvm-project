@@ -6602,11 +6602,12 @@ void LoopVectorizationPlanner::addReductionResultComputation(
         cast<PHINode>(PhiR->getUnderlyingInstr()));
     Type *PhiTy = PhiR->getScalarType();
 
-    // Convert a VPBlendRecipe backedge to a select.
+    // Convert a VPBlendRecipe backedge to a select. Its condition is the
+    // header mask, whose probability is not tracked, so mark it unknown.
     if (auto *Blend = dyn_cast<VPBlendRecipe>(PhiR->getBackedgeValue())) {
       if (Blend->getNumIncomingValues() == 2 &&
           Blend->getMask(0) == HeaderMask) {
-        auto *Sel = VPBuilder(Blend).createSelect(
+        auto *Sel = VPBuilder(Blend).createSelectWithUnknownProfile(
             Blend->getMask(0), Blend->getIncomingValue(0),
             Blend->getIncomingValue(1), {}, "", *Blend);
         Blend->replaceAllUsesWith(Sel);
