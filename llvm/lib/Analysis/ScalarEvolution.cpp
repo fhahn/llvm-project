@@ -15692,13 +15692,6 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       RewriteMap[From] = To;
     };
 
-    // Checks whether \p S has already been rewritten. In that case returns the
-    // existing rewrite because we want to chain further rewrites onto the
-    // already rewritten value. Otherwise returns \p S.
-    auto GetMaybeRewritten = [&](const SCEV *S) {
-      return RewriteMap.lookup_or(S, S);
-    };
-
     // Check for a condition of the form (-C1 + X < C2).  InstCombine will
     // create this form when combining two checks of the form (X u< C2 + C1) and
     // (X >=u C1).
@@ -15709,7 +15702,8 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       // Tighten the raw range with what we already know about LHSUnknown
       // from prior guards recorded in RewriteMap, or from SCEV's own range
       // analysis.
-      const SCEV *RewrittenUnknown = GetMaybeRewritten(LHSUnknown);
+      const SCEV *RewrittenUnknown =
+          RewriteMap.lookup_or(LHSUnknown, LHSUnknown);
       ConstantRange ExactRegion =
           ConstantRange::makeExactICmpRegion(Predicate, *C2)
               .sub(*C1)
@@ -15740,7 +15734,7 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       Predicate = CmpInst::getSwappedPredicate(Predicate);
     }
 
-    const SCEV *RewrittenLHS = GetMaybeRewritten(LHS);
+    const SCEV *RewrittenLHS = RewriteMap.lookup_or(LHS, LHS);
     // Apply divisibility information when computing the constant multiple.
     const APInt &DividesBy =
         SE.getConstantMultiple(DivGuards.rewrite(RewrittenLHS));
@@ -15820,7 +15814,8 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       const SCEV *From = Worklist.pop_back_val();
       if (isa<SCEVConstant>(From) || !Visited.insert(From).second)
         continue;
-      const SCEV *FromRewritten = GetMaybeRewritten(From);
+      // Chain the new bound onto an existing rewrite of From, if any.
+      const SCEV *FromRewritten = RewriteMap.lookup_or(From, From);
 
       // From s>= RHS s>= 0 implies From u>= RHS, so an earlier
       // umax(C, From) with C u<= RHS is redundant. Drop it, as the range of
