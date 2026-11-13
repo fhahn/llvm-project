@@ -1164,6 +1164,12 @@ static bool argTypeIsABIEquivalent(QualType SrcType, QualType DestType,
 
 static unsigned int checkCastFunctionType(Sema &Self, const ExprResult &SrcExpr,
                                           QualType DestType) {
+  // Only casts to function pointers and references are checked below.
+  if (!DestType->isFunctionPointerType() &&
+      !DestType->isMemberFunctionPointerType() &&
+      !DestType->isFunctionReferenceType())
+    return 0;
+
   unsigned int DiagID = 0;
   const unsigned int DiagList[] = {diag::warn_cast_function_type_strict,
                                    diag::warn_cast_function_type};
