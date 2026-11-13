@@ -513,11 +513,9 @@ static Value* memChrToCharCompare(CallInst *CI, Value *NBytes,
   if (NBytes) {
     Value *Zero = ConstantInt::get(NBytes->getType(), 0);
     Value *And = B.CreateICmpNE(NBytes, Zero);
-    Cmp = B.CreateLogicalAnd(And, Cmp);
-    // The and above is based on the byte count and the query, neither of which
-    // we know without value profiling, so mark the profile as unknown.
-    if (auto *SI = dyn_cast<SelectInst>(Cmp))
-      setExplicitlyUnknownBranchWeightsIfProfiled(*SI, DEBUG_TYPE);
+    // The and is based on the byte count and the query, neither of which we
+    // know without value profiling, so mark the profile as unknown.
+    Cmp = B.CreateLogicalAndWithUnknownProfile(And, Cmp, DEBUG_TYPE);
   }
 
   Value *NullPtr = Constant::getNullValue(CI->getType());
@@ -1348,9 +1346,7 @@ Value *LibCallSimplifier::optimizeMemRChr(CallInst *CI, IRBuilderBase &B) {
   CharVal = B.CreateTrunc(CharVal, Int8Ty);
   Value *CEqS0 =
       B.CreateICmpEQ(ConstantInt::get(Int8Ty, (unsigned char)Str[0]), CharVal);
-  Value *And = B.CreateLogicalAnd(NNeZ, CEqS0);
-  if (auto *AndSI = dyn_cast<SelectInst>(And))
-    setExplicitlyUnknownBranchWeightsIfProfiled(*AndSI, DEBUG_TYPE);
+  Value *And = B.CreateLogicalAndWithUnknownProfile(NNeZ, CEqS0, DEBUG_TYPE);
   Value *SizeM1 = B.CreateSub(Size, ConstantInt::get(SizeTy, 1));
   Value *SrcPlus =
       B.CreateInBoundsGEP(Int8Ty, SrcStr, SizeM1, "memrchr.ptr_plus");

@@ -1156,6 +1156,26 @@ Value *IRBuilderBase::CreateSelectFMFWithUnknownProfile(Value *C, Value *True,
   return Ret;
 }
 
+Value *IRBuilderBase::CreateLogicalAndWithUnknownProfile(Value *Cond1,
+                                                         Value *Cond2,
+                                                         StringRef PassName,
+                                                         const Twine &Name) {
+  Value *Ret = CreateLogicalAnd(Cond1, Cond2, Name);
+  if (auto *SI = dyn_cast<SelectInst>(Ret))
+    setExplicitlyUnknownBranchWeightsIfProfiled(*SI, PassName);
+  return Ret;
+}
+
+Value *IRBuilderBase::CreateLogicalOrWithUnknownProfile(Value *Cond1,
+                                                        Value *Cond2,
+                                                        StringRef PassName,
+                                                        const Twine &Name) {
+  Value *Ret = CreateLogicalOr(Cond1, Cond2, Name);
+  if (auto *SI = dyn_cast<SelectInst>(Ret))
+    setExplicitlyUnknownBranchWeightsIfProfiled(*SI, PassName);
+  return Ret;
+}
+
 Value *IRBuilderBase::CreateSelect(Value *C, Value *True, Value *False,
                                    const Twine &Name, Instruction *MDFrom) {
   return CreateSelectFMF(C, True, False, {}, Name, MDFrom);

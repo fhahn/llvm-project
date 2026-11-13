@@ -2719,6 +2719,14 @@ public:
                                                     StringRef PassName,
                                                     const Twine &Name = "");
 
+  LLVM_ABI Value *CreateLogicalAndWithUnknownProfile(Value *Cond1, Value *Cond2,
+                                                     StringRef PassName,
+                                                     const Twine &Name = "");
+
+  LLVM_ABI Value *CreateLogicalOrWithUnknownProfile(Value *Cond1, Value *Cond2,
+                                                    StringRef PassName,
+                                                    const Twine &Name = "");
+
   LLVM_ABI Value *CreateSelect(Value *C, Value *True, Value *False,
                                const Twine &Name = "",
                                Instruction *MDFrom = nullptr);

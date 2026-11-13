@@ -3913,10 +3913,8 @@ Instruction *InstCombinerImpl::foldSelectOfBools(SelectInst &SI) {
     if (match(CondVal, m_OneUse(m_Select(m_Value(A), m_One(), m_Value(B)))) &&
         impliesPoisonOrCond(FalseVal, B, /*Expected=*/false, SQ)) {
       // (A || B) || C --> A || (B | C)
-      Value *LOr = Builder.CreateLogicalOr(A, Builder.CreateOr(B, FalseVal));
-      if (auto *I = dyn_cast<Instruction>(LOr)) {
-        setExplicitlyUnknownBranchWeightsIfProfiled(*I, DEBUG_TYPE);
-      }
+      Value *LOr = Builder.CreateLogicalOrWithUnknownProfile(
+          A, Builder.CreateOr(B, FalseVal), DEBUG_TYPE);
       return replaceInstUsesWith(SI, LOr);
     }
 
@@ -3959,10 +3957,8 @@ Instruction *InstCombinerImpl::foldSelectOfBools(SelectInst &SI) {
     if (match(CondVal, m_OneUse(m_Select(m_Value(A), m_Value(B), m_Zero()))) &&
         impliesPoisonOrCond(TrueVal, B, /*Expected=*/true, SQ)) {
       // (A && B) && C --> A && (B & C)
-      Value *LAnd = Builder.CreateLogicalAnd(A, Builder.CreateAnd(B, TrueVal));
-      if (auto *I = dyn_cast<Instruction>(LAnd)) {
-        setExplicitlyUnknownBranchWeightsIfProfiled(*I, DEBUG_TYPE);
-      }
+      Value *LAnd = Builder.CreateLogicalAndWithUnknownProfile(
+          A, Builder.CreateAnd(B, TrueVal), DEBUG_TYPE);
       return replaceInstUsesWith(SI, LAnd);
     }
 

@@ -289,14 +289,13 @@ static bool sinkMinMaxInBB(BasicBlock &BB,
     if ((IsLess && IsMin) || (IsGreater && IsMax))
       // x < min(a, b) -> x < a && x < b
       // x > max(a, b) -> x > a && x > b
-      Replacement = Builder.CreateLogicalAnd(LHS, RHS);
+      Replacement =
+          Builder.CreateLogicalAndWithUnknownProfile(LHS, RHS, DEBUG_TYPE);
     else
       // x > min(a, b) -> x > a || x > b
       // x < max(a, b) -> x < a || x < b
-      Replacement = Builder.CreateLogicalOr(LHS, RHS);
-
-    if (SelectInst *ReplacementInst = dyn_cast<SelectInst>(Replacement))
-      setExplicitlyUnknownBranchWeightsIfProfiled(*ReplacementInst, DEBUG_TYPE);
+      Replacement =
+          Builder.CreateLogicalOrWithUnknownProfile(LHS, RHS, DEBUG_TYPE);
 
     ICmp->replaceAllUsesWith(Replacement);
 

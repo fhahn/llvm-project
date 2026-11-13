@@ -284,13 +284,10 @@ bool FlattenCFGOpt::FlattenParallelAndOr(BasicBlock *BB, IRBuilder<> &Builder) {
     Value *NC;
     if (Idx == 0)
       // Case 2, use parallel or.
-      NC = Builder.CreateLogicalOr(PC, CC);
+      NC = Builder.CreateLogicalOrWithUnknownProfile(PC, CC, DEBUG_TYPE);
     else
       // Case 1, use parallel and.
-      NC = Builder.CreateLogicalAnd(PC, CC);
-
-    if (SelectInst *SI = dyn_cast<SelectInst>(NC))
-      setExplicitlyUnknownBranchWeightsIfProfiled(*SI, DEBUG_TYPE);
+      NC = Builder.CreateLogicalAndWithUnknownProfile(PC, CC, DEBUG_TYPE);
 
     PBI->replaceUsesOfWith(CC, NC);
     PC = NC;
