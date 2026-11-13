@@ -140,6 +140,8 @@ void DiagnosticsEngine::Reset(bool soft /*=false*/) {
     DiagStates.clear();
     DiagStatesByLoc.clear(false);
     DiagStateOnPushStack.clear();
+    EnabledDiags.reset();
+    EnablesUnmappedDiags = false;
 
     // Create a DiagState and DiagStatePoint representing diagnostic changes
     // through command-line.
@@ -371,6 +373,9 @@ void DiagnosticsEngine::setSeverity(diag::kind Diag, diag::Severity Map,
           (Map == diag::Severity::Fatal || Map == diag::Severity::Error)) &&
          "Cannot map errors into warnings!");
   assert((L.isInvalid() || SourceMgr) && "No SourceMgr for valid location");
+
+  if (Map != diag::Severity::Ignored && !DiagnosticIDs::IsCustomDiag(Diag))
+    EnabledDiags.set(Diag);
 
   // A command line -Wfoo has an invalid L and cannot override error/fatal
   // mapping, while a warning pragma can.

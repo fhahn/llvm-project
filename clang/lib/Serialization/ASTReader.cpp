@@ -7368,6 +7368,9 @@ void ASTReader::ReadPragmaDiagnosticMappings(DiagnosticsEngine &Diag) {
         }
 
         Mapping = NewMapping;
+        if (NewMapping.getSeverity() != diag::Severity::Ignored &&
+            !DiagnosticIDs::IsCustomDiag(DiagID))
+          Diag.EnabledDiags.set(DiagID);
       }
       return NewState;
     };
@@ -7399,6 +7402,9 @@ void ASTReader::ReadPragmaDiagnosticMappings(DiagnosticsEngine &Diag) {
       Initial.EnableAllWarnings = Flags & 1; Flags >>= 1;
       Initial.IgnoreAllWarnings = Flags & 1; Flags >>= 1;
       Initial.ExtBehavior = (diag::Severity)Flags;
+      Diag.EnablesUnmappedDiags |=
+          Initial.EnableAllWarnings ||
+          Initial.ExtBehavior != diag::Severity::Ignored;
       FirstState = ReadDiagState(Initial, true);
 
       assert(F.OriginalSourceFileID.isValid());
