@@ -1124,16 +1124,13 @@ MemoryAccess *MemorySSA::renameBlock(BasicBlock *BB, MemoryAccess *IncomingVal,
 /// We walk the dominator tree in preorder, renaming accesses, and then filling
 /// in phi nodes in our successors.
 void MemorySSA::renamePass(DomTreeNode *Root, MemoryAccess *IncomingVal,
-                           SmallPtrSetImpl<BasicBlock *> &Visited,
-                           bool SkipVisited, bool RenameAllUses) {
+                           SmallPtrSetImpl<BasicBlock *> *Visited,
+                           bool RenameAllUses) {
   assert(Root && "Trying to rename accesses in an unreachable block");
 
   SmallVector<RenamePassData, 32> WorkStack;
   // Skip everything if we already renamed this block and we are skipping.
-  // Note: You can't sink this into the if, because we need it to occur
-  // regardless of whether we skip blocks or not.
-  bool AlreadyVisited = !Visited.insert(Root->getBlock()).second;
-  if (SkipVisited && AlreadyVisited)
+  if (Visited && !Visited->insert(Root->getBlock()).second)
     return;
 
   IncomingVal = renameBlock(Root->getBlock(), IncomingVal, RenameAllUses);
@@ -1151,10 +1148,7 @@ void MemorySSA::renamePass(DomTreeNode *Root, MemoryAccess *IncomingVal,
       DomTreeNode *Child = *ChildIt;
       ++WorkStack.back().ChildIt;
       BasicBlock *BB = Child->getBlock();
-      // Note: You can't sink this into the if, because we need it to occur
-      // regardless of whether we skip blocks or not.
-      AlreadyVisited = !Visited.insert(BB).second;
-      if (SkipVisited && AlreadyVisited) {
+      if (Visited && !Visited->insert(BB).second) {
         // We already visited this during our renaming, which can happen when
         // being asked to rename multiple blocks. Figure out the incoming val,
         // which is the last def.
@@ -1551,9 +1545,7 @@ void MemorySSA::buildMemorySSA(BatchAAResults &BAA, IterT Blocks) {
   }
   placePHINodes(DefiningBlocks);
 
-  // Now do regular SSA renaming on the MemoryDef/MemoryUse. Visited will get
-  // filled in with all blocks.
-  SmallPtrSet<BasicBlock *, 16> Visited;
+  // Now do regular SSA renaming on the MemoryDef/MemoryUse.
   if (L) {
     // Only building MemorySSA for a single loop. placePHINodes may have
     // inserted a MemoryPhi in the loop's preheader. As this is outside the
@@ -1563,21 +1555,17 @@ void MemorySSA::buildMemorySSA(BatchAAResults &BAA, IterT Blocks) {
         U.set(LiveOnEntryDef.get());
       removeFromLists(P);
     }
-    // Now rename accesses in the loop. Populate Visited with the exit blocks of
-    // the loop, to limit the scope of the renaming.
-    SmallVector<BasicBlock *> ExitBlocks;
-    L->getExitBlocks(ExitBlocks);
-    Visited.insert_range(ExitBlocks);
+    // Now rename accesses in the loop.
     renamePass(DT->getNode(L->getLoopPreheader()), LiveOnEntryDef.get(),
-               Visited);
+               /*Visited=*/nullptr);
   } else {
-    renamePass(DT->getRootNode(), LiveOnEntryDef.get(), Visited);
+    renamePass(DT->getRootNode(), LiveOnEntryDef.get(), /*Visited=*/nullptr);
   }
 
   // Mark the uses in unreachable blocks as live on entry, so that they go
   // somewhere.
   for (auto &BB : Blocks)
-    if (!Visited.count(&BB))
+    if (!DT->isReachableFromEntry(&BB))
       markUnreachableAsLiveOnEntry(&BB);
 }
 

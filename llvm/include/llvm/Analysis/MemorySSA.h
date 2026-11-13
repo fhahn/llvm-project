@@ -809,7 +809,7 @@ protected:
   // Rename the dominator tree branch rooted at BB.
   void renamePass(BasicBlock *BB, MemoryAccess *IncomingVal,
                   SmallPtrSetImpl<BasicBlock *> &Visited) {
-    renamePass(DT->getNode(BB), IncomingVal, Visited, true, true);
+    renamePass(DT->getNode(BB), IncomingVal, &Visited, true);
   }
 
   LLVM_ABI void removeFromLookups(MemoryAccess *);
@@ -878,9 +878,10 @@ private:
   void placePHINodes(const SmallPtrSetImpl<BasicBlock *> &);
   MemoryAccess *renameBlock(BasicBlock *, MemoryAccess *, bool);
   void renameSuccessorPhis(BasicBlock *, MemoryAccess *, bool);
+  // Rename the dominator tree branch rooted at the given node. If \p Visited
+  // is not null, skip renaming blocks already in it and add visited blocks.
   LLVM_ABI void renamePass(DomTreeNode *, MemoryAccess *IncomingVal,
-                           SmallPtrSetImpl<BasicBlock *> &Visited,
-                           bool SkipVisited = false,
+                           SmallPtrSetImpl<BasicBlock *> *Visited,
                            bool RenameAllUses = false);
   void renumberBlock(const BasicBlock *) const;
   const AnalysisOptions &Opts;
