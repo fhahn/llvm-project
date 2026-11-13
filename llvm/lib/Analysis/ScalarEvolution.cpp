@@ -15270,11 +15270,11 @@ const SCEVAddRecExpr *SCEVWrapPredicate::getExpr() const { return AR; }
 bool SCEVWrapPredicate::implies(const SCEVPredicate *N,
                                 ScalarEvolution &SE) const {
   const auto *Op = dyn_cast<SCEVWrapPredicate>(N);
-  if (!Op || setFlags(Flags, Op->Flags) != Flags)
+  if (!Op)
     return false;
 
   if (Op->AR == AR)
-    return true;
+    return setFlags(Flags, Op->Flags) == Flags;
 
   if (Flags != SCEVWrapPredicate::IncrementNSSW &&
       Flags != SCEVWrapPredicate::IncrementNUSW)
@@ -15297,6 +15297,26 @@ bool SCEVWrapPredicate::implies(const SCEVPredicate *N,
 
   const SCEV *Step = AR->getStepRecurrence(SE);
   const SCEV *OpStep = Op->AR->getStepRecurrence(SE);
+  bool IsNUW = Flags == SCEVWrapPredicate::IncrementNUSW;
+
+  // If AR does not wrap, ext(AR) is {ext(Start),+,sext(Step)} (zext for NUSW,
+  // sext for NSSW) and does not wrap either. For NUSW, its values are in
+  // [0, 2^BitWidth(AR)), so it is also NSSW.
+  if (AR->isAffine() && AR->getLoop() == Op->AR->getLoop()) {
+    Type *WiderTy = Op->AR->getType();
+    const SCEV *ExtStart = IsNUW ? SE.getNoopOrZeroExtend(Start, WiderTy)
+                                 : SE.getNoopOrSignExtend(Start, WiderTy);
+    if (ExtStart == OpStart &&
+        SE.getNoopOrSignExtend(Step, WiderTy) == OpStep) {
+      IncrementWrapFlags ExtFlags =
+          IsNUW ? setFlags(Flags, SCEVWrapPredicate::IncrementNSSW) : Flags;
+      return setFlags(ExtFlags, Op->Flags) == ExtFlags;
+    }
+  }
+
+  if (setFlags(Flags, Op->Flags) != Flags)
+    return false;
+
   if (!SE.isKnownPositive(Step) || !SE.isKnownPositive(OpStep))
     return false;
 
@@ -15306,7 +15326,6 @@ bool SCEVWrapPredicate::implies(const SCEVPredicate *N,
   Step = SE.getNoopOrZeroExtend(Step, WiderTy);
   OpStep = SE.getNoopOrZeroExtend(OpStep, WiderTy);
 
-  bool IsNUW = Flags == SCEVWrapPredicate::IncrementNUSW;
   OpStart = IsNUW ? SE.getNoopOrZeroExtend(OpStart, WiderTy)
                   : SE.getNoopOrSignExtend(OpStart, WiderTy);
   Start = IsNUW ? SE.getNoopOrZeroExtend(Start, WiderTy)
