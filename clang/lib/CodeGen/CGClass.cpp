@@ -46,8 +46,10 @@ CharUnits CodeGenModule::getClassPointerAlignment(const CXXRecordDecl *RD) {
   auto &layout = getContext().getASTRecordLayout(RD);
 
   // If the class is final, then we know that the pointer points to an
-  // object of that type and can use the full alignment.
-  if (RD->isEffectivelyFinal())
+  // object of that type and can use the full alignment. Only check for a
+  // final class if that changes the result.
+  if (layout.getAlignment() != layout.getNonVirtualAlignment() &&
+      RD->isEffectivelyFinal())
     return layout.getAlignment();
 
   // Otherwise, we have to assume it could be a subclass.
@@ -65,12 +67,15 @@ CharUnits CodeGenModule::getMinimumClassObjectSize(const CXXRecordDecl *RD) {
   auto &layout = getContext().getASTRecordLayout(RD);
 
   // If the class is final, then we know that the pointer points to an
-  // object of that type and can use the full alignment.
-  if (RD->isEffectivelyFinal())
+  // object of that type and can use the full size. Only check for a final
+  // class if that changes the result.
+  CharUnits NonVirtualSize =
+      std::max(layout.getNonVirtualSize(), CharUnits::One());
+  if (layout.getSize() != NonVirtualSize && RD->isEffectivelyFinal())
     return layout.getSize();
 
   // Otherwise, we have to assume it could be a subclass.
-  return std::max(layout.getNonVirtualSize(), CharUnits::One());
+  return NonVirtualSize;
 }
 
 /// Return the best known alignment for a pointer to a virtual base,
