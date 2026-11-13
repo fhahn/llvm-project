@@ -375,3 +375,102 @@ loop:
 exit:
   ret void
 }
+
+; The nsw of %x only holds if %loop runs. Its exit value (64 + %n) is also the
+; SCEV of %y, which is computed for %c = false as well and wraps for %n = 65.
+define void @add_flags_only_hold_if_loop_runs(i8 %n.in, i1 %c) {
+; CHECK-LABEL: 'add_flags_only_hold_if_loop_runs'
+; CHECK-NEXT:  Classifying expressions for: @add_flags_only_hold_if_loop_runs
+; CHECK-NEXT:    %n = or i8 %n.in, 1
+; CHECK-NEXT:    --> %n U: [1,0) S: [1,0)
+; CHECK-NEXT:    %iv = phi i8 [ 0, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><%loop> U: full-set S: full-set Exits: %n LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %s = phi i8 [ 0, %entry ], [ 64, %loop ]
+; CHECK-NEXT:    --> %s U: [0,65) S: [0,65) Exits: 64 LoopDispositions: { %loop: Variant }
+; CHECK-NEXT:    %x = add nsw i8 %s, %iv
+; CHECK-NEXT:    --> ({0,+,1}<nuw><%loop> + %s)<nsw> U: full-set S: full-set Exits: (64 + %n)<nsw> LoopDispositions: { %loop: Variant }
+; CHECK-NEXT:    %iv.next = add i8 %iv, 1
+; CHECK-NEXT:    --> {1,+,1}<nw><%loop> U: full-set S: full-set Exits: (1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %y = add i8 %n, 64
+; CHECK-NEXT:    --> (64 + %n)<nsw> U: [-64,-128) S: [-64,-128)
+; CHECK-NEXT:  Determining loop execution counts for: @add_flags_only_hold_if_loop_runs
+; CHECK-NEXT:  Loop %loop: backedge-taken count is %n
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 -1
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is %n
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %n = or i8 %n.in, 1
+  br i1 %c, label %loop, label %exit
+
+loop:
+  %iv = phi i8 [ 0, %entry ], [ %iv.next, %loop ]
+  %s = phi i8 [ 0, %entry ], [ 64, %loop ]
+  %x = add nsw i8 %s, %iv
+  call void @use(i8 noundef %x)
+  %iv.next = add i8 %iv, 1
+  %ec = icmp eq i8 %iv, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  %y = add i8 %n, 64
+  ret void
+}
+
+; The nsw of %x only holds if %inner runs. Its value after %inner folds to the
+; recurrence {0,+,64}<%outer.header>, which is also the SCEV of %y. %y is
+; computed for %c = false as well and wraps in the third iteration.
+define void @mul_flags_only_hold_if_inner_loop_runs(i1 %c) {
+; CHECK-LABEL: 'mul_flags_only_hold_if_inner_loop_runs'
+; CHECK-NEXT:  Classifying expressions for: @mul_flags_only_hold_if_inner_loop_runs
+; CHECK-NEXT:    %outer.iv = phi i8 [ 0, %entry ], [ %outer.iv.next, %outer.latch ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%outer.header> U: [0,3) S: [0,3) Exits: 2 LoopDispositions: { %outer.header: Computable, %inner: Invariant }
+; CHECK-NEXT:    %inner.iv = phi i8 [ 0, %outer.header ], [ %inner.iv.next, %inner ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%inner> U: [0,2) S: [0,2) Exits: 1 LoopDispositions: { %inner: Computable, %outer.header: Uniform }
+; CHECK-NEXT:    %s = phi i8 [ 0, %outer.header ], [ 64, %inner ]
+; CHECK-NEXT:    --> %s U: [0,65) S: [0,65) Exits: 64 LoopDispositions: { %inner: Variant, %outer.header: Variant }
+; CHECK-NEXT:    %x = mul nsw i8 %s, %outer.iv
+; CHECK-NEXT:    --> ({0,+,1}<nuw><nsw><%outer.header> * %s)<nuw><nsw> U: [0,-127) S: [-128,65) Exits: {0,+,64}<nuw><nsw><%outer.header> LoopDispositions: { %inner: Variant, %outer.header: Variant }
+; CHECK-NEXT:    %inner.iv.next = add i8 %inner.iv, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%inner> U: [1,3) S: [1,3) Exits: 2 LoopDispositions: { %inner: Computable, %outer.header: Uniform }
+; CHECK-NEXT:    %y = mul i8 %outer.iv, 64
+; CHECK-NEXT:    --> {0,+,64}<nuw><nsw><%outer.header> U: [0,-128) S: [0,65) Exits: -128 LoopDispositions: { %outer.header: Computable, %inner: Invariant }
+; CHECK-NEXT:    %outer.iv.next = add i8 %outer.iv, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%outer.header> U: [1,4) S: [1,4) Exits: 3 LoopDispositions: { %outer.header: Computable, %inner: Invariant }
+; CHECK-NEXT:  Determining loop execution counts for: @mul_flags_only_hold_if_inner_loop_runs
+; CHECK-NEXT:  Loop %inner: backedge-taken count is i8 1
+; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i8 1
+; CHECK-NEXT:  Loop %inner: symbolic max backedge-taken count is i8 1
+; CHECK-NEXT:  Loop %inner: Trip multiple is 2
+; CHECK-NEXT:  Loop %outer.header: backedge-taken count is i8 2
+; CHECK-NEXT:  Loop %outer.header: constant max backedge-taken count is i8 2
+; CHECK-NEXT:  Loop %outer.header: symbolic max backedge-taken count is i8 2
+; CHECK-NEXT:  Loop %outer.header: Trip multiple is 3
+;
+entry:
+  br label %outer.header
+
+outer.header:
+  %outer.iv = phi i8 [ 0, %entry ], [ %outer.iv.next, %outer.latch ]
+  br i1 %c, label %inner, label %outer.latch
+
+inner:
+  %inner.iv = phi i8 [ 0, %outer.header ], [ %inner.iv.next, %inner ]
+  %s = phi i8 [ 0, %outer.header ], [ 64, %inner ]
+  %x = mul nsw i8 %s, %outer.iv
+  call void @use(i8 noundef %x)
+  %inner.iv.next = add i8 %inner.iv, 1
+  %inner.ec = icmp eq i8 %inner.iv.next, 2
+  br i1 %inner.ec, label %outer.latch, label %inner
+
+outer.latch:
+  %y = mul i8 %outer.iv, 64
+  %outer.iv.next = add i8 %outer.iv, 1
+  %outer.ec = icmp eq i8 %outer.iv.next, 3
+  br i1 %outer.ec, label %exit, label %outer.header
+
+exit:
+  ret void
+}
+
+declare void @use(i8)

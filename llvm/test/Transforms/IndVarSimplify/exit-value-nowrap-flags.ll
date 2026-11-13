@@ -434,3 +434,67 @@ outer.latch:
 exit:
   ret i32 %l
 }
+
+; The nsw of %x only holds if %loop.1 runs. Its exit value (64 + %n) is also the
+; SCEV of %y, which is computed for %c = false as well. For %c = false and
+; %n = 65, %y wraps to -127 and %loop.2 exits with %iv.2.next = 66.
+define i8 @flags_only_hold_if_loop_runs(i8 %n.in, i1 %c) {
+; CHECK-LABEL: define i8 @flags_only_hold_if_loop_runs(
+; CHECK-SAME: i8 [[N_IN:%.*]], i1 [[C:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[N:%.*]] = or i8 [[N_IN]], 1
+; CHECK-NEXT:    br i1 [[C]], label %[[LOOP_1_PREHEADER:.*]], label %[[LOOP_2_PH:.*]]
+; CHECK:       [[LOOP_1_PREHEADER]]:
+; CHECK-NEXT:    br label %[[LOOP_1:.*]]
+; CHECK:       [[LOOP_1]]:
+; CHECK-NEXT:    [[IV_1:%.*]] = phi i8 [ [[IV_1_NEXT:%.*]], %[[LOOP_1]] ], [ 0, %[[LOOP_1_PREHEADER]] ]
+; CHECK-NEXT:    [[S:%.*]] = phi i8 [ 64, %[[LOOP_1]] ], [ 0, %[[LOOP_1_PREHEADER]] ]
+; CHECK-NEXT:    [[X:%.*]] = add nsw i8 [[S]], [[IV_1]]
+; CHECK-NEXT:    call void @use(i8 noundef [[X]])
+; CHECK-NEXT:    [[IV_1_NEXT]] = add i8 [[IV_1]], 1
+; CHECK-NEXT:    [[EC_1:%.*]] = icmp eq i8 [[IV_1]], [[N]]
+; CHECK-NEXT:    br i1 [[EC_1]], label %[[LOOP_1_EXIT:.*]], label %[[LOOP_1]]
+; CHECK:       [[LOOP_1_EXIT]]:
+; CHECK-NEXT:    [[X_LCSSA:%.*]] = phi i8 [ [[X]], %[[LOOP_1]] ]
+; CHECK-NEXT:    call void @use(i8 [[X_LCSSA]])
+; CHECK-NEXT:    br label %[[LOOP_2_PH]]
+; CHECK:       [[LOOP_2_PH]]:
+; CHECK-NEXT:    br label %[[LOOP_2:.*]]
+; CHECK:       [[LOOP_2]]:
+; CHECK-NEXT:    br i1 false, label %[[LOOP_2]], label %[[EXIT:.*]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    [[Y:%.*]] = add i8 [[N]], 64
+; CHECK-NEXT:    ret i8 [[Y]]
+;
+entry:
+  %n = or i8 %n.in, 1
+  br i1 %c, label %loop.1, label %loop.2.ph
+
+loop.1:
+  %iv.1 = phi i8 [ 0, %entry ], [ %iv.1.next, %loop.1 ]
+  %s = phi i8 [ 0, %entry ], [ 64, %loop.1 ]
+  %x = add nsw i8 %s, %iv.1
+  call void @use(i8 noundef %x)
+  %iv.1.next = add i8 %iv.1, 1
+  %ec.1 = icmp eq i8 %iv.1, %n
+  br i1 %ec.1, label %loop.1.exit, label %loop.1
+
+loop.1.exit:
+  call void @use(i8 %x)
+  br label %loop.2.ph
+
+loop.2.ph:
+  %y = add i8 %n, 64
+  br label %loop.2
+
+loop.2:
+  %iv.2 = phi i8 [ %n, %loop.2.ph ], [ %iv.2.next, %loop.2 ]
+  %iv.2.next = add i8 %iv.2, 1
+  %ec.2 = icmp slt i8 %iv.2.next, %y
+  br i1 %ec.2, label %loop.2, label %exit
+
+exit:
+  ret i8 %iv.2.next
+}
+
+declare void @use(i8)
