@@ -4138,6 +4138,17 @@ static VPIRMetadata getCommonMetadata(ArrayRef<VPReplicateRecipe *> Recipes) {
   return CommonMetadata;
 }
 
+/// Intersect the flags of \p Kept's address with those of all addresses in
+/// \p Group.
+static void intersectAddressFlags(VPReplicateRecipe *Kept,
+                                  ArrayRef<VPReplicateRecipe *> Group) {
+  unsigned AddrIdx = Kept->getOpcode() == Instruction::Load ? 0 : 1;
+  if (auto *RFlags = dyn_cast<VPRecipeWithIRFlags>(Kept->getOperand(AddrIdx)))
+    for (VPReplicateRecipe *R : Group)
+      RFlags->intersectFlags(
+          *cast<VPRecipeWithIRFlags>(R->getOperand(AddrIdx)));
+}
+
 template <unsigned Opcode>
 static SmallVector<SmallVector<VPReplicateRecipe *, 4>>
 collectComplementaryPredicatedMemOps(VPlan &Plan,
@@ -4145,6 +4156,7 @@ collectComplementaryPredicatedMemOps(VPlan &Plan,
                                      const Loop *L) {
   static_assert(Opcode == Instruction::Load || Opcode == Instruction::Store,
                 "Only Load and Store opcodes supported");
+  constexpr unsigned AddrIdx = Opcode == Instruction::Load ? 0 : 1;
 
   // For each address, collect operations with the same or complementary masks.
   SmallVector<SmallVector<VPReplicateRecipe *, 4>> AllGroups;
@@ -4164,6 +4176,15 @@ collectComplementaryPredicatedMemOps(VPlan &Plan,
         continue;
 
       VPValue *MaskI = RecipeI->getMask();
+      // SCEV only proves the addresses equal in lanes where the operations
+      // execute; in other lanes they may differ or be poison. Require
+      // addresses computed by equal recipes, modulo flags. Recipes reading
+      // memory are excluded, as equal loads in different blocks may read
+      // different values.
+      VPValue *AddrI = RecipeI->getOperand(AddrIdx);
+      auto *DefI = dyn_cast<VPSingleDefRecipe>(AddrI);
+      bool CanCompareDefI = DefI && VPCSEDenseMapInfo::canHandle(DefI) &&
+                            !DefI->mayReadFromMemory();
       SmallVector<VPReplicateRecipe *, 4> Group;
       Group.push_back(RecipeI);
       RecipeI = nullptr;
@@ -4172,6 +4193,12 @@ collectComplementaryPredicatedMemOps(VPlan &Plan,
       bool HasComplementaryMask = false;
       for (VPReplicateRecipe *&RecipeJ : Recipes) {
         if (!RecipeJ)
+          continue;
+
+        VPValue *AddrJ = RecipeJ->getOperand(AddrIdx);
+        auto *DefJ = dyn_cast<VPSingleDefRecipe>(AddrJ);
+        if (AddrI != AddrJ && (!CanCompareDefI || !DefJ ||
+                               !VPCSEDenseMapInfo::isEqual(DefI, DefJ)))
           continue;
 
         VPValue *MaskJ = RecipeJ->getMask();
@@ -4222,6 +4249,8 @@ void VPlanTransforms::hoistPredicatedLoads(VPlan &Plan,
     auto LoadLoc = vputils::getMemoryLocation(*EarliestLoad);
     if (!LoadLoc || !canHoistOrSinkWithNoAliasCheck(*LoadLoc, FirstBB, LastBB))
       continue;
+
+    intersectAddressFlags(EarliestLoad, Group);
 
     // Collect common metadata from all loads in the group.
     VPIRMetadata CommonMetadata = getCommonMetadata(Group);
@@ -4282,6 +4311,7 @@ void VPlanTransforms::sinkPredicatedStores(VPlan &Plan,
     // Use the last (most dominated) store's location for the unconditional
     // store.
     VPReplicateRecipe *LastStore = Group.back();
+    intersectAddressFlags(LastStore, Group);
 
     // Collect common alias metadata from all stores in the group.
     VPIRMetadata CommonMetadata = getCommonMetadata(Group);
