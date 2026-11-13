@@ -15828,6 +15828,10 @@ void Sema::ActOnDocumentableDecls(ArrayRef<Decl *> Group) {
   if (Group.empty() || !Group[0])
     return;
 
+  // Without comments there is nothing to attach.
+  if (Context.Comments.empty())
+    return;
+
   if (!areDocumentationDiagsEnabled(Group[0]->getLocation()))
     return;
 
