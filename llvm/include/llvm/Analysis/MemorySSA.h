@@ -848,6 +848,8 @@ private:
     ListPtr<AccessList> Accesses;
     /// The list of MemoryDefs and MemoryPhis in the block.
     ListPtr<DefsList> Defs;
+    /// Whether BlockNumbering is valid for the accesses in the block.
+    mutable bool NumberingValid = false;
   };
 
   /// Return the index of \p BB in the per-block lists. Blocks must not be
@@ -905,8 +907,7 @@ private:
 
   // Domination mappings
   // Note that the numbering is local to a block, even though the map is
-  // global.
-  mutable SmallPtrSet<const BasicBlock *, 16> BlockNumberingValid;
+  // global. It is only valid for blocks with BlockInfo::NumberingValid set.
   mutable DenseMap<const MemoryAccess *, unsigned long> BlockNumbering;
 
   // Memory SSA building info

@@ -1636,7 +1636,7 @@ void MemorySSA::insertIntoListsForBlock(MemoryAccess *NewAccess,
     if (!isa<MemoryUse>(NewAccess))
       getOrCreateList(Info.Defs)->push_back(*NewAccess);
   }
-  BlockNumberingValid.erase(BB);
+  Info.NumberingValid = false;
 }
 
 void MemorySSA::insertIntoListsBefore(MemoryAccess *What, const BasicBlock *BB,
@@ -1665,7 +1665,7 @@ void MemorySSA::insertIntoListsBefore(MemoryAccess *What, const BasicBlock *BB,
         Defs->insert(InsertPt->getDefsIterator(), *What);
     }
   }
-  BlockNumberingValid.erase(BB);
+  Info.NumberingValid = false;
 }
 
 void MemorySSA::prepareForMoveTo(MemoryAccess *What, BasicBlock *BB) {
@@ -1878,7 +1878,7 @@ void MemorySSA::removeFromLists(MemoryAccess *MA, bool ShouldDelete) {
 
   if (Info.Accesses->empty()) {
     Info.Accesses.reset();
-    BlockNumberingValid.erase(BB);
+    Info.NumberingValid = false;
   }
 }
 
@@ -1969,17 +1969,19 @@ void MemorySSA::verifyPrevDefInPhis(IterT Blocks) const {
 /// actually have valid domination numbers.
 template <typename IterT>
 void MemorySSA::verifyDominationNumbers(IterT Blocks) const {
-  if (BlockNumberingValid.empty())
+  unsigned NumValidBlocks = count_if(
+      PerBlock, [](const BlockInfo &Info) { return Info.NumberingValid; });
+  if (NumValidBlocks == 0)
     return;
 
-  SmallPtrSet<const BasicBlock *, 16> ValidBlocks = BlockNumberingValid;
   for (const BasicBlock &BB : Blocks) {
-    if (!ValidBlocks.count(&BB))
+    const BlockInfo *Info = getBlockInfo(&BB);
+    if (!Info || !Info->NumberingValid)
       continue;
 
-    ValidBlocks.erase(&BB);
+    --NumValidBlocks;
 
-    const AccessList *Accesses = getBlockAccesses(&BB);
+    const AccessList *Accesses = Info->Accesses.get();
     // It's correct to say an empty block has valid numbering.
     if (!Accesses)
       continue;
@@ -1999,8 +2001,8 @@ void MemorySSA::verifyDominationNumbers(IterT Blocks) const {
     }
   }
 
-  assert(ValidBlocks.empty() &&
-         "All valid BasicBlocks should exist in F -- dangling pointers?");
+  assert(NumValidBlocks == 0 &&
+         "Valid numbering recorded for a block not in F");
 }
 
 /// Verify ordering: the order and existence of MemoryAccesses matches the
@@ -2121,11 +2123,11 @@ void MemorySSA::verifyUseInDefs(MemoryAccess *Def, MemoryAccess *Use) const {
 void MemorySSA::renumberBlock(const BasicBlock *B) const {
   // The pre-increment ensures the numbers really start at 1.
   unsigned long CurrentNumber = 0;
-  const AccessList *AL = getBlockAccesses(B);
-  assert(AL != nullptr && "Asking to renumber an empty block");
-  for (const auto &I : *AL)
+  const BlockInfo *Info = getBlockInfo(B);
+  assert(Info && Info->Accesses && "Asking to renumber an empty block");
+  for (const auto &I : *Info->Accesses)
     BlockNumbering[&I] = ++CurrentNumber;
-  BlockNumberingValid.insert(B);
+  Info->NumberingValid = true;
 }
 
 /// Determine, for two memory accesses in the same block,
@@ -2151,7 +2153,9 @@ bool MemorySSA::locallyDominates(const MemoryAccess *Dominator,
   if (isLiveOnEntryDef(Dominator))
     return true;
 
-  if (!BlockNumberingValid.count(DominatorBlock))
+  const BlockInfo *Info = getBlockInfo(DominatorBlock);
+  assert(Info && Info->Accesses && "Dominator access is not in its block");
+  if (!Info->NumberingValid)
     renumberBlock(DominatorBlock);
 
   unsigned long DominatorNum = BlockNumbering.lookup(Dominator);
