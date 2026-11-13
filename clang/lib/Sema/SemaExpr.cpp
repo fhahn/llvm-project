@@ -21027,7 +21027,9 @@ static void DoMarkVarDeclReferenced(
                                        : Var->getTemplateSpecializationKind();
 
   OdrUseContext OdrUse = isOdrUseContext(SemaRef);
+  // Only read below for variables that may need to be instantiated.
   bool UsableInConstantExpr =
+      TSK != TSK_Undeclared &&
       Var->mightBeUsableInConstantExpressions(SemaRef.Context);
 
   // Only track variables with internal linkage or local scope.

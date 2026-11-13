@@ -582,8 +582,8 @@ ExprDependence clang::computeDependence(DeclRefExpr *E, const ASTContext &Ctx) {
       if (Init->containsErrors())
         Deps |= ExprDependence::Error;
 
-      if (Var->mightBeUsableInConstantExpressions(Ctx) &&
-          Init->isValueDependent())
+      if (Init->isValueDependent() &&
+          Var->mightBeUsableInConstantExpressions(Ctx))
         Deps |= ExprDependence::ValueInstantiation;
     }
 
