@@ -2829,6 +2829,11 @@ struct StrBoolAttr {
 
 bool AttributeFuncs::areInlineCompatible(const Function &Caller,
                                          const Function &Callee) {
+  // The rules only compare function attributes of the caller and the callee,
+  // and all of them hold if both functions have the same attributes.
+  if (Caller.getAttributes().getFnAttrs() ==
+      Callee.getAttributes().getFnAttrs())
+    return true;
   return hasCompatibleFnAttrs(Caller, Callee);
 }
 
