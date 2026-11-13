@@ -1451,8 +1451,12 @@ bool CVPImpl::inferReturnRangeAttr() {
   if (!RetRange || RetRange->isFullSet())
     return false;
   Attribute RangeAttr = F.getRetAttribute(Attribute::Range);
-  if (RangeAttr.isValid())
+  if (RangeAttr.isValid()) {
     RetRange = RetRange->intersectWith(RangeAttr.getRange());
+    // The existing attribute is already as precise.
+    if (*RetRange == RangeAttr.getRange())
+      return false;
+  }
   // Don't add attribute for constant integer returns to reduce noise. These
   // are propagated across functions by IPSCCP.
   if (RetRange->isEmptySet() || RetRange->isSingleElement())
