@@ -8928,6 +8928,9 @@ void Sema::ProcessDeclAttributes(Scope *S, Decl *D, const Declarator &PD) {
   auto ProcessAttributesWithSliding =
       [&](const ParsedAttributesView &Src,
           const ProcessDeclAttributeOptions &Options) {
+        if (Src.empty())
+          return;
+
         ParsedAttributesView NonSlidingAttrs;
         for (ParsedAttr &AL : Src) {
           // FIXME: this sliding is specific to standard attributes and should
