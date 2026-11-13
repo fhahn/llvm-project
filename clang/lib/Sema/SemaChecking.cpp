@@ -4762,8 +4762,8 @@ void Sema::checkCall(NamedDecl *FDecl, const FunctionProtoType *Proto,
 
     // If the callee has an AArch64 SME attribute to indicate that it is an
     // __arm_streaming function, then the caller requires SME to be available.
-    FunctionProtoType::ExtProtoInfo ExtInfo = Proto->getExtProtoInfo();
-    if (ExtInfo.AArch64SMEAttributes & FunctionType::SME_PStateSMEnabledMask) {
+    unsigned SMEAttrs = Proto->getAArch64SMEAttributes();
+    if (SMEAttrs & FunctionType::SME_PStateSMEnabledMask) {
       if (auto *CallerFD = dyn_cast<FunctionDecl>(CurContext)) {
         llvm::StringMap<bool> CallerFeatureMap;
         Context.getFunctionFeatureMap(CallerFeatureMap, CallerFD);
@@ -4783,9 +4783,9 @@ void Sema::checkCall(NamedDecl *FDecl, const FunctionProtoType *Proto,
     if (CallerFD && (!FD || !FD->getBuiltinID()) &&
         (IsScalableArg || IsScalableRet)) {
       bool IsCalleeStreaming =
-          ExtInfo.AArch64SMEAttributes & FunctionType::SME_PStateSMEnabledMask;
+          SMEAttrs & FunctionType::SME_PStateSMEnabledMask;
       bool IsCalleeStreamingCompatible =
-          ExtInfo.AArch64SMEAttributes &
+          SMEAttrs &
           FunctionType::SME_PStateSMCompatibleMask;
       SemaARM::ArmStreamingType CallerFnType = getArmStreamingFnType(CallerFD);
       if (!IsCalleeStreamingCompatible &&
@@ -4819,9 +4819,9 @@ void Sema::checkCall(NamedDecl *FDecl, const FunctionProtoType *Proto,
     }
 
     FunctionType::ArmStateValue CalleeArmZAState =
-        FunctionType::getArmZAState(ExtInfo.AArch64SMEAttributes);
+        FunctionType::getArmZAState(SMEAttrs);
     FunctionType::ArmStateValue CalleeArmZT0State =
-        FunctionType::getArmZT0State(ExtInfo.AArch64SMEAttributes);
+        FunctionType::getArmZT0State(SMEAttrs);
     if (CalleeArmZAState != FunctionType::ARM_None ||
         CalleeArmZT0State != FunctionType::ARM_None) {
       bool CallerHasZAState = false;
