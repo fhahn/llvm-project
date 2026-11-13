@@ -66,7 +66,8 @@ define i32 @rewrite_flags_only_hold_under_guard(i32 %a, i32 %y) {
 ; CHECK:       exit:
 ; CHECK-NEXT:    [[UMAX:%.*]] = call i32 @llvm.umax.i32(i32 [[A]], i32 16)
 ; CHECK-NEXT:    [[N:%.*]] = add i32 [[UMAX]], [[Y]]
-; CHECK-NEXT:    ret i32 [[N]]
+; CHECK-NEXT:    [[UMAX1:%.*]] = call i32 @llvm.umax.i32(i32 [[N]], i32 1)
+; CHECK-NEXT:    ret i32 [[UMAX1]]
 ;
 entry:
   %add = add nuw i32 %a, %y
@@ -118,7 +119,7 @@ define i32 @rewrite_flags_only_hold_under_guard_exit_value(i32 %a, i32 %y) {
 ; CHECK-NEXT:    br i1 true, label [[EXIT:%.*]], label [[LOOP_2]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    [[UMAX:%.*]] = call i32 @llvm.umax.i32(i32 [[A]], i32 16)
-; CHECK-NEXT:    [[TMP0:%.*]] = add nuw i32 [[Y]], [[UMAX]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[Y]], [[UMAX]]
 ; CHECK-NEXT:    ret i32 [[TMP0]]
 ;
 entry:
@@ -161,7 +162,7 @@ define i32 @rewrite_flags_only_hold_under_guard_strengthen(i32 %a, i32 %start) {
 ; CHECK-NEXT:    [[P:%.*]] = phi i32 [ [[START]], [[ENTRY:%.*]] ], [ [[P_NEXT:%.*]], [[OUTER_LATCH:%.*]] ]
 ; CHECK-NEXT:    [[ADD:%.*]] = add nuw i32 [[A]], [[P]]
 ; CHECK-NEXT:    call void @use(i32 noundef [[ADD]])
-; CHECK-NEXT:    [[R:%.*]] = add nuw i32 [[P]], -1
+; CHECK-NEXT:    [[R:%.*]] = add i32 [[P]], -1
 ; CHECK-NEXT:    [[PRE:%.*]] = icmp eq i32 [[A]], -1
 ; CHECK-NEXT:    br i1 [[PRE]], label [[INNER_PREHEADER:%.*]], label [[OUTER_LATCH]]
 ; CHECK:       inner.preheader:

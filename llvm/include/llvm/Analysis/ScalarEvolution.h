@@ -1584,8 +1584,6 @@ public:
   class LoopGuards {
     DenseMap<const SCEV *, const SCEV *> RewriteMap;
     SmallDenseSet<std::pair<const SCEV *, const SCEV *>> NotEqual;
-    bool PreserveNUW = false;
-    bool PreserveNSW = false;
     /// The loop to collect guards for on first use by applyLoopGuards, if not
     /// collected yet.
     const Loop *PendingLoop = nullptr;
@@ -1618,8 +1616,8 @@ public:
         unsigned Depth);
 
     /// Like rewrite(Expr), but look up rewrites with \p Lookup if set.
-    const SCEV *rewrite(const SCEV *Expr,
-                        function_ref<const SCEV *(const SCEV *)> Lookup) const;
+    SCEVUse rewrite(const SCEV *Expr,
+                    function_ref<const SCEV *(const SCEV *)> Lookup) const;
 
   public:
     /// Return loop guards for loop \p L, which are collected on first use.
@@ -1629,13 +1627,15 @@ public:
       return Guards;
     }
 
-    /// Try to apply the collected loop guards to \p Expr.
-    LLVM_ABI const SCEV *rewrite(const SCEV *Expr) const;
+    /// Try to apply the collected loop guards to \p Expr. The no-wrap flags
+    /// of rewritten adds only hold under the guards and are returned as use
+    /// flags, also on the operands of the result.
+    LLVM_ABI SCEVUse rewrite(const SCEV *Expr) const;
   };
 
   /// Try to apply information from loop guards for \p L to \p Expr.
-  LLVM_ABI const SCEV *applyLoopGuards(const SCEV *Expr, const Loop *L);
-  LLVM_ABI const SCEV *applyLoopGuards(const SCEV *Expr, LoopGuards &Guards);
+  LLVM_ABI SCEVUse applyLoopGuards(const SCEV *Expr, const Loop *L);
+  LLVM_ABI SCEVUse applyLoopGuards(const SCEV *Expr, LoopGuards &Guards);
 
   /// Return true if the loop has no abnormal exits. That is, if the loop
   /// is not infinite, it must exit through an explicit edge in the CFG.
@@ -2031,6 +2031,11 @@ private:
   /// copied if its needed for longer.
   LLVM_ABI const ConstantRange &getRangeRef(const SCEV *S, RangeSignHint Hint,
                                             unsigned Depth = 0);
+
+  /// Determine the range of the use \p S, also using the use flags of \p S
+  /// and, through adds and zero-extends, of its operands. Not cached, as the
+  /// flags only hold for this use.
+  ConstantRange getRangeOfUse(SCEVUse S, RangeSignHint Hint);
 
   /// Determine the range for a particular SCEV, but evaluates ranges for
   /// operands iteratively first.

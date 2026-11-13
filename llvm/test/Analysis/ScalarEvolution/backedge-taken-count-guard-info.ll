@@ -147,9 +147,9 @@ define void @rewrite_flags_only_hold_under_guard(i32 %a, i32 %y) {
 ; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -1
 ; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (%a + %y)<nuw>
 ; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
-; CHECK-NEXT:  Loop %loop.1: backedge-taken count is (-1 + (1 umax (16 + %y)<nuw>))
+; CHECK-NEXT:  Loop %loop.1: backedge-taken count is (-1 + (1 umax (16 + %y)))
 ; CHECK-NEXT:  Loop %loop.1: constant max backedge-taken count is i32 -2
-; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is (-1 + (1 umax (16 + %y)<nuw>))
+; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is (-1 + (1 umax (16 + %y)))
 ; CHECK-NEXT:  Loop %loop.1: Trip multiple is 1
 ;
 entry:
@@ -186,9 +186,9 @@ define void @rewrite_flags_only_hold_under_guard_mul(i32 %a, i32 %y) {
 ; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -16
 ; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (%a * %y)<nuw>
 ; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
-; CHECK-NEXT:  Loop %loop.1: backedge-taken count is (-1 + (1 umax (16 * %y)<nuw>))
+; CHECK-NEXT:  Loop %loop.1: backedge-taken count is (-1 + (1 umax (16 * %y)))
 ; CHECK-NEXT:  Loop %loop.1: constant max backedge-taken count is i32 -17
-; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is (-1 + (1 umax (16 * %y)<nuw>))
+; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is (-1 + (1 umax (16 * %y)))
 ; CHECK-NEXT:  Loop %loop.1: Trip multiple is 1
 ;
 entry:

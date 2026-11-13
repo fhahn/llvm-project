@@ -869,8 +869,8 @@ public:
   }
 
   const SCEV *visitUDivExpr(const SCEVUDivExpr *Expr) {
-    auto *LHS = ((SC *)this)->visit(Expr->getLHS());
-    auto *RHS = ((SC *)this)->visit(Expr->getRHS());
+    const SCEV *LHS = ((SC *)this)->visit(Expr->getLHS());
+    const SCEV *RHS = ((SC *)this)->visit(Expr->getRHS());
     bool Changed = LHS != Expr->getLHS() || RHS != Expr->getRHS();
     return !Changed ? Expr : SE.getUDivExpr(LHS, RHS);
   }
