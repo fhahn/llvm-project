@@ -1672,3 +1672,142 @@ loop.latch:
 exit:
   ret void
 }
+
+; SCEV proves the store addresses equal, but %idx.then is only disjoint for
+; even %iv, when the store in %then executes, so it cannot be used for all lanes.
+define void @sink_stores_scev_equal_addresses_with_disjoint_or(ptr %dst, ptr %src) {
+; CHECK-LABEL: define void @sink_stores_scev_equal_addresses_with_disjoint_or(
+; CHECK-SAME: ptr [[DST:%.*]], ptr [[SRC:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr i8, ptr [[DST]], i64 4
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[DST]], i64 404
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[SRC]], i64 400
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP0]], [[TMP2]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC]], [[TMP1]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i64> [ <i64 0, i64 1>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP3]], align 4, !alias.scope [[META129:![0-9]+]]
+; CHECK-NEXT:    [[TMP4:%.*]] = and <2 x i64> [[VEC_IND]], splat (i64 1)
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp ne <2 x i64> [[TMP4]], zeroinitializer
+; CHECK-NEXT:    [[TMP6:%.*]] = or disjoint <2 x i64> [[VEC_IND]], splat (i64 1)
+; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <2 x i64> [[TMP6]], i64 0
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i32, ptr [[DST]], i64 [[TMP7]]
+; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <2 x i64> [[TMP6]], i64 1
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr i32, ptr [[DST]], i64 [[TMP9]]
+; CHECK-NEXT:    [[TMP11:%.*]] = select <2 x i1> [[TMP5]], <2 x i32> zeroinitializer, <2 x i32> [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <2 x i32> [[TMP11]], i64 0
+; CHECK-NEXT:    store i32 [[TMP12]], ptr [[TMP8]], align 4, !alias.scope [[META132:![0-9]+]], !noalias [[META129]]
+; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <2 x i32> [[TMP11]], i64 1
+; CHECK-NEXT:    store i32 [[TMP13]], ptr [[TMP10]], align 4, !alias.scope [[META132]], !noalias [[META129]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <2 x i64> [[VEC_IND]], splat (i64 2)
+; CHECK-NEXT:    [[TMP14:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
+; CHECK-NEXT:    br i1 [[TMP14]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP134:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br [[EXIT:label %.*]]
+; CHECK:       [[SCALAR_PH]]:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  %gep.src = getelementptr inbounds i32, ptr %src, i64 %iv
+  %l = load i32, ptr %gep.src, align 4
+  %iv.rem = and i64 %iv, 1
+  %iv.even = icmp eq i64 %iv.rem, 0
+  br i1 %iv.even, label %then, label %else
+
+then:
+  %idx.then = or disjoint i64 %iv, 1
+  %gep.then = getelementptr i32, ptr %dst, i64 %idx.then
+  store i32 %l, ptr %gep.then, align 4
+  br label %loop.latch
+
+else:
+  %idx.else = add i64 %iv, 1
+  %gep.else = getelementptr i32, ptr %dst, i64 %idx.else
+  store i32 0, ptr %gep.else, align 4
+  br label %loop.latch
+
+loop.latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 100
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The stores can be sunk, but inbounds must be dropped from the address, as it
+; is only present on one of the GEPs.
+define void @sink_stores_duplicate_gep_different_flags(ptr %dst, ptr %cond) {
+; CHECK-LABEL: define void @sink_stores_duplicate_gep_different_flags(
+; CHECK-SAME: ptr [[DST:%.*]], ptr [[COND:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr i8, ptr [[DST]], i64 400
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[COND]], i64 400
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[TMP1]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[COND]], [[TMP0]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP2:%.*]] = add i32 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i32, ptr [[COND]], i32 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP3]], align 4, !alias.scope [[META136:![0-9]+]]
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp ugt <2 x i32> [[WIDE_LOAD]], splat (i32 11)
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[INDEX]]
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP2]]
+; CHECK-NEXT:    [[TMP7:%.*]] = select <2 x i1> [[TMP4]], <2 x i32> splat (i32 2), <2 x i32> splat (i32 1)
+; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <2 x i32> [[TMP7]], i64 0
+; CHECK-NEXT:    store i32 [[TMP8]], ptr [[TMP5]], align 4, !alias.scope [[META139:![0-9]+]], !noalias [[META136]]
+; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <2 x i32> [[TMP7]], i64 1
+; CHECK-NEXT:    store i32 [[TMP9]], ptr [[TMP6]], align 4, !alias.scope [[META139]], !noalias [[META136]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i32 [[INDEX_NEXT]], 100
+; CHECK-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP141:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br [[EXIT:label %.*]]
+; CHECK:       [[SCALAR_PH]]:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i32 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  %gep.cond = getelementptr inbounds i32, ptr %cond, i32 %iv
+  %l.c = load i32, ptr %gep.cond, align 4
+  %c = icmp ule i32 %l.c, 11
+  br i1 %c, label %then, label %else
+
+then:
+  %gep.dst.then = getelementptr inbounds i32, ptr %dst, i32 %iv
+  store i32 1, ptr %gep.dst.then, align 4
+  br label %loop.latch
+
+else:
+  %gep.dst.else = getelementptr i32, ptr %dst, i32 %iv
+  store i32 2, ptr %gep.dst.else, align 4
+  br label %loop.latch
+
+loop.latch:
+  %iv.next = add nuw nsw i32 %iv, 1
+  %ec = icmp eq i32 %iv.next, 100
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
