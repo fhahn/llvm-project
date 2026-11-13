@@ -375,3 +375,67 @@ loop:
 exit:
   ret void
 }
+
+; Evaluating %p outside %outer replaces its step by the exit value of %j, giving
+; {0,+,3}<%inner>, the same expression as %q. %q wraps in earlier iterations of
+; %outer (e.g. if %end is 1), so it must not get nuw.
+define void @inner_step_from_outer_iv(ptr %ends) {
+; CHECK-LABEL: 'inner_step_from_outer_iv'
+; CHECK-NEXT:  Classifying expressions for: @inner_step_from_outer_iv
+; CHECK-NEXT:    %j = phi i64 [ 1, %entry ], [ %j.next, %outer.latch ]
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%outer.header> U: [1,4) S: [1,4) Exits: 3 LoopDispositions: { %outer.header: Computable, %inner: Invariant }
+; CHECK-NEXT:    %gep = getelementptr i64, ptr %ends, i64 %j
+; CHECK-NEXT:    --> {(8 + %ends),+,8}<nw><%outer.header> U: full-set S: full-set Exits: (24 + %ends) LoopDispositions: { %outer.header: Computable, %inner: Invariant }
+; CHECK-NEXT:    %end = load i64, ptr %gep, align 4
+; CHECK-NEXT:    --> %end U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %outer.header: Variant, %inner: Invariant }
+; CHECK-NEXT:    %p = phi i64 [ 0, %outer.header ], [ %p.next, %inner ]
+; CHECK-NEXT:    --> {0,+,{1,+,1}<nuw><nsw><%outer.header>}<nuw><%inner> U: full-set S: full-set Exits: ((-1 + (-6148914691236517205 * %end)) * {1,+,1}<nuw><nsw><%outer.header>) LoopDispositions: { %inner: Computable, %outer.header: Variant }
+; CHECK-NEXT:    %q = phi i64 [ 0, %outer.header ], [ %q.next, %inner ]
+; CHECK-NEXT:    --> {0,+,3}<%inner> U: full-set S: full-set Exits: (-3 + %end) LoopDispositions: { %inner: Computable, %outer.header: Uniform }
+; CHECK-NEXT:    %p.next = add nuw i64 %p, %j
+; CHECK-NEXT:    --> {{\{\{}}1,+,1}<nuw><nsw><%outer.header>,+,{1,+,1}<nuw><nsw><%outer.header>}<nw><%inner> U: full-set S: full-set Exits: ({-6148914691236517205,+,-6148914691236517205}<%outer.header> * %end) LoopDispositions: { %inner: Computable, %outer.header: Variant }
+; CHECK-NEXT:    %q.next = add i64 %q, 3
+; CHECK-NEXT:    --> {3,+,3}<%inner> U: full-set S: full-set Exits: %end LoopDispositions: { %inner: Computable, %outer.header: Uniform }
+; CHECK-NEXT:    %p.lcssa = phi i64 [ %p, %inner ]
+; CHECK-NEXT:    --> {0,+,{1,+,1}<nuw><nsw><%outer.header>}<nuw><%inner> U: full-set S: full-set --> ((-1 + (-6148914691236517205 * %end)) * {1,+,1}<nuw><nsw><%outer.header>) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %outer.header: Variant, %inner: Computable }
+; CHECK-NEXT:    %q.lcssa = phi i64 [ %q, %inner ]
+; CHECK-NEXT:    --> {0,+,3}<nuw><%inner> U: full-set S: full-set --> (-3 + %end) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %outer.header: Uniform, %inner: Computable }
+; CHECK-NEXT:    %j.next = add i64 %j, 1
+; CHECK-NEXT:    --> {2,+,1}<nuw><nsw><%outer.header> U: [2,5) S: [2,5) Exits: 4 LoopDispositions: { %outer.header: Computable, %inner: Invariant }
+; CHECK-NEXT:  Determining loop execution counts for: @inner_step_from_outer_iv
+; CHECK-NEXT:  Loop %inner: backedge-taken count is (-1 + (-6148914691236517205 * %end))
+; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %inner: symbolic max backedge-taken count is (-1 + (-6148914691236517205 * %end))
+; CHECK-NEXT:  Loop %inner: Trip multiple is 1
+; CHECK-NEXT:  Loop %outer.header: backedge-taken count is i64 2
+; CHECK-NEXT:  Loop %outer.header: constant max backedge-taken count is i64 2
+; CHECK-NEXT:  Loop %outer.header: symbolic max backedge-taken count is i64 2
+; CHECK-NEXT:  Loop %outer.header: Trip multiple is 3
+;
+entry:
+  br label %outer.header
+
+outer.header:
+  %j = phi i64 [ 1, %entry ], [ %j.next, %outer.latch ]
+  %gep = getelementptr i64, ptr %ends, i64 %j
+  %end = load i64, ptr %gep
+  br label %inner
+
+inner:
+  %p = phi i64 [ 0, %outer.header ], [ %p.next, %inner ]
+  %q = phi i64 [ 0, %outer.header ], [ %q.next, %inner ]
+  %p.next = add nuw i64 %p, %j
+  %q.next = add i64 %q, 3
+  %ec = icmp eq i64 %q.next, %end
+  br i1 %ec, label %outer.latch, label %inner
+
+outer.latch:
+  %p.lcssa = phi i64 [ %p, %inner ]
+  %q.lcssa = phi i64 [ %q, %inner ]
+  %j.next = add i64 %j, 1
+  %outer.ec = icmp eq i64 %j, 3
+  br i1 %outer.ec, label %exit, label %outer.header
+
+exit:
+  ret void
+}
