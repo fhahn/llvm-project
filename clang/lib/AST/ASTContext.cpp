@@ -3311,8 +3311,7 @@ ASTContext::getExtQualType(const Type *baseType, Qualifiers quals) const {
     canonSplit.Quals.addConsistentQualifiers(quals);
     canon = getExtQualType(canonSplit.Ty, canonSplit.Quals);
 
-    // Re-find the insert position.
-    (void)ExtQualNodes.lookup(ID, Token);
+    assert(!ExtQualNodes.lookup(ID, Token) && "Shouldn't be in the map!");
   }
 
   auto *eq = new (*this, alignof(ExtQuals)) ExtQuals(baseType, canon, quals);
@@ -4276,10 +4275,7 @@ QualType ASTContext::getMemberPointerType(QualType T,
     Canonical =
         getMemberPointerType(getCanonicalType(T), CanonicalQualifier, Cls);
     assert(!cast<MemberPointerType>(Canonical)->isSugared());
-    // Get the new insert position for the node we care about.
-    [[maybe_unused]] MemberPointerType *NewIP =
-        MemberPointerTypes.lookup(ID, Token);
-    assert(!NewIP && "Shouldn't be in the map!");
+    assert(!MemberPointerTypes.lookup(ID, Token) && "Shouldn't be in the map!");
   }
   auto *New = new (*this, alignof(MemberPointerType))
       MemberPointerType(T, Qualifier, Canonical);
@@ -4327,9 +4323,7 @@ QualType ASTContext::getConstantArrayType(QualType EltTy,
                                  ASM, IndexTypeQuals);
     Canon = getQualifiedType(Canon, canonSplit.Quals);
 
-    // Get the new insert position for the node we care about.
-    ConstantArrayType *NewIP = ConstantArrayTypes.lookup(ID, Token);
-    assert(!NewIP && "Shouldn't be in the map!"); (void)NewIP;
+    assert(!ConstantArrayTypes.lookup(ID, Token) && "Shouldn't be in the map!");
   }
 
   auto *New = ConstantArrayType::Create(*this, EltTy, Canon, ArySize, SizeExpr,
@@ -4591,9 +4585,8 @@ QualType ASTContext::getIncompleteArrayType(QualType elementType,
                                    ASM, elementTypeQuals);
     canon = getQualifiedType(canon, canonSplit.Quals);
 
-    // Get the new insert position for the node we care about.
-    IncompleteArrayType *existing = IncompleteArrayTypes.lookup(ID, Token);
-    assert(!existing && "Shouldn't be in the map!"); (void) existing;
+    assert(!IncompleteArrayTypes.lookup(ID, Token) &&
+           "Shouldn't be in the map!");
   }
 
   auto *newType = new (*this, alignof(IncompleteArrayType))
@@ -4757,9 +4750,7 @@ QualType ASTContext::getVectorType(QualType vecType, unsigned NumElts,
   if (!vecType.isCanonical()) {
     Canonical = getVectorType(getCanonicalType(vecType), NumElts, VecKind);
 
-    // Get the new insert position for the node we care about.
-    VectorType *NewIP = VectorTypes.lookup(ID, Token);
-    assert(!NewIP && "Shouldn't be in the map!"); (void)NewIP;
+    assert(!VectorTypes.lookup(ID, Token) && "Shouldn't be in the map!");
   }
   auto *New = new (*this, alignof(VectorType))
       VectorType(vecType, NumElts, Canonical, VecKind);
@@ -4827,9 +4818,7 @@ QualType ASTContext::getExtVectorType(QualType vecType,
   if (!vecType.isCanonical()) {
     Canonical = getExtVectorType(getCanonicalType(vecType), NumElts);
 
-    // Get the new insert position for the node we care about.
-    VectorType *NewIP = VectorTypes.lookup(ID, Token);
-    assert(!NewIP && "Shouldn't be in the map!"); (void)NewIP;
+    assert(!VectorTypes.lookup(ID, Token) && "Shouldn't be in the map!");
   }
   auto *New = new (*this, alignof(ExtVectorType))
       ExtVectorType(vecType, NumElts, Canonical);
@@ -5044,9 +5033,8 @@ ASTContext::getFunctionNoProtoType(QualType ResultTy,
     Canonical =
       getFunctionNoProtoType(getCanonicalFunctionResultType(ResultTy), Info);
 
-    // Get the new insert position for the node we care about.
-    FunctionNoProtoType *NewIP = FunctionNoProtoTypes.lookup(ID, Token);
-    assert(!NewIP && "Shouldn't be in the map!"); (void)NewIP;
+    assert(!FunctionNoProtoTypes.lookup(ID, Token) &&
+           "Shouldn't be in the map!");
   }
 
   auto *New = new (*this, alignof(FunctionNoProtoType))
@@ -5216,9 +5204,7 @@ QualType ASTContext::getFunctionTypeInternal(
     Canonical =
         getFunctionTypeInternal(CanResultTy, CanonicalArgs, CanonicalEPI, true);
 
-    // Get the new insert position for the node we care about.
-    FunctionProtoType *NewIP = FunctionProtoTypes.lookup(ID, Token);
-    assert(!NewIP && "Shouldn't be in the map!"); (void)NewIP;
+    assert(!FunctionProtoTypes.lookup(ID, Token) && "Shouldn't be in the map!");
   }
 
   // Compute the needed size to hold this FunctionProtoType and the
