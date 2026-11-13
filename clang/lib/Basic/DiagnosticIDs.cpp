@@ -536,6 +536,14 @@ DiagnosticIDs::getDiagnosticLevel(unsigned DiagID, SourceLocation Loc,
 diag::Severity
 DiagnosticIDs::getDiagnosticSeverity(unsigned DiagID, SourceLocation Loc,
                                      const DiagnosticsEngine &Diag) const {
+  // A built-in diagnostic that is ignored by default and that nothing enabled
+  // is ignored in every diagnostic state, so skip looking up the state at Loc.
+  const StaticDiagInfoRec *Info = GetDiagInfo(DiagID);
+  if (Info &&
+      (diag::Severity)Info->DefaultSeverity == diag::Severity::Ignored &&
+      !Diag.EnablesUnmappedDiags && !Diag.EnabledDiags[DiagID])
+    return diag::Severity::Ignored;
+
   return getDiagnosticListHighestSeverity({DiagID}, Loc, Diag);
 }
 
