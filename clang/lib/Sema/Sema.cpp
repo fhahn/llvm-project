@@ -2393,6 +2393,12 @@ void Sema::checkTypeSupport(QualType Ty, SourceLocation Loc, ValueDecl *D) {
 
     QualType UnqualTy = Ty.getCanonicalType().getUnqualifiedType();
     const TargetInfo &TI = Context.getTargetInfo();
+
+    // Apart from the AMDGPU types, only builtin and vector types are checked
+    // below.
+    if (!isa<BuiltinType, VectorType>(UnqualTy) && !TI.hasAMDGPUTypes())
+      return;
+
     if (!TI.hasLongDoubleType() && UnqualTy == Context.LongDoubleTy) {
       PartialDiagnostic PD = PDiag(diag::err_target_unsupported_type);
       if (D)
