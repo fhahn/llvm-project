@@ -388,11 +388,11 @@ define void @add_flags_only_hold_if_loop_runs(i8 %n.in, i1 %c) {
 ; CHECK-NEXT:    %s = phi i8 [ 0, %entry ], [ 64, %loop ]
 ; CHECK-NEXT:    --> %s U: [0,65) S: [0,65) Exits: 64 LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:    %x = add nsw i8 %s, %iv
-; CHECK-NEXT:    --> ({0,+,1}<nuw><%loop> + %s)<nsw> U: full-set S: full-set Exits: (64 + %n)<nsw> LoopDispositions: { %loop: Variant }
+; CHECK-NEXT:    --> ({0,+,1}<nuw><%loop> + %s)<nsw> U: full-set S: full-set Exits: (64 + %n)<u nsw> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:    %iv.next = add i8 %iv, 1
 ; CHECK-NEXT:    --> {1,+,1}<nw><%loop> U: full-set S: full-set Exits: (1 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %y = add i8 %n, 64
-; CHECK-NEXT:    --> (64 + %n)<nsw> U: [-64,-128) S: [-64,-128)
+; CHECK-NEXT:    --> (64 + %n) U: [65,64) S: [65,64)
 ; CHECK-NEXT:  Determining loop execution counts for: @add_flags_only_hold_if_loop_runs
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is %n
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 -1
@@ -430,11 +430,11 @@ define void @mul_flags_only_hold_if_inner_loop_runs(i1 %c) {
 ; CHECK-NEXT:    %s = phi i8 [ 0, %outer.header ], [ 64, %inner ]
 ; CHECK-NEXT:    --> %s U: [0,65) S: [0,65) Exits: 64 LoopDispositions: { %inner: Variant, %outer.header: Variant }
 ; CHECK-NEXT:    %x = mul nsw i8 %s, %outer.iv
-; CHECK-NEXT:    --> ({0,+,1}<nuw><nsw><%outer.header> * %s)<nuw><nsw> U: [0,-127) S: [-128,65) Exits: {0,+,64}<nuw><nsw><%outer.header> LoopDispositions: { %inner: Variant, %outer.header: Variant }
+; CHECK-NEXT:    --> ({0,+,1}<nuw><nsw><%outer.header> * %s)<nuw><nsw> U: [0,-127) S: [-128,65) Exits: {0,+,64}<nuw><%outer.header> LoopDispositions: { %inner: Variant, %outer.header: Variant }
 ; CHECK-NEXT:    %inner.iv.next = add i8 %inner.iv, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%inner> U: [1,3) S: [1,3) Exits: 2 LoopDispositions: { %inner: Computable, %outer.header: Uniform }
 ; CHECK-NEXT:    %y = mul i8 %outer.iv, 64
-; CHECK-NEXT:    --> {0,+,64}<nuw><nsw><%outer.header> U: [0,-128) S: [0,65) Exits: -128 LoopDispositions: { %outer.header: Computable, %inner: Invariant }
+; CHECK-NEXT:    --> {0,+,64}<nuw><%outer.header> U: [0,-127) S: [-128,65) Exits: -128 LoopDispositions: { %outer.header: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %outer.iv.next = add i8 %outer.iv, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%outer.header> U: [1,4) S: [1,4) Exits: 3 LoopDispositions: { %outer.header: Computable, %inner: Invariant }
 ; CHECK-NEXT:  Determining loop execution counts for: @mul_flags_only_hold_if_inner_loop_runs

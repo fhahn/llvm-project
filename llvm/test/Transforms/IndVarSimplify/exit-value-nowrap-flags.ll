@@ -464,7 +464,9 @@ define i8 @flags_only_hold_if_loop_runs(i8 %n.in, i1 %c) {
 ; CHECK-NEXT:    br i1 false, label %[[LOOP_2]], label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[Y:%.*]] = add i8 [[N]], 64
-; CHECK-NEXT:    ret i8 [[Y]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i8 [[N]], 1
+; CHECK-NEXT:    [[SMAX:%.*]] = call i8 @llvm.smax.i8(i8 [[Y]], i8 [[TMP0]])
+; CHECK-NEXT:    ret i8 [[SMAX]]
 ;
 entry:
   %n = or i8 %n.in, 1

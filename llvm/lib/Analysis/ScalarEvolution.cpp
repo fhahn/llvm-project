@@ -10161,6 +10161,15 @@ SCEVUse ScalarEvolution::computeSCEVAtScope(const SCEV *V, const Loop *L) {
           NewOps.push_back(OpAtScope);
         }
 
+        // The new operands are only equal to the old ones if the loops they
+        // were evaluated for have run, so the flags of V only hold for this
+        // use.
+        if (auto *Add = dyn_cast<SCEVAddExpr>(V))
+          return getAddExpr(
+              NewOps, SCEVFlagsPair(SCEV::FlagNone, Add->getNoWrapFlags()));
+        if (auto *Mul = dyn_cast<SCEVMulExpr>(V))
+          return getMulExpr(
+              NewOps, SCEVFlagsPair(SCEV::FlagNone, Mul->getNoWrapFlags()));
         return getWithOperands(V, NewOps);
       }
     }
