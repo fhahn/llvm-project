@@ -30,6 +30,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/VirtualFileSystemFwd.h"
+#include <bitset>
 #include <cassert>
 #include <cstdint>
 #include <limits>
@@ -526,6 +527,14 @@ private:
 
   DiagStateMap DiagStatesByLoc;
 
+  /// The built-in diagnostics that were mapped to a severity other than
+  /// diag::Severity::Ignored in some diagnostic state.
+  std::bitset<diag::DIAG_UPPER_LIMIT> EnabledDiags;
+
+  /// Whether some diagnostic state enables diagnostics without mapping them,
+  /// as -Weverything and -pedantic do.
+  bool EnablesUnmappedDiags = false;
+
   /// Keeps the DiagState that was active during each diagnostic 'push'
   /// so we can get back at it when we 'pop'.
   std::vector<DiagState *> DiagStateOnPushStack;
@@ -731,6 +740,7 @@ public:
   /// If this and IgnoreAllWarnings are both set, then that one wins.
   void setEnableAllWarnings(bool Val) {
     GetCurDiagState()->EnableAllWarnings = Val;
+    EnablesUnmappedDiags |= Val;
   }
   bool getEnableAllWarnings() const {
     return GetCurDiagState()->EnableAllWarnings;
@@ -847,6 +857,7 @@ public:
   /// This corresponds to the GCC -pedantic and -pedantic-errors option.
   void setExtensionHandlingBehavior(diag::Severity H) {
     GetCurDiagState()->ExtBehavior = H;
+    EnablesUnmappedDiags |= H != diag::Severity::Ignored;
   }
   diag::Severity getExtensionHandlingBehavior() const {
     return GetCurDiagState()->ExtBehavior;
