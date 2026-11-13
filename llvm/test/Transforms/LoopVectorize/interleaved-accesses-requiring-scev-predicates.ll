@@ -247,3 +247,321 @@ loop:
 exit:
   ret void
 }
+
+; Same as @wrap_around_scev_check, but %idxprom also has a dead user, so only
+; its first lane is used.
+define void @wrap_around_scev_check_dead_ext_user(ptr noalias %a, ptr noalias %b, i8 %x, i8 %y) {
+; CHECK-LABEL: define void @wrap_around_scev_check_dead_ext_user(
+; CHECK-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], i8 [[X:%.*]], i8 [[Y:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[CMP9:%.*]] = icmp eq i8 [[Y]], 0
+; CHECK-NEXT:    br i1 [[CMP9]], label %[[EXIT:.*]], label %[[LOOP_PREHEADER:.*]]
+; CHECK:       [[LOOP_PREHEADER]]:
+; CHECK-NEXT:    [[WIDE_TRIP_COUNT:%.*]] = zext i8 [[Y]] to i64
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 [[WIDE_TRIP_COUNT]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
+; CHECK:       [[VECTOR_SCEVCHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = add nsw i64 [[WIDE_TRIP_COUNT]], -1
+; CHECK-NEXT:    [[TMP1:%.*]] = trunc i64 [[TMP0]] to i8
+; CHECK-NEXT:    [[MUL1:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 2, i8 [[TMP1]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL1]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL1]], 1
+; CHECK-NEXT:    [[TMP2:%.*]] = add i8 [[X]], [[MUL_RESULT]]
+; CHECK-NEXT:    [[TMP3:%.*]] = icmp ult i8 [[TMP2]], [[X]]
+; CHECK-NEXT:    [[TMP4:%.*]] = or i1 [[TMP3]], [[MUL_OVERFLOW]]
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp ugt i64 [[TMP0]], 255
+; CHECK-NEXT:    [[TMP6:%.*]] = or i1 [[TMP4]], [[TMP5]]
+; CHECK-NEXT:    br i1 [[TMP6]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP7:%.*]] = and i64 [[WIDE_TRIP_COUNT]], 3
+; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[TMP7]], 0
+; CHECK-NEXT:    [[TMP9:%.*]] = select i1 [[TMP8]], i64 4, i64 [[TMP7]]
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[WIDE_TRIP_COUNT]], [[TMP9]]
+; CHECK-NEXT:    [[TMP10:%.*]] = trunc i64 [[N_VEC]] to i8
+; CHECK-NEXT:    [[TMP11:%.*]] = shl i8 [[TMP10]], 1
+; CHECK-NEXT:    [[TMP12:%.*]] = add i8 [[X]], [[TMP11]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i8> poison, i8 [[X]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i8> [[BROADCAST_SPLATINSERT]], <4 x i8> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[INDUCTION:%.*]] = add <4 x i8> [[BROADCAST_SPLAT]], <i8 0, i8 2, i8 4, i8 6>
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i8> [ [[INDUCTION]], %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP13:%.*]] = zext <4 x i8> [[VEC_IND]] to <4 x i64>
+; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <4 x i64> [[TMP13]], i64 0
+; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP14]]
+; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <8 x i32>, ptr [[TMP15]], align 4
+; CHECK-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <8 x i32> [[WIDE_VEC]], <8 x i32> poison, <4 x i32> <i32 0, i32 2, i32 4, i32 6>
+; CHECK-NEXT:    [[TMP16:%.*]] = shl <4 x i32> [[STRIDED_VEC]], splat (i32 1)
+; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[INDEX]]
+; CHECK-NEXT:    store <4 x i32> [[TMP16]], ptr [[TMP17]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i8> [[VEC_IND]], splat (i8 8)
+; CHECK-NEXT:    [[TMP18:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP18]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[LOOP_PREHEADER]] ], [ 0, %[[VECTOR_SCEVCHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL2:%.*]] = phi i8 [ [[TMP12]], %[[MIDDLE_BLOCK]] ], [ [[X]], %[[LOOP_PREHEADER]] ], [ [[X]], %[[VECTOR_SCEVCHECK]] ]
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[INDEX_011:%.*]] = phi i8 [ [[BC_RESUME_VAL2]], %[[SCALAR_PH]] ], [ [[ADD:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IDXPROM:%.*]] = zext i8 [[INDEX_011]] to i64
+; CHECK-NEXT:    [[DEAD:%.*]] = add i64 [[IDXPROM]], 1
+; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IDXPROM]]
+; CHECK-NEXT:    [[TMP19:%.*]] = load i32, ptr [[ARRAYIDX]], align 4
+; CHECK-NEXT:    [[MUL:%.*]] = shl i32 [[TMP19]], 1
+; CHECK-NEXT:    [[ARRAYIDX2:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[IV]]
+; CHECK-NEXT:    store i32 [[MUL]], ptr [[ARRAYIDX2]], align 4
+; CHECK-NEXT:    [[ADD]] = add i8 [[INDEX_011]], 2
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[IV_NEXT]], [[WIDE_TRIP_COUNT]]
+; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[EXIT_LOOPEXIT:.*]], label %[[LOOP]], !llvm.loop [[LOOP8:![0-9]+]]
+; CHECK:       [[EXIT_LOOPEXIT]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %cmp9 = icmp eq i8 %y, 0
+  br i1 %cmp9, label %exit, label %loop.preheader
+
+loop.preheader:
+  %wide.trip.count = zext i8 %y to i64
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %loop.preheader ], [ %iv.next, %loop ]
+  %index.011 = phi i8 [ %x, %loop.preheader ], [ %add, %loop ]
+  %idxprom = zext i8 %index.011 to i64
+  %dead = add i64 %idxprom, 1
+  %arrayidx = getelementptr inbounds i32, ptr %a, i64 %idxprom
+  %0 = load i32, ptr %arrayidx, align 4
+  %mul = shl i32 %0, 1
+  %arrayidx2 = getelementptr inbounds i32, ptr %b, i64 %iv
+  store i32 %mul, ptr %arrayidx2, align 4
+  %add = add i8 %index.011, 2
+  %iv.next = add nuw nsw i64 %iv, 1
+  %exitcond = icmp eq i64 %iv.next, %wide.trip.count
+  br i1 %exitcond, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Same as @wrap_around_scev_check_dead_ext_user, but the dead user is on the
+; llvm.umin call computing the index.
+define void @wrap_around_scev_check_dead_umin_user(ptr noalias %a, ptr noalias %b, i8 %x, i8 %y) {
+; CHECK-LABEL: define void @wrap_around_scev_check_dead_umin_user(
+; CHECK-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], i8 [[X:%.*]], i8 [[Y:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[CMP9:%.*]] = icmp eq i8 [[Y]], 0
+; CHECK-NEXT:    br i1 [[CMP9]], label %[[EXIT:.*]], label %[[LOOP_PREHEADER:.*]]
+; CHECK:       [[LOOP_PREHEADER]]:
+; CHECK-NEXT:    [[WIDE_TRIP_COUNT:%.*]] = zext i8 [[Y]] to i64
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 [[WIDE_TRIP_COUNT]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
+; CHECK:       [[VECTOR_SCEVCHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = add nsw i64 [[WIDE_TRIP_COUNT]], -1
+; CHECK-NEXT:    [[TMP1:%.*]] = trunc i64 [[TMP0]] to i8
+; CHECK-NEXT:    [[MUL1:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 2, i8 [[TMP1]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL1]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL1]], 1
+; CHECK-NEXT:    [[TMP2:%.*]] = add i8 [[X]], [[MUL_RESULT]]
+; CHECK-NEXT:    [[TMP3:%.*]] = icmp ult i8 [[TMP2]], [[X]]
+; CHECK-NEXT:    [[TMP4:%.*]] = or i1 [[TMP3]], [[MUL_OVERFLOW]]
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp ugt i64 [[TMP0]], 255
+; CHECK-NEXT:    [[TMP6:%.*]] = or i1 [[TMP4]], [[TMP5]]
+; CHECK-NEXT:    br i1 [[TMP6]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP7:%.*]] = and i64 [[WIDE_TRIP_COUNT]], 3
+; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[TMP7]], 0
+; CHECK-NEXT:    [[TMP9:%.*]] = select i1 [[TMP8]], i64 4, i64 [[TMP7]]
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[WIDE_TRIP_COUNT]], [[TMP9]]
+; CHECK-NEXT:    [[TMP10:%.*]] = trunc i64 [[N_VEC]] to i8
+; CHECK-NEXT:    [[TMP11:%.*]] = shl i8 [[TMP10]], 1
+; CHECK-NEXT:    [[TMP12:%.*]] = add i8 [[X]], [[TMP11]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i8> poison, i8 [[X]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i8> [[BROADCAST_SPLATINSERT]], <4 x i8> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[INDUCTION:%.*]] = add <4 x i8> [[BROADCAST_SPLAT]], <i8 0, i8 2, i8 4, i8 6>
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i8> [ [[INDUCTION]], %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP13:%.*]] = call <4 x i8> @llvm.umin.v4i8(<4 x i8> [[VEC_IND]], <4 x i8> splat (i8 -1))
+; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <4 x i8> [[TMP13]], i64 0
+; CHECK-NEXT:    [[TMP15:%.*]] = zext i8 [[TMP14]] to i64
+; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP15]]
+; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <8 x i32>, ptr [[TMP16]], align 4
+; CHECK-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <8 x i32> [[WIDE_VEC]], <8 x i32> poison, <4 x i32> <i32 0, i32 2, i32 4, i32 6>
+; CHECK-NEXT:    [[TMP17:%.*]] = shl <4 x i32> [[STRIDED_VEC]], splat (i32 1)
+; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[INDEX]]
+; CHECK-NEXT:    store <4 x i32> [[TMP17]], ptr [[TMP18]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i8> [[VEC_IND]], splat (i8 8)
+; CHECK-NEXT:    [[TMP19:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP19]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[LOOP_PREHEADER]] ], [ 0, %[[VECTOR_SCEVCHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL2:%.*]] = phi i8 [ [[TMP12]], %[[MIDDLE_BLOCK]] ], [ [[X]], %[[LOOP_PREHEADER]] ], [ [[X]], %[[VECTOR_SCEVCHECK]] ]
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[INDEX_011:%.*]] = phi i8 [ [[BC_RESUME_VAL2]], %[[SCALAR_PH]] ], [ [[ADD:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[UMIN:%.*]] = call i8 @llvm.umin.i8(i8 [[INDEX_011]], i8 -1)
+; CHECK-NEXT:    [[DEAD:%.*]] = add i8 [[UMIN]], 1
+; CHECK-NEXT:    [[IDXPROM:%.*]] = zext i8 [[UMIN]] to i64
+; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IDXPROM]]
+; CHECK-NEXT:    [[TMP20:%.*]] = load i32, ptr [[ARRAYIDX]], align 4
+; CHECK-NEXT:    [[MUL:%.*]] = shl i32 [[TMP20]], 1
+; CHECK-NEXT:    [[ARRAYIDX2:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[IV]]
+; CHECK-NEXT:    store i32 [[MUL]], ptr [[ARRAYIDX2]], align 4
+; CHECK-NEXT:    [[ADD]] = add i8 [[INDEX_011]], 2
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[IV_NEXT]], [[WIDE_TRIP_COUNT]]
+; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[EXIT_LOOPEXIT:.*]], label %[[LOOP]], !llvm.loop [[LOOP10:![0-9]+]]
+; CHECK:       [[EXIT_LOOPEXIT]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %cmp9 = icmp eq i8 %y, 0
+  br i1 %cmp9, label %exit, label %loop.preheader
+
+loop.preheader:
+  %wide.trip.count = zext i8 %y to i64
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %loop.preheader ], [ %iv.next, %loop ]
+  %index.011 = phi i8 [ %x, %loop.preheader ], [ %add, %loop ]
+  %umin = call i8 @llvm.umin.i8(i8 %index.011, i8 -1)
+  %dead = add i8 %umin, 1
+  %idxprom = zext i8 %umin to i64
+  %arrayidx = getelementptr inbounds i32, ptr %a, i64 %idxprom
+  %0 = load i32, ptr %arrayidx, align 4
+  %mul = shl i32 %0, 1
+  %arrayidx2 = getelementptr inbounds i32, ptr %b, i64 %iv
+  store i32 %mul, ptr %arrayidx2, align 4
+  %add = add i8 %index.011, 2
+  %iv.next = add nuw nsw i64 %iv, 1
+  %exitcond = icmp eq i64 %iv.next, %wide.trip.count
+  br i1 %exitcond, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Same as @wrap_around_scev_check_dead_ext_user, but the dead user is on the
+; result of the llvm.sadd.with.overflow call computing the index.
+define void @wrap_around_scev_check_dead_sadd_user(ptr noalias %a, ptr noalias %b, i8 %x, i8 %y) {
+; CHECK-LABEL: define void @wrap_around_scev_check_dead_sadd_user(
+; CHECK-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], i8 [[X:%.*]], i8 [[Y:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[CMP9:%.*]] = icmp eq i8 [[Y]], 0
+; CHECK-NEXT:    br i1 [[CMP9]], label %[[EXIT:.*]], label %[[LOOP_PREHEADER:.*]]
+; CHECK:       [[LOOP_PREHEADER]]:
+; CHECK-NEXT:    [[WIDE_TRIP_COUNT:%.*]] = zext i8 [[Y]] to i64
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 [[WIDE_TRIP_COUNT]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
+; CHECK:       [[VECTOR_SCEVCHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = add nsw i64 [[WIDE_TRIP_COUNT]], -1
+; CHECK-NEXT:    [[TMP1:%.*]] = trunc i64 [[TMP0]] to i8
+; CHECK-NEXT:    [[MUL1:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 2, i8 [[TMP1]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL1]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL1]], 1
+; CHECK-NEXT:    [[TMP2:%.*]] = add i8 [[X]], [[MUL_RESULT]]
+; CHECK-NEXT:    [[TMP3:%.*]] = icmp ult i8 [[TMP2]], [[X]]
+; CHECK-NEXT:    [[TMP4:%.*]] = or i1 [[TMP3]], [[MUL_OVERFLOW]]
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp ugt i64 [[TMP0]], 255
+; CHECK-NEXT:    [[TMP6:%.*]] = or i1 [[TMP4]], [[TMP5]]
+; CHECK-NEXT:    br i1 [[TMP6]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP7:%.*]] = and i64 [[WIDE_TRIP_COUNT]], 3
+; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[TMP7]], 0
+; CHECK-NEXT:    [[TMP9:%.*]] = select i1 [[TMP8]], i64 4, i64 [[TMP7]]
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[WIDE_TRIP_COUNT]], [[TMP9]]
+; CHECK-NEXT:    [[TMP10:%.*]] = trunc i64 [[N_VEC]] to i8
+; CHECK-NEXT:    [[TMP11:%.*]] = shl i8 [[TMP10]], 1
+; CHECK-NEXT:    [[TMP12:%.*]] = add i8 [[X]], [[TMP11]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i8> poison, i8 [[X]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i8> [[BROADCAST_SPLATINSERT]], <4 x i8> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[INDUCTION:%.*]] = add <4 x i8> [[BROADCAST_SPLAT]], <i8 0, i8 2, i8 4, i8 6>
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i8> [ [[INDUCTION]], %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP13:%.*]] = call { <4 x i8>, <4 x i1> } @llvm.sadd.with.overflow.v4i8(<4 x i8> [[VEC_IND]], <4 x i8> zeroinitializer)
+; CHECK-NEXT:    [[TMP14:%.*]] = extractvalue { <4 x i8>, <4 x i1> } [[TMP13]], 0
+; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <4 x i8> [[TMP14]], i64 0
+; CHECK-NEXT:    [[TMP16:%.*]] = zext i8 [[TMP15]] to i64
+; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP16]]
+; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <8 x i32>, ptr [[TMP17]], align 4
+; CHECK-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <8 x i32> [[WIDE_VEC]], <8 x i32> poison, <4 x i32> <i32 0, i32 2, i32 4, i32 6>
+; CHECK-NEXT:    [[TMP18:%.*]] = shl <4 x i32> [[STRIDED_VEC]], splat (i32 1)
+; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[INDEX]]
+; CHECK-NEXT:    store <4 x i32> [[TMP18]], ptr [[TMP19]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i8> [[VEC_IND]], splat (i8 8)
+; CHECK-NEXT:    [[TMP20:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP20]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[LOOP_PREHEADER]] ], [ 0, %[[VECTOR_SCEVCHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL2:%.*]] = phi i8 [ [[TMP12]], %[[MIDDLE_BLOCK]] ], [ [[X]], %[[LOOP_PREHEADER]] ], [ [[X]], %[[VECTOR_SCEVCHECK]] ]
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[INDEX_011:%.*]] = phi i8 [ [[BC_RESUME_VAL2]], %[[SCALAR_PH]] ], [ [[ADD:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[SADD:%.*]] = call { i8, i1 } @llvm.sadd.with.overflow.i8(i8 [[INDEX_011]], i8 0)
+; CHECK-NEXT:    [[SADD_RES:%.*]] = extractvalue { i8, i1 } [[SADD]], 0
+; CHECK-NEXT:    [[DEAD:%.*]] = add i8 [[SADD_RES]], 1
+; CHECK-NEXT:    [[IDXPROM:%.*]] = zext i8 [[SADD_RES]] to i64
+; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IDXPROM]]
+; CHECK-NEXT:    [[TMP21:%.*]] = load i32, ptr [[ARRAYIDX]], align 4
+; CHECK-NEXT:    [[MUL:%.*]] = shl i32 [[TMP21]], 1
+; CHECK-NEXT:    [[ARRAYIDX2:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[IV]]
+; CHECK-NEXT:    store i32 [[MUL]], ptr [[ARRAYIDX2]], align 4
+; CHECK-NEXT:    [[ADD]] = add i8 [[INDEX_011]], 2
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[IV_NEXT]], [[WIDE_TRIP_COUNT]]
+; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[EXIT_LOOPEXIT:.*]], label %[[LOOP]], !llvm.loop [[LOOP12:![0-9]+]]
+; CHECK:       [[EXIT_LOOPEXIT]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %cmp9 = icmp eq i8 %y, 0
+  br i1 %cmp9, label %exit, label %loop.preheader
+
+loop.preheader:
+  %wide.trip.count = zext i8 %y to i64
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %loop.preheader ], [ %iv.next, %loop ]
+  %index.011 = phi i8 [ %x, %loop.preheader ], [ %add, %loop ]
+  %sadd = call { i8, i1 } @llvm.sadd.with.overflow.i8(i8 %index.011, i8 0)
+  %sadd.res = extractvalue { i8, i1 } %sadd, 0
+  %dead = add i8 %sadd.res, 1
+  %idxprom = zext i8 %sadd.res to i64
+  %arrayidx = getelementptr inbounds i32, ptr %a, i64 %idxprom
+  %0 = load i32, ptr %arrayidx, align 4
+  %mul = shl i32 %0, 1
+  %arrayidx2 = getelementptr inbounds i32, ptr %b, i64 %iv
+  store i32 %mul, ptr %arrayidx2, align 4
+  %add = add i8 %index.011, 2
+  %iv.next = add nuw nsw i64 %iv, 1
+  %exitcond = icmp eq i64 %iv.next, %wide.trip.count
+  br i1 %exitcond, label %exit, label %loop
+
+exit:
+  ret void
+}
