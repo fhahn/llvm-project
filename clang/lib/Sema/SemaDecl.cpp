@@ -6365,6 +6365,7 @@ void Sema::warnOnReservedIdentifier(const NamedDecl *D) {
     return;
   ReservedIdentifierStatus Status = D->isReserved(getLangOpts());
   if (Status != ReservedIdentifierStatus::NotReserved &&
+      !Diags.isIgnored(diag::warn_reserved_extern_symbol, D->getLocation()) &&
       !isFromSystemHeader(Context.getSourceManager(), D)) {
     Diag(D->getLocation(), diag::warn_reserved_extern_symbol)
         << D << static_cast<int>(Status);
