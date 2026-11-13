@@ -2488,20 +2488,23 @@ bool VarDecl::mightBeUsableInConstantExpressions(const ASTContext &C) const {
   if (isa<ParmVarDecl>(this))
     return false;
 
-  // The values of weak variables are never usable in constant expressions.
-  if (isWeak())
-    return false;
-
   // In C++11, any variable of reference type can be used in a constant
   // expression if it is initialized by a constant expression.
-  if (Lang.CPlusPlus11 && getType()->isReferenceType())
-    return true;
-
   // Only const objects can be used in constant expressions in C++. C++98 does
   // not require the variable to be non-volatile, but we consider this to be a
   // defect.
-  if (!getType().isConstant(C) || getType().isVolatileQualified())
+  bool IsReference = Lang.CPlusPlus11 && getType()->isReferenceType();
+  if (!IsReference &&
+      (!getType().isConstant(C) || getType().isVolatileQualified()))
     return false;
+
+  // The values of weak variables are never usable in constant expressions.
+  // Check this after the type, the attribute lookups are more expensive.
+  if (isWeak())
+    return false;
+
+  if (IsReference)
+    return true;
 
   // In C++, but not in C, const, non-volatile variables of integral or
   // enumeration types can be used in constant expressions.
