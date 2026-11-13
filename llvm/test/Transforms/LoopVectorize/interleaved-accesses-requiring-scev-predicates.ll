@@ -280,15 +280,13 @@ define void @wrap_around_scev_check_dead_ext_user(ptr noalias %a, ptr noalias %b
 ; CHECK-NEXT:    [[TMP10:%.*]] = trunc i64 [[N_VEC]] to i8
 ; CHECK-NEXT:    [[TMP11:%.*]] = shl i8 [[TMP10]], 1
 ; CHECK-NEXT:    [[TMP12:%.*]] = add i8 [[X]], [[TMP11]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i8> poison, i8 [[X]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i8> [[BROADCAST_SPLATINSERT]], <4 x i8> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[INDUCTION:%.*]] = add <4 x i8> [[BROADCAST_SPLAT]], <i8 0, i8 2, i8 4, i8 6>
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i8> [ [[INDUCTION]], %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP13:%.*]] = zext <4 x i8> [[VEC_IND]] to <4 x i64>
-; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <4 x i64> [[TMP13]], i64 0
+; CHECK-NEXT:    [[TMP13:%.*]] = trunc i64 [[INDEX]] to i8
+; CHECK-NEXT:    [[TMP20:%.*]] = shl i8 [[TMP13]], 1
+; CHECK-NEXT:    [[TMP21:%.*]] = add i8 [[X]], [[TMP20]]
+; CHECK-NEXT:    [[TMP14:%.*]] = zext i8 [[TMP21]] to i64
 ; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP14]]
 ; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <8 x i32>, ptr [[TMP15]], align 4
 ; CHECK-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <8 x i32> [[WIDE_VEC]], <8 x i32> poison, <4 x i32> <i32 0, i32 2, i32 4, i32 6>
@@ -296,7 +294,6 @@ define void @wrap_around_scev_check_dead_ext_user(ptr noalias %a, ptr noalias %b
 ; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <4 x i32> [[TMP16]], ptr [[TMP17]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i8> [[VEC_IND]], splat (i8 8)
 ; CHECK-NEXT:    [[TMP18:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP18]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -383,15 +380,13 @@ define void @wrap_around_scev_check_dead_umin_user(ptr noalias %a, ptr noalias %
 ; CHECK-NEXT:    [[TMP10:%.*]] = trunc i64 [[N_VEC]] to i8
 ; CHECK-NEXT:    [[TMP11:%.*]] = shl i8 [[TMP10]], 1
 ; CHECK-NEXT:    [[TMP12:%.*]] = add i8 [[X]], [[TMP11]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i8> poison, i8 [[X]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i8> [[BROADCAST_SPLATINSERT]], <4 x i8> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[INDUCTION:%.*]] = add <4 x i8> [[BROADCAST_SPLAT]], <i8 0, i8 2, i8 4, i8 6>
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i8> [ [[INDUCTION]], %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP13:%.*]] = call <4 x i8> @llvm.umin.v4i8(<4 x i8> [[VEC_IND]], <4 x i8> splat (i8 -1))
-; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <4 x i8> [[TMP13]], i64 0
+; CHECK-NEXT:    [[TMP13:%.*]] = trunc i64 [[INDEX]] to i8
+; CHECK-NEXT:    [[TMP21:%.*]] = shl i8 [[TMP13]], 1
+; CHECK-NEXT:    [[TMP22:%.*]] = add i8 [[X]], [[TMP21]]
+; CHECK-NEXT:    [[TMP14:%.*]] = call i8 @llvm.umin.i8(i8 [[TMP22]], i8 -1)
 ; CHECK-NEXT:    [[TMP15:%.*]] = zext i8 [[TMP14]] to i64
 ; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP15]]
 ; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <8 x i32>, ptr [[TMP16]], align 4
@@ -400,7 +395,6 @@ define void @wrap_around_scev_check_dead_umin_user(ptr noalias %a, ptr noalias %
 ; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <4 x i32> [[TMP17]], ptr [[TMP18]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i8> [[VEC_IND]], splat (i8 8)
 ; CHECK-NEXT:    [[TMP19:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP19]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -489,16 +483,14 @@ define void @wrap_around_scev_check_dead_sadd_user(ptr noalias %a, ptr noalias %
 ; CHECK-NEXT:    [[TMP10:%.*]] = trunc i64 [[N_VEC]] to i8
 ; CHECK-NEXT:    [[TMP11:%.*]] = shl i8 [[TMP10]], 1
 ; CHECK-NEXT:    [[TMP12:%.*]] = add i8 [[X]], [[TMP11]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i8> poison, i8 [[X]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i8> [[BROADCAST_SPLATINSERT]], <4 x i8> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[INDUCTION:%.*]] = add <4 x i8> [[BROADCAST_SPLAT]], <i8 0, i8 2, i8 4, i8 6>
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i8> [ [[INDUCTION]], %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP13:%.*]] = call { <4 x i8>, <4 x i1> } @llvm.sadd.with.overflow.v4i8(<4 x i8> [[VEC_IND]], <4 x i8> zeroinitializer)
-; CHECK-NEXT:    [[TMP14:%.*]] = extractvalue { <4 x i8>, <4 x i1> } [[TMP13]], 0
-; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <4 x i8> [[TMP14]], i64 0
+; CHECK-NEXT:    [[TMP13:%.*]] = trunc i64 [[INDEX]] to i8
+; CHECK-NEXT:    [[TMP14:%.*]] = shl i8 [[TMP13]], 1
+; CHECK-NEXT:    [[TMP22:%.*]] = add i8 [[X]], [[TMP14]]
+; CHECK-NEXT:    [[TMP23:%.*]] = call { i8, i1 } @llvm.sadd.with.overflow.i8(i8 [[TMP22]], i8 0)
+; CHECK-NEXT:    [[TMP15:%.*]] = extractvalue { i8, i1 } [[TMP23]], 0
 ; CHECK-NEXT:    [[TMP16:%.*]] = zext i8 [[TMP15]] to i64
 ; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP16]]
 ; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <8 x i32>, ptr [[TMP17]], align 4
@@ -507,7 +499,6 @@ define void @wrap_around_scev_check_dead_sadd_user(ptr noalias %a, ptr noalias %
 ; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <4 x i32> [[TMP18]], ptr [[TMP19]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i8> [[VEC_IND]], splat (i8 8)
 ; CHECK-NEXT:    [[TMP20:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP20]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

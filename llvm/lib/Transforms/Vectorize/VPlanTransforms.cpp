@@ -819,6 +819,11 @@ static void legalizeAndOptimizeInductions(VPlan &Plan) {
        make_isa_range<VPWidenInductionRecipe>(HeaderVPBB->phis()))
     WideIVs.push_back(&PhiR);
 
+  auto IsExtractValue = [](VPUser *U) {
+    return match(U,
+                 m_Binary<Instruction::ExtractValue>(m_VPValue(), m_VPValue()));
+  };
+
   // Try to narrow wide and replicating recipes to uniform recipes, based on
   // VPlan analysis.
   // TODO: Apply to all recipes in the future, to replace legacy uniformity
@@ -830,27 +835,45 @@ static void legalizeAndOptimizeInductions(VPlan &Plan) {
       auto *RepR = dyn_cast<VPReplicateRecipe>(U);
       // Skip recipes that shouldn't be narrowed.
       if (!Def ||
-          !isa<VPReplicateRecipe, VPWidenRecipe, VPWidenGEPRecipe>(Def) ||
+          !isa<VPReplicateRecipe, VPWidenRecipe, VPWidenGEPRecipe,
+               VPWidenCastRecipe, VPWidenIntrinsicRecipe>(Def) ||
           Def->user_empty() || !Def->getUnderlyingValue() ||
           (RepR && (RepR->isSingleScalar() || RepR->isPredicated())))
         continue;
 
-      // Skip recipes that may have other lanes than their first used.
-      if (!vputils::isSingleScalar(Def) && !vputils::onlyFirstLaneUsed(Def))
+      // TODO: Support scalarizing ExtractValue on its own.
+      if (IsExtractValue(Def))
         continue;
 
-      // TODO: Support scalarizing ExtractValue.
-      if (match(Def,
-                m_Binary<Instruction::ExtractValue>(m_VPValue(), m_VPValue())))
+      // ExtractValues take the shape of their aggregate, so calls returning
+      // structs are narrowed together with their extractvalue users.
+      // Otherwise, skip recipes whose other lanes may be used.
+      SmallVector<VPRecipeWithIRFlags *> ToNarrow = {Def};
+      if (all_of(Def->users(), [&](VPUser *U) {
+            return IsExtractValue(U) &&
+                   vputils::onlyFirstLaneUsed(cast<VPSingleDefRecipe>(U));
+          })) {
+        for (VPUser *U : Def->users())
+          ToNarrow.push_back(cast<VPRecipeWithIRFlags>(U));
+      } else if (!vputils::isSingleScalar(Def) &&
+                 !vputils::onlyFirstLaneUsed(Def)) {
         continue;
+      }
 
-      auto *Clone = VPBuilder::createSingleScalarOp(
-          Def->getUnderlyingInstr()->getOpcode(), Def->operands(),
-          /*Mask=*/nullptr, *Def, getMetadataOf(Def), DebugLoc::getUnknown(),
-          Def->getScalarType(), Def->getUnderlyingInstr());
-      Clone->insertAfter(Def);
-      Def->replaceAllUsesWith(Clone);
-      Def->eraseFromParent();
+      for (VPRecipeWithIRFlags *R : ToNarrow) {
+        SmallVector<VPValue *> Ops(R->operands());
+        // Single-scalar calls take the called function as last operand.
+        if (isa<VPWidenIntrinsicRecipe>(R))
+          Ops.push_back(Plan.getOrAddLiveIn(
+              cast<CallInst>(R->getUnderlyingValue())->getCalledOperand()));
+        auto *Clone = VPBuilder::createSingleScalarOp(
+            R->getUnderlyingInstr()->getOpcode(), Ops,
+            /*Mask=*/nullptr, *R, getMetadataOf(R), R->getDebugLoc(),
+            R->getScalarType(), R->getUnderlyingInstr());
+        Clone->insertAfter(R);
+        R->replaceAllUsesWith(Clone);
+        R->eraseFromParent();
+      }
     }
   }
 
