@@ -15616,36 +15616,6 @@ static const SCEV *roundToMultiple(const SCEV *Expr, const APInt &Divisor,
                         Divisor);
 }
 
-static bool collectDivisibilityInformation(
-    ICmpInst::Predicate Predicate, const SCEV *LHS, const SCEV *RHS,
-    DenseMap<const SCEV *, const SCEV *> &DivInfo,
-    DenseMap<const SCEV *, APInt> &Multiples, ScalarEvolution &SE) {
-  // If we have LHS == 0, check if LHS is computing a property of some unknown
-  // SCEV %v which we can rewrite %v to express explicitly.
-  if (Predicate != CmpInst::ICMP_EQ || !match(RHS, m_scev_Zero()))
-    return false;
-  // If LHS is A % B, i.e. A % B == 0, rewrite A to (A /u B) * B to
-  // explicitly express that.
-  const SCEVUnknown *URemLHS = nullptr;
-  const SCEV *URemRHS = nullptr;
-  if (!match(LHS, m_scev_URem(m_SCEVUnknown(URemLHS), m_SCEV(URemRHS), SE)))
-    return false;
-
-  const SCEV *Multiple =
-      SE.getMulExpr(SE.getUDivExpr(URemLHS, URemRHS), URemRHS);
-  DivInfo[URemLHS] = Multiple;
-  if (auto *C = dyn_cast<SCEVConstant>(URemRHS))
-    Multiples[URemLHS] = C->getAPInt();
-  return true;
-}
-
-// Check if the condition is a divisibility guard (A % B == 0).
-static bool isDivisibilityGuard(const SCEV *LHS, const SCEV *RHS,
-                                ScalarEvolution &SE) {
-  const SCEV *X, *Y;
-  return match(LHS, m_scev_URem(m_SCEV(X), m_SCEV(Y), SE)) && RHS->isZero();
-}
-
 // Apply divisibility by \p Divisor on MinMaxExpr with constant values,
 // recursively. This is done by aligning up/down the constant value to the
 // Divisor.
@@ -15896,11 +15866,11 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       break;
   }
 
-  // Now apply the information from the collected conditions to
-  // RewriteMap. Conditions are processed in reverse order, so the
-  // earliest conditions is processed first, except guards with divisibility
-  // information, which are moved to the back. This ensures the SCEVs with the
-  // shortest dependency chains are constructed first.
+  // Now translate the collected conditions to predicates on SCEVs. They are
+  // processed in reverse order of collection: dominating branches from the
+  // farthest to the closest one, followed by guards and assumptions. This
+  // ensures the SCEVs with the shortest dependency chains are constructed
+  // first.
   SmallVector<std::tuple<CmpInst::Predicate, const SCEV *, const SCEV *>>
       GuardsToProcess;
   for (auto [Term, EnterIfTrue] : reverse(Terms)) {
@@ -15937,14 +15907,21 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
     }
   }
 
-  // Process divisibility guards in reverse order to populate DivGuards early.
+  // Collect divisibility information from all conditions up front, so it is
+  // available when processing the conditions below. For A % B == 0 with an
+  // unknown A, rewrite A to (A /u B) * B to explicitly express that.
   DenseMap<const SCEV *, APInt> Multiples;
   LoopGuards DivGuards(SE);
   for (const auto &[Predicate, LHS, RHS] : GuardsToProcess) {
-    if (!isDivisibilityGuard(LHS, RHS, SE))
+    const SCEV *URemLHS, *URemRHS;
+    if (!match(LHS, m_scev_URem(m_SCEV(URemLHS), m_SCEV(URemRHS), SE)) ||
+        !RHS->isZero() || Predicate != CmpInst::ICMP_EQ ||
+        !isa<SCEVUnknown>(URemLHS))
       continue;
-    collectDivisibilityInformation(Predicate, LHS, RHS, DivGuards.RewriteMap,
-                                   Multiples, SE);
+    DivGuards.RewriteMap[URemLHS] =
+        SE.getMulExpr(SE.getUDivExpr(URemLHS, URemRHS), URemRHS);
+    if (auto *C = dyn_cast<SCEVConstant>(URemRHS))
+      Multiples[URemLHS] = C->getAPInt();
   }
 
   for (const auto &[Predicate, LHS, RHS] : GuardsToProcess)
