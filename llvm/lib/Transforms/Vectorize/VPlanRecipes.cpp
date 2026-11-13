@@ -4346,20 +4346,6 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
     if (isSingleScalar())
       return ScalarCost;
 
-    // If any of the operands is from a different replicate region and has its
-    // cost skipped, it may have been forced to scalar. Fall back to legacy cost
-    // model to avoid cost mis-match.
-    if (any_of(operands(), [&Ctx, VF](VPValue *Op) {
-          auto *PredR = dyn_cast<VPPredInstPHIRecipe>(Op);
-          if (!PredR)
-            return false;
-          return Ctx.skipCostComputation(
-              dyn_cast_or_null<Instruction>(
-                  PredR->getOperand(0)->getUnderlyingValue()),
-              VF.isVector());
-        }))
-      break;
-
     // Predicated results are only inserted into a vector if they are packed.
     const VPRegionBlock *ParentRegion = getRegion();
     bool InReplicateRegion = ParentRegion && ParentRegion->isReplicator();

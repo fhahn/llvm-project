@@ -367,18 +367,17 @@ for.end:
 ; CHECK-LABEL: predicated_udiv_operand_from_other_region_no_vector_user
 ;
 ; Same as predicated_udiv_operand_from_other_region, but %tmp2 only has scalar
-; users and is not packed. The cost of %tmp3 includes extracting the lanes of
-; %tmp2:
+; users and is not packed. We compute the costs as:
 ;
 ; Cost of %tmp2, without inserting its lanes:
 ;   (udiv(2) + extractelement(4)) / 2 = 3
-; Cost of %tmp3, including extracting the lanes of %tmp2:
-;   (udiv(2) + extractelement(4) + insertelement(4)) / 4 = 2.5
+; Cost of %tmp3, without extracting the lanes of %tmp2:
+;   (udiv(2) + insertelement(4)) / 4 = 1.5
 ;
 ; CHECK: Scalarizing and predicating: %tmp2 = udiv i32 %tmp1, %x
 ; CHECK: Scalarizing and predicating: %tmp3 = udiv i32 %tmp2, %y
 ; CHECK: Cost of 3 for VF 2: REPLICATE ir<%tmp2> = udiv ir<%tmp1>, ir<%x>{{$}}
-; CHECK: Cost of 2.5 for VF 2: REPLICATE ir<%tmp3> = udiv vp<{{.+}}>, ir<%y> (S->V)
+; CHECK: Cost of 1.5 for VF 2: REPLICATE ir<%tmp3> = udiv vp<{{.+}}>, ir<%y> (S->V)
 ;
 define void @predicated_udiv_operand_from_other_region_no_vector_user(ptr %a, i1 %c, i1 %c2, i32 %x, i32 %y, i64 %n) {
 entry:
@@ -412,15 +411,15 @@ for.end:
 ; CHECK-LABEL: predicated_load_operand_from_other_region
 ;
 ; Same as predicated_udiv_operand_from_other_region, but %tmp2 is a predicated
-; load. The cost of %tmp3 does not include extracting the lanes of %tmp2, which
-; is packed for the phi:
+; load. We compute the cost of %tmp3 as:
 ;
-; Cost of %tmp3:
-;   (udiv(2) + insertelement(4)) / 4 = 1.5
+; Cost of %tmp3, including extracting the lanes of %tmp2, which is packed for
+; the phi:
+;   (udiv(2) + extractelement(4) + insertelement(4)) / 4 = 2.5
 ;
 ; CHECK: Scalarizing and predicating: %tmp2 = load i32, ptr %gep.b, align 4
 ; CHECK: Scalarizing and predicating: %tmp3 = udiv i32 %tmp2, %y
-; CHECK: Cost of 1.5 for VF 2: REPLICATE ir<%tmp3> = udiv vp<{{.+}}>, ir<%y> (S->V)
+; CHECK: Cost of 2.5 for VF 2: REPLICATE ir<%tmp3> = udiv vp<{{.+}}>, ir<%y> (S->V)
 ;
 define void @predicated_load_operand_from_other_region(ptr %a, ptr %b, i1 %c, i1 %c2, i32 %y, i64 %n) {
 entry:
