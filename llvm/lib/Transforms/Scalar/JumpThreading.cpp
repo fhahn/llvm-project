@@ -218,6 +218,11 @@ static void updatePredecessorProfileMetadata(PHINode *PN, BasicBlock *BB) {
 
 PreservedAnalyses JumpThreadingPass::run(Function &F,
                                          FunctionAnalysisManager &AM) {
+  // The entry block has no predecessors, so the terminator of a function's
+  // only block has no successors and there is nothing to thread or merge.
+  if (F.size() == 1)
+    return PreservedAnalyses::all();
+
   auto &TTI = AM.getResult<TargetIRAnalysis>(F);
   // Jump Threading has no sense for the targets with divergent CF
   if (TTI.hasBranchDivergence(&F))
