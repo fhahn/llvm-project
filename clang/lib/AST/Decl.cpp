@@ -3411,6 +3411,11 @@ bool FunctionDecl::isImmediateEscalating() const {
 }
 
 bool FunctionDecl::isImmediateFunction() const {
+  // Immediate functions were introduced in C++20: before that, there are
+  // neither consteval functions nor immediate-escalating expressions.
+  if (!getLangOpts().CPlusPlus20)
+    return false;
+
   // C++23 [expr.const]/p18
   // An immediate function is a function or constructor that is
   // - declared with the consteval specifier
