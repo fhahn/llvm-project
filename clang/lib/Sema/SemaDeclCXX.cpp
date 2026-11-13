@@ -3428,7 +3428,8 @@ void Sema::CheckShadowInheritedFields(const SourceLocation &Loc,
                                       DeclarationName FieldName,
                                       const CXXRecordDecl *RD,
                                       bool DeclIsField) {
-  if (Diags.isIgnored(diag::warn_shadow_field, Loc))
+  // There are no inherited fields without base classes.
+  if (!RD->getNumBases() || Diags.isIgnored(diag::warn_shadow_field, Loc))
     return;
 
   // To record a shadowed field in a base
@@ -11247,7 +11248,8 @@ void Sema::NoteHiddenVirtualMethods(CXXMethodDecl *MD,
 }
 
 void Sema::DiagnoseHiddenVirtualMethods(CXXMethodDecl *MD) {
-  if (MD->isInvalidDecl())
+  // A method cannot hide a virtual method without base classes.
+  if (MD->isInvalidDecl() || !MD->getParent()->getNumBases())
     return;
 
   if (Diags.isIgnored(diag::warn_overloaded_virtual, MD->getLocation()))
