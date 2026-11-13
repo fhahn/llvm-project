@@ -5162,11 +5162,13 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
     if (SentinelVal) {
       // Sentinel-based approach: reduce IVs with min/max, compare against
       // sentinel to detect if condition was ever true, select accordingly.
+      // Like for any-of reductions, the probability of the condition having
+      // been true in any iteration is not known.
       VPValue *Sentinel = Plan.getConstantInt(*SentinelVal);
       auto *Cmp = MiddleBuilder.createICmp(CmpInst::ICMP_NE, ReducedIV,
                                            Sentinel, ExitDL);
-      NewRdxResult = MiddleBuilder.createSelect(Cmp, VectorRegionExitingVal,
-                                                StartVPV, ExitDL);
+      NewRdxResult = MiddleBuilder.createSelectWithUnknownProfile(
+          Cmp, VectorRegionExitingVal, StartVPV, ExitDL);
       StartVPV = Sentinel;
     } else {
       // Introduce a boolean AnyOf reduction to track if the condition was ever
