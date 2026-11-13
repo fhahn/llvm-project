@@ -2556,8 +2556,8 @@ bool Sema::LookupQualifiedName(LookupResult &R, DeclContext *LookupCtx,
     return LookupQualifiedNameInUsingDirectives(*this, R, LookupCtx);
 
   // If this isn't a C++ class, we aren't allowed to look into base
-  // classes, we're done.
-  if (!LookupRec || !LookupRec->getDefinition())
+  // classes, we're done. The same holds for classes without base classes.
+  if (!LookupRec || !LookupRec->getDefinition() || !LookupRec->getNumBases())
     return false;
 
   // We're done for lookups that can never succeed for C++ classes.

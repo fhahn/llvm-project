@@ -9388,6 +9388,10 @@ bool Sema::CheckVariableDeclaration(VarDecl *NewVD, LookupResult &Previous) {
 }
 
 bool Sema::AddOverriddenMethods(CXXRecordDecl *DC, CXXMethodDecl *MD) {
+  // There is nothing to override without base classes.
+  if (!DC->getNumBases())
+    return false;
+
   llvm::SmallPtrSet<const CXXMethodDecl*, 4> Overridden;
 
   // Look for methods in base classes that this method might override.
