@@ -6259,7 +6259,8 @@ bool Sema::CheckTemplateArgumentList(
   if (UpdateArgsWithConversions)
     TemplateArgs = std::move(NewArgs);
 
-  if (!PartialTemplateArgs) {
+  // Most templates have no constraints, so check for that first.
+  if (!PartialTemplateArgs && Template->hasAssociatedConstraints()) {
     // Setup the context/ThisScope for the case where we are needing to
     // re-instantiate constraints outside of normal instantiation.
     DeclContext *NewContext = Template->getDeclContext();
