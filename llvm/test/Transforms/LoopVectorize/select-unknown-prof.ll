@@ -201,15 +201,15 @@ define void @logical_or_of_edge_masks(ptr noalias %src1, ptr noalias %src2, ptr 
 ; CHECK:    br i1 [[TMP7:%.*]], label %[[PRED_LOAD_IF1:.*]], label %[[PRED_LOAD_CONTINUE2:.*]]
 ; CHECK:  [[PRED_LOAD_IF1]]:
 ; CHECK:  [[PRED_LOAD_CONTINUE2]]:
-; CHECK:    [[TMP18:%.*]] = select i1 [[TMP16:%.*]], i1 true, i1 [[TMP14:%.*]]
-; CHECK:    [[TMP19:%.*]] = select i1 [[TMP17:%.*]], i1 true, i1 [[TMP15:%.*]]
+; CHECK:    [[TMP18:%.*]] = select i1 [[TMP16:%.*]], i1 true, i1 [[TMP14:%.*]], !prof [[PROF18:![0-9]+]]
+; CHECK:    [[TMP19:%.*]] = select i1 [[TMP17:%.*]], i1 true, i1 [[TMP15:%.*]], !prof [[PROF18]]
 ; CHECK:    br i1 [[TMP18]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; CHECK:  [[PRED_STORE_IF]]:
 ; CHECK:  [[PRED_STORE_CONTINUE]]:
 ; CHECK:    br i1 [[TMP19]], label %[[PRED_STORE_IF3:.*]], label %[[PRED_STORE_CONTINUE4:.*]]
 ; CHECK:  [[PRED_STORE_IF3]]:
 ; CHECK:  [[PRED_STORE_CONTINUE4]]:
-; CHECK:    br i1 [[TMP22:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP18:![0-9]+]]
+; CHECK:    br i1 [[TMP22:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP19:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
 ; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:  [[SCALAR_PH]]:
@@ -219,7 +219,7 @@ define void @logical_or_of_edge_masks(ptr noalias %src1, ptr noalias %src2, ptr 
 ; CHECK:    br i1 [[C_2:%.*]], label %[[JOIN]], label %[[LOOP_LATCH:.*]]
 ; CHECK:  [[JOIN]]:
 ; CHECK:  [[LOOP_LATCH]]:
-; CHECK:    br i1 [[EC:%.*]], label %[[EXIT]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP19:![0-9]+]]
+; CHECK:    br i1 [[EC:%.*]], label %[[EXIT]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP20:![0-9]+]]
 ; CHECK:  [[EXIT]]:
 ;
 entry:
@@ -266,9 +266,9 @@ define i32 @logical_and_of_mask_and_condition(ptr noalias %src1, ptr noalias %sr
 ; CHECK:    br i1 [[TMP7:%.*]], label %[[PRED_LOAD_IF2:.*]], label %[[PRED_LOAD_CONTINUE3:.*]]
 ; CHECK:  [[PRED_LOAD_IF2]]:
 ; CHECK:  [[PRED_LOAD_CONTINUE3]]:
-; CHECK:    [[TMP16:%.*]] = select i1 [[TMP6]], i1 [[TMP14:%.*]], i1 false
-; CHECK:    [[TMP18:%.*]] = select i1 [[TMP7]], i1 [[TMP15:%.*]], i1 false
-; CHECK:    br i1 [[TMP20:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP20:![0-9]+]]
+; CHECK:    [[TMP16:%.*]] = select i1 [[TMP6]], i1 [[TMP14:%.*]], i1 false, !prof [[PROF18]]
+; CHECK:    [[TMP18:%.*]] = select i1 [[TMP7]], i1 [[TMP15:%.*]], i1 false, !prof [[PROF18]]
+; CHECK:    br i1 [[TMP20:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP21:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
 ; CHECK:    [[RDX_SELECT:%.*]] = select i1 [[TMP21:%.*]], i32 1, i32 0
 ; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
@@ -278,7 +278,7 @@ define i32 @logical_and_of_mask_and_condition(ptr noalias %src1, ptr noalias %sr
 ; CHECK:  [[THEN]]:
 ; CHECK:    [[SEL:%.*]] = select i1 [[C_2:%.*]], i32 1, i32 [[RES:%.*]]
 ; CHECK:  [[LOOP_LATCH]]:
-; CHECK:    br i1 [[EC:%.*]], label %[[EXIT]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP21:![0-9]+]]
+; CHECK:    br i1 [[EC:%.*]], label %[[EXIT]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP22:![0-9]+]]
 ; CHECK:  [[EXIT]]:
 ;
 entry:
@@ -319,11 +319,11 @@ define i64 @early_exit_first_active_lane_interleaved(ptr dereferenceable(1024) %
 ; CHECK:  [[VECTOR_BODY:.*]]:
 ; CHECK:    br i1 [[TMP7:%.*]], label %[[VECTOR_EARLY_EXIT:.*]], label %[[VECTOR_BODY_INTERIM:.*]]
 ; CHECK:  [[VECTOR_BODY_INTERIM]]:
-; CHECK:    br i1 [[TMP8:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP22:![0-9]+]]
+; CHECK:    br i1 [[TMP8:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP23:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
 ; CHECK:  [[VECTOR_EARLY_EXIT]]:
-; CHECK:    [[TMP12:%.*]] = select i1 [[TMP11:%.*]], i64 [[TMP10:%.*]], i64 [[TMP9:%.*]]
-; CHECK:    [[TMP18:%.*]] = select i1 [[TMP17:%.*]], i8 [[TMP16:%.*]], i8 [[TMP14:%.*]]
+; CHECK:    [[TMP12:%.*]] = select i1 [[TMP11:%.*]], i64 [[TMP10:%.*]], i64 [[TMP9:%.*]], !prof [[PROF18]]
+; CHECK:    [[TMP18:%.*]] = select i1 [[TMP17:%.*]], i8 [[TMP16:%.*]], i8 [[TMP14:%.*]], !prof [[PROF18]]
 ; CHECK:  [[EXIT:.*:]]
 ;
 entry:
@@ -362,15 +362,15 @@ define i32 @find_last_interleave_only(ptr %a, i64 %n, i32 %start) !prof !0 {
 ; CHECK:    [[TMP14:%.*]] = select i1 [[TMP12]], i1 [[TMP11:%.*]], i1 [[TMP2:%.*]]
 ; CHECK:    [[TMP15:%.*]] = select i1 [[TMP12]], i32 [[TMP6:%.*]], i32 [[VEC_PHI:%.*]]
 ; CHECK:    [[TMP16:%.*]] = select i1 [[TMP12]], i32 [[TMP7:%.*]], i32 [[VEC_PHI1:%.*]]
-; CHECK:    br i1 [[TMP17:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP23:![0-9]+]]
+; CHECK:    br i1 [[TMP17:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP24:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
-; CHECK:    [[TMP18:%.*]] = select i1 [[TMP13]], i32 [[TMP15]], i32 [[START]]
-; CHECK:    [[TMP19:%.*]] = select i1 [[TMP14]], i32 [[TMP16]], i32 [[TMP18]]
+; CHECK:    [[TMP18:%.*]] = select i1 [[TMP13]], i32 [[TMP15]], i32 [[START]], !prof [[PROF18]]
+; CHECK:    [[TMP19:%.*]] = select i1 [[TMP14]], i32 [[TMP16]], i32 [[TMP18]], !prof [[PROF18]]
 ; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:  [[SCALAR_PH]]:
 ; CHECK:  [[LOOP:.*]]:
 ; CHECK:    [[RES_NEXT:%.*]] = select i1 [[C:%.*]], i32 [[L:%.*]], i32 [[RES:%.*]]
-; CHECK:    br i1 [[EC:%.*]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP24:![0-9]+]]
+; CHECK:    br i1 [[EC:%.*]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP25:![0-9]+]]
 ; CHECK:  [[EXIT]]:
 ;
 entry:
@@ -417,11 +417,12 @@ exit:
 ; CHECK: [[META15]] = !{!"llvm.loop.estimated_trip_count", i32 0}
 ; CHECK: [[LOOP16]] = distinct !{[[LOOP16]], [[META2]], [[META3]]}
 ; CHECK: [[LOOP17]] = distinct !{[[LOOP17]], [[META3]], [[META2]]}
-; CHECK: [[LOOP18]] = distinct !{[[LOOP18]], [[META2]], [[META3]]}
-; CHECK: [[LOOP19]] = distinct !{[[LOOP19]], [[META2]]}
-; CHECK: [[LOOP20]] = distinct !{[[LOOP20]], [[META2]], [[META3]]}
-; CHECK: [[LOOP21]] = distinct !{[[LOOP21]], [[META2]]}
-; CHECK: [[LOOP22]] = distinct !{[[LOOP22]], [[META2]], [[META3]]}
+; CHECK: [[PROF18]] = !{!"unknown", !"loop-vectorize"}
+; CHECK: [[LOOP19]] = distinct !{[[LOOP19]], [[META2]], [[META3]]}
+; CHECK: [[LOOP20]] = distinct !{[[LOOP20]], [[META2]]}
+; CHECK: [[LOOP21]] = distinct !{[[LOOP21]], [[META2]], [[META3]]}
+; CHECK: [[LOOP22]] = distinct !{[[LOOP22]], [[META2]]}
 ; CHECK: [[LOOP23]] = distinct !{[[LOOP23]], [[META2]], [[META3]]}
-; CHECK: [[LOOP24]] = distinct !{[[LOOP24]], [[META2]]}
+; CHECK: [[LOOP24]] = distinct !{[[LOOP24]], [[META2]], [[META3]]}
+; CHECK: [[LOOP25]] = distinct !{[[LOOP25]], [[META2]]}
 ;.

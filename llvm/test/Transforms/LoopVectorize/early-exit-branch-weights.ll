@@ -159,11 +159,11 @@ define i64 @three_early_exits(ptr dereferenceable(1024) %a, ptr dereferenceable(
 ; VF4:  [[ENTRY:.*:]]
 ; VF4:  [[VECTOR_PH:.*:]]
 ; VF4:  [[VECTOR_BODY:.*]]:
-; VF4:    [[TMP5:%.*]] = select <4 x i1> [[TMP2:%.*]], <4 x i1> splat (i1 true), <4 x i1> [[TMP3:%.*]]
-; VF4:    [[TMP6:%.*]] = select <4 x i1> [[TMP5]], <4 x i1> splat (i1 true), <4 x i1> [[TMP4:%.*]]
+; VF4:    [[TMP5:%.*]] = select <4 x i1> [[TMP2:%.*]], <4 x i1> splat (i1 true), <4 x i1> [[TMP3:%.*]], !prof [[PROF6:![0-9]+]]
+; VF4:    [[TMP6:%.*]] = select <4 x i1> [[TMP5]], <4 x i1> splat (i1 true), <4 x i1> [[TMP4:%.*]], !prof [[PROF6]]
 ; VF4:    br i1 [[TMP8:%.*]], label %[[VECTOR_EARLY_EXIT_CHECK:.*]], label %[[VECTOR_BODY_INTERIM:.*]]
 ; VF4:  [[VECTOR_BODY_INTERIM]]:
-; VF4:    br i1 [[TMP9:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
+; VF4:    br i1 [[TMP9:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; VF4:  [[MIDDLE_BLOCK]]:
 ; VF4:  [[VECTOR_EARLY_EXIT_CHECK]]:
 ; VF4:    br i1 [[TMP10:%.*]], label %[[VECTOR_EARLY_EXIT_0:.*]], label %[[VECTOR_EARLY_EXIT_CHECK_0:.*]]
@@ -182,11 +182,11 @@ define i64 @three_early_exits(ptr dereferenceable(1024) %a, ptr dereferenceable(
 ; VF2:  [[ENTRY:.*:]]
 ; VF2:  [[VECTOR_PH:.*:]]
 ; VF2:  [[VECTOR_BODY:.*]]:
-; VF2:    [[TMP5:%.*]] = select <2 x i1> [[TMP2:%.*]], <2 x i1> splat (i1 true), <2 x i1> [[TMP3:%.*]]
-; VF2:    [[TMP6:%.*]] = select <2 x i1> [[TMP5]], <2 x i1> splat (i1 true), <2 x i1> [[TMP4:%.*]]
+; VF2:    [[TMP5:%.*]] = select <2 x i1> [[TMP2:%.*]], <2 x i1> splat (i1 true), <2 x i1> [[TMP3:%.*]], !prof [[PROF6:![0-9]+]]
+; VF2:    [[TMP6:%.*]] = select <2 x i1> [[TMP5]], <2 x i1> splat (i1 true), <2 x i1> [[TMP4:%.*]], !prof [[PROF6]]
 ; VF2:    br i1 [[TMP8:%.*]], label %[[VECTOR_EARLY_EXIT_CHECK:.*]], label %[[VECTOR_BODY_INTERIM:.*]]
 ; VF2:  [[VECTOR_BODY_INTERIM]]:
-; VF2:    br i1 [[TMP9:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
+; VF2:    br i1 [[TMP9:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; VF2:  [[MIDDLE_BLOCK]]:
 ; VF2:  [[VECTOR_EARLY_EXIT_CHECK]]:
 ; VF2:    br i1 [[TMP10:%.*]], label %[[VECTOR_EARLY_EXIT_0:.*]], label %[[VECTOR_EARLY_EXIT_CHECK_0:.*]]
@@ -246,7 +246,7 @@ define i64 @early_exit_not_profiled(ptr dereferenceable(1024) %a) {
 ; VF4:  [[VECTOR_BODY:.*]]:
 ; VF4:    br i1 [[TMP3:%.*]], label %[[VECTOR_EARLY_EXIT:.*]], label %[[VECTOR_BODY_INTERIM:.*]]
 ; VF4:  [[VECTOR_BODY_INTERIM]]:
-; VF4:    br i1 [[TMP4:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
+; VF4:    br i1 [[TMP4:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; VF4:  [[MIDDLE_BLOCK]]:
 ; VF4:  [[VECTOR_EARLY_EXIT]]:
 ; VF4:  [[FOUND:.*:]]
@@ -259,7 +259,7 @@ define i64 @early_exit_not_profiled(ptr dereferenceable(1024) %a) {
 ; VF2:  [[VECTOR_BODY:.*]]:
 ; VF2:    br i1 [[TMP3:%.*]], label %[[VECTOR_EARLY_EXIT:.*]], label %[[VECTOR_BODY_INTERIM:.*]]
 ; VF2:  [[VECTOR_BODY_INTERIM]]:
-; VF2:    br i1 [[TMP4:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
+; VF2:    br i1 [[TMP4:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; VF2:  [[MIDDLE_BLOCK]]:
 ; VF2:  [[VECTOR_EARLY_EXIT]]:
 ; VF2:  [[FOUND:.*:]]
@@ -297,8 +297,9 @@ exit:
 ; VF4: [[META3]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; VF4: [[LOOP4]] = distinct !{[[LOOP4]], [[META2]], [[META3]]}
 ; VF4: [[LOOP5]] = distinct !{[[LOOP5]], [[META2]], [[META3]]}
-; VF4: [[LOOP6]] = distinct !{[[LOOP6]], [[META2]], [[META3]]}
+; VF4: [[PROF6]] = !{!"unknown", !"loop-vectorize"}
 ; VF4: [[LOOP7]] = distinct !{[[LOOP7]], [[META2]], [[META3]]}
+; VF4: [[LOOP8]] = distinct !{[[LOOP8]], [[META2]], [[META3]]}
 ;.
 ; VF2: [[PROF0]] = !{!"function_entry_count", i64 1000}
 ; VF2: [[LOOP1]] = distinct !{[[LOOP1]], [[META2:![0-9]+]], [[META3:![0-9]+]]}
@@ -306,6 +307,7 @@ exit:
 ; VF2: [[META3]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; VF2: [[LOOP4]] = distinct !{[[LOOP4]], [[META2]], [[META3]]}
 ; VF2: [[LOOP5]] = distinct !{[[LOOP5]], [[META2]], [[META3]]}
-; VF2: [[LOOP6]] = distinct !{[[LOOP6]], [[META2]], [[META3]]}
+; VF2: [[PROF6]] = !{!"unknown", !"loop-vectorize"}
 ; VF2: [[LOOP7]] = distinct !{[[LOOP7]], [[META2]], [[META3]]}
+; VF2: [[LOOP8]] = distinct !{[[LOOP8]], [[META2]], [[META3]]}
 ;.

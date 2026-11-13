@@ -798,17 +798,20 @@ Value *VPInstruction::generate(VPTransformState &State,
     Value *A = State.get(getOperand(0), GenerateSingleScalar);
     return Builder.CreateNot(A, Name);
   }
+  // The probability of the first operand of LogicalAnd and LogicalOr could be
+  // derived from the execution frequency of the block it masks, but it is not
+  // recorded on the recipe, so mark them explicitly unknown.
   case VPInstruction::LogicalAnd: {
     // TODO: Use IsSingleScalar to produce a scalar value.
     Value *A = State.get(getOperand(0));
     Value *B = State.get(getOperand(1));
-    return Builder.CreateLogicalAnd(A, B, Name);
+    return Builder.CreateLogicalAndWithUnknownProfile(A, B, DEBUG_TYPE, Name);
   }
   case VPInstruction::LogicalOr: {
     // TODO: Use IsSingleScalar to produce a scalar value.
     Value *A = State.get(getOperand(0));
     Value *B = State.get(getOperand(1));
-    return Builder.CreateLogicalOr(A, B, Name);
+    return Builder.CreateLogicalOrWithUnknownProfile(A, B, DEBUG_TYPE, Name);
   }
   case Instruction::ExtractElement: {
     assert(GenerateSingleScalar &&
@@ -1109,7 +1112,7 @@ Value *VPInstruction::generate(VPTransformState &State,
                              State.get(getOperand(Idx)), VectorIdx);
       if (Res) {
         Value *Cmp = Builder.CreateICmpUGE(LaneToExtract, VectorStart);
-        Res = Builder.CreateSelect(Cmp, Ext, Res);
+        Res = Builder.CreateSelectWithUnknownProfile(Cmp, Ext, Res, DEBUG_TYPE);
       } else {
         Res = Ext;
       }
@@ -1146,7 +1149,8 @@ Value *VPInstruction::generate(VPTransformState &State,
           TrailingZeros);
       if (Res) {
         Value *Cmp = Builder.CreateICmpNE(TrailingZeros, RuntimeVF);
-        Res = Builder.CreateSelect(Cmp, Current, Res);
+        Res = Builder.CreateSelectWithUnknownProfile(Cmp, Current, Res,
+                                                     DEBUG_TYPE);
       } else {
         Res = Current;
       }
@@ -1171,7 +1175,8 @@ Value *VPInstruction::generate(VPTransformState &State,
       Type *VTy = Data->getType();
 
       if (State.VF.isScalar())
-        Result = Builder.CreateSelect(Mask, Data, Result);
+        Result = Builder.CreateSelectWithUnknownProfile(Mask, Data, Result,
+                                                        DEBUG_TYPE);
       else
         Result = Builder.CreateIntrinsic(
             Intrinsic::experimental_vector_extract_last_active, {VTy},
@@ -3677,8 +3682,11 @@ void VPReductionRecipe::execute(VPTransformState &State) {
     if (State.VF.isVector())
       Start = State.Builder.CreateVectorSplat(VecTy->getElementCount(), Start);
 
-    Value *Select = State.Builder.CreateSelect(NewCond, NewVecOp, Start);
-    NewVecOp = Select;
+    // The select neutralizes the lanes the reduction is not to accumulate. Its
+    // condition is the mask of the predicated block, whose probability is not
+    // tracked, so mark it explicitly unknown.
+    NewVecOp = State.Builder.CreateSelectWithUnknownProfile(NewCond, NewVecOp,
+                                                            Start, DEBUG_TYPE);
   }
   Value *NewRed;
   Value *NextInChain;
