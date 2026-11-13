@@ -16652,12 +16652,6 @@ void Sema::DiagnoseEmptyLoopBody(const Stmt *S,
 
 void Sema::DiagnoseSelfMove(const Expr *LHSExpr, const Expr *RHSExpr,
                              SourceLocation OpLoc) {
-  if (Diags.isIgnored(diag::warn_sizeof_pointer_expr_memaccess, OpLoc))
-    return;
-
-  if (inTemplateInstantiation())
-    return;
-
   // Strip parens and casts away.
   LHSExpr = LHSExpr->IgnoreParenImpCasts();
   RHSExpr = RHSExpr->IgnoreParenImpCasts();
@@ -16671,6 +16665,12 @@ void Sema::DiagnoseSelfMove(const Expr *LHSExpr, const Expr *RHSExpr,
            CXXSCE && CXXSCE->isXValue())
     RHSExpr = CXXSCE->getSubExpr();
   else
+    return;
+
+  if (Diags.isIgnored(diag::warn_sizeof_pointer_expr_memaccess, OpLoc))
+    return;
+
+  if (inTemplateInstantiation())
     return;
 
   const DeclRefExpr *LHSDeclRef = dyn_cast<DeclRefExpr>(LHSExpr);

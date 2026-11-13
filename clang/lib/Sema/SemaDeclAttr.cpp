@@ -2157,24 +2157,27 @@ void clang::inferNoReturnAttr(Sema &S, Decl *D) {
   if (FD->getTemplateSpecializationKind() == TSK_ExplicitSpecialization)
     return;
 
+  // Check the function first: this is cheaper than querying the diagnostic
+  // state and rejects most functions.
+  if (FD->isNoReturn() || FD->hasAttr<InferredNoReturnAttr>() ||
+      !isKnownToAlwaysThrow(FD))
+    return;
+
   DiagnosticsEngine &Diags = S.getDiagnostics();
   if (Diags.isIgnored(diag::warn_falloff_nonvoid, FD->getLocation()) &&
       Diags.isIgnored(diag::warn_suggest_noreturn_function, FD->getLocation()))
     return;
 
-  if (!FD->isNoReturn() && !FD->hasAttr<InferredNoReturnAttr>() &&
-      isKnownToAlwaysThrow(FD)) {
-    FD->addAttr(InferredNoReturnAttr::CreateImplicit(S.Context));
+  FD->addAttr(InferredNoReturnAttr::CreateImplicit(S.Context));
 
-    // [[noreturn]] can only be added to lambdas since C++23
-    if (const auto *MD = dyn_cast<CXXMethodDecl>(FD);
-        MD && !S.getLangOpts().CPlusPlus23 && isLambdaCallOperator(MD))
-      return;
+  // [[noreturn]] can only be added to lambdas since C++23
+  if (const auto *MD = dyn_cast<CXXMethodDecl>(FD);
+      MD && !S.getLangOpts().CPlusPlus23 && isLambdaCallOperator(MD))
+    return;
 
-    // Emit a diagnostic suggesting the function being marked [[noreturn]].
-    S.Diag(FD->getLocation(), diag::warn_suggest_noreturn_function)
-        << /*isFunction=*/0 << FD;
-  }
+  // Emit a diagnostic suggesting the function being marked [[noreturn]].
+  S.Diag(FD->getLocation(), diag::warn_suggest_noreturn_function)
+      << /*isFunction=*/0 << FD;
 }
 
 static void handleNoReturnAttr(Sema &S, Decl *D, const ParsedAttr &Attrs) {

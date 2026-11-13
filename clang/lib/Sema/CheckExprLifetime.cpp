@@ -1118,12 +1118,11 @@ static AnalysisResult analyzePathForGSLPointer(const IndirectLocalPath &Path,
 
 static bool shouldRunGSLAssignmentAnalysis(const Sema &SemaRef,
                                            const AssignedEntity &Entity) {
-  bool EnableGSLAssignmentWarnings = !SemaRef.getDiagnostics().isIgnored(
-      diag::warn_dangling_lifetime_pointer_assignment, SourceLocation());
-  return (EnableGSLAssignmentWarnings &&
-          (isGslPointerType(Entity.LHS->getType()) ||
-           lifetimes::isAssignmentOperatorLifetimeBound(
-               Entity.AssignmentOperator)));
+  return (isGslPointerType(Entity.LHS->getType()) ||
+          lifetimes::isAssignmentOperatorLifetimeBound(
+              Entity.AssignmentOperator)) &&
+         !SemaRef.getDiagnostics().isIgnored(
+             diag::warn_dangling_lifetime_pointer_assignment, SourceLocation());
 }
 
 static void
@@ -1491,11 +1490,11 @@ void checkExprLifetimeMustTailArg(Sema &SemaRef,
 
 void checkAssignmentLifetime(Sema &SemaRef, const AssignedEntity &Entity,
                              Expr *Init) {
-  bool EnableDanglingPointerAssignment = !SemaRef.getDiagnostics().isIgnored(
-      diag::warn_dangling_pointer_assignment, SourceLocation());
-  bool RunAnalysis = (EnableDanglingPointerAssignment &&
-                      Entity.LHS->getType()->isPointerType()) ||
-                     shouldRunGSLAssignmentAnalysis(SemaRef, Entity);
+  bool RunAnalysis =
+      (Entity.LHS->getType()->isPointerType() &&
+       !SemaRef.getDiagnostics().isIgnored(
+           diag::warn_dangling_pointer_assignment, SourceLocation())) ||
+      shouldRunGSLAssignmentAnalysis(SemaRef, Entity);
 
   if (!RunAnalysis)
     return;
