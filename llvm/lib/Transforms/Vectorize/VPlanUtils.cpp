@@ -379,10 +379,11 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
                        IsaPred<SCEVCouldNotCompute>))
               return SE.getCouldNotCompute();
 
-            return SE.getAddExpr(
-                SE.getTruncateOrSignExtend(Start, IV->getType()),
-                SE.getMulExpr(
-                    IV, SE.getTruncateOrSignExtend(Scale, IV->getType())));
+            const SCEV *DerivedIV =
+                SE.getAddExpr(SE.getTruncateOrSignExtend(Start, IV->getType()),
+                              SE.getMulExpr(IV, SE.getTruncateOrSignExtend(
+                                                    Scale, IV->getType())));
+            return SE.getTruncateOrSignExtend(DerivedIV, R->getScalarType());
           })
           .Case([&SE, &PSE, L](const VPScalarIVStepsRecipe *R) {
             const SCEV *IV = getSCEVExprForVPValue(R->getOperand(0), PSE, L);
