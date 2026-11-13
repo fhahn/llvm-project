@@ -1871,13 +1871,15 @@ InstructionCost VPCostContext::getScalarizationOverhead(
     }
   }
   // Compute the cost of scalarizing the operands, skipping ones that do not
-  // require extraction/scalarization and do not incur any overhead.
+  // require extraction/scalarization and do not incur any overhead. Predicated
+  // values only need extracting if they are packed.
   SmallPtrSet<const VPValue *, 4> UniqueOperands;
   SmallVector<Type *> Tys;
   for (auto *Op : Operands) {
     if (isa<VPIRValue>(Op) ||
-        (!AlwaysIncludeReplicatingR &&
-         isa<VPReplicateRecipe, VPPredInstPHIRecipe>(Op)) ||
+        (!AlwaysIncludeReplicatingR && isa<VPReplicateRecipe>(Op)) ||
+        (!AlwaysIncludeReplicatingR && isa<VPPredInstPHIRecipe>(Op) &&
+         vputils::onlyScalarValuesOrLanesUsed(Op)) ||
         (isa<VPReplicateRecipe>(Op) &&
          cast<VPReplicateRecipe>(Op)->getOpcode() == Instruction::Load) ||
         !UniqueOperands.insert(Op).second)

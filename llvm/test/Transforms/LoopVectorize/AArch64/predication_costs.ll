@@ -455,19 +455,18 @@ for.end:
 ; CHECK-LABEL: predicated_udiv_used_by_call
 ;
 ; The udiv is used by a speculatable call, which is replicated outside the
-; replicate region, and by a widened add, so %tmp2 is packed. The cost of the
-; call does not include extracting the lanes of %tmp2. If we assume the block
-; probability is 50%, we compute the costs as:
+; replicate region, and by a widened add, so %tmp2 is packed. If we assume the
+; block probability is 50%, we compute the costs as:
 ;
 ; Cost of %tmp2:
 ;   (udiv(2) + extractelement(4) + insertelement(4)) / 2 = 5
-; Cost of %tmp3:
-;   call(20) + insertelement(4) = 24
+; Cost of %tmp3, including extracting the lanes of %tmp2:
+;   call(20) + extractelement(4) + insertelement(4) = 28
 ;
 ; CHECK: Scalarizing: %tmp3 = call i32 @foo(i32 %tmp2)
 ; CHECK: Scalarizing and predicating: %tmp2 = udiv i32 %tmp1, %x
 ; CHECK: Cost of 5 for VF 2: REPLICATE ir<%tmp2> = udiv ir<%tmp1>, ir<%x> (S->V)
-; CHECK: Cost of 24 for VF 2: REPLICATE ir<%tmp3> = call @foo(vp<{{.+}}>)
+; CHECK: Cost of 28 for VF 2: REPLICATE ir<%tmp3> = call @foo(vp<{{.+}}>)
 ;
 define void @predicated_udiv_used_by_call(ptr %a, i1 %c, i32 %x, i64 %n) {
 entry:
