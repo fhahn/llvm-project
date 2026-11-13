@@ -9,8 +9,8 @@ define void @safe_avl(ptr %p) vscale_range(2, 1024) !prof !0 {
 ; CHECK:  [[ENTRY:.*:]]
 ; CHECK:  [[VECTOR_PH:.*:]]
 ; CHECK:  [[VECTOR_BODY:.*]]:
-; CHECK:    [[SAFE_AVL:%.*]] = select i1 [[TMP0:%.*]], i64 [[AVL:%.*]], i64 1024
-; CHECK:    br i1 [[TMP6:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP1:![0-9]+]]
+; CHECK:    [[SAFE_AVL:%.*]] = select i1 [[TMP0:%.*]], i64 [[AVL:%.*]], i64 1024, !prof [[PROF1:![0-9]+]]
+; CHECK:    br i1 [[TMP6:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP2:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
 ; CHECK:  [[EXIT:.*:]]
 ;
@@ -35,7 +35,8 @@ exit:
 !0 = !{!"function_entry_count", i64 1000}
 ;.
 ; CHECK: [[PROF0]] = !{!"function_entry_count", i64 1000}
-; CHECK: [[LOOP1]] = distinct !{[[LOOP1]], [[META2:![0-9]+]], [[META3:![0-9]+]]}
-; CHECK: [[META2]] = !{!"llvm.loop.isvectorized", i32 1}
-; CHECK: [[META3]] = !{!"llvm.loop.unroll.runtime.disable"}
+; CHECK: [[PROF1]] = !{!"unknown", !"loop-vectorize"}
+; CHECK: [[LOOP2]] = distinct !{[[LOOP2]], [[META3:![0-9]+]], [[META4:![0-9]+]]}
+; CHECK: [[META3]] = !{!"llvm.loop.isvectorized", i32 1}
+; CHECK: [[META4]] = !{!"llvm.loop.unroll.runtime.disable"}
 ;.

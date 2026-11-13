@@ -1890,8 +1890,10 @@ static void narrowToSingleScalarRecipes(VPlan &Plan) {
         auto Opc = getUnmaskedDivRemOpcode(IntrR->getVectorIntrinsicID());
         if (!Opc)
           continue;
+        // The divisor is replaced by 1 for masked-off lanes. The probability
+        // of the mask is not tracked, so mark the select unknown.
         VPBuilder Builder(IntrR);
-        VPValue *SafeDivisor = Builder.createSelect(
+        VPValue *SafeDivisor = Builder.createSelectWithUnknownProfile(
             IntrR->getOperand(2), IntrR->getOperand(1),
             Plan.getConstantInt(IntrR->getScalarType(), 1));
         VPValue *Clone = Builder.createNaryOp(
@@ -4296,7 +4298,7 @@ void VPlanTransforms::sinkPredicatedStores(VPlan &Plan,
              "all members in group must agree on IsSingleScalar");
       VPValue *Mask = Group[I]->getMask();
       VPValue *Value = Group[I]->getOperand(0);
-      SelectedValue = Builder.createSelect(
+      SelectedValue = Builder.createSelectWithUnknownProfile(
           Mask, Value, SelectedValue, Group[I]->getDebugLoc(), "",
           VPIRFlags::getDefaultFlags(Instruction::Select,
                                      Value->getScalarType()));

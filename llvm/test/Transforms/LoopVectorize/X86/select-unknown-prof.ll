@@ -11,12 +11,12 @@ define void @sdiv_feeding_gep(ptr %dst, i32 %x, i64 %M, i64 %conv6, i64 %N) !pro
 ; CHECK:    br i1 [[TMP4:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:  [[VECTOR_PH]]:
 ; CHECK:  [[VECTOR_BODY:.*]]:
-; CHECK:    [[TMP8:%.*]] = select i1 [[TMP7:%.*]], i64 [[CONV6]], i64 1
-; CHECK:    br i1 [[TMP18:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP1:![0-9]+]]
+; CHECK:    [[TMP8:%.*]] = select i1 [[TMP7:%.*]], i64 [[CONV6]], i64 1, !prof [[PROF1:![0-9]+]]
+; CHECK:    br i1 [[TMP18:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP2:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
 ; CHECK:  [[SCALAR_PH]]:
 ; CHECK:  [[LOOP:.*]]:
-; CHECK:    br i1 [[EC:%.*]], label %[[EXIT:.*]], label %[[LOOP]], !llvm.loop [[LOOP4:![0-9]+]]
+; CHECK:    br i1 [[EC:%.*]], label %[[EXIT:.*]], label %[[LOOP]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:  [[EXIT]]:
 ;
 entry:
@@ -46,8 +46,9 @@ exit:
 !0 = !{!"function_entry_count", i64 1000}
 ;.
 ; CHECK: [[PROF0]] = !{!"function_entry_count", i64 1000}
-; CHECK: [[LOOP1]] = distinct !{[[LOOP1]], [[META2:![0-9]+]], [[META3:![0-9]+]]}
-; CHECK: [[META2]] = !{!"llvm.loop.isvectorized", i32 1}
-; CHECK: [[META3]] = !{!"llvm.loop.unroll.runtime.disable"}
-; CHECK: [[LOOP4]] = distinct !{[[LOOP4]], [[META2]]}
+; CHECK: [[PROF1]] = !{!"unknown", !"loop-vectorize"}
+; CHECK: [[LOOP2]] = distinct !{[[LOOP2]], [[META3:![0-9]+]], [[META4:![0-9]+]]}
+; CHECK: [[META3]] = !{!"llvm.loop.isvectorized", i32 1}
+; CHECK: [[META4]] = !{!"llvm.loop.unroll.runtime.disable"}
+; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META3]]}
 ;.

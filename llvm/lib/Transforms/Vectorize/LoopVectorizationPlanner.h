@@ -27,6 +27,7 @@
 #include "VPlanUtils.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/IR/ProfDataUtils.h"
 #include "llvm/Support/InstructionCost.h"
 #include <optional>
 
@@ -316,6 +317,20 @@ public:
                           Flags.value_or(VPIRFlags::getDefaultFlags(
                               Instruction::Select, TrueVal->getScalarType())),
                           {}, DL, Name));
+  }
+
+  /// Like createSelect, but mark the select's profile as explicitly unknown if
+  /// the function has profile data, for selects whose condition has no
+  /// probability that can be derived.
+  VPInstruction *createSelectWithUnknownProfile(
+      VPValue *Cond, VPValue *TrueVal, VPValue *FalseVal,
+      DebugLoc DL = DebugLoc::getUnknown(), const Twine &Name = "",
+      std::optional<VPIRFlags> Flags = std::nullopt) {
+    VPInstruction *Sel = createSelect(Cond, TrueVal, FalseVal, DL, Name, Flags);
+    if (MDNode *MD = getExplicitlyUnknownBranchWeightsIfProfiled(
+            *getPlan().getIRFunction(), "loop-vectorize"))
+      Sel->setMetadata(LLVMContext::MD_prof, MD);
+    return Sel;
   }
 
   /// Create a new ICmp VPInstruction with predicate \p Pred and operands \p A

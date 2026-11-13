@@ -608,13 +608,18 @@ void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
         continue;
       }
 
-      // Expand VPBlendRecipe into VPInstruction::Select.
+      // Expand VPBlendRecipe into VPInstruction::Select. The masks are
+      // combinations of the edge conditions leading to the blend, whose
+      // probabilities are not tracked, so mark the selects unknown.
+      // TODO: At VF=1 without tail folding, the mask of a two-way blend can be
+      // the original branch condition, whose weights could be reused if they
+      // were recorded during predication.
       if (auto *Blend = dyn_cast<VPBlendRecipe>(&R)) {
         VPValue *Select = Blend->getIncomingValue(0);
         for (unsigned I = 1; I != Blend->getNumIncomingValues(); ++I)
-          Select = Builder.createSelect(Blend->getMask(I),
-                                        Blend->getIncomingValue(I), Select,
-                                        R.getDebugLoc(), "predphi", *Blend);
+          Select = Builder.createSelectWithUnknownProfile(
+              Blend->getMask(I), Blend->getIncomingValue(I), Select,
+              R.getDebugLoc(), "predphi", *Blend);
         Blend->replaceAllUsesWith(Select);
         Blend->eraseFromParent();
         continue;

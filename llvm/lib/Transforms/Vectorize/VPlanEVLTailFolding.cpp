@@ -523,8 +523,10 @@ void VPlanTransforms::addExplicitVectorLength(
     // Support for MaxSafeDist for correct loop emission.
     VPValue *AVLSafe = Plan.getConstantInt(CanIVTy, *MaxSafeElements);
     VPValue *Cmp = Builder.createICmp(ICmpInst::ICMP_ULT, AVL, AVLSafe);
-    AVL = Builder.createSelect(Cmp, AVL, AVLSafe, DebugLoc::getUnknown(),
-                               "safe_avl");
+    // The condition only holds in the final iterations of the vector loop. No
+    // probability is derived for it, so mark the select unknown.
+    AVL = Builder.createSelectWithUnknownProfile(
+        Cmp, AVL, AVLSafe, DebugLoc::getUnknown(), "safe_avl");
   }
   auto *VPEVL = Builder.createNaryOp(VPInstruction::ExplicitVectorLength, AVL,
                                      DebugLoc::getUnknown(), "evl");
