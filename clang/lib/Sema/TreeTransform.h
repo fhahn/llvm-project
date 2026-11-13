@@ -14991,7 +14991,22 @@ TreeTransform<Derived>::TransformCXXOperatorCallExpr(CXXOperatorCallExpr *E) {
   if (UnresolvedLookupExpr *ULE = dyn_cast<UnresolvedLookupExpr>(Callee)) {
     LookupResult R(SemaRef, ULE->getName(), ULE->getNameLoc(),
                    Sema::LookupOrdinaryName);
-    if (getDerived().TransformOverloadExprDecls(ULE, ULE->requiresADL(), R))
+    // RebuildCXXOperatorCallExpr builds a builtin operator without looking at
+    // the functions if no operand has an overloadable type. Transforming
+    // functions declared at file scope cannot fail, so skip it in that case.
+    auto IsOverloadable = [](Expr *E) {
+      return E && (E->isTypeDependent() ||
+                   E->getType()->isOverloadableType() ||
+                   E->getObjectKind() == OK_ObjCProperty);
+    };
+    bool NeedsFunctions =
+        IsOverloadable(First.get()) || IsOverloadable(Second.get()) ||
+        ULE->getNumDecls() == 0 ||
+        llvm::any_of(ULE->decls(), [](NamedDecl *D) {
+          return !D->getDeclContext()->isFileContext();
+        });
+    if (NeedsFunctions &&
+        getDerived().TransformOverloadExprDecls(ULE, ULE->requiresADL(), R))
       return ExprError();
 
     return getDerived().RebuildCXXOperatorCallExpr(
