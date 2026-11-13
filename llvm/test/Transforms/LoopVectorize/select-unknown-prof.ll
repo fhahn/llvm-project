@@ -326,6 +326,158 @@ exit:
   ret void
 }
 
+; The selects updating the data and the mask of a find-last reduction if the
+; condition holds for any lane.
+define i32 @find_last(ptr %a, i64 %n, i32 %start) !prof !0 {
+; CHECK-LABEL: define i32 @find_last(
+; CHECK-SAME: ptr [[A:%.*]], i64 [[N:%.*]], i32 [[START:%.*]]) !prof [[PROF0]] {
+; CHECK:  [[ENTRY:.*:]]
+; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:  [[VECTOR_PH]]:
+; CHECK:  [[VECTOR_BODY:.*]]:
+; CHECK:    [[TMP6:%.*]] = select i1 [[TMP5:%.*]], <4 x i1> [[TMP4:%.*]], <4 x i1> [[TMP1:%.*]]
+; CHECK:    [[TMP7:%.*]] = select i1 [[TMP5]], <4 x i32> [[WIDE_LOAD:%.*]], <4 x i32> [[VEC_PHI:%.*]]
+; CHECK:    br i1 [[TMP8:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP29:![0-9]+]]
+; CHECK:  [[MIDDLE_BLOCK]]:
+; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:  [[SCALAR_PH]]:
+; CHECK:  [[LOOP:.*]]:
+; CHECK:    [[RES_NEXT:%.*]] = select i1 [[C:%.*]], i32 [[L:%.*]], i32 [[RES:%.*]]
+; CHECK:    br i1 [[EC:%.*]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP30:![0-9]+]]
+; CHECK:  [[EXIT]]:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %res = phi i32 [ %start, %entry ], [ %res.next, %loop ]
+  %gep = getelementptr inbounds i32, ptr %a, i64 %iv
+  %l = load i32, ptr %gep, align 4
+  %c = icmp sgt i32 %l, 42
+  %res.next = select i1 %c, i32 %l, i32 %res
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret i32 %res.next
+}
+
+; The selects picking the reduction result and the resume value of the
+; induction when exiting early due to a NaN in a maxnum reduction.
+define float @fmaxnum_reduction(ptr %src, i64 %n) !prof !0 {
+; CHECK-LABEL: define float @fmaxnum_reduction(
+; CHECK-SAME: ptr [[SRC:%.*]], i64 [[N:%.*]]) !prof [[PROF0]] {
+; CHECK:  [[ENTRY:.*:]]
+; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:  [[VECTOR_PH]]:
+; CHECK:  [[VECTOR_BODY:.*]]:
+; CHECK:    br i1 [[TMP7:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP31:![0-9]+]]
+; CHECK:  [[MIDDLE_BLOCK]]:
+; CHECK:    [[TMP8:%.*]] = select i1 [[TMP5:%.*]], <4 x float> [[VEC_PHI:%.*]], <4 x float> [[TMP3:%.*]]
+; CHECK:    [[TMP9:%.*]] = select i1 [[TMP5]], i64 [[INDEX:%.*]], i64 [[N_VEC:%.*]]
+; CHECK:    br i1 [[TMP12:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:  [[SCALAR_PH]]:
+; CHECK:  [[LOOP:.*]]:
+; CHECK:    br i1 [[EC:%.*]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP32:![0-9]+]]
+; CHECK:  [[EXIT]]:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %red = phi float [ -1.0, %entry ], [ %red.next, %loop ]
+  %gep = getelementptr inbounds float, ptr %src, i64 %iv
+  %l = load float, ptr %gep, align 4
+  %red.next = call float @llvm.maxnum.f32(float %red, float %l)
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret float %red.next
+}
+
+; Same, with an induction not starting at 0, which is resumed via a derived IV.
+define float @fmaxnum_reduction_iv_start(ptr %src, i64 %start, i64 %n) !prof !0 {
+; CHECK-LABEL: define float @fmaxnum_reduction_iv_start(
+; CHECK-SAME: ptr [[SRC:%.*]], i64 [[START:%.*]], i64 [[N:%.*]]) !prof [[PROF0]] {
+; CHECK:  [[ENTRY:.*:]]
+; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:  [[VECTOR_PH]]:
+; CHECK:  [[VECTOR_BODY:.*]]:
+; CHECK:    br i1 [[TMP9:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP33:![0-9]+]]
+; CHECK:  [[MIDDLE_BLOCK]]:
+; CHECK:    [[TMP10:%.*]] = select i1 [[TMP7:%.*]], <4 x float> [[VEC_PHI:%.*]], <4 x float> [[TMP5:%.*]]
+; CHECK:    [[TMP11:%.*]] = select i1 [[TMP7]], i64 [[INDEX:%.*]], i64 [[N_VEC:%.*]]
+; CHECK:    br i1 [[TMP15:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:  [[SCALAR_PH]]:
+; CHECK:  [[LOOP:.*]]:
+; CHECK:    br i1 [[EC:%.*]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP34:![0-9]+]]
+; CHECK:  [[EXIT]]:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+  %red = phi float [ -1.0, %entry ], [ %red.next, %loop ]
+  %gep = getelementptr inbounds float, ptr %src, i64 %iv
+  %l = load float, ptr %gep, align 4
+  %red.next = call float @llvm.maxnum.f32(float %red, float %l)
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret float %red.next
+}
+
+; The select masking the IVs of the lanes holding the overall max value of a
+; find-last-IV reduction using the max as condition. Whether a lane holds it is
+; not known.
+define i64 @smax_idx_last(ptr %a, i64 %mm, i64 %ii, ptr %res_max, i64 %n) !prof !0 {
+; CHECK-LABEL: define i64 @smax_idx_last(
+; CHECK-SAME: ptr [[A:%.*]], i64 [[MM:%.*]], i64 [[II:%.*]], ptr [[RES_MAX:%.*]], i64 [[N:%.*]]) !prof [[PROF0]] {
+; CHECK:  [[ENTRY:.*:]]
+; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:  [[VECTOR_PH]]:
+; CHECK:  [[VECTOR_BODY:.*]]:
+; CHECK:    [[TMP4:%.*]] = select <4 x i1> [[TMP3:%.*]], <4 x i64> [[VEC_PHI1:%.*]], <4 x i64> [[VEC_IND:%.*]]
+; CHECK:    br i1 [[TMP5:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP35:![0-9]+]]
+; CHECK:  [[MIDDLE_BLOCK]]:
+; CHECK:    [[TMP8:%.*]] = select <4 x i1> [[TMP7:%.*]], <4 x i64> [[TMP4]], <4 x i64> splat (i64 -9223372036854775808)
+; CHECK:    [[TMP11:%.*]] = select i1 [[TMP10:%.*]], i64 [[TMP9:%.*]], i64 [[II]]
+; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:  [[SCALAR_PH]]:
+; CHECK:  [[LOOP:.*]]:
+; CHECK:    [[MAX_IDX_NEXT:%.*]] = select i1 [[CMP:%.*]], i64 [[MAX_IDX:%.*]], i64 [[IV:%.*]]
+; CHECK:    br i1 [[EC:%.*]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP36:![0-9]+]]
+; CHECK:  [[EXIT]]:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %max = phi i64 [ %mm, %entry ], [ %max.next, %loop ]
+  %max.idx = phi i64 [ %ii, %entry ], [ %max.idx.next, %loop ]
+  %gep.a = getelementptr inbounds i64, ptr %a, i64 %iv
+  %l = load i64, ptr %gep.a
+  %max.next = tail call i64 @llvm.smax.i64(i64 %max, i64 %l)
+  %cmp = icmp sgt i64 %max, %l
+  %max.idx.next = select i1 %cmp, i64 %max.idx, i64 %iv
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  store i64 %max.next, ptr %res_max
+  ret i64 %max.idx.next
+}
+
 !0 = !{!"function_entry_count", i64 1000}
 !1 = !{!"branch_weights", i32 999, i32 1}
 !2 = distinct !{!2, !3, !4}
@@ -358,4 +510,12 @@ exit:
 ; CHECK: [[LOOP21]] = distinct !{[[LOOP21]], [[META2]], [[META3]]}
 ; CHECK: [[LOOP27]] = distinct !{[[LOOP27]], [[META2]], [[META3]]}
 ; CHECK: [[LOOP28]] = distinct !{[[LOOP28]], [[META2]]}
+; CHECK: [[LOOP29]] = distinct !{[[LOOP29]], [[META2]], [[META3]]}
+; CHECK: [[LOOP30]] = distinct !{[[LOOP30]], [[META3]], [[META2]]}
+; CHECK: [[LOOP31]] = distinct !{[[LOOP31]], [[META2]], [[META3]]}
+; CHECK: [[LOOP32]] = distinct !{[[LOOP32]], [[META3]], [[META2]]}
+; CHECK: [[LOOP33]] = distinct !{[[LOOP33]], [[META2]], [[META3]]}
+; CHECK: [[LOOP34]] = distinct !{[[LOOP34]], [[META3]], [[META2]]}
+; CHECK: [[LOOP35]] = distinct !{[[LOOP35]], [[META2]], [[META3]]}
+; CHECK: [[LOOP36]] = distinct !{[[LOOP36]], [[META3]], [[META2]]}
 ;.
