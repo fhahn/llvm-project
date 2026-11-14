@@ -3,6 +3,8 @@
 
 target datalayout = "ni:1"
 
+%struct.S = type { i64, [256 x float] }
+
 ; Loads from a lookup table indexed by a loaded byte: the offset is not an
 ; AddRec, but its unsigned range is [0, 255].
 define void @lut_zext_i8_index(ptr %dst, ptr %src, ptr %lut, i64 %n) {
@@ -127,6 +129,127 @@ exit:
   ret void
 }
 
+; The table is a field of a struct. All three GEPs are nuw, but the loop is
+; guarded, so the field GEP in the entry block may not be followed by an access
+; and SCEV drops its NUW flag when folding it into the address.
+define void @lut_struct_field(ptr %dst, ptr %src, ptr %s, i64 %n) {
+; CHECK-LABEL: 'lut_struct_field'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %lut = getelementptr inbounds nuw i8, ptr %s, i64 3128
+  %c = icmp sgt i64 %n, 0
+  br i1 %c, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.src = getelementptr inbounds nuw i8, ptr %src, i64 %iv
+  %b = load i8, ptr %gep.src, align 1
+  %idx = zext i8 %b to i64
+  %gep.lut = getelementptr inbounds nuw [3 x float], ptr %lut, i64 %idx
+  %gep.lut.1 = getelementptr inbounds nuw i8, ptr %gep.lut, i64 4
+  %l = load float, ptr %gep.lut.1, align 4
+  %gep.dst = getelementptr inbounds nuw float, ptr %dst, i64 %iv
+  store float %l, ptr %gep.dst, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Same as @lut_struct_field, but the field GEP is not nuw, so the address may
+; unsigned wrap.
+define void @lut_struct_field_may_wrap(ptr %dst, ptr %src, ptr %s, i64 %n) {
+; CHECK-LABEL: 'lut_struct_field_may_wrap'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %lut = getelementptr inbounds i8, ptr %s, i64 3128
+  %c = icmp sgt i64 %n, 0
+  br i1 %c, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.src = getelementptr inbounds nuw i8, ptr %src, i64 %iv
+  %b = load i8, ptr %gep.src, align 1
+  %idx = zext i8 %b to i64
+  %gep.lut = getelementptr inbounds nuw [3 x float], ptr %lut, i64 %idx
+  %gep.lut.1 = getelementptr inbounds nuw i8, ptr %gep.lut, i64 4
+  %l = load float, ptr %gep.lut.1, align 4
+  %gep.dst = getelementptr inbounds nuw float, ptr %dst, i64 %iv
+  store float %l, ptr %gep.dst, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The pointer to the table is a phi that SCEV looks through, so the nuw GEPs do
+; not form a chain from the base %s. This is conservatively rejected.
+define void @lut_struct_field_through_phi(ptr %dst, ptr %src, ptr %s, i64 %n, i1 %c0) {
+; CHECK-LABEL: 'lut_struct_field_through_phi'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %lut = getelementptr inbounds nuw i8, ptr %s, i64 3128
+  br i1 %c0, label %then, label %ph
+
+then:
+  br label %ph
+
+ph:
+  %lut.p = phi ptr [ %lut, %entry ], [ %lut, %then ]
+  %c = icmp sgt i64 %n, 0
+  br i1 %c, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %ph ], [ %iv.next, %loop ]
+  %gep.src = getelementptr inbounds nuw i8, ptr %src, i64 %iv
+  %b = load i8, ptr %gep.src, align 1
+  %idx = zext i8 %b to i64
+  %gep.lut = getelementptr inbounds nuw float, ptr %lut.p, i64 %idx
+  %l = load float, ptr %gep.lut, align 4
+  %gep.dst = getelementptr inbounds nuw float, ptr %dst, i64 %iv
+  store float %l, ptr %gep.dst, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
 ; The index GEP is not nuw.
 define void @lut_index_gep_may_wrap(ptr %dst, ptr %src, ptr %lut, i64 %n) {
 ; CHECK-LABEL: 'lut_index_gep_may_wrap'
@@ -151,6 +274,182 @@ loop:
   %idx = sext i8 %b to i64
   %gep.lut = getelementptr inbounds float, ptr %lut, i64 %idx
   %l = load float, ptr %gep.lut, align 4
+  %gep.dst = getelementptr inbounds nuw float, ptr %dst, i64 %iv
+  store float %l, ptr %gep.dst, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The index is loaded in the header and the table is accessed in a conditional
+; block, so SCEV does not use the nuw flag of the index GEP. Both GEPs are nuw.
+define void @lut_struct_field_conditional(ptr %dst, ptr %src, ptr %s, i64 %n) {
+; CHECK-LABEL: 'lut_struct_field_conditional'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %lut = getelementptr inbounds nuw i8, ptr %s, i64 3128
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  %gep.src = getelementptr inbounds nuw i8, ptr %src, i64 %iv
+  %b = load i8, ptr %gep.src, align 1
+  %c = icmp ne i8 %b, 0
+  br i1 %c, label %then, label %latch
+
+then:
+  %idx = zext i8 %b to i64
+  %gep.lut = getelementptr nuw float, ptr %lut, i64 %idx
+  %l = load float, ptr %gep.lut, align 4
+  %gep.dst = getelementptr inbounds nuw float, ptr %dst, i64 %iv
+  store float %l, ptr %gep.dst, align 4
+  br label %latch
+
+latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Same as @lut_struct_field_conditional, but the field GEP is not nuw, so the
+; address may unsigned wrap.
+define void @lut_struct_field_conditional_may_wrap(ptr %dst, ptr %src, ptr %s, i64 %n) {
+; CHECK-LABEL: 'lut_struct_field_conditional_may_wrap'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %lut = getelementptr inbounds i8, ptr %s, i64 3128
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  %gep.src = getelementptr inbounds nuw i8, ptr %src, i64 %iv
+  %b = load i8, ptr %gep.src, align 1
+  %c = icmp ne i8 %b, 0
+  br i1 %c, label %then, label %latch
+
+then:
+  %idx = zext i8 %b to i64
+  %gep.lut = getelementptr nuw float, ptr %lut, i64 %idx
+  %l = load float, ptr %gep.lut, align 4
+  %gep.dst = getelementptr inbounds nuw float, ptr %dst, i64 %iv
+  store float %l, ptr %gep.dst, align 4
+  br label %latch
+
+latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; A single nuw GEP indexes a table that is a field of a struct, in a
+; conditional block.
+define void @lut_struct_field_multi_index_conditional(ptr %dst, ptr %src, ptr %s, i64 %n) {
+; CHECK-LABEL: 'lut_struct_field_multi_index_conditional'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  %gep.src = getelementptr inbounds nuw i8, ptr %src, i64 %iv
+  %b = load i8, ptr %gep.src, align 1
+  %c = icmp ne i8 %b, 0
+  br i1 %c, label %then, label %latch
+
+then:
+  %idx = zext i8 %b to i64
+  %gep.lut = getelementptr nuw %struct.S, ptr %s, i64 0, i32 1, i64 %idx
+  %l = load float, ptr %gep.lut, align 4
+  %gep.dst = getelementptr inbounds nuw float, ptr %dst, i64 %iv
+  store float %l, ptr %gep.dst, align 4
+  br label %latch
+
+latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Two loads with the same address, only one of which is through a nuw GEP. The
+; other one may unsigned wrap.
+define void @lut_shared_address_one_nuw(ptr %dst, ptr %src, ptr %lut, i64 %n) {
+; CHECK-LABEL: 'lut_shared_address_one_nuw'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  %gep.src = getelementptr inbounds nuw i8, ptr %src, i64 %iv
+  %b = load i8, ptr %gep.src, align 1
+  %idx = zext i8 %b to i64
+  %c = icmp ne i8 %b, 0
+  br i1 %c, label %then, label %else
+
+then:
+  %gep.lut.nuw = getelementptr nuw float, ptr %lut, i64 %idx
+  %l.nuw = load float, ptr %gep.lut.nuw, align 4
+  br label %latch
+
+else:
+  %gep.lut = getelementptr float, ptr %lut, i64 %idx
+  %l.lut = load float, ptr %gep.lut, align 4
+  br label %latch
+
+latch:
+  %l = phi float [ %l.nuw, %then ], [ %l.lut, %else ]
   %gep.dst = getelementptr inbounds nuw float, ptr %dst, i64 %iv
   store float %l, ptr %gep.dst, align 4
   %iv.next = add nuw nsw i64 %iv, 1
