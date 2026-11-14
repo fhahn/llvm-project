@@ -94,3 +94,55 @@ loop:
 exit:
   ret void
 }
+
+; Test for loads from a lookup table that is a struct field, where SCEV drops
+; the nuw of the field GEP.
+define void @lut_struct_field(ptr %dst, ptr %src, ptr %s, i64 %n) {
+; CHECK-LABEL: define void @lut_struct_field(
+; CHECK-SAME: ptr [[DST:%.*]], ptr [[SRC:%.*]], ptr [[S:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[LUT:%.*]] = getelementptr inbounds nuw i8, ptr [[S]], i64 3128
+; CHECK-NEXT:    [[C:%.*]] = icmp sgt i64 [[N]], 0
+; CHECK-NEXT:    br i1 [[C]], label %[[LOOP_PREHEADER:.*]], label %[[EXIT:.*]]
+; CHECK:       [[LOOP_PREHEADER]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[IV_NEXT:%.*]], %[[LOOP]] ], [ 0, %[[LOOP_PREHEADER]] ]
+; CHECK-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds nuw i8, ptr [[SRC]], i64 [[IV]]
+; CHECK-NEXT:    [[L_SRC:%.*]] = load i8, ptr [[GEP_SRC]], align 1
+; CHECK-NEXT:    [[IDX:%.*]] = zext i8 [[L_SRC]] to i64
+; CHECK-NEXT:    [[GEP_LUT:%.*]] = getelementptr inbounds nuw [3 x float], ptr [[LUT]], i64 [[IDX]]
+; CHECK-NEXT:    [[GEP_LUT_1:%.*]] = getelementptr inbounds nuw i8, ptr [[GEP_LUT]], i64 4
+; CHECK-NEXT:    [[L_LUT:%.*]] = load float, ptr [[GEP_LUT_1]], align 4
+; CHECK-NEXT:    [[GEP_DST:%.*]] = getelementptr inbounds nuw float, ptr [[DST]], i64 [[IV]]
+; CHECK-NEXT:    store float [[L_LUT]], ptr [[GEP_DST]], align 4
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT_LOOPEXIT:.*]], label %[[LOOP]]
+; CHECK:       [[EXIT_LOOPEXIT]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %lut = getelementptr inbounds nuw i8, ptr %s, i64 3128
+  %c = icmp sgt i64 %n, 0
+  br i1 %c, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.src = getelementptr inbounds nuw i8, ptr %src, i64 %iv
+  %l.src = load i8, ptr %gep.src, align 1
+  %idx = zext i8 %l.src to i64
+  %gep.lut = getelementptr inbounds nuw [3 x float], ptr %lut, i64 %idx
+  %gep.lut.1 = getelementptr inbounds nuw i8, ptr %gep.lut, i64 4
+  %l.lut = load float, ptr %gep.lut.1, align 4
+  %gep.dst = getelementptr inbounds nuw float, ptr %dst, i64 %iv
+  store float %l.lut, ptr %gep.dst, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}

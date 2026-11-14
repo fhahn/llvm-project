@@ -1365,3 +1365,129 @@ loop:
 exit:
   ret void
 }
+
+; The access is conditional, so SCEV does not apply the nuw of the GEP, and %d
+; may be zero if the access does not execute. The unsigned range of the offset
+; is too large.
+define void @conditional_nuw_gep_udiv_variable_divisor(ptr %a, ptr %b, ptr %c, i64 %d, i64 %N) {
+; CHECK-LABEL: 'conditional_nuw_gep_udiv_variable_divisor'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  %gep.c = getelementptr inbounds nuw i8, ptr %c, i64 %iv
+  %l.c = load i8, ptr %gep.c, align 1
+  %cmp = icmp eq i8 %l.c, 0
+  br i1 %cmp, label %then, label %latch
+
+then:
+  %div = udiv i64 %iv, %d
+  %gep.a = getelementptr nuw i8, ptr %a, i64 %div
+  %l.a = load i8, ptr %gep.a, align 1
+  %gep.b = getelementptr inbounds nuw i8, ptr %b, i64 %iv
+  store i8 %l.a, ptr %gep.b, align 1
+  br label %latch
+
+latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %N
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Same as above, but with a constant trip count, so the unsigned range of the
+; offset is [0, 63].
+define void @conditional_nuw_gep_udiv_variable_divisor_const_tc(ptr %a, ptr %b, ptr %c, i64 %d) {
+; CHECK-LABEL: 'conditional_nuw_gep_udiv_variable_divisor_const_tc'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  %gep.c = getelementptr inbounds nuw i8, ptr %c, i64 %iv
+  %l.c = load i8, ptr %gep.c, align 1
+  %cmp = icmp eq i8 %l.c, 0
+  br i1 %cmp, label %then, label %latch
+
+then:
+  %div = udiv i64 %iv, %d
+  %gep.a = getelementptr nuw i8, ptr %a, i64 %div
+  %l.a = load i8, ptr %gep.a, align 1
+  %gep.b = getelementptr inbounds nuw i8, ptr %b, i64 %iv
+  store i8 %l.a, ptr %gep.b, align 1
+  br label %latch
+
+latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 64
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Same as above, but the GEP is inbounds and not nuw.
+define void @conditional_inbounds_gep_udiv_variable_divisor_const_tc(ptr %a, ptr %b, ptr %c, i64 %d) {
+; CHECK-LABEL: 'conditional_inbounds_gep_udiv_variable_divisor_const_tc'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  %gep.c = getelementptr inbounds nuw i8, ptr %c, i64 %iv
+  %l.c = load i8, ptr %gep.c, align 1
+  %cmp = icmp eq i8 %l.c, 0
+  br i1 %cmp, label %then, label %latch
+
+then:
+  %div = udiv i64 %iv, %d
+  %gep.a = getelementptr inbounds i8, ptr %a, i64 %div
+  %l.a = load i8, ptr %gep.a, align 1
+  %gep.b = getelementptr inbounds nuw i8, ptr %b, i64 %iv
+  store i8 %l.a, ptr %gep.b, align 1
+  br label %latch
+
+latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 64
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
