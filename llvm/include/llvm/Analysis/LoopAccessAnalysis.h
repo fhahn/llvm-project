@@ -1009,6 +1009,9 @@ LLVM_ABI bool isConsecutiveAccess(Value *A, Value *B, const DataLayout &DL,
 ///
 /// There is no conflict when the intervals are disjoint:
 /// NoConflict = (P2.Start >= P1.End) || (P1.Start >= P2.End)
+///
+/// If \p PtrExpr is a loop-variant Base + Offset that is not an AddRec, the
+/// caller must ensure that it does not unsigned wrap for any accessed Offset.
 LLVM_ABI std::pair<const SCEV *, const SCEV *> getStartAndEndForAccess(
     const Loop *Lp, const SCEV *PtrExpr, Type *AccessTy, const SCEV *BTC,
     const SCEV *MaxBTC, ScalarEvolution *SE,
