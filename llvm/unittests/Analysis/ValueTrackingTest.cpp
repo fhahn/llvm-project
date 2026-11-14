@@ -4059,6 +4059,40 @@ TEST_F(ValueTrackingTest, ComputeConstantRange) {
     EXPECT_EQ(-3, CR3.getSignedMin().getSExtValue());
     EXPECT_EQ(5, CR3.getSignedMax().getSExtValue());
   }
+  {
+    // Range of selects of constants, where the union of the operand ranges
+    // may wrap in the unsigned or signed domain.
+    auto M = parseModule(R"(
+  define void @test(i1 %c) {
+    %s.u = select i1 %c, i8 1, i8 -2
+    %s.s = select i1 %c, i8 -100, i8 100
+    %s.nowrap = select i1 %c, i8 1, i8 5
+    ret void
+  })");
+    Function *F = M->getFunction("test");
+    SimplifyQuery SQ(M->getDataLayout());
+
+    // {1, 254}: the smallest union [-2, 2) wraps unsigned.
+    Instruction *SU = &findInstructionByName(F, "s.u");
+    EXPECT_EQ(computeConstantRange(SU, /*ForSigned=*/false, SQ),
+              ConstantRange(APInt(8, -2, true), APInt(8, 2)));
+    EXPECT_EQ(computeConstantRange(SU, /*ForSigned=*/true, SQ),
+              ConstantRange(APInt(8, -2, true), APInt(8, 2)));
+
+    // {-100, 100}: the smallest union [100, -99) wraps signed.
+    Instruction *SS = &findInstructionByName(F, "s.s");
+    EXPECT_EQ(computeConstantRange(SS, /*ForSigned=*/false, SQ),
+              ConstantRange(APInt(8, 100), APInt(8, -99, true)));
+    EXPECT_EQ(computeConstantRange(SS, /*ForSigned=*/true, SQ),
+              ConstantRange(APInt(8, 100), APInt(8, -99, true)));
+
+    // {1, 5}: no wrapping in either signedness.
+    Instruction *SNoWrap = &findInstructionByName(F, "s.nowrap");
+    EXPECT_EQ(computeConstantRange(SNoWrap, /*ForSigned=*/false, SQ),
+              ConstantRange(APInt(8, 1), APInt(8, 6)));
+    EXPECT_EQ(computeConstantRange(SNoWrap, /*ForSigned=*/true, SQ),
+              ConstantRange(APInt(8, 1), APInt(8, 6)));
+  }
 }
 
 struct FindAllocaForValueTestParams {
