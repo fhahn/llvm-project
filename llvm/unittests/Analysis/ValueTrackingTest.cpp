@@ -4072,19 +4072,20 @@ TEST_F(ValueTrackingTest, ComputeConstantRange) {
     Function *F = M->getFunction("test");
     SimplifyQuery SQ(M->getDataLayout());
 
-    // {1, 254}: the smallest union [-2, 2) wraps unsigned.
+    // {1, 254}: the smallest union [-2, 2) wraps unsigned, [1, 255) does not.
     Instruction *SU = &findInstructionByName(F, "s.u");
     EXPECT_EQ(computeConstantRange(SU, /*ForSigned=*/false, SQ),
-              ConstantRange(APInt(8, -2, true), APInt(8, 2)));
+              ConstantRange(APInt(8, 1), APInt(8, 255)));
     EXPECT_EQ(computeConstantRange(SU, /*ForSigned=*/true, SQ),
               ConstantRange(APInt(8, -2, true), APInt(8, 2)));
 
-    // {-100, 100}: the smallest union [100, -99) wraps signed.
+    // {-100, 100}: the smallest union [100, -99) wraps signed, [-100, 101)
+    // does not.
     Instruction *SS = &findInstructionByName(F, "s.s");
     EXPECT_EQ(computeConstantRange(SS, /*ForSigned=*/false, SQ),
               ConstantRange(APInt(8, 100), APInt(8, -99, true)));
     EXPECT_EQ(computeConstantRange(SS, /*ForSigned=*/true, SQ),
-              ConstantRange(APInt(8, 100), APInt(8, -99, true)));
+              ConstantRange(APInt(8, -100, true), APInt(8, 101)));
 
     // {1, 5}: no wrapping in either signedness.
     Instruction *SNoWrap = &findInstructionByName(F, "s.nowrap");
