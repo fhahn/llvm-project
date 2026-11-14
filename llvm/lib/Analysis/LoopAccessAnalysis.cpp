@@ -330,8 +330,8 @@ static bool isKnownNonDecreasingInLoop(const SCEV *S, const Loop *L,
 /// The caller must ensure that Base + Offset does not unsigned wrap for any
 /// accessed Offset (see isNonAffinePtrNoWrap).
 ///
-/// If the add has NUW and the offset is provably monotonically non-decreasing,
-/// it is bounded by its value at the first iteration (via
+/// If the add has NUW and is provably monotonically non-decreasing, the offset
+/// is bounded by its value at the first iteration (via
 /// SplitIntoInitAndPostInc) and last iteration (via getSCEVAtScope). Otherwise,
 /// or if those cannot be computed or are not loop-invariant, it is bounded by
 /// its unsigned range. The returned range is half-open: its end is the address
@@ -353,8 +353,11 @@ getNonAffineBounds(const Loop *Lp, const SCEV *PtrExpr, const SCEV *EltSizeSCEV,
     return {nullptr, nullptr};
 
   const SCEV *Offset = SE->getMinusSCEV(PtrExpr, Base);
+  // Check PtrExpr rather than Offset, which getMinusSCEV rebuilds without
+  // PtrExpr's flags. As PtrExpr has NUW, Offset does not wrap either and is
+  // non-decreasing if PtrExpr is.
   if (PtrAdd->hasNoUnsignedWrap() &&
-      isKnownNonDecreasingInLoop(Offset, Lp, *SE)) {
+      isKnownNonDecreasingInLoop(PtrExpr, Lp, *SE)) {
     const SCEV *OffStart = SE->SplitIntoInitAndPostInc(Lp, Offset).first;
     const SCEV *OffEnd = SE->getSCEVAtScope(Offset, Lp->getParentLoop());
     // Offset contains an AddRec in Lp, so the add only has NUW if the access
