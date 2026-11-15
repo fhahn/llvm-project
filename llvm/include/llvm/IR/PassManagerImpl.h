@@ -102,12 +102,18 @@ inline AnalysisManager<IRUnitT, ExtraArgTs...>::AnalysisManager() = default;
 
 template <typename IRUnitT, typename... ExtraArgTs>
 inline AnalysisManager<IRUnitT, ExtraArgTs...>::AnalysisManager(
-    AnalysisManager &&) = default;
+    AnalysisManager &&RHS) {
+  *this = std::move(RHS);
+}
 
 template <typename IRUnitT, typename... ExtraArgTs>
 inline AnalysisManager<IRUnitT, ExtraArgTs...> &
-AnalysisManager<IRUnitT, ExtraArgTs...>::operator=(AnalysisManager &&) =
-    default;
+AnalysisManager<IRUnitT, ExtraArgTs...>::operator=(AnalysisManager &&RHS) {
+  AnalysisPasses = std::move(RHS.AnalysisPasses);
+  AnalysisResultLists = std::move(RHS.AnalysisResultLists);
+  LastIR = RHS.LastIR = nullptr;
+  return *this;
+}
 
 template <typename IRUnitT, typename... ExtraArgTs>
 inline void
@@ -119,24 +125,21 @@ AnalysisManager<IRUnitT, ExtraArgTs...>::clear(IRUnitT &IR,
   auto ResultsListI = AnalysisResultLists.find(&IR);
   if (ResultsListI == AnalysisResultLists.end())
     return;
-  // Delete the map entries that point to the results in the list.
-  for (auto &IDAndResult : ResultsListI->second)
-    AnalysisResults.erase({IDAndResult.first, &IR});
 
-  // And actually destroy and erase the results associated with this IR.
+  // Destroy and erase the results associated with this IR.
   AnalysisResultLists.erase(ResultsListI);
+  LastIR = nullptr;
 }
 
 template <typename IRUnitT, typename... ExtraArgTs>
 inline typename AnalysisManager<IRUnitT, ExtraArgTs...>::ResultConceptT &
 AnalysisManager<IRUnitT, ExtraArgTs...>::getResultImpl(
     AnalysisKey *ID, IRUnitT &IR, ExtraArgTs... ExtraArgs) {
-  auto [RI, Inserted] =
-      AnalysisResults.try_emplace(std::make_pair(ID, &IR), nullptr);
+  ResultConceptT *ResultPtr = getCachedResultImpl(ID, IR);
 
   // If we don't have a cached result for this function, look up the pass and
   // run it to produce a result, which we then add to the cache.
-  if (Inserted) {
+  if (!ResultPtr) {
     auto &P = this->lookUpPass(ID);
 
     PassInstrumentation PI;
@@ -148,21 +151,16 @@ AnalysisManager<IRUnitT, ExtraArgTs...>::getResultImpl(
     // Run the analysis first: running it can recursively cache another
     // result and rehash the map.
     auto Result = P.run(IR, *this, std::forward<ExtraArgTs>(ExtraArgs)...);
-    ResultConceptT *ResultPtr = Result.get();
+    ResultPtr = Result.get();
     AnalysisResultListT &ResultList = AnalysisResultLists[&IR];
     ResultList.emplace_back(ID, std::move(Result));
+    LastIR = &IR;
+    LastResults = &ResultList;
 
     PI.runAfterAnalysis(P, IR);
-
-    // P.run may have inserted elements into AnalysisResults and invalidated
-    // RI.
-    RI = AnalysisResults.find({ID, &IR});
-    assert(RI != AnalysisResults.end() && "we just inserted it!");
-
-    RI->second = ResultPtr;
   }
 
-  return *RI->second;
+  return *ResultPtr;
 }
 
 template <typename IRUnitT, typename... ExtraArgTs>
@@ -172,10 +170,10 @@ inline void AnalysisManager<IRUnitT, ExtraArgTs...>::invalidate(
   if (PA.allAnalysesInSetPreserved<AllAnalysesOn<IRUnitT>>())
     return;
 
-  auto ResultsListI = AnalysisResultLists.find(&IR);
-  if (ResultsListI == AnalysisResultLists.end())
+  auto *ResultsListPtr = const_cast<AnalysisResultListT *>(getResultList(IR));
+  if (!ResultsListPtr)
     return;
-  AnalysisResultListT &ResultsList = ResultsListI->second;
+  AnalysisResultListT &ResultsList = *ResultsListPtr;
 
   // Track whether each result is invalidated, by its index in ResultsList. The
   // Invalidator lets results recursively query their dependencies.
@@ -201,14 +199,14 @@ inline void AnalysisManager<IRUnitT, ExtraArgTs...>::invalidate(
       AnalysisKey *ID = ResultsList[ReadIdx].first;
       if (PI)
         PI->runAnalysisInvalidated(this->lookUpPass(ID), IR);
-
-      AnalysisResults.erase({ID, &IR});
     }
     ResultsList.resize(WriteIdx);
   }
 
-  if (ResultsList.empty())
+  if (ResultsList.empty()) {
     AnalysisResultLists.erase(&IR);
+    LastIR = nullptr;
+  }
 }
 } // end namespace llvm
 
