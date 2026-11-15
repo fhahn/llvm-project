@@ -160,11 +160,17 @@ static bool builtinIsSupported(const llvm::StringTable &Strings,
   /* Builtins Unsupported */
   if (LangOpts.NoBuiltin && strchr(AttributesStr.data(), 'f') != nullptr)
     return false;
-  /* CorBuiltins Unsupported */
-  if (!LangOpts.Coroutines && (BuiltinInfo.Langs & COR_LANG))
-    return false;
   /* MathBuiltins Unsupported */
   if (LangOpts.NoMathBuiltin && BuiltinInfo.Header.ID == HeaderDesc::MATH_H)
+    return false;
+  /* consteval Unsupported */
+  if (!LangOpts.CPlusPlus20 && strchr(AttributesStr.data(), 'G') != nullptr)
+    return false;
+  // The remaining checks are for builtins that need a language mode.
+  if (BuiltinInfo.Langs == ALL_LANGUAGES)
+    return true;
+  /* CorBuiltins Unsupported */
+  if (!LangOpts.Coroutines && (BuiltinInfo.Langs & COR_LANG))
     return false;
   /* GnuMode Unsupported */
   if (!LangOpts.GNUMode && (BuiltinInfo.Langs & GNU_LANG))
@@ -203,9 +209,6 @@ static bool builtinIsSupported(const llvm::StringTable &Strings,
     return false;
   /* CPlusPlus Unsupported */
   if (!LangOpts.CPlusPlus && BuiltinInfo.Langs == CXX_LANG)
-    return false;
-  /* consteval Unsupported */
-  if (!LangOpts.CPlusPlus20 && strchr(AttributesStr.data(), 'G') != nullptr)
     return false;
   /* C23 unsupported */
   if (!LangOpts.C23 && BuiltinInfo.Langs == C23_LANG)
