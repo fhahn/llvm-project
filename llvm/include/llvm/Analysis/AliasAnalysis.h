@@ -647,8 +647,9 @@ public:
   BatchAAResults(AAResults &AAR, CaptureAnalysis *CA)
       : AA(AAR), AAQI(AAR, CA) {}
 
-  AliasResult alias(const MemoryLocation &LocA, const MemoryLocation &LocB) {
-    return AA.alias(LocA, LocB, AAQI);
+  AliasResult alias(const MemoryLocation &LocA, const MemoryLocation &LocB,
+                    const Instruction *CtxI = nullptr) {
+    return AA.alias(LocA, LocB, AAQI, CtxI);
   }
   bool pointsToConstantMemory(const MemoryLocation &Loc, bool OrLocal = false) {
     return isNoModRef(AA.getModRefInfoMask(Loc, AAQI, OrLocal));
