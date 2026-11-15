@@ -795,7 +795,7 @@ bool SCEVExprContains(const SCEV *Root, PredTy Pred) {
 /// The result from each visit is cached, so it will return the same
 /// SCEV for the same input.
 template <typename SC>
-class SCEVRewriteVisitor : public SCEVVisitor<SC, const SCEV *> {
+class SCEVRewriteVisitor : public SCEVVisitor<SC, SCEVUse> {
 protected:
   ScalarEvolution &SE;
   // Memoize the result of each visit so that we only compute once for
@@ -803,19 +803,26 @@ protected:
   // a SCEV is referenced by multiple SCEVs. Without memoization, this
   // visit algorithm would have exponential time complexity in the worst
   // case, causing the compiler to hang on certain tests.
-  SmallDenseMap<const SCEV *, const SCEV *, 16> RewriteResults;
+  SmallDenseMap<const SCEV *, SCEVUse, 16> RewriteResults;
 
 public:
   SCEVRewriteVisitor(ScalarEvolution &SE) : SE(SE) {}
 
-  const SCEV *visit(const SCEV *S) {
+  SCEVUse visit(const SCEV *S) {
     auto It = RewriteResults.find(S);
     if (It != RewriteResults.end())
       return It->second;
-    auto *Visited = SCEVVisitor<SC, const SCEV *>::visit(S);
+    SCEVUse Visited = SCEVVisitor<SC, SCEVUse>::visit(S);
     auto Result = RewriteResults.try_emplace(S, Visited);
     assert(Result.second && "Should insert a new entry");
     return Result.first->second;
+  }
+
+  /// Visit the operand \p Op. If it is rewritten to its expression without use
+  /// flags, return \p Op to keep its use flags.
+  SCEVUse visitOperand(SCEVUse Op) {
+    SCEVUse Visited = ((SC *)this)->visit(Op);
+    return Visited == SCEVUse(Op.getPointer()) ? Op : Visited;
   }
 
   const SCEV *visitConstant(const SCEVConstant *Constant) { return Constant; }
@@ -823,26 +830,26 @@ public:
   const SCEV *visitVScale(const SCEVVScale *VScale) { return VScale; }
 
   const SCEV *visitPtrToAddrExpr(const SCEVPtrToAddrExpr *Expr) {
-    const SCEV *Operand = ((SC *)this)->visit(Expr->getOperand());
+    SCEVUse Operand = visitOperand(Expr->getOperand());
     return Operand == Expr->getOperand() ? Expr : SE.getPtrToAddrExpr(Operand);
   }
 
   const SCEV *visitTruncateExpr(const SCEVTruncateExpr *Expr) {
-    const SCEV *Operand = ((SC *)this)->visit(Expr->getOperand());
+    SCEVUse Operand = visitOperand(Expr->getOperand());
     return Operand == Expr->getOperand()
                ? Expr
                : SE.getTruncateExpr(Operand, Expr->getType());
   }
 
   const SCEV *visitZeroExtendExpr(const SCEVZeroExtendExpr *Expr) {
-    const SCEV *Operand = ((SC *)this)->visit(Expr->getOperand());
+    SCEVUse Operand = visitOperand(Expr->getOperand());
     return Operand == Expr->getOperand()
                ? Expr
                : SE.getZeroExtendExpr(Operand, Expr->getType());
   }
 
   const SCEV *visitSignExtendExpr(const SCEVSignExtendExpr *Expr) {
-    const SCEV *Operand = ((SC *)this)->visit(Expr->getOperand());
+    SCEVUse Operand = visitOperand(Expr->getOperand());
     return Operand == Expr->getOperand()
                ? Expr
                : SE.getSignExtendExpr(Operand, Expr->getType());
@@ -851,8 +858,8 @@ public:
   const SCEV *visitAddExpr(const SCEVAddExpr *Expr) {
     SmallVector<SCEVUse, 2> Operands;
     bool Changed = false;
-    for (const SCEV *Op : Expr->operands()) {
-      Operands.push_back(((SC *)this)->visit(Op));
+    for (SCEVUse Op : Expr->operands()) {
+      Operands.push_back(visitOperand(Op));
       Changed |= Op != Operands.back();
     }
     return !Changed ? Expr : SE.getAddExpr(Operands);
@@ -861,16 +868,16 @@ public:
   const SCEV *visitMulExpr(const SCEVMulExpr *Expr) {
     SmallVector<SCEVUse, 2> Operands;
     bool Changed = false;
-    for (const SCEV *Op : Expr->operands()) {
-      Operands.push_back(((SC *)this)->visit(Op));
+    for (SCEVUse Op : Expr->operands()) {
+      Operands.push_back(visitOperand(Op));
       Changed |= Op != Operands.back();
     }
     return !Changed ? Expr : SE.getMulExpr(Operands);
   }
 
   const SCEV *visitUDivExpr(const SCEVUDivExpr *Expr) {
-    auto *LHS = ((SC *)this)->visit(Expr->getLHS());
-    auto *RHS = ((SC *)this)->visit(Expr->getRHS());
+    SCEVUse LHS = visitOperand(Expr->getLHS());
+    SCEVUse RHS = visitOperand(Expr->getRHS());
     bool Changed = LHS != Expr->getLHS() || RHS != Expr->getRHS();
     return !Changed ? Expr : SE.getUDivExpr(LHS, RHS);
   }
@@ -878,8 +885,8 @@ public:
   const SCEV *visitAddRecExpr(const SCEVAddRecExpr *Expr) {
     SmallVector<SCEVUse, 2> Operands;
     bool Changed = false;
-    for (const SCEV *Op : Expr->operands()) {
-      Operands.push_back(((SC *)this)->visit(Op));
+    for (SCEVUse Op : Expr->operands()) {
+      Operands.push_back(visitOperand(Op));
       Changed |= Op != Operands.back();
     }
     return !Changed ? Expr
@@ -890,8 +897,8 @@ public:
   const SCEV *visitSMaxExpr(const SCEVSMaxExpr *Expr) {
     SmallVector<SCEVUse, 2> Operands;
     bool Changed = false;
-    for (const SCEV *Op : Expr->operands()) {
-      Operands.push_back(((SC *)this)->visit(Op));
+    for (SCEVUse Op : Expr->operands()) {
+      Operands.push_back(visitOperand(Op));
       Changed |= Op != Operands.back();
     }
     return !Changed ? Expr : SE.getSMaxExpr(Operands);
@@ -900,8 +907,8 @@ public:
   const SCEV *visitUMaxExpr(const SCEVUMaxExpr *Expr) {
     SmallVector<SCEVUse, 2> Operands;
     bool Changed = false;
-    for (const SCEV *Op : Expr->operands()) {
-      Operands.push_back(((SC *)this)->visit(Op));
+    for (SCEVUse Op : Expr->operands()) {
+      Operands.push_back(visitOperand(Op));
       Changed |= Op != Operands.back();
     }
     return !Changed ? Expr : SE.getUMaxExpr(Operands);
@@ -910,8 +917,8 @@ public:
   const SCEV *visitSMinExpr(const SCEVSMinExpr *Expr) {
     SmallVector<SCEVUse, 2> Operands;
     bool Changed = false;
-    for (const SCEV *Op : Expr->operands()) {
-      Operands.push_back(((SC *)this)->visit(Op));
+    for (SCEVUse Op : Expr->operands()) {
+      Operands.push_back(visitOperand(Op));
       Changed |= Op != Operands.back();
     }
     return !Changed ? Expr : SE.getSMinExpr(Operands);
@@ -920,8 +927,8 @@ public:
   const SCEV *visitUMinExpr(const SCEVUMinExpr *Expr) {
     SmallVector<SCEVUse, 2> Operands;
     bool Changed = false;
-    for (const SCEV *Op : Expr->operands()) {
-      Operands.push_back(((SC *)this)->visit(Op));
+    for (SCEVUse Op : Expr->operands()) {
+      Operands.push_back(visitOperand(Op));
       Changed |= Op != Operands.back();
     }
     return !Changed ? Expr : SE.getUMinExpr(Operands);
@@ -930,8 +937,8 @@ public:
   const SCEV *visitSequentialUMinExpr(const SCEVSequentialUMinExpr *Expr) {
     SmallVector<SCEVUse, 2> Operands;
     bool Changed = false;
-    for (const SCEV *Op : Expr->operands()) {
-      Operands.push_back(((SC *)this)->visit(Op));
+    for (SCEVUse Op : Expr->operands()) {
+      Operands.push_back(visitOperand(Op));
       Changed |= Op != Operands.back();
     }
     return !Changed ? Expr : SE.getUMinExpr(Operands, /*Sequential=*/true);

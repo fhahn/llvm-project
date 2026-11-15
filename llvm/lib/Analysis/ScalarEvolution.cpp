@@ -945,8 +945,8 @@ public:
     SmallVector<SCEVUse, 2> Operands;
     bool Changed = false;
     for (SCEVUse Op : Expr->operands()) {
-      Operands.push_back(visit(Op.getPointer()));
-      Changed |= Op.getPointer() != Operands.back();
+      Operands.push_back(visitOperand(Op));
+      Changed |= Op != Operands.back();
     }
     return !Changed ? Expr : SE.getAddExpr(Operands, Expr->getNoWrapFlags());
   }
@@ -14695,7 +14695,7 @@ void ScalarEvolution::verify() const {
     if (It == BackedgeTakenCounts.end())
       continue;
 
-    auto *CurBECount =
+    const SCEV *CurBECount =
         SCM.visit(It->second.getExact(L, const_cast<ScalarEvolution *>(this)));
     auto *NewBECount = SE2.getBackedgeTakenCount(L);
 
@@ -16258,7 +16258,7 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(
       SmallVector<SCEVUse, 2> Operands;
       bool Changed = false;
       for (SCEVUse Op : Expr->operands()) {
-        Operands.push_back(visit(Op));
+        Operands.push_back(visitOperand(Op));
         Changed |= Op != Operands.back();
       }
       // We are only replacing operands with equivalent values, so transfer the
@@ -16273,7 +16273,7 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(
       SmallVector<SCEVUse, 2> Operands;
       bool Changed = false;
       for (SCEVUse Op : Expr->operands()) {
-        Operands.push_back(visit(Op));
+        Operands.push_back(visitOperand(Op));
         Changed |= Op != Operands.back();
       }
       // We are only replacing operands with equivalent values, so transfer the
