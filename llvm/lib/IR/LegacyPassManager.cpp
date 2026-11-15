@@ -623,28 +623,10 @@ AnalysisUsage *PMTopLevelManager::findAnalysisUsage(Pass *P) {
     AnUsage = DMI->second;
   else {
     // Look up the analysis usage from the pass instance (different instances
-    // of the same pass can produce different results), but unique the
-    // resulting object to reduce memory usage.  This helps to greatly reduce
-    // memory usage when we have many instances of only a few pass types
-    // (e.g. instcombine, simplifycfg, etc...) which tend to share a fixed set
-    // of dependencies.
-    AnalysisUsage AU;
-    P->getAnalysisUsage(AU);
-
-    AUFoldingSetNode* Node = nullptr;
-    FoldingSetNodeID ID;
-    AUFoldingSetNode::Profile(ID, AU);
-    FoldingSetInsertToken Token;
-    if (auto *N = UniqueAnalysisUsages.lookup(ID, Token))
-      Node = N;
-    else {
-      Node = new (AUFoldingSetNodeAllocator.Allocate()) AUFoldingSetNode(AU);
-      UniqueAnalysisUsages.insert(Node, Token);
-    }
-    assert(Node && "cached analysis usage must be non null");
-
-    AnUsageMap[P] = &Node->AU;
-    AnUsage = &Node->AU;
+    // of the same pass can produce different results).
+    AnUsage = new (AnalysisUsageAllocator.Allocate()) AnalysisUsage();
+    P->getAnalysisUsage(*AnUsage);
+    AnUsageMap[P] = AnUsage;
   }
   return AnUsage;
 }
