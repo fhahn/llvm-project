@@ -37,7 +37,7 @@ SourceLocation ScratchBuffer::getToken(const char *Buf, unsigned Len,
   else {
     // Clear out the source line cache if it's already been computed.
     // FIXME: Allow this to be incrementally extended.
-    SourceMgr.getSLocEntry(SourceMgr.getFileID(BufferStartLoc))
+    SourceMgr.getSLocEntry(BufferFID)
         .getFile()
         .getContentCache()
         .SourceLineCache = SrcMgr::LineOffsetMapping();
@@ -77,7 +77,7 @@ void ScratchBuffer::AllocScratchBuffer(unsigned RequestLen) {
       llvm::WritableMemoryBuffer::getNewMemBuffer(RequestLen,
                                                   "<scratch space>");
   CurBuffer = OwnBuf->getBufferStart();
-  FileID FID = SourceMgr.createFileID(std::move(OwnBuf));
-  BufferStartLoc = SourceMgr.getLocForStartOfFile(FID);
+  BufferFID = SourceMgr.createFileID(std::move(OwnBuf));
+  BufferStartLoc = SourceMgr.getLocForStartOfFile(BufferFID);
   BytesUsed = 0;
 }
