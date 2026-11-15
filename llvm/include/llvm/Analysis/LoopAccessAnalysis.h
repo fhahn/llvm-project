@@ -534,8 +534,8 @@ struct RuntimeCheckingPtrGroup {
   /// Whether the pointer needs to be frozen after expansion, e.g. because it
   /// may be poison outside the loop.
   bool NeedsFreeze = false;
-  /// Whether the bounds can be expanded to cover all iterations of the parent
-  /// loop without wrapping.
+  /// Whether the bounds are affine in the parent loop with the same step and
+  /// can be expanded to cover all its iterations without wrapping.
   bool CanExpandToOuterLoop = false;
 };
 

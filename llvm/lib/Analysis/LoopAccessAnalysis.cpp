@@ -682,12 +682,23 @@ void RuntimePointerChecking::generateChecks(
   };
   const auto &Preds = cast<SCEVUnionPredicate>(DC.getPSE().getPredicate());
   if (OuterLoop && all_of(Preds.getPredicates(), IsOuterInvariant) &&
-      allIterationsReachLatch(OuterLoop, InnerLoop, LI, *SE)) {
-    for (RuntimeCheckingPtrGroup &CG : CheckingGroups)
-      CG.CanExpandToOuterLoop = all_of(CG.Members, [&](unsigned I) {
-        return accessesOneObjectInAllIterations(Pointers[I], OuterLoop, DC,
-                                                *SE);
-      });
+      allIterationsReachLatch(OuterLoop, InnerLoop, LI, *SE) &&
+      SE->hasLoopInvariantBackedgeTakenCount(OuterLoop)) {
+    for (RuntimeCheckingPtrGroup &CG : CheckingGroups) {
+      // The bounds are expanded to the start of Low and the value of High in
+      // the last outer iteration, with a check that the step is non-negative.
+      // This only bounds the range if both are affine with the same step.
+      const SCEV *Step;
+      CG.CanExpandToOuterLoop =
+          match(CG.Low, m_scev_AffineAddRec(m_SCEV(), m_SCEV(Step),
+                                            m_SpecificLoop(OuterLoop))) &&
+          match(CG.High, m_scev_AffineAddRec(m_SCEV(), m_scev_Specific(Step),
+                                             m_SpecificLoop(OuterLoop))) &&
+          all_of(CG.Members, [&](unsigned I) {
+            return accessesOneObjectInAllIterations(Pointers[I], OuterLoop, DC,
+                                                    *SE);
+          });
+    }
   }
 
   Checks = generateChecks();
