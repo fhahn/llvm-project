@@ -2503,13 +2503,8 @@ bool InstrRefBasedLDV::mlocJoin(
   // as its predecessors. If a PHI is placed, test to see whether it's now a
   // redundant PHI that we can eliminate.
 
-  SmallVector<const MachineBasicBlock *, 8> BlockOrders(MBB.predecessors());
-
   // Visit predecessors in RPOT order.
-  auto Cmp = [&](const MachineBasicBlock *A, const MachineBasicBlock *B) {
-    return BBToOrder.find(A)->second < BBToOrder.find(B)->second;
-  };
-  llvm::sort(BlockOrders, Cmp);
+  ArrayRef<MachineBasicBlock *> BlockOrders = PredsInRPO[MBB.getNumber()];
 
   // Skip entry block.
   if (BlockOrders.size() == 0) {
@@ -3037,13 +3032,7 @@ bool InstrRefBasedLDV::vlocJoin(
   bool Changed = false;
 
   // Order predecessors by RPOT order, for exploring them in that order.
-  SmallVector<MachineBasicBlock *, 8> BlockOrders(MBB.predecessors());
-
-  auto Cmp = [&](MachineBasicBlock *A, MachineBasicBlock *B) {
-    return BBToOrder[A] < BBToOrder[B];
-  };
-
-  llvm::sort(BlockOrders, Cmp);
+  ArrayRef<MachineBasicBlock *> BlockOrders = PredsInRPO[MBB.getNumber()];
 
   unsigned CurBlockRPONum = BBToOrder[&MBB];
 
@@ -3542,6 +3531,16 @@ void InstrRefBasedLDV::initialSetup(MachineFunction &MF) {
     if (!BBToOrder.contains(&MBB))
       processMBB(&MBB);
 
+  // Joins visit predecessors in RPO.
+  PredsInRPO.resize(MF.getNumBlockIDs());
+  for (MachineBasicBlock &MBB : MF) {
+    auto &Preds = PredsInRPO[MBB.getNumber()];
+    Preds.assign(MBB.pred_begin(), MBB.pred_end());
+    llvm::sort(Preds, [&](MachineBasicBlock *A, MachineBasicBlock *B) {
+      return BBToOrder.find(A)->second < BBToOrder.find(B)->second;
+    });
+  }
+
   // Order value substitutions by their "source" operand pair, for quick lookup.
   llvm::sort(MF.DebugValueSubstitutions);
 
@@ -3935,6 +3934,7 @@ bool InstrRefBasedLDV::ExtendRanges(MachineFunction &MF,
   OrderToBB.clear();
   BBToOrder.clear();
   BBNumToRPO.clear();
+  PredsInRPO.clear();
   DebugInstrNumToInstr.clear();
   DebugPHINumToValue.clear();
   OverlapFragments.clear();
