@@ -1750,9 +1750,17 @@ bool InstrRefBasedLDV::transferDebugInstrRef(MachineInstr &MI,
         ValuesToFind.push_back(Op.ID);
   }
 
+  // Most locations hold values that no operand wants. Set a bit per def
+  // location of the wanted values, to skip searching ValuesToFind for others.
+  auto DefLocBit = [](ValueIDNum Num) { return 1ULL << (Num.getLoc() % 64); };
+  uint64_t WantedBits = 0;
+  for (ValueIDNum Num : ValuesToFind)
+    WantedBits |= DefLocBit(Num);
   for (auto Location : MTracker->locations()) {
     LocIdx CurL = Location.Idx;
     ValueIDNum ID = MTracker->readMLoc(CurL);
+    if (!(WantedBits & DefLocBit(ID)))
+      continue;
     auto ValueToFindIt = find(ValuesToFind, ID);
     if (ValueToFindIt == ValuesToFind.end())
       continue;
