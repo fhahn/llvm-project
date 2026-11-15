@@ -4279,6 +4279,15 @@ static const SCEV *getAddressAccessSCEV(const VPValue *Ptr,
   return vputils::isAddressSCEVForCost(Addr, *PSE.getSE(), L) ? Addr : nullptr;
 }
 
+/// Returns true if the predicated result of \p R is packed into a vector, i.e.
+/// if a VPPredInstPHIRecipe using it has vector users.
+static bool isPackedPredicatedResult(const VPReplicateRecipe &R) {
+  return any_of(R.users(), [](const VPUser *U) {
+    auto *PredR = dyn_cast<VPPredInstPHIRecipe>(U);
+    return PredR && !vputils::onlyScalarValuesOrLanesUsed(PredR);
+  });
+}
+
 InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
                                                VPCostContext &Ctx) const {
   Instruction *UI = cast<Instruction>(getUnderlyingValue());
@@ -4351,13 +4360,18 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
         }))
       break;
 
-    ScalarCost = ScalarCost * VF.getFixedValue() +
-                 Ctx.getScalarizationOverhead(this->getScalarType(),
-                                              to_vector(operands()), VF);
+    // Predicated results are only inserted into a vector if they are packed.
+    const VPRegionBlock *ParentRegion = getRegion();
+    bool InReplicateRegion = ParentRegion && ParentRegion->isReplicator();
+    Type *ResultTy = InReplicateRegion && !isPackedPredicatedResult(*this)
+                         ? Type::getVoidTy(Ctx.LLVMCtx)
+                         : getScalarType();
+    ScalarCost =
+        ScalarCost * VF.getFixedValue() +
+        Ctx.getScalarizationOverhead(ResultTy, to_vector(operands()), VF);
     // If the recipe is not predicated (i.e. not in a replicate region), return
     // the scalar cost. Otherwise handle predicated cost.
-    const VPRegionBlock *ParentRegion = getRegion();
-    if (!ParentRegion || !ParentRegion->isReplicator())
+    if (!InReplicateRegion)
       return ScalarCost;
 
     // Account for the phi nodes that we will create.
@@ -4525,13 +4539,7 @@ void VPReplicateRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
     printOperands(O, SlotTracker);
   }
 
-  // Find if the recipe is used by a widened recipe via an intervening
-  // VPPredInstPHIRecipe. In this case, also pack the scalar values in a vector.
-  if (any_of(users(), [](const VPUser *U) {
-        if (auto *PredR = dyn_cast<VPPredInstPHIRecipe>(U))
-          return !vputils::onlyScalarValuesUsed(PredR);
-        return false;
-      }))
+  if (isPackedPredicatedResult(*this))
     O << " (S->V)";
 }
 #endif
