@@ -389,6 +389,10 @@ class DwarfDebug : public DebugHandlerBase {
 
   SmallDenseSet<const MachineInstr *> ForceIsStmtInstrs;
 
+  /// Non-variadic forms of the expressions of DBG_VALUEs in location lists.
+  DenseMap<const DIExpression *, std::optional<const DIExpression *>>
+      NonVariadicExprs;
+
   /// If nonnull, stores the current machine function we're processing.
   const MachineFunction *CurFn = nullptr;
 

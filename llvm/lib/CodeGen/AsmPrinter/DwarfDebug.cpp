@@ -237,9 +237,22 @@ const DIType *DbgVariable::getType() const {
 }
 
 /// Get .debug_loc entry for the instruction range starting at MI.
-static DbgValueLoc getDebugLocValue(const MachineInstr *MI) {
+/// \p NonVariadicExprs, if given, caches the non-variadic form of each
+/// expression.
+static DbgValueLoc getDebugLocValue(
+    const MachineInstr *MI,
+    DenseMap<const DIExpression *, std::optional<const DIExpression *>>
+        *NonVariadicExprs = nullptr) {
   const DIExpression *Expr = MI->getDebugExpression();
-  auto SingleLocExprOpt = DIExpression::convertToNonVariadicExpression(Expr);
+  std::optional<const DIExpression *> SingleLocExprOpt;
+  if (NonVariadicExprs) {
+    auto [It, Inserted] = NonVariadicExprs->try_emplace(Expr);
+    if (Inserted)
+      It->second = DIExpression::convertToNonVariadicExpression(Expr);
+    SingleLocExprOpt = It->second;
+  } else {
+    SingleLocExprOpt = DIExpression::convertToNonVariadicExpression(Expr);
+  }
   const bool IsVariadic = !SingleLocExprOpt;
   // If we have a variadic debug value instruction that is equivalent to a
   // non-variadic instruction, then convert it to non-variadic form here.
@@ -1883,7 +1896,7 @@ bool DwarfDebug::buildLocationList(SmallVectorImpl<DebugLocEntry> &DebugLoc,
       // all fragments are undef then the whole location list entry is
       // redundant.
       if (!Instr->isUndefDebugValue()) {
-        auto Value = getDebugLocValue(Instr);
+        auto Value = getDebugLocValue(Instr, &NonVariadicExprs);
         OpenRanges.emplace_back(EI->getEndIndex(), Value);
 
         // TODO: Add support for single value fragment locations.
