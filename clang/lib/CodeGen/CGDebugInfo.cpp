@@ -5416,8 +5416,18 @@ void CGDebugInfo::EmitLocation(CGBuilderTy &Builder, SourceLocation Loc) {
     return;
 
   llvm::MDNode *Scope = LexicalBlockStack.back();
-  Builder.SetCurrentDebugLocation(llvm::DILocation::get(
-      CGM.getLLVMContext(), CurLocLine, CurLocColumn, Scope, CurInlinedAt));
+  // Consecutive statements and expressions often share a location; reuse the
+  // last one instead of uniquing it again if all its key fields match.
+  auto *DL = cast_or_null<llvm::DILocation>(LastLocation.get());
+  if (!DL || !DL->isUniqued() || DL->getLine() != CurLocLine ||
+      DL->getColumn() != CurLocColumn || DL->getRawScope() != Scope ||
+      DL->getRawInlinedAt() != CurInlinedAt || DL->isImplicitCode() ||
+      DL->getAtomGroup() || DL->getAtomRank() || DL->getRawIRLayers()) {
+    DL = llvm::DILocation::get(CGM.getLLVMContext(), CurLocLine, CurLocColumn,
+                               Scope, CurInlinedAt);
+    LastLocation.reset(DL);
+  }
+  Builder.SetCurrentDebugLocation(DL);
 }
 
 void CGDebugInfo::CreateLexicalBlock(SourceLocation Loc) {

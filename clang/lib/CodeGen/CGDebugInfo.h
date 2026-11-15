@@ -73,6 +73,8 @@ class CGDebugInfo {
   unsigned CurLocLine = 0;
   unsigned CurLocColumn = 0;
   llvm::DILocation *CurInlinedAt = nullptr;
+  /// The location EmitLocation created last.
+  llvm::TrackingMDNodeRef LastLocation;
   llvm::DIType *VTablePtrType = nullptr;
   llvm::DIType *ClassTy = nullptr;
   llvm::DICompositeType *ObjTy = nullptr;
