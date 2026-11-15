@@ -1205,6 +1205,9 @@ private:
   DenseMap<const MachineBasicBlock *, unsigned int> BBToOrder;
   DenseMap<unsigned, unsigned> BBNumToRPO;
 
+  /// The predecessors of each block, by block number, in RPO.
+  SmallVector<SmallVector<MachineBasicBlock *, 4>> PredsInRPO;
+
   /// Pair of MachineInstr, and its 1-based offset into the containing block.
   using InstAndNum = std::pair<const MachineInstr *, unsigned>;
   /// Map from debug instruction number to the MachineInstr labelled with that
