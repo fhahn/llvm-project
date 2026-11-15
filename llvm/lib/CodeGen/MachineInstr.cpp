@@ -239,7 +239,11 @@ void MachineInstr::addOperand(MachineFunction &MF, const MachineOperand &Op) {
   OperandCapacity OldCap = CapOperands;
   MachineOperand *OldOperands = Operands;
   if (!OldOperands || OldCap.getSize() == getNumOperands()) {
-    CapOperands = OldOperands ? OldCap.getNext() : OldCap.get(1);
+    // Grow to at least four operands: instructions that outgrow what their
+    // descriptor reserves (variadic ones) usually take several more.
+    CapOperands = OldOperands && OldCap.getSize() >= 4
+                      ? OldCap.getNext()
+                      : OperandCapacity::get(4);
     Operands = MF.allocateOperandArray(CapOperands);
     // Move the operands before the insertion point.
     if (OpNo)
