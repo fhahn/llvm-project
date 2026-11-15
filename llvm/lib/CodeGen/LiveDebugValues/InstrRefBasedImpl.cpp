@@ -3857,8 +3857,19 @@ bool InstrRefBasedLDV::ExtendRanges(MachineFunction &MF,
     VTracker->MBB = MBB;
     MTracker->loadFromArray(MInLocs[*MBB], CurBB);
     CurInst = 1;
+    // Only DBG_VALUEs of registers read machine values here, and only
+    // IMPLICIT_DEFs track new locations depending on them. Without either,
+    // the machine values other instructions produce are never read.
+    bool ReadsMLocs = any_of(*MBB, [](const MachineInstr &MI) {
+      return MI.isImplicitDef() ||
+             (MI.isDebugValue() &&
+              any_of(MI.debug_operands(), [](const MachineOperand &MO) {
+                return MO.isReg() && MO.getReg();
+              }));
+    });
     for (auto &MI : *MBB) {
-      process(MI, &MOutLocs, &MInLocs);
+      if (ReadsMLocs || MI.isDebugInstr())
+        process(MI, &MOutLocs, &MInLocs);
       ++CurInst;
     }
     MTracker->reset();
