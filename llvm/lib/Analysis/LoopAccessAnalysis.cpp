@@ -666,7 +666,16 @@ void RuntimePointerChecking::generateChecks(
   // all outer iterations.
   const Loop *InnerLoop = DC.getInnermostLoop();
   Loop *OuterLoop = InnerLoop->getParentLoop();
-  if (OuterLoop && allIterationsReachLatch(OuterLoop, InnerLoop, LI, *SE)) {
+  // The bounds only describe the accesses where the predicates hold, so the
+  // predicates must be invariant in the outer loop.
+  auto IsOuterInvariant = [&](const SCEVPredicate *Pred) {
+    auto *Cmp = dyn_cast<SCEVComparePredicate>(Pred);
+    return Cmp && SE->isLoopInvariant(Cmp->getLHS(), OuterLoop) &&
+           SE->isLoopInvariant(Cmp->getRHS(), OuterLoop);
+  };
+  const auto &Preds = cast<SCEVUnionPredicate>(DC.getPSE().getPredicate());
+  if (OuterLoop && all_of(Preds.getPredicates(), IsOuterInvariant) &&
+      allIterationsReachLatch(OuterLoop, InnerLoop, LI, *SE)) {
     for (RuntimeCheckingPtrGroup &CG : CheckingGroups)
       CG.CanExpandToOuterLoop = all_of(CG.Members, [&](unsigned I) {
         return accessesOneObjectInAllIterations(Pointers[I], OuterLoop, DC,
