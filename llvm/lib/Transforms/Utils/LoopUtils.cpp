@@ -2185,39 +2185,21 @@ llvm::getRuntimeCheckBounds(const RuntimeCheckingPtrGroup *CG,
   // whereas using a restricted range check could have allowed us to enter at
   // least once. This is why the behaviour is not currently the default and is
   // controlled by the parameter 'HoistRuntimeChecks'.
-  if (HoistRuntimeChecks && CG->CanExpandToOuterLoop &&
-      isa<SCEVAddRecExpr>(High) && isa<SCEVAddRecExpr>(Low)) {
+  if (HoistRuntimeChecks && CG->CanExpandToOuterLoop) {
     auto *HighAR = cast<SCEVAddRecExpr>(High);
     auto *LowAR = cast<SCEVAddRecExpr>(Low);
     const Loop *OuterLoop = TheLoop->getParentLoop();
     const SCEV *Recur = LowAR->getStepRecurrence(SE);
-    // Checking the step is non-negative only ensures the start and the value
-    // at the last outer iteration bound the range if the step is invariant,
-    // i.e. the recurrences are affine (equal steps imply HighAR is too).
-    if (LowAR->isAffine() && Recur == HighAR->getStepRecurrence(SE) &&
-        HighAR->getLoop() == OuterLoop && LowAR->getLoop() == OuterLoop) {
-      BasicBlock *OuterLoopLatch = OuterLoop->getLoopLatch();
-      const SCEV *OuterExitCount = SE.getExitCount(OuterLoop, OuterLoopLatch);
-      if (!isa<SCEVCouldNotCompute>(OuterExitCount) &&
-          OuterExitCount->getType()->isIntegerTy()) {
-        const SCEV *NewHigh =
-            cast<SCEVAddRecExpr>(High)->evaluateAtIteration(OuterExitCount, SE);
-        if (!isa<SCEVCouldNotCompute>(NewHigh)) {
-          LLVM_DEBUG(dbgs() << "LAA: Expanded RT check for range to include "
-                               "outer loop in order to permit hoisting\n");
-          High = NewHigh;
-          Low = cast<SCEVAddRecExpr>(Low)->getStart();
-          // If there is a possibility that the stride is negative then we have
-          // to generate extra checks to ensure the stride is positive.
-          if (!SE.isKnownNonNegative(
-                  SE.applyLoopGuards(Recur, HighAR->getLoop()))) {
-            Stride = Recur;
-            LLVM_DEBUG(dbgs() << "LAA: ... but need to check stride is "
-                                 "positive: "
-                              << *Stride << '\n');
-          }
-        }
-      }
+    LLVM_DEBUG(dbgs() << "LAA: Expanded RT check for range to include "
+                         "outer loop in order to permit hoisting\n");
+    High = HighAR->getExitValue(SE);
+    Low = LowAR->getStart();
+    // If there is a possibility that the stride is negative then we have to
+    // generate extra checks to ensure the stride is positive.
+    if (!SE.isKnownNonNegative(SE.applyLoopGuards(Recur, OuterLoop))) {
+      Stride = Recur;
+      LLVM_DEBUG(dbgs() << "LAA: ... but need to check stride is positive: "
+                        << *Stride << '\n');
     }
   }
   return {Low, High, Stride};
