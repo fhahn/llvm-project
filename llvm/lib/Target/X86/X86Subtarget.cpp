@@ -337,8 +337,6 @@ X86Subtarget::X86Subtarget(const Triple &TT, StringRef CPU, StringRef TuneCPU,
     setPICStyle(PICStyles::Style::GOT);
 
   CallLoweringInfo.reset(new X86CallLowering(*getTargetLowering()));
-  Legalizer.reset(new X86LegalizerInfo(*this, TM));
-
   auto *RBI = new X86RegisterBankInfo(*getRegisterInfo());
   RegBankInfo.reset(RBI);
   InstSelector.reset(createX86InstructionSelector(TM, *this, *RBI));
@@ -356,6 +354,10 @@ InstructionSelector *X86Subtarget::getInstructionSelector() const {
 }
 
 const LegalizerInfo *X86Subtarget::getLegalizerInfo() const {
+  // Only GlobalISel uses the legalizer; build it on first use.
+  if (!Legalizer)
+    Legalizer.reset(new X86LegalizerInfo(
+        *this, static_cast<const X86TargetMachine &>(TM)));
   return Legalizer.get();
 }
 

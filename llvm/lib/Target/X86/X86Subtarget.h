@@ -92,7 +92,7 @@ class X86Subtarget final : public X86GenSubtargetInfo {
 
   /// GlobalISel related APIs.
   std::unique_ptr<CallLowering> CallLoweringInfo;
-  std::unique_ptr<LegalizerInfo> Legalizer;
+  mutable std::unique_ptr<LegalizerInfo> Legalizer;
   std::unique_ptr<RegisterBankInfo> RegBankInfo;
   std::unique_ptr<InstructionSelector> InstSelector;
 
