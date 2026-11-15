@@ -290,20 +290,14 @@ private:
   ///
   /// Requires result pointers to stay valid across appending new entries and
   /// arbitrary erases (results are heap allocated behind unique_ptrs).
-  /// Provides the analysis ID to enable finding results for a given entry in
-  /// the map below, and provides the storage for the actual result concept.
+  /// Provides the analysis ID to enable finding the result of an analysis, and
+  /// provides the storage for the actual result concept.
   using AnalysisResultListT =
       SmallVector<std::pair<AnalysisKey *, typename ResultConceptT::unique_ptr>,
                   8>;
 
   /// Map type from IRUnitT pointer to our custom list type.
   using AnalysisResultListMapT = DenseMap<IRUnitT *, AnalysisResultListT>;
-
-  /// Map type from a pair of analysis ID and IRUnitT pointer to the result in
-  /// a particular result list (which is where the actual analysis result is
-  /// stored).
-  using AnalysisResultMapT =
-      DenseMap<std::pair<AnalysisKey *, IRUnitT *>, ResultConceptT *>;
 
 public:
   /// API to communicate dependencies between analyses during invalidation.
@@ -403,12 +397,7 @@ public:
   AnalysisManager &operator=(AnalysisManager &&);
 
   /// Returns true if the analysis manager has an empty results cache.
-  bool empty() const {
-    assert(AnalysisResults.empty() == AnalysisResultLists.empty() &&
-           "The storage and index of analysis results disagree on how many "
-           "there are!");
-    return AnalysisResults.empty();
-  }
+  bool empty() const { return AnalysisResultLists.empty(); }
 
   /// Clear any cached analysis results for a single unit of IR.
   ///
@@ -424,8 +413,8 @@ public:
   /// IR units itself has potentially changed, and thus we can't even look up a
   /// a result and invalidate/clear it directly.
   void clear() {
-    AnalysisResults.clear();
     AnalysisResultLists.clear();
+    LastIR = nullptr;
   }
 
   /// Returns true if the specified analysis pass is registered.
@@ -540,7 +529,10 @@ public:
         llvm::find_if(ResultsList, [&ID](auto &E) { return E.first == ID; });
     assert(I != ResultsList.end() && "Analysis must be available");
     ResultsList.erase(I);
-    AnalysisResults.erase({ID, &IR});
+    if (ResultsList.empty()) {
+      AnalysisResultLists.erase(ResultsListI);
+      LastIR = nullptr;
+    }
   }
 
 private:
@@ -564,11 +556,28 @@ private:
   ResultConceptT &getResultImpl(AnalysisKey *ID, IRUnitT &IR,
                                 ExtraArgTs... ExtraArgs);
 
+  /// Get the result list of \p IR or return null. Passes query several
+  /// analyses of the same IR unit in a row, so remember the last list.
+  AnalysisResultListT *getResultList(IRUnitT &IR) const {
+    if (LastIR != &IR) {
+      auto ResultsListI = AnalysisResultLists.find(&IR);
+      if (ResultsListI == AnalysisResultLists.end())
+        return nullptr;
+      LastIR = &IR;
+      LastResults = const_cast<AnalysisResultListT *>(&ResultsListI->second);
+    }
+    return LastResults;
+  }
+
   /// Get a cached analysis result or return null.
   ResultConceptT *getCachedResultImpl(AnalysisKey *ID, IRUnitT &IR) const {
-    typename AnalysisResultMapT::const_iterator RI =
-        AnalysisResults.find({ID, &IR});
-    return RI == AnalysisResults.end() ? nullptr : RI->second;
+    AnalysisResultListT *ResultsList = getResultList(IR);
+    if (!ResultsList)
+      return nullptr;
+    auto RI = llvm::find_if(*ResultsList, [ID](const auto &IDAndResult) {
+      return IDAndResult.first == ID;
+    });
+    return RI == ResultsList->end() ? nullptr : RI->second.get();
   }
 
   /// Map type from analysis pass ID to pass concept pointer.
@@ -584,9 +593,10 @@ private:
   /// the ultimate storage for a particular cached analysis result.
   AnalysisResultListMapT AnalysisResultLists;
 
-  /// Map from an analysis ID and IR unit to a particular cached
-  /// analysis result.
-  AnalysisResultMapT AnalysisResults;
+  /// The IR unit and result list getResultList returned last. Reset whenever
+  /// an entry of AnalysisResultLists is added or erased.
+  mutable const IRUnitT *LastIR = nullptr;
+  mutable AnalysisResultListT *LastResults = nullptr;
 };
 
 extern template class LLVM_TEMPLATE_ABI AnalysisManager<Module>;
