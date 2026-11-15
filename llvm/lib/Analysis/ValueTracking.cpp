@@ -880,25 +880,20 @@ static bool cmpExcludesZero(CmpInst::Predicate Pred, const Value *RHS) {
   if (Pred == ICmpInst::ICMP_NE)
     return match(RHS, m_Zero());
 
-  // All other predicates - rely on generic ConstantRange handling.
+  // All other predicates - the compare excludes zero iff 0 Pred C is false.
   const APInt *C;
   auto Zero = APInt::getZero(RHS->getType()->getScalarSizeInBits());
-  if (match(RHS, m_APInt(C))) {
-    ConstantRange TrueValues = ConstantRange::makeExactICmpRegion(Pred, *C);
-    return !TrueValues.contains(Zero);
-  }
+  if (match(RHS, m_APInt(C)))
+    return !ICmpInst::compare(Zero, *C, Pred);
 
   auto *VC = dyn_cast<ConstantDataVector>(RHS);
   if (VC == nullptr)
     return false;
 
   for (unsigned ElemIdx = 0, NElem = VC->getNumElements(); ElemIdx < NElem;
-       ++ElemIdx) {
-    ConstantRange TrueValues = ConstantRange::makeExactICmpRegion(
-        Pred, VC->getElementAsAPInt(ElemIdx));
-    if (TrueValues.contains(Zero))
+       ++ElemIdx)
+    if (ICmpInst::compare(Zero, VC->getElementAsAPInt(ElemIdx), Pred))
       return false;
-  }
   return true;
 }
 
