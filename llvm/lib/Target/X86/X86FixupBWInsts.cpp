@@ -115,8 +115,10 @@ private:
   /// Local member for function's OptForSize attribute.
   bool OptForSize = false;
 
-  /// Register Liveness information after the current instruction.
-  LiveRegUnits LiveUnits;
+  /// Register Liveness information after the current instruction, computed
+  /// on the first query in a block: most blocks have nothing to replace.
+  mutable LiveRegUnits LiveUnits;
+  mutable bool LiveUnitsValid = false;
 
   ProfileSummaryInfo *PSI = nullptr;
   MachineBlockFrequencyInfo *MBFI = nullptr;
@@ -196,6 +198,19 @@ Register X86FixupBWInstImpl::getSuperRegDestIfDead(MachineInstr *OrigMI) const {
   // super-register is considered dead.
   if (SubRegIdx == X86::sub_8bit_hi)
     return Register();
+
+  // Compute the liveness after OrigMI on the first query in the block.
+  if (!LiveUnitsValid) {
+    MachineBasicBlock &MBB = *OrigMI->getParent();
+    LiveUnits.clear();
+    // We run after PEI, so we need to AddPristinesAndCSRs.
+    LiveUnits.addLiveOuts(MBB);
+    for (MachineInstr &MI :
+         make_range(MBB.rbegin(), MachineBasicBlock::reverse_iterator(OrigMI)))
+      if (!MI.isDebugInstr())
+        LiveUnits.stepBackward(MI);
+    LiveUnitsValid = true;
+  }
 
   // Test all regunits of the super register that are not part of the
   // sub register. If none of them are live then the super register is safe to
@@ -441,11 +456,9 @@ void X86FixupBWInstImpl::processBasicBlock(MachineFunction &MF,
   // from making it seem as if the larger register might be live.
   SmallVector<std::pair<MachineInstr *, MachineInstr *>, 8> MIReplacements;
 
-  // Start computing liveness for this block. We iterate from the end to be able
-  // to update this for each instruction.
-  LiveUnits.clear();
-  // We run after PEI, so we need to AddPristinesAndCSRs.
-  LiveUnits.addLiveOuts(MBB);
+  // Liveness is computed from the end of the block once it is first queried,
+  // then updated for each instruction.
+  LiveUnitsValid = false;
 
   OptForSize = llvm::shouldOptimizeForSize(&MBB, PSI, MBFI);
 
@@ -454,7 +467,7 @@ void X86FixupBWInstImpl::processBasicBlock(MachineFunction &MF,
       MIReplacements.push_back(std::make_pair(&MI, NewMI));
 
     // We're done with this instruction, update liveness for the next one.
-    if (!MI.isDebugInstr())
+    if (LiveUnitsValid && !MI.isDebugInstr())
       LiveUnits.stepBackward(MI);
   }
 
