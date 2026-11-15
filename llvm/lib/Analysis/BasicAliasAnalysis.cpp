@@ -268,7 +268,16 @@ CaptureComponents EarliestEscapeAnalysis::getCapturesBefore(
       return isNotInCycle(I, &DT, LI, CI);
     }
 
-    return !isPotentiallyReachable(CaptureInst, I, nullptr, &DT, LI, CI);
+    // Unless the capture precedes I in the same block, whether it can reach I
+    // only depends on the two blocks.
+    const BasicBlock *CaptureBB = CaptureInst->getParent();
+    const BasicBlock *BB = I->getParent();
+    if (CaptureBB == BB && CaptureInst->comesBefore(I))
+      return false;
+    auto [It, Inserted] = Reachable.try_emplace({CaptureBB, BB});
+    if (Inserted)
+      It->second = isPotentiallyReachable(CaptureInst, I, nullptr, &DT, LI, CI);
+    return !It->second;
   };
   if (IsNotCapturedBefore())
     return CaptureComponents::None;

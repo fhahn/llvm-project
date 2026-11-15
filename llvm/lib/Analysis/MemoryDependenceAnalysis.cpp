@@ -1505,6 +1505,7 @@ void MemoryDependenceResults::invalidateCachedPointerInfo(Value *Ptr) {
 
 void MemoryDependenceResults::invalidateCachedPredecessors() {
   PredCache.clear();
+  EEA.invalidateReachability();
 }
 
 void MemoryDependenceResults::removeInstruction(Instruction *RemInst) {

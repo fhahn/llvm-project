@@ -4202,6 +4202,8 @@ BasicBlock *GVNPassImpl::splitCriticalEdges(BasicBlock *Pred,
   if (BB) {
     if (MD)
       MD->invalidateCachedPredecessors();
+    if (EA)
+      EA->invalidateReachability();
     InvalidBlockRPONumbers = true;
   }
   return BB;
@@ -4223,6 +4225,8 @@ bool GVNPassImpl::splitCriticalEdges() {
   if (Changed) {
     if (MD)
       MD->invalidateCachedPredecessors();
+    if (EA)
+      EA->invalidateReachability();
     InvalidBlockRPONumbers = true;
   }
   return Changed;

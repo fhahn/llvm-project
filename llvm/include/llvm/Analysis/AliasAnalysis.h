@@ -204,6 +204,10 @@ class LLVM_ABI EarliestEscapeAnalysis final : public CaptureAnalysis {
   /// account for longjmp re-entry paths not visible to the forward CFG.
   std::optional<bool> CallsReturnsTwiceFn;
 
+  /// Cached reachability from a capturing block to a query block, which only
+  /// depends on the CFG.
+  DenseMap<std::pair<const BasicBlock *, const BasicBlock *>, bool> Reachable;
+
   /// Whether the function contains a call that may return twice (e.g., setjmp).
   bool callsReturnsTwiceFn();
 
@@ -216,6 +220,9 @@ public:
                                       bool OrAt, bool ReturnCaptures) override;
 
   void removeInstruction(Instruction *I);
+
+  /// Must be called when the CFG changes while this object is in use.
+  void invalidateReachability() { Reachable.clear(); }
 };
 
 /// Cache key for BasicAA results. It only includes the pointer and size from
