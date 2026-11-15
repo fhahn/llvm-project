@@ -778,6 +778,10 @@ private:
   /// location.
   llvm::DIFile *getOrCreateFile(SourceLocation Loc);
 
+  /// Get the file debug info descriptor for the input location, whose
+  /// presumed location the caller has already computed.
+  llvm::DIFile *getOrCreateFile(SourceLocation Loc, const PresumedLoc &PLoc);
+
   /// Create a file debug info descriptor for a source file.
   llvm::DIFile *
   createFile(StringRef FileName,
