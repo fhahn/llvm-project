@@ -534,6 +534,9 @@ struct RuntimeCheckingPtrGroup {
   /// Whether the pointer needs to be frozen after expansion, e.g. because it
   /// may be poison outside the loop.
   bool NeedsFreeze = false;
+  /// Whether the bounds can be expanded to cover all iterations of the parent
+  /// loop without wrapping.
+  bool CanExpandToOuterLoop = false;
 };
 
 /// A memcheck which made up of a pair of grouped pointers.
@@ -616,7 +619,8 @@ public:
 
   /// Generate the checks and store it.  This also performs the grouping
   /// of pointers to reduce the number of memchecks necessary.
-  LLVM_ABI void generateChecks(MemoryDepChecker::DepCandidates &DepCands);
+  LLVM_ABI void generateChecks(MemoryDepChecker::DepCandidates &DepCands,
+                               const LoopInfo &LI);
 
   /// Returns the checks that generateChecks created. They can be used to ensure
   /// no read/write accesses overlap across all loop iterations.
