@@ -485,9 +485,12 @@ Value *Mapper::mapValue(const Value *V) {
     NewTy = TypeMapper->remapType(NewTy);
 
   // If the result type and all operands match up, then just insert an identity
-  // mapping.
-  if (OpNo == NumOperands && NewTy == C->getType())
+  // mapping. ConstantData is cheaper to map again than to track in the map.
+  if (OpNo == NumOperands && NewTy == C->getType()) {
+    if (isa<ConstantData>(C))
+      return C;
     return getVM()[V] = C;
+  }
 
   // Okay, we need to create a new constant.  We've already processed some or
   // all of the operands, set them all up now.
@@ -621,6 +624,7 @@ std::optional<Metadata *> MDNodeMapper::tryToMapOperand(const Metadata *Op) {
 #ifndef NDEBUG
     if (auto *CMD = dyn_cast<ConstantAsMetadata>(Op))
       assert((!*MappedOp || M.getVM().count(CMD->getValue()) ||
+              isa<ConstantData>(CMD->getValue()) ||
               M.getVM().getMappedMD(Op)) &&
              "Expected Value to be memoized");
     else
@@ -671,8 +675,14 @@ std::optional<Metadata *> MDNodeMapper::getMappedOp(const Metadata *Op) const {
   if (isa<MDString>(Op))
     return const_cast<Metadata *>(Op);
 
-  if (auto *CMD = dyn_cast<ConstantAsMetadata>(Op))
-    return wrapConstantAsMetadata(*CMD, M.getVM().lookup(CMD->getValue()));
+  if (auto *CMD = dyn_cast<ConstantAsMetadata>(Op)) {
+    Value *V = CMD->getValue();
+    Value *MappedV = M.getVM().lookup(V);
+    // An identity mapping of ConstantData is not memoized, see mapValue().
+    if (!MappedV && isa<ConstantData>(V))
+      MappedV = M.mapValue(V);
+    return wrapConstantAsMetadata(*CMD, MappedV);
+  }
 
   return std::nullopt;
 }
