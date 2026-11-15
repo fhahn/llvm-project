@@ -184,7 +184,41 @@ ConstantRange ConstantRange::makeExactICmpRegion(CmpInst::Predicate Pred,
   // for example ult [2,5) makeAllowedICmpRegion returns [0,4) but
   // makeSatisfyICmpRegion returns [0,2).
   //
-  return makeAllowedICmpRegion(Pred, C);
+  // This is makeAllowedICmpRegion for the singleton [C, C+1), without
+  // constructing it and computing its bounds.
+  uint32_t W = C.getBitWidth();
+  switch (Pred) {
+  default:
+    llvm_unreachable("Invalid ICmp predicate to makeExactICmpRegion()");
+  case CmpInst::ICMP_EQ:
+    return ConstantRange(C);
+  case CmpInst::ICMP_NE:
+    return ConstantRange(C + 1, C);
+  case CmpInst::ICMP_ULT:
+    if (C.isMinValue())
+      return getEmpty(W);
+    return ConstantRange(APInt::getMinValue(W), C);
+  case CmpInst::ICMP_SLT:
+    if (C.isMinSignedValue())
+      return getEmpty(W);
+    return ConstantRange(APInt::getSignedMinValue(W), C);
+  case CmpInst::ICMP_ULE:
+    return getNonEmpty(APInt::getMinValue(W), C + 1);
+  case CmpInst::ICMP_SLE:
+    return getNonEmpty(APInt::getSignedMinValue(W), C + 1);
+  case CmpInst::ICMP_UGT:
+    if (C.isMaxValue())
+      return getEmpty(W);
+    return ConstantRange(C + 1, APInt::getZero(W));
+  case CmpInst::ICMP_SGT:
+    if (C.isMaxSignedValue())
+      return getEmpty(W);
+    return ConstantRange(C + 1, APInt::getSignedMinValue(W));
+  case CmpInst::ICMP_UGE:
+    return getNonEmpty(C, APInt::getZero(W));
+  case CmpInst::ICMP_SGE:
+    return getNonEmpty(C, APInt::getSignedMinValue(W));
+  }
 }
 
 bool ConstantRange::areInsensitiveToSignednessOfICmpPredicate(
