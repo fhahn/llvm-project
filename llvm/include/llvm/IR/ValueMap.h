@@ -94,6 +94,7 @@ class ValueMap {
   MapT Map;
   std::optional<MDMapT> MDMap;
   ExtraData Data;
+  bool TrackKeys = true;
 
 public:
   using key_type = KeyT;
@@ -111,6 +112,13 @@ public:
   ValueMap(ValueMap &&) = delete;
   ValueMap &operator=(const ValueMap &) = delete;
   ValueMap &operator=(ValueMap &&) = delete;
+
+  /// Do not watch the keys for deletion and RAUW. Only valid if no key is
+  /// deleted or RAUW'd while it is in the map; saves a value handle per key.
+  void untrackKeys() {
+    assert(empty() && "Keys already tracked");
+    TrackKeys = false;
+  }
 
   bool hasMD() const { return bool(MDMap); }
   MDMapT &MD() {
@@ -225,17 +233,17 @@ class ValueMapCallbackVH final : public CallbackVH {
   using ValueMapT = ValueMap<KeyT, ValueT, Config>;
   using KeySansPointerT = std::remove_pointer_t<KeyT>;
 
+  KeyT Key;
   ValueMapT *Map;
 
   ValueMapCallbackVH(KeyT Key, ValueMapT *Map)
-      : CallbackVH(const_cast<Value *>(static_cast<const Value *>(Key))),
-        Map(Map) {}
-
-  // Private constructor used to create empty DenseMap keys.
-  ValueMapCallbackVH(Value *V) : CallbackVH(V), Map(nullptr) {}
+      : CallbackVH(Map->TrackKeys
+                       ? const_cast<Value *>(static_cast<const Value *>(Key))
+                       : nullptr),
+        Key(Key), Map(Map) {}
 
 public:
-  KeyT Unwrap() const { return cast_or_null<KeySansPointerT>(getValPtr()); }
+  KeyT Unwrap() const { return Key; }
 
   void deleted() override {
     // Make a copy that won't get changed even when *this is destroyed.
@@ -286,10 +294,12 @@ struct DenseMapInfo<ValueMapCallbackVH<KeyT, ValueT, Config>> {
     return DenseMapInfo<KeyT>::getHashValue(Val);
   }
 
-  static bool isEqual(const VH &LHS, const VH &RHS) { return LHS == RHS; }
+  static bool isEqual(const VH &LHS, const VH &RHS) {
+    return LHS.Unwrap() == RHS.Unwrap();
+  }
 
   static bool isEqual(const KeyT &LHS, const VH &RHS) {
-    return LHS == RHS.getValPtr();
+    return LHS == RHS.Unwrap();
   }
 };
 
