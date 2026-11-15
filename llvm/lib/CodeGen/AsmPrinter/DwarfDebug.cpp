@@ -2151,9 +2151,8 @@ void DwarfDebug::collectEntityInfo(DwarfCompileUnit &TheCU,
 // Process beginning of an instruction.
 void DwarfDebug::beginInstruction(const MachineInstr *MI) {
   const MachineFunction &MF = *MI->getMF();
-  const auto *SP = MF.getFunction().getSubprogram();
-  bool NoDebug =
-      !SP || SP->getUnit()->getEmissionKind() == DICompileUnit::NoDebug;
+  // CurFn is set exactly while emitting a function with debug info.
+  bool NoDebug = !CurFn;
 
   // Delay slot support check.
   auto delaySlotSupported = [](const MachineInstr &MI) {
@@ -2170,8 +2169,9 @@ void DwarfDebug::beginInstruction(const MachineInstr *MI) {
   };
 
   // When describing calls, we need a label for the call instruction.
-  if (!NoDebug && SP->areAllCallsDescribed() &&
+  if (!NoDebug &&
       MI->isCandidateForAdditionalCallInfo(MachineInstr::AnyInBundle) &&
+      MF.getFunction().getSubprogram()->areAllCallsDescribed() &&
       (!MI->hasDelaySlot() || delaySlotSupported(*MI))) {
     const TargetInstrInfo *TII = MF.getSubtarget().getInstrInfo();
     bool IsTail = TII->isTailCall(*MI);
@@ -2249,9 +2249,16 @@ void DwarfDebug::beginInstruction(const MachineInstr *MI) {
   // should use not-key is_stmt handling. Key Instructions functions inlined
   // into Not-Key-Instructions functions should use Key Instructions is_stmt
   // handling.
-  bool ScopeUsesKeyInstructions =
-      KeyInstructionsAreStmts && DL &&
-      DL->getScope()->getSubprogram()->getKeyInstructionsEnabled();
+  bool ScopeUsesKeyInstructions = false;
+  if (KeyInstructionsAreStmts && DL) {
+    const DILocalScope *Scope = DL->getScope();
+    if (Scope != KeyInstructionsScope) {
+      KeyInstructionsScope = Scope;
+      KeyInstructionsScopeEnabled =
+          Scope->getSubprogram()->getKeyInstructionsEnabled();
+    }
+    ScopeUsesKeyInstructions = KeyInstructionsScopeEnabled;
+  }
 
   bool IsKey = false;
   if (ScopeUsesKeyInstructions && DL && DL.getLine()) {
@@ -2268,6 +2275,7 @@ void DwarfDebug::beginInstruction(const MachineInstr *MI) {
     // somewhere that doesn't have a source location already. It should be in
     // the entry block.
     assert(MI->getParent() == &*MI->getMF()->begin());
+    const DISubprogram *SP = MF.getFunction().getSubprogram();
     recordSourceLine(SP->getScopeLine(), 0, SP,
                      DWARF2_FLAG_PROLOGUE_END | DWARF2_FLAG_IS_STMT);
     return;
@@ -2866,6 +2874,7 @@ void DwarfDebug::beginFunctionImpl(const MachineFunction *MF) {
   // functions and vice versa. Key Instructions are only computed once an
   // instruction from a scope using them is emitted.
   KeyInstructionsComputed = false;
+  KeyInstructionsScope = nullptr;
   findForceIsStmtInstrs(MF);
 }
 
