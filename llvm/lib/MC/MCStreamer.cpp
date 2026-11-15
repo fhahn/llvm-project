@@ -156,21 +156,23 @@ void MCStreamer::emitIntValue(const APInt &Value) {
 /// EmitULEB128IntValue - Special case of EmitULEB128Value that avoids the
 /// client having to pass in a MCExpr for constant integers.
 unsigned MCStreamer::emitULEB128IntValue(uint64_t Value, unsigned PadTo) {
-  SmallString<128> Tmp;
-  raw_svector_ostream OSE(Tmp);
-  encodeULEB128(Value, OSE, PadTo);
-  emitBytes(OSE.str());
-  return Tmp.size();
+  // A 64-bit value takes at most 10 bytes, more only when padded.
+  SmallString<16> Tmp;
+  Tmp.resize_for_overwrite(std::max(PadTo, 10u));
+  unsigned Size =
+      encodeULEB128(Value, reinterpret_cast<uint8_t *>(Tmp.data()), PadTo);
+  emitBytes(Tmp.str().take_front(Size));
+  return Size;
 }
 
 /// EmitSLEB128IntValue - Special case of EmitSLEB128Value that avoids the
 /// client having to pass in a MCExpr for constant integers.
 unsigned MCStreamer::emitSLEB128IntValue(int64_t Value) {
-  SmallString<128> Tmp;
-  raw_svector_ostream OSE(Tmp);
-  encodeSLEB128(Value, OSE);
-  emitBytes(OSE.str());
-  return Tmp.size();
+  SmallString<16> Tmp;
+  Tmp.resize_for_overwrite(10);
+  unsigned Size = encodeSLEB128(Value, reinterpret_cast<uint8_t *>(Tmp.data()));
+  emitBytes(Tmp.str().take_front(Size));
+  return Size;
 }
 
 void MCStreamer::emitValue(const MCExpr *Value, unsigned Size, SMLoc Loc) {
