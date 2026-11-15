@@ -471,6 +471,10 @@ private:
   SmallDenseSet<const MachineInstr *> KeyInstructions;
   /// Whether KeyInstructions is up to date for the current function.
   bool KeyInstructionsComputed = false;
+  /// The scope of the last instruction looked at and whether its subprogram
+  /// uses Key Instructions.
+  const DILocalScope *KeyInstructionsScope = nullptr;
+  bool KeyInstructionsScopeEnabled = false;
 
   /// Force the use of DW_AT_ranges even for single-entry range lists.
   MinimizeAddrInV5 MinimizeAddr = MinimizeAddrInV5::Disabled;
