@@ -24,6 +24,7 @@ namespace clang {
 class ScratchBuffer {
   SourceManager &SourceMgr;
   char *CurBuffer;
+  FileID BufferFID;
   SourceLocation BufferStartLoc;
   unsigned BytesUsed;
 public:
