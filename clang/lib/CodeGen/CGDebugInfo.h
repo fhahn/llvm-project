@@ -807,6 +807,10 @@ private:
   /// location.
   llvm::DIFile *getOrCreateFile(SourceLocation Loc);
 
+  /// Get the file debug info descriptor for the input location, whose
+  /// presumed location the caller has already computed.
+  llvm::DIFile *getOrCreateFile(SourceLocation Loc, const PresumedLoc &PLoc);
+
   /// Note that \p F was created for a location in \p FID.
   void recordDIFileSource(const llvm::DIFile *F, FileID FID);
 
