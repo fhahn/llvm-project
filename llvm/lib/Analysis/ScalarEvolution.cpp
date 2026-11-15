@@ -1385,11 +1385,11 @@ static APInt extractConstantWithoutWrapping(ScalarEvolution &SE,
   return APInt(BitWidth, 0);
 }
 
+template <typename FoldCacheUserT>
 static void insertFoldCacheEntry(
     const ScalarEvolution::FoldID &ID, const SCEV *S,
     DenseMap<ScalarEvolution::FoldID, const SCEV *> &FoldCache,
-    DenseMap<const SCEV *, SmallVector<ScalarEvolution::FoldID, 2>>
-        &FoldCacheUser) {
+    FoldCacheUserT &FoldCacheUser) {
   auto I = FoldCache.insert({ID, S});
   if (!I.second) {
     // Remove FoldCacheUser entry for ID when replacing an existing FoldCache
@@ -4385,7 +4385,7 @@ bool ScalarEvolution::containsAddRecurrence(const SCEV *S) {
 /// Return the ValueOffsetPair set for \p S. \p S can be represented
 /// by the value and offset from any ValueOffsetPair in the set.
 ArrayRef<Value *> ScalarEvolution::getSCEVValues(const SCEV *S) {
-  ExprValueMapType::iterator SI = ExprValueMap.find_as(S);
+  ExprValueMapType::iterator SI = ExprValueMap.find(S);
   if (SI == ExprValueMap.end())
     return {};
   return SI->second;
@@ -6461,7 +6461,7 @@ static bool RangeRefPHIAllowedOperands(DominatorTree &DT, PHINode *PHI) {
 const ConstantRange &
 ScalarEvolution::getRangeRefIter(const SCEV *S,
                                  ScalarEvolution::RangeSignHint SignHint) {
-  DenseMap<const SCEV *, ConstantRange> &Cache =
+  SCEVKeyedMap<ConstantRange> &Cache =
       SignHint == ScalarEvolution::HINT_RANGE_UNSIGNED ? UnsignedRanges
                                                        : SignedRanges;
   SmallVector<SCEVUse> WorkList;
@@ -6544,7 +6544,7 @@ const APInt *ScalarEvolution::getConstantAPIntOrNull(const SCEV *S) {
 /// with a "cleaner" unsigned (resp. signed) representation.
 const ConstantRange &ScalarEvolution::getRangeRef(
     const SCEV *S, ScalarEvolution::RangeSignHint SignHint, unsigned Depth) {
-  DenseMap<const SCEV *, ConstantRange> &Cache =
+  SCEVKeyedMap<ConstantRange> &Cache =
       SignHint == ScalarEvolution::HINT_RANGE_UNSIGNED ? UnsignedRanges
                                                        : SignedRanges;
   ConstantRange::PreferredRangeType RangeType =
@@ -13916,7 +13916,10 @@ ScalarEvolution::ScalarEvolution(Function &F, TargetLibraryInfo &TLI,
                                  LoopInfo &LI)
     : Opts(getAnalysisOptions(F)), F(F), DL(F.getDataLayout()), TLI(TLI),
       AC(AC), DT(DT), LI(LI), CouldNotCompute(new SCEVCouldNotCompute()),
-      ValuesAtScopes(64), LoopDispositions(64), BlockDispositions(64) {
+      HasRecMap(0), ExprValueMap(1), FoldCacheUser(2), ConstantMultipleCache(3),
+      BECountUsers(4), ValuesAtScopes(5, 64), ValuesAtScopesUsers(6),
+      LoopDispositions(7, 64), BlockDispositions(8, 64), SCEVUsers(9),
+      UnsignedRanges(10), SignedRanges(11) {
   // To use guards for proving predicates, we need to scan every instruction in
   // relevant basic blocks, and not just terminators.  Doing this is a waste of
   // time if the IR does not actually contain any calls to
@@ -13935,8 +13938,9 @@ ScalarEvolution::ScalarEvolution(Function &F, TargetLibraryInfo &TLI,
 ScalarEvolution::ScalarEvolution(ScalarEvolution &&Arg)
     : Opts(Arg.Opts), F(Arg.F), DL(Arg.DL), HasGuards(Arg.HasGuards),
       TLI(Arg.TLI), AC(Arg.AC), DT(Arg.DT), LI(Arg.LI),
-      CouldNotCompute(std::move(Arg.CouldNotCompute)),
-      ValueExprMap(std::move(Arg.ValueExprMap)),
+      CouldNotCompute(std::move(Arg.CouldNotCompute)), HasRecMap(0),
+      ExprValueMap(1), ValueExprMap(std::move(Arg.ValueExprMap)),
+      FoldCacheUser(2),
       PendingLoopPredicates(std::move(Arg.PendingLoopPredicates)),
       PendingMerges(std::move(Arg.PendingMerges)),
       ConstantMultipleCache(std::move(Arg.ConstantMultipleCache)),

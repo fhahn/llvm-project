@@ -292,6 +292,13 @@ protected:
   /// miscellaneous information.
   unsigned short SubclassData = 0;
 
+private:
+  friend class ScalarEvolution;
+  /// One bit per ScalarEvolution cache keyed by SCEV, set while this node may
+  /// have an entry in that cache.
+  mutable unsigned short CachedIn = 0;
+
+protected:
   /// Pointer to the canonical version of the SCEV, i.e. one where all operands
   /// have no SCEVUse flags.
   const SCEV *CanonicalSCEV = nullptr;
@@ -1708,6 +1715,74 @@ private:
   // Needs getWithOperands to rebuild a node from its canonical operands.
   friend void SCEV::computeAndSetCanonical(ScalarEvolution &SE);
 
+  /// A map keyed by SCEV that keeps its own bit in SCEV::CachedIn set for all
+  /// non-null keys, so that lookups of nodes without an entry (most nodes when
+  /// forgetting) do not probe the map. Null keys are always probed.
+  template <typename ValueT> class SCEVKeyedMap {
+    using MapT = DenseMap<const SCEV *, ValueT>;
+    MapT Map;
+    unsigned short Bit;
+
+    bool mayContain(const SCEV *S) const { return !S || (S->CachedIn & Bit); }
+    void setBit(const SCEV *S) {
+      if (S)
+        S->CachedIn |= Bit;
+    }
+    void clearBit(const SCEV *S) {
+      if (S)
+        S->CachedIn &= ~Bit;
+    }
+
+  public:
+    using iterator = typename MapT::iterator;
+    using const_iterator = typename MapT::const_iterator;
+
+    explicit SCEVKeyedMap(unsigned BitIdx, unsigned InitialReserve = 0)
+        : Map(InitialReserve), Bit(1 << BitIdx) {
+      assert(BitIdx < 16 && "SCEV::CachedIn has 16 bits");
+    }
+
+    iterator begin() { return Map.begin(); }
+    iterator end() { return Map.end(); }
+    const_iterator begin() const { return Map.begin(); }
+    const_iterator end() const { return Map.end(); }
+
+    iterator find(const SCEV *S) {
+      return mayContain(S) ? Map.find(S) : Map.end();
+    }
+    const_iterator find(const SCEV *S) const {
+      return mayContain(S) ? Map.find(S) : Map.end();
+    }
+    bool contains(const SCEV *S) const {
+      return mayContain(S) && Map.contains(S);
+    }
+
+    ValueT &operator[](const SCEV *S) {
+      setBit(S);
+      return Map[S];
+    }
+    std::pair<iterator, bool> insert(std::pair<const SCEV *, ValueT> &&KV) {
+      setBit(KV.first);
+      return Map.insert(std::move(KV));
+    }
+    std::pair<iterator, bool> insert_or_assign(const SCEV *S, ValueT &&V) {
+      setBit(S);
+      return Map.insert_or_assign(S, std::move(V));
+    }
+
+    bool erase(const SCEV *S) {
+      if (!mayContain(S))
+        return false;
+      clearBit(S);
+      return Map.erase(S);
+    }
+    void erase(iterator I) {
+      clearBit(I->first);
+      Map.erase(I);
+    }
+    void clear() { Map.clear(); }
+  };
+
   const AnalysisOptions &Opts;
 
   /// The function we are analyzing.
@@ -1737,13 +1812,13 @@ private:
   std::unique_ptr<SCEVCouldNotCompute> CouldNotCompute;
 
   /// The type for HasRecMap.
-  using HasRecMapType = DenseMap<const SCEV *, bool>;
+  using HasRecMapType = SCEVKeyedMap<bool>;
 
   /// This is a cache to record whether a SCEV contains any scAddRecExpr.
   HasRecMapType HasRecMap;
 
   /// The type for ExprValueMap.
-  using ExprValueMapType = DenseMap<const SCEV *, TinyPtrVector<Value *>>;
+  using ExprValueMapType = SCEVKeyedMap<TinyPtrVector<Value *>>;
 
   /// ExprValueMap -- This map records the original values from which
   /// the SCEV expr is generated from.
@@ -1759,7 +1834,7 @@ private:
   /// This is a cache for expressions that got folded to a different existing
   /// SCEV.
   DenseMap<FoldID, const SCEV *> FoldCache;
-  DenseMap<const SCEV *, SmallVector<FoldID, 2>> FoldCacheUser;
+  SCEVKeyedMap<SmallVector<FoldID, 2>> FoldCacheUser;
 
   /// Mark predicate values currently being processed by isImpliedCond.
   SmallPtrSet<const Value *, 6> PendingLoopPredicates;
@@ -1776,7 +1851,7 @@ private:
   bool ProvingSplitPredicate = false;
 
   /// Memoized values for the getConstantMultiple
-  DenseMap<const SCEV *, APInt> ConstantMultipleCache;
+  SCEVKeyedMap<APInt> ConstantMultipleCache;
 
   /// Return the Value set from which the SCEV expr is generated.
   ArrayRef<Value *> getSCEVValues(const SCEV *S);
@@ -1944,7 +2019,7 @@ private:
   DenseMap<const Loop *, BackedgeTakenInfo> PredicatedBackedgeTakenCounts;
 
   /// Loops whose backedge taken counts directly use this non-constant SCEV.
-  DenseMap<const SCEV *, SmallPtrSet<PointerIntPair<const Loop *, 1, bool>, 4>>
+  SCEVKeyedMap<SmallPtrSet<PointerIntPair<const Loop *, 1, bool>, 4>>
       BECountUsers;
 
   /// This map contains entries for all of the PHI instructions that we
@@ -1956,17 +2031,15 @@ private:
   /// This map contains entries for all the expressions that we attempt to
   /// compute getSCEVAtScope information for, which can be expensive in
   /// extreme cases.
-  DenseMap<const SCEV *, SmallVector<std::pair<const Loop *, SCEVUse>, 2>>
-      ValuesAtScopes;
+  SCEVKeyedMap<SmallVector<std::pair<const Loop *, SCEVUse>, 2>> ValuesAtScopes;
 
   /// Reverse map for invalidation purposes: Stores of which SCEV and which
   /// loop this is the value-at-scope of.
-  DenseMap<const SCEV *, SmallVector<std::pair<const Loop *, const SCEV *>, 2>>
+  SCEVKeyedMap<SmallVector<std::pair<const Loop *, const SCEV *>, 2>>
       ValuesAtScopesUsers;
 
   /// Memoized computeLoopDisposition results.
-  DenseMap<const SCEV *,
-           SmallVector<PointerIntPair<const Loop *, 2, LoopDisposition>, 2>>
+  SCEVKeyedMap<SmallVector<PointerIntPair<const Loop *, 2, LoopDisposition>, 2>>
       LoopDispositions;
 
   struct LoopProperties {
@@ -1996,8 +2069,7 @@ private:
   LoopDisposition computeLoopDisposition(const SCEV *S, const Loop *L);
 
   /// Memoized computeBlockDisposition results.
-  DenseMap<
-      const SCEV *,
+  SCEVKeyedMap<
       SmallVector<PointerIntPair<const BasicBlock *, 2, BlockDisposition>, 2>>
       BlockDispositions;
 
@@ -2005,13 +2077,13 @@ private:
   BlockDisposition computeBlockDisposition(const SCEV *S, const BasicBlock *BB);
 
   /// Stores all SCEV that use a given SCEV as its direct operand.
-  DenseMap<const SCEV *, SmallPtrSet<const SCEV *, 8> > SCEVUsers;
+  SCEVKeyedMap<SmallPtrSet<const SCEV *, 8>> SCEVUsers;
 
   /// Memoized results from getRange
-  DenseMap<const SCEV *, ConstantRange> UnsignedRanges;
+  SCEVKeyedMap<ConstantRange> UnsignedRanges;
 
   /// Memoized results from getRange
-  DenseMap<const SCEV *, ConstantRange> SignedRanges;
+  SCEVKeyedMap<ConstantRange> SignedRanges;
 
   /// Used to parameterize getRange
   enum RangeSignHint { HINT_RANGE_UNSIGNED, HINT_RANGE_SIGNED };
@@ -2019,7 +2091,7 @@ private:
   /// Set the memoized range for the given SCEV.
   const ConstantRange &setRange(const SCEV *S, RangeSignHint Hint,
                                 ConstantRange CR) {
-    DenseMap<const SCEV *, ConstantRange> &Cache =
+    SCEVKeyedMap<ConstantRange> &Cache =
         Hint == HINT_RANGE_UNSIGNED ? UnsignedRanges : SignedRanges;
 
     auto Pair = Cache.insert_or_assign(S, std::move(CR));
