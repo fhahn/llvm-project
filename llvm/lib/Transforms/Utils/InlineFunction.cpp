@@ -2779,6 +2779,11 @@ void llvm::InlineFunctionImpl(CallBase &CB, InlineFunctionInfo &IFI,
 
   { // Scope to destroy VMap after cloning.
     ValueToValueMapTy VMap;
+    // The keys are values of the callee, which is only read while VMap lives,
+    // and module-level values (constants, inline asm, metadata as value) that
+    // inlining does not delete or replace. Only self-inlining changes them.
+    if (Caller != CalledFunc)
+      VMap.untrackKeys();
     struct ByValInit {
       Value *Dst;
       Value *Src;
