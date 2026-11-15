@@ -1923,25 +1923,30 @@ void InstrRefBasedLDV::transferRegisterDef(MachineInstr &MI) {
     return MI.isCall() && MTracker->SPAliases.count(R);
   };
 
-  // Find the regs killed by MI, and find regmasks of preserved regs.
-  // Max out the number of statically allocated elements in `DeadRegs`, as this
-  // prevents fallback to std::set::count() operations.
-  SmallSet<uint32_t, 32> DeadRegs;
+  // Find the regs killed by MI, and find regmasks of preserved regs. Collect
+  // them in the order a SmallSet<uint32_t, 32> iterates: as inserted, sorted
+  // once there are more than 32.
+  SmallVector<uint32_t, 32> DeadRegs;
   SmallVector<const uint32_t *, 4> RegMasks;
   SmallVector<const MachineOperand *, 4> RegMaskPtrs;
   for (const MachineOperand &MO : MI.operands()) {
     // Determine whether the operand is a register def.
     if (MO.isReg() && MO.isDef() && MO.getReg() && MO.getReg().isPhysical() &&
         !IgnoreSPAlias(MO.getReg())) {
-      // Remove ranges of all aliased registers.
+      // Remove ranges of all aliased registers. The aliases of one register
+      // are distinct, so only look for those of earlier defs.
+      size_t NumEarlier = DeadRegs.size();
       for (MCRegAliasIterator RAI(MO.getReg(), TRI, true); RAI.isValid(); ++RAI)
-        // FIXME: Can we break out of this loop early if no insertion occurs?
-        DeadRegs.insert((*RAI).id());
+        if (!is_contained(ArrayRef(DeadRegs).take_front(NumEarlier),
+                          (*RAI).id()))
+          DeadRegs.push_back((*RAI).id());
     } else if (MO.isRegMask()) {
       RegMasks.push_back(MO.getRegMask());
       RegMaskPtrs.push_back(&MO);
     }
   }
+  if (DeadRegs.size() > 32)
+    llvm::sort(DeadRegs);
 
   // Tell MLocTracker about all definitions, of regmasks and otherwise.
   for (uint32_t DeadReg : DeadRegs)
