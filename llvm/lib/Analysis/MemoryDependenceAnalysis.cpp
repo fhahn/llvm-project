@@ -340,8 +340,8 @@ MemDepResult MemoryDependenceResults::getSimplePointerDependencyFrom(
     BasicBlock *BB, Instruction *QueryInst, unsigned *Limit,
     BatchAAResults &BatchAA) {
   bool isInvariantLoad = false;
-  Align MemLocAlign =
-      MemLoc.Ptr->getPointerAlignment(BB->getDataLayout());
+  const DataLayout &DL = BB->getDataLayout();
+  Align MemLocAlign = MemLoc.Ptr->getPointerAlignment(DL);
 
   unsigned DefaultLimit = getDefaultBlockScanLimit();
   if (!Limit)
@@ -468,13 +468,15 @@ MemDepResult MemoryDependenceResults::getSimplePointerDependencyFrom(
           return MemDepResult::getClobber(LI);
       }
 
-      MemoryLocation LoadLoc = MemoryLocation::get(LI);
       // For a load query, only MustAlias and PartialAlias with a known offset
       // create a dependency, see below. AA metadata can only prove NoAlias,
-      // which is treated like MayAlias, so drop it to skip the metadata-based
-      // AA checks.
-      if (isLoad)
-        LoadLoc = LoadLoc.getWithoutAATags();
+      // which is treated like MayAlias, so don't collect it, to skip the
+      // metadata-based AA checks.
+      MemoryLocation LoadLoc =
+          isLoad ? MemoryLocation(LI->getPointerOperand(),
+                                  LocationSize::precise(DL.getTypeStoreSize(
+                                      LI->getType())))
+                 : MemoryLocation::get(LI);
 
       // If we found a pointer, check if it could be the same as our pointer.
       AliasResult R = BatchAA.alias(LoadLoc, MemLoc);
