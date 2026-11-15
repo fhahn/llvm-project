@@ -534,21 +534,23 @@ MemDepResult MemoryDependenceResults::getSimplePointerDependencyFrom(
           return MemDepResult::getClobber(SI);
 
       // If alias analysis can tell that this store is guaranteed to not modify
-      // the query pointer, ignore it.  Use getModRefInfo to handle cases where
-      // the query pointer points to constant memory etc.
-      if (!isModOrRefSet(BatchAA.getModRefInfo(SI, MemLoc)))
-        continue;
-
-      // Ok, this store might clobber the query pointer.  Check to see if it is
-      // a must alias: in this case, we want to return this as a def.
-      // FIXME: Use ModRefInfo::Must bit from getModRefInfo call above.
+      // the query pointer, ignore it. This does what getModRefInfo(SI, MemLoc)
+      // does, but keeps its alias result: without a NoAlias result from the
+      // context-sensitive query, the context-free one would be the same.
       MemoryLocation StoreLoc = MemoryLocation::get(SI);
-
-      // If we found a pointer, check if it could be the same as our pointer.
-      AliasResult R = BatchAA.alias(StoreLoc, MemLoc);
-
-      if (R == AliasResult::NoAlias)
+      AliasResult R = BatchAA.alias(StoreLoc, MemLoc, SI);
+      if (R == AliasResult::NoAlias) {
+        // Synchronizing stores may affect locations they do not alias.
+        if (!isStrongerThanMonotonic(SI->getOrdering()) ||
+            !isModOrRefSet(BatchAA.getModRefInfo(SI, MemLoc)))
+          continue;
+        R = BatchAA.alias(StoreLoc, MemLoc);
+        if (R == AliasResult::NoAlias)
+          continue;
+      } else if (!isModSet(BatchAA.getModRefInfoMask(MemLoc))) {
+        // Stores don't modify constant memory.
         continue;
+      }
       if (R == AliasResult::MustAlias)
         return MemDepResult::getDef(Inst);
       if (isInvariantLoad)
