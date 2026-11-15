@@ -263,7 +263,15 @@ class AttributeSetNode final
 
   DenseMap<StringRef, Attribute> StringAttrs;
 
+  /// Bit N % 64 is set if a string attribute kind has length N. Most lookups
+  /// of absent kinds return early on it, without hashing the kind.
+  uint64_t StringKindLengths = 0;
+
   AttributeSetNode(ArrayRef<Attribute> Attrs);
+
+  bool mayHaveStringAttribute(StringRef Kind) const {
+    return StringKindLengths & (uint64_t(1) << (Kind.size() % 64));
+  }
 
   /// Find the enum attribute of kind \p Kind, or return std::nullopt if it
   /// is absent. Defined in Attributes.cpp, its only user.

@@ -1306,10 +1306,12 @@ AttributeSetNode::AttributeSetNode(ArrayRef<Attribute> Attrs)
   llvm::copy(Attrs, getTrailingObjects());
 
   for (const auto &I : *this) {
-    if (I.isStringAttribute())
+    if (I.isStringAttribute()) {
       StringAttrs.insert({ I.getKindAsString(), I });
-    else
+      StringKindLengths |= uint64_t(1) << (I.getKindAsString().size() % 64);
+    } else {
       AvailableAttrs.addAttribute(I.getKindAsEnum());
+    }
   }
 }
 
@@ -1386,7 +1388,7 @@ AttributeSetNode *AttributeSetNode::get(LLVMContext &C, const AttrBuilder &B) {
 }
 
 bool AttributeSetNode::hasAttribute(StringRef Kind) const {
-  return StringAttrs.count(Kind);
+  return mayHaveStringAttribute(Kind) && StringAttrs.count(Kind);
 }
 
 inline std::optional<Attribute>
@@ -1418,6 +1420,8 @@ Attribute AttributeSetNode::getAttribute(Attribute::AttrKind Kind) const {
 }
 
 Attribute AttributeSetNode::getAttribute(StringRef Kind) const {
+  if (!mayHaveStringAttribute(Kind))
+    return {};
   return StringAttrs.lookup(Kind);
 }
 
