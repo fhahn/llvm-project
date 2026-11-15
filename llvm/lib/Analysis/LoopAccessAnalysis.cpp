@@ -566,11 +566,13 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
     return false;
 
   // If the start values for both Src and Sink also vary according to an outer
-  // loop, then it's probably better to avoid creating diff checks because
-  // they may not be hoisted. We should instead let llvm::addRuntimeChecks
-  // do the expanded full range overlap checks, which can be hoisted.
-  if (HoistRuntimeChecks && InnerLoop->getParentLoop() &&
-      isa<SCEVAddRecExpr>(SinkStartInt) && isa<SCEVAddRecExpr>(SrcStartInt)) {
+  // loop and their bounds can be expanded to it, then it's probably better to
+  // avoid creating diff checks because they may not be hoisted. We should
+  // instead let llvm::addRuntimeChecks do the expanded full range overlap
+  // checks, which can be hoisted.
+  if (HoistRuntimeChecks && CGI.CanExpandToOuterLoop &&
+      CGJ.CanExpandToOuterLoop && isa<SCEVAddRecExpr>(SinkStartInt) &&
+      isa<SCEVAddRecExpr>(SrcStartInt)) {
     auto *SrcStartAR = cast<SCEVAddRecExpr>(SrcStartInt);
     auto *SinkStartAR = cast<SCEVAddRecExpr>(SinkStartInt);
     const Loop *StartARLoop = SrcStartAR->getLoop();
@@ -612,11 +614,70 @@ SmallVector<RuntimePointerCheck, 4> RuntimePointerChecking::generateChecks() {
   return Checks;
 }
 
+/// Returns true if every iteration of \p OuterLoop reaches its latch and
+/// \p InnerLoop exits only from its latch.
+static bool allIterationsReachLatch(Loop *OuterLoop, const Loop *InnerLoop,
+                                    const LoopInfo &LI, ScalarEvolution &SE) {
+  BasicBlock *Latch = OuterLoop->getLoopLatch();
+  return Latch && OuterLoop->getExitingBlock() == Latch &&
+         InnerLoop->getExitingBlock() == InnerLoop->getLoopLatch() &&
+         isLoopNestFinite(OuterLoop, SE, LI) &&
+         SE.loopHasNoAbnormalExits(OuterLoop);
+}
+
+/// Returns true if \p P is an inbounds GEP chain from a base invariant in
+/// \p OuterLoop and is dereferenced in every iteration of \p OuterLoop.
+static bool
+accessesOneObjectInAllIterations(const RuntimePointerChecking::PointerInfo &P,
+                                 const Loop *OuterLoop,
+                                 const MemoryDepChecker &DC,
+                                 ScalarEvolution &SE) {
+  // Forked pointers are not dereferenced themselves, and the bounds of
+  // non-affine pointers are not tied to an accessed address.
+  if (P.IsForked || (!isa<SCEVAddRecExpr>(P.Expr) &&
+                     !SE.isLoopInvariant(P.Expr, DC.getInnermostLoop())))
+    return false;
+  // Only inbounds GEPs keep the pointer within the object of their base. So do
+  // header phis advanced by inbounds GEPs, as all their values are accessed.
+  const Value *Base = P.PointerValue->stripInBoundsOffsets();
+  for (const Loop *L : {DC.getInnermostLoop(), OuterLoop}) {
+    BasicBlock *Incoming, *Backedge;
+    auto *Phi = dyn_cast<PHINode>(Base);
+    if (Phi && Phi->getParent() == L->getHeader() &&
+        L->getIncomingAndBackEdge(Incoming, Backedge) &&
+        Phi->getIncomingValueForBlock(Backedge)->stripInBoundsOffsets() == Phi)
+      Base = Phi->getIncomingValueForBlock(Incoming)->stripInBoundsOffsets();
+  }
+  if (!OuterLoop->isLoopInvariant(Base))
+    return false;
+  // The access must use the pointer itself, not a phi of it.
+  return any_of(DC.getInstructionsForAccess(P.PointerValue, P.IsWritePtr),
+                [&](Instruction *I) {
+                  return getLoadStorePointerOperand(I) == P.PointerValue &&
+                         !LoopAccessInfo::blockNeedsPredication(
+                             I->getParent(), OuterLoop, DC.getDT());
+                });
+}
+
 void RuntimePointerChecking::generateChecks(
-    MemoryDepChecker::DepCandidates &DepCands) {
+    MemoryDepChecker::DepCandidates &DepCands, const LoopInfo &LI) {
   assert(Checks.empty() && "Checks is not empty");
   groupChecks(DepCands);
   mergeStencilGroups();
+
+  // Bounds can only be expanded to cover all iterations of the outer loop if
+  // they cannot wrap across them, which holds if each pointer accesses one
+  // allocated object in all of them.
+  const Loop *InnerLoop = DC.getInnermostLoop();
+  Loop *OuterLoop = InnerLoop->getParentLoop();
+  if (OuterLoop && allIterationsReachLatch(OuterLoop, InnerLoop, LI, *SE)) {
+    for (RuntimeCheckingPtrGroup &CG : CheckingGroups)
+      CG.CanExpandToOuterLoop = all_of(CG.Members, [&](unsigned I) {
+        return accessesOneObjectInAllIterations(Pointers[I], OuterLoop, DC,
+                                                *SE);
+      });
+  }
+
   Checks = generateChecks();
 }
 
@@ -2386,7 +2447,7 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
   }
 
   if (MayNeedRTCheck && (CanDoRT || AllowPartial))
-    RtCheck.generateChecks(DepCands);
+    RtCheck.generateChecks(DepCands, *LI);
 
   LLVM_DEBUG(dbgs() << "LAA: We need to do " << RtCheck.getNumberOfChecks()
                     << " pointer comparisons.\n");

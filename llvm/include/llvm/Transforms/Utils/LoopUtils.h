@@ -669,9 +669,10 @@ struct RuntimeCheckBounds {
   const SCEV *StrideToCheck;
 };
 
-/// Return the bounds of \p CG in \p TheLoop. If \p HoistRuntimeChecks is true,
-/// bounds varying in the parent loop of \p TheLoop may be widened to cover the
-/// whole parent loop, so that checks using them can be hoisted out of it.
+/// Return the bounds of \p CG in \p TheLoop. If \p HoistRuntimeChecks is true
+/// and \p CG can be expanded to the outer loop, bounds varying in the parent
+/// loop of \p TheLoop may be widened to cover the whole parent loop, so that
+/// checks using them can be hoisted out of it.
 LLVM_ABI RuntimeCheckBounds
 getRuntimeCheckBounds(const RuntimeCheckingPtrGroup *CG, const Loop *TheLoop,
                       ScalarEvolution &SE, bool HoistRuntimeChecks);

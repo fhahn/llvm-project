@@ -2185,7 +2185,7 @@ llvm::getRuntimeCheckBounds(const RuntimeCheckingPtrGroup *CG,
   // whereas using a restricted range check could have allowed us to enter at
   // least once. This is why the behaviour is not currently the default and is
   // controlled by the parameter 'HoistRuntimeChecks'.
-  if (HoistRuntimeChecks && TheLoop->getParentLoop() &&
+  if (HoistRuntimeChecks && CG->CanExpandToOuterLoop &&
       isa<SCEVAddRecExpr>(High) && isa<SCEVAddRecExpr>(Low)) {
     auto *HighAR = cast<SCEVAddRecExpr>(High);
     auto *LowAR = cast<SCEVAddRecExpr>(Low);
