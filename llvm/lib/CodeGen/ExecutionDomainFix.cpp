@@ -526,12 +526,12 @@ bool ExecutionDomainFixImpl::runOnMachineFunction(
   LLVM_DEBUG(dbgs() << "********** FIX EXECUTION DOMAIN: "
                     << TRI->getRegClassName(RC) << " **********\n");
 
-  // If no relevant registers are used in the function, we can skip it
-  // completely.
+  // If no instruction refers to a relevant register, we can skip it
+  // completely. Register masks only clobber them, which leaves nothing to fix.
   bool anyregs = false;
   const MachineRegisterInfo &MRI = mf.getRegInfo();
   for (unsigned Reg : *RC) {
-    if (MRI.isPhysRegUsed(Reg)) {
+    if (MRI.isPhysRegUsed(Reg, /*SkipRegMaskTest=*/true)) {
       anyregs = true;
       break;
     }
