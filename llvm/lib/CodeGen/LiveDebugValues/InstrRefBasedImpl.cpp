@@ -1142,13 +1142,29 @@ void MLocTracker::writeRegMask(const MachineOperand *MO, unsigned CurBB,
   // Def any register we track have that isn't preserved. The regmask
   // terminates the liveness of a register, meaning its value can't be
   // relied upon -- we represent this by giving it a new value.
-  for (auto Location : locations()) {
-    unsigned ID = LocIdxToLocID[Location.Idx];
-    // Don't clobber SP, even if the mask says it's clobbered.
-    if (ID < NumRegs && MO->clobbersPhysReg(ID) && !SPAliases.count(ID))
-      defReg(ID, CurBB, InstID);
-  }
+  for (LocIdx L : getRegMaskClobbers(MO))
+    LocIdxToIDNum[L] = {CurBB, InstID, L};
   Masks.push_back(std::make_pair(MO, InstID));
+}
+
+ArrayRef<LocIdx> MLocTracker::getRegMaskClobbers(const MachineOperand *MO) {
+  // Functions mostly use a single mask and locations are only ever appended:
+  // scan only the locations added since the last query for the same mask.
+  const uint32_t *Mask = MO->getRegMask();
+  if (Mask != ClobbersMask) {
+    ClobbersMask = Mask;
+    NumLocsScannedForMask = 0;
+    MaskClobberedLocs.clear();
+  }
+  for (unsigned I = NumLocsScannedForMask, E = getNumLocs(); I != E; ++I) {
+    unsigned ID = LocIdxToLocID[LocIdx(I)];
+    // Don't clobber SP, even if the mask says it's clobbered.
+    if (ID < NumRegs && MachineOperand::clobbersPhysReg(Mask, ID) &&
+        !SPAliases.count(ID))
+      MaskClobberedLocs.push_back(LocIdx(I));
+  }
+  NumLocsScannedForMask = getNumLocs();
+  return MaskClobberedLocs;
 }
 
 std::optional<SpillLocationNo> MLocTracker::getOrTrackSpillLoc(SpillLoc L) {
@@ -1981,8 +1997,12 @@ void InstrRefBasedLDV::transferRegisterDef(MachineInstr &MI) {
   }
 
   // Look for any clobbers performed by a register mask. Only test locations
-  // that are actually being tracked.
-  if (!RegMaskPtrs.empty()) {
+  // that are actually being tracked. A call with a single mask ignores the
+  // same SP aliases as MLocTracker does.
+  if (RegMaskPtrs.size() == 1 && MI.isCall() && !CallChangesSP) {
+    for (LocIdx L : MTracker->getRegMaskClobbers(RegMaskPtrs[0]))
+      TTracker->clobberMloc(L, MI.getIterator(), false);
+  } else if (!RegMaskPtrs.empty()) {
     for (auto L : MTracker->locations()) {
       // Stack locations can't be clobbered by regmasks.
       if (MTracker->isSpill(L.Idx))

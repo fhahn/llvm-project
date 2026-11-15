@@ -741,6 +741,12 @@ public:
   /// on.
   SmallVector<std::pair<const MachineOperand *, unsigned>, 32> Masks;
 
+  /// The register mask last passed to getRegMaskClobbers, the number of
+  /// locations scanned for it, and the scanned locations it clobbers.
+  const uint32_t *ClobbersMask = nullptr;
+  unsigned NumLocsScannedForMask = 0;
+  SmallVector<LocIdx> MaskClobberedLocs;
+
   /// Pair for describing a position within a stack slot -- first the size in
   /// bits, then the offset.
   typedef std::pair<unsigned short, unsigned short> StackSlotPos;
@@ -876,6 +882,7 @@ public:
   /// the information in this pass uninterpretable.
   void clear() {
     reset();
+    ClobbersMask = nullptr;
     LocIDToLocIdx.clear();
     LocIdxToLocID.clear();
     LocIdxToIDNum.clear();
@@ -963,6 +970,10 @@ public:
   /// track, stores a pointer to the mask in case we have to account for it
   /// later.
   void writeRegMask(const MachineOperand *MO, unsigned CurBB, unsigned InstID);
+
+  /// Return the tracked register locations other than SP aliases that the
+  /// register mask \p MO clobbers, in ascending order.
+  ArrayRef<LocIdx> getRegMaskClobbers(const MachineOperand *MO);
 
   /// Find LocIdx for SpillLoc \p L, creating a new one if it's not tracked.
   /// Returns std::nullopt when in scenarios where a spill slot could be
