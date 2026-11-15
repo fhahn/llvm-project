@@ -1767,10 +1767,12 @@ AliasResult BasicAAResult::aliasCheck(const Value *V1, LocationSize V1Size,
 
   int OrigNumAssumptionUses = AAQI.NumAssumptionUses;
   unsigned OrigNumAssumptionBasedResults = AAQI.AssumptionBasedResults.size();
+  AAQI.AliasCacheChanged = false;
   AliasResult Result =
       aliasCheckRecursive(V1, V1Size, V2, V2Size, AAQI, O1, O2);
 
-  auto It = AAQI.AliasCache.find(Locs);
+  // Look the entry up again only if the recursive queries changed the cache.
+  auto It = AAQI.AliasCacheChanged ? AAQI.AliasCache.find(Locs) : Pair.first;
   assert(It != AAQI.AliasCache.end() && "Must be in cache");
   auto &Entry = It->second;
 
@@ -1792,6 +1794,10 @@ AliasResult BasicAAResult::aliasCheck(const Value *V1, LocationSize V1Size,
   if (AssumptionDisproven)
     while (AAQI.AssumptionBasedResults.size() > OrigNumAssumptionBasedResults)
       AAQI.AliasCache.erase(AAQI.AssumptionBasedResults.pop_back_val());
+
+  // Our insertion (and any removal above) changed the cache for the enclosing
+  // queries.
+  AAQI.AliasCacheChanged = true;
 
   // The result may still be based on assumptions higher up in the chain.
   // Remember it, so it can be purged from the cache later.

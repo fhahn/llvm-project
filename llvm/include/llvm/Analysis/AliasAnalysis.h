@@ -281,6 +281,11 @@ public:
   using AliasCacheT = SmallDenseMap<LocPair, CacheEntry, 8>;
   AliasCacheT AliasCache;
 
+  /// Whether entries were inserted into or removed from AliasCache, the only
+  /// operations that move its entries, since the innermost active aliasCheck()
+  /// started its recursive queries.
+  bool AliasCacheChanged = false;
+
   CaptureAnalysis *CA;
 
   /// Query depth used to distinguish recursive queries.
