@@ -1032,7 +1032,9 @@ bool X86AsmBackend::finishLayout() const {
   // decode limited.  It is often better to reduce the number of instructions
   // (i.e. eliminate nops) even at the cost of increasing the size and
   // complexity of others.
-  if (!CLOpts.pad_for_align && !CLOpts.pad_for_branch_align)
+  // Boundary align fragments only exist with auto padding.
+  if (!CLOpts.pad_for_align &&
+      (!CLOpts.pad_for_branch_align || !AllowAutoPadding))
     return false;
 
   // The processed regions are delimitered by LabeledFragments. -g may have more
