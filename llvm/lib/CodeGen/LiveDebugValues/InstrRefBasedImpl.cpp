@@ -2651,16 +2651,14 @@ void InstrRefBasedLDV::placeMLocPHIs(
            SmallVector<MachineBasicBlock *, 32>>
       PHIBlocksForDefs;
   ArrayRef<MachineBasicBlock *> PHIBlocks;
+  // The blocks defining each location, in RPO.
+  SmallVector<SmallVector<MachineBasicBlock *, 8>> DefsOfLoc(
+      MTracker->getNumLocs());
+  for (MachineBasicBlock *MBB : OrderToBB)
+    for (const auto &P : MLocTransfer[MBB->getNumber()])
+      DefsOfLoc[P.first.asU64()].push_back(MBB);
   auto CollectPHIsForLoc = [&](LocIdx L) {
-    // Collect the defs.
-    SmallVector<MachineBasicBlock *, 8> Defs;
-    for (MachineBasicBlock *MBB : OrderToBB) {
-      const auto &TransferFunc = MLocTransfer[MBB->getNumber()];
-      if (TransferFunc.contains(L))
-        Defs.push_back(MBB);
-    }
-
-    auto [It, Inserted] = PHIBlocksForDefs.try_emplace(std::move(Defs));
+    auto [It, Inserted] = PHIBlocksForDefs.try_emplace(DefsOfLoc[L.asU64()]);
     if (Inserted) {
       SmallPtrSet<MachineBasicBlock *, 32> DefBlocks(It->first.begin(),
                                                      It->first.end());
