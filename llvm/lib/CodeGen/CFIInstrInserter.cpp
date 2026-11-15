@@ -46,6 +46,10 @@ public:
     if (MF.usesWindowsUnwindInfo())
       return false;
 
+    // CFI is only inserted at the start of blocks after the first one.
+    if (MF.size() == 1 && !VerifyCFI)
+      return false;
+
     MBBVector.resize(MF.getNumBlockIDs());
     calculateCFAInfo(MF);
 
