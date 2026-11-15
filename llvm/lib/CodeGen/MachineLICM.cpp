@@ -183,6 +183,9 @@ namespace {
     // which is checked against both the outermost loop and its subloops.
     SmallDenseMap<MachineLoop *, bool> GuaranteedToExecute;
 
+    // Register units of the registers not preserved by each regmask seen.
+    SmallDenseMap<const uint32_t *, BitVector, 4> RegMaskClobbers;
+
   public:
     MachineLICMImpl(bool PreRegAlloc, Pass *LegacyPass,
                     MachineFunctionAnalysisManager *MFAM)
@@ -201,6 +204,7 @@ namespace {
       BackTrace.clear();
       CSEMap.clear();
       ExitBlockMap.clear();
+      RegMaskClobbers.clear();
     }
 
   private:
@@ -215,6 +219,8 @@ namespace {
     };
 
     void HoistRegionPostRA(MachineLoop *CurLoop);
+
+    void applyRegMaskClobbers(BitVector &RUs, const uint32_t *Mask);
 
     void HoistPostRA(MachineInstr *MI, Register Def, MachineLoop *CurLoop);
 
@@ -532,6 +538,15 @@ static void applyBitsNotInRegMaskToRegUnitsMask(const TargetRegisterInfo &TRI,
   RUs |= RUsFromRegsNotInMask;
 }
 
+void MachineLICMImpl::applyRegMaskClobbers(BitVector &RUs,
+                                           const uint32_t *Mask) {
+  auto [It, Inserted] =
+      RegMaskClobbers.try_emplace(Mask, TRI->getNumRegUnits());
+  if (Inserted)
+    applyBitsNotInRegMaskToRegUnitsMask(*TRI, It->second, Mask);
+  RUs |= It->second;
+}
+
 /// Examine the instruction for potential LICM candidate. Also
 /// gather register def and frame object update information.
 void MachineLICMImpl::ProcessMI(MachineInstr *MI, BitVector &RUDefs,
@@ -557,7 +572,7 @@ void MachineLICMImpl::ProcessMI(MachineInstr *MI, BitVector &RUDefs,
     // We can't hoist an instruction defining a physreg that is clobbered in
     // the loop.
     if (MO.isRegMask()) {
-      applyBitsNotInRegMaskToRegUnitsMask(*TRI, RUClobbers, MO.getRegMask());
+      applyRegMaskClobbers(RUClobbers, MO.getRegMask());
       continue;
     }
 
@@ -650,7 +665,7 @@ void MachineLICMImpl::HoistRegionPostRA(MachineLoop *CurLoop) {
 
     // Funclet entry blocks will clobber all registers
     if (const uint32_t *Mask = BB->getBeginClobberMask(TRI))
-      applyBitsNotInRegMaskToRegUnitsMask(*TRI, RUClobbers, Mask);
+      applyRegMaskClobbers(RUClobbers, Mask);
 
     // EH landing pads clobber exception pointer/selector registers.
     if (BB->isEHPad()) {
