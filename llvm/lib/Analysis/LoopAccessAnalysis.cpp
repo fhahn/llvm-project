@@ -675,12 +675,21 @@ void RuntimePointerChecking::generateChecks(
   };
   const auto &Preds = cast<SCEVUnionPredicate>(DC.getPSE().getPredicate());
   if (OuterLoop && all_of(Preds.getPredicates(), IsOuterInvariant) &&
-      allIterationsReachLatch(OuterLoop, InnerLoop, LI, *SE)) {
-    for (RuntimeCheckingPtrGroup &CG : CheckingGroups)
-      CG.CanExpandToOuterLoop = all_of(CG.Members, [&](unsigned I) {
-        return accessesOneObjectInAllIterations(Pointers[I], OuterLoop, DC,
-                                                *SE);
-      });
+      allIterationsReachLatch(OuterLoop, InnerLoop, LI, *SE) &&
+      SE->hasLoopInvariantBackedgeTakenCount(OuterLoop)) {
+    for (RuntimeCheckingPtrGroup &CG : CheckingGroups) {
+      // The step is only checked once, so it must be invariant and shared.
+      const SCEV *Step;
+      CG.CanExpandToOuterLoop =
+          match(CG.Low, m_scev_AffineAddRec(m_SCEV(), m_SCEV(Step),
+                                            m_SpecificLoop(OuterLoop))) &&
+          match(CG.High, m_scev_AffineAddRec(m_SCEV(), m_scev_Specific(Step),
+                                             m_SpecificLoop(OuterLoop))) &&
+          all_of(CG.Members, [&](unsigned I) {
+            return accessesOneObjectInAllIterations(Pointers[I], OuterLoop, DC,
+                                                    *SE);
+          });
+    }
   }
 
   Checks = generateChecks();
