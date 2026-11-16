@@ -570,8 +570,28 @@ void LookupResult::resolveKind() {
   if (ResultKind == LookupResultKind::Ambiguous)
     return;
 
-  llvm::SmallDenseMap<const NamedDecl *, unsigned, 16> Unique;
-  llvm::SmallDenseMap<QualType, unsigned, 16> UniqueTypes;
+  // Map each canonical declaration, and the canonical type of each type
+  // declaration, to its first result. Result sets are usually small, so
+  // search them linearly and use hash maps only for large ones.
+  constexpr unsigned MaxLinearSearch = 16;
+  SmallVector<std::pair<const NamedDecl *, unsigned>, MaxLinearSearch> Seen;
+  SmallVector<std::pair<QualType, unsigned>, MaxLinearSearch> SeenTypes;
+  llvm::DenseMap<const NamedDecl *, unsigned> Unique;
+  llvm::DenseMap<QualType, unsigned> UniqueTypes;
+  auto FindOrInsert = [&](auto &Vec, auto &Map, auto Key,
+                          unsigned I) -> std::optional<unsigned> {
+    if (N > MaxLinearSearch) {
+      auto [It, Inserted] = Map.try_emplace(Key, I);
+      if (Inserted)
+        return std::nullopt;
+      return It->second;
+    }
+    auto *It = llvm::find_if(Vec, [&](const auto &P) { return P.first == Key; });
+    if (It != Vec.end())
+      return It->second;
+    Vec.emplace_back(Key, I);
+    return std::nullopt;
+  };
 
   bool Ambiguous = false;
   bool ReferenceToPlaceHolderVariable = false;
@@ -622,31 +642,25 @@ void LookupResult::resolveKind() {
     // and, through using declarations and directives, across scopes. There is
     // no ambiguity if they all refer to the same type, so unique based on the
     // canonical type.
-    if (const auto *TD = dyn_cast<TypeDecl>(D)) {
-      auto UniqueResult = UniqueTypes.insert(
-          std::make_pair(getSema().Context.getCanonicalTypeDeclType(TD), I));
-      if (!UniqueResult.second) {
-        // The type is not unique.
-        ExistingI = UniqueResult.first->second;
-      }
-    }
+    if (const auto *TD = dyn_cast<TypeDecl>(D))
+      ExistingI = FindOrInsert(
+          SeenTypes, UniqueTypes,
+          getSema().Context.getCanonicalTypeDeclType(TD), I);
 
     // For non-type declarations, check for a prior lookup result naming this
     // canonical declaration.
-    if (!ExistingI) {
-      auto UniqueResult = Unique.insert(std::make_pair(D, I));
-      if (!UniqueResult.second) {
-        // We've seen this entity before.
-        ExistingI = UniqueResult.first->second;
-      }
-    }
+    if (!ExistingI)
+      ExistingI = FindOrInsert(Seen, Unique, D, I);
 
     if (ExistingI) {
       // This is not a unique lookup result. Pick one of the results and
-      // discard the other.
-      if (isPreferredLookupResult(getSema(), getLookupKind(), Decls[I],
-                                  Decls[*ExistingI]))
-        Decls[*ExistingI] = Decls[I];
+      // discard the other. Nothing changes if both are the same result.
+      DeclAccessPair &Existing = Decls[*ExistingI];
+      if ((Decls[I].getDecl() != Existing.getDecl() ||
+           Decls[I].getAccess() != Existing.getAccess()) &&
+          isPreferredLookupResult(getSema(), getLookupKind(), Decls[I],
+                                  Existing))
+        Existing = Decls[I];
       RemovedDecls.set(I);
       continue;
     }
