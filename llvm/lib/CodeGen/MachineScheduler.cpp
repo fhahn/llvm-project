@@ -2820,8 +2820,6 @@ void SchedBoundary::reset() {
   HasReservedCycles = false;
   ReservedCycles.clear();
   ReservedResourceSegments.clear();
-  ReservedCyclesIndex.clear();
-  ResourceGroupSubUnitMasks.clear();
 #if LLVM_ENABLE_ABI_BREAKING_CHECKS
   // Track the maximum number of stall cycles that could arise either from the
   // latency of a DAG edge or the number of cycles that a processor resource is
@@ -2863,23 +2861,27 @@ init(ScheduleDAGMI *dag, const TargetSchedModel *smodel, SchedRemainder *rem) {
   Rem = rem;
   if (SchedModel->hasInstrSchedModel()) {
     unsigned ResourceCount = SchedModel->getNumProcResourceKinds();
-    ReservedCyclesIndex.resize(ResourceCount);
     ExecutedResCounts.resize(ResourceCount);
-    ResourceGroupSubUnitMasks.resize(ResourceCount, APInt(ResourceCount, 0));
-    unsigned NumUnits = 0;
-
-    for (unsigned i = 0; i < ResourceCount; ++i) {
-      ReservedCyclesIndex[i] = NumUnits;
-      NumUnits += SchedModel->getProcResource(i)->NumUnits;
-      if (isReservedGroup(i)) {
-        auto SubUnits = SchedModel->getProcResource(i)->SubUnitsIdxBegin;
-        for (unsigned U = 0, UE = SchedModel->getProcResource(i)->NumUnits;
-             U != UE; ++U)
-          ResourceGroupSubUnitMasks[i].setBit(SubUnits[U]);
+    // The resource tables only depend on the scheduling model, so compute them
+    // once rather than for every region.
+    if (ResourceTablesModel != SchedModel->getMCSchedModel()) {
+      ResourceTablesModel = SchedModel->getMCSchedModel();
+      ReservedCyclesIndex.resize(ResourceCount);
+      ResourceGroupSubUnitMasks.assign(ResourceCount, APInt(ResourceCount, 0));
+      NumResourceUnits = 0;
+      for (unsigned i = 0; i < ResourceCount; ++i) {
+        ReservedCyclesIndex[i] = NumResourceUnits;
+        NumResourceUnits += SchedModel->getProcResource(i)->NumUnits;
+        if (isReservedGroup(i)) {
+          auto SubUnits = SchedModel->getProcResource(i)->SubUnitsIdxBegin;
+          for (unsigned U = 0, UE = SchedModel->getProcResource(i)->NumUnits;
+               U != UE; ++U)
+            ResourceGroupSubUnitMasks[i].setBit(SubUnits[U]);
+        }
       }
     }
 
-    ReservedCycles.resize(NumUnits, InvalidCycle);
+    ReservedCycles.resize(NumResourceUnits, InvalidCycle);
   }
 }
 
