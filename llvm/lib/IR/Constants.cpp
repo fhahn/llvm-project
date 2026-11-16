@@ -972,10 +972,44 @@ Constant *ConstantInt::getBool(Type *Ty, bool V) {
   return V ? getTrue(Ty) : getFalse(Ty);
 }
 
+/// Return the SmallIntConstants slot for \p V, or nullptr if \p V does not
+/// have one of the common widths or a small value.
+static ConstantInt **getSmallIntConstantSlot(LLVMContextImpl *pImpl,
+                                             const APInt &V) {
+  unsigned WidthIdx;
+  switch (V.getBitWidth()) {
+  case 1:
+    WidthIdx = 0;
+    break;
+  case 8:
+    WidthIdx = 1;
+    break;
+  case 16:
+    WidthIdx = 2;
+    break;
+  case 32:
+    WidthIdx = 3;
+    break;
+  case 64:
+    WidthIdx = 4;
+    break;
+  default:
+    return nullptr;
+  }
+  int64_t Idx = V.getSExtValue() - LLVMContextImpl::SmallIntConstantMin;
+  if (Idx < 0 || Idx >= LLVMContextImpl::NumSmallIntConstants)
+    return nullptr;
+  return &pImpl->SmallIntConstants[WidthIdx][Idx];
+}
+
 // Get a ConstantInt from an APInt.
 ConstantInt *ConstantInt::get(LLVMContext &Context, const APInt &V) {
-  // get an existing value or the insertion position
   LLVMContextImpl *pImpl = Context.pImpl;
+  ConstantInt **SmallSlot = getSmallIntConstantSlot(pImpl, V);
+  if (SmallSlot && *SmallSlot)
+    return *SmallSlot;
+
+  // get an existing value or the insertion position
   std::unique_ptr<ConstantInt> &Slot =
       V.isZero()  ? pImpl->IntZeroConstants[V.getBitWidth()]
       : V.isOne() ? pImpl->IntOneConstants[V.getBitWidth()]
@@ -986,6 +1020,8 @@ ConstantInt *ConstantInt::get(LLVMContext &Context, const APInt &V) {
     Slot.reset(new ConstantInt(ITy, V));
   }
   assert(Slot->getType() == IntegerType::get(Context, V.getBitWidth()));
+  if (SmallSlot)
+    *SmallSlot = Slot.get();
   return Slot.get();
 }
 
