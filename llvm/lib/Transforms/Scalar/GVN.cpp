@@ -147,16 +147,26 @@ struct llvm::GVNValueTable::Expression {
   }
 };
 
-template <> struct llvm::DenseMapInfo<GVNValueTable::Expression> {
-  static unsigned getHashValue(const GVNValueTable::Expression &E) {
-    using llvm::hash_value;
+/// An expression to look up in ExpressionNumbering.
+struct llvm::GVNValueTable::ExprLookup {
+  const Expression &E;
+  unsigned Hash;
+  const std::vector<Expression> &Expressions;
 
-    return static_cast<unsigned>(hash_value(E));
+  ExprLookup(const Expression &E, const std::vector<Expression> &Expressions)
+      : E(E), Hash(static_cast<unsigned>(hash_value(E))),
+        Expressions(Expressions) {}
+};
+
+struct llvm::GVNValueTable::ExprKeyInfo {
+  static unsigned getHashValue(const ExprKey &K) { return K.Hash; }
+  static unsigned getHashValue(const ExprLookup &L) { return L.Hash; }
+  static bool isEqual(const ExprKey &LHS, const ExprKey &RHS) {
+    return LHS.Idx == RHS.Idx;
   }
-
-  static bool isEqual(const GVNValueTable::Expression &LHS,
-                      const GVNValueTable::Expression &RHS) {
-    return LHS == RHS;
+  // Equal expressions have equal hashes, so compare those first.
+  static bool isEqual(const ExprLookup &LHS, const ExprKey &RHS) {
+    return LHS.Hash == RHS.Hash && LHS.E == LHS.Expressions[RHS.Idx];
   }
 };
 
@@ -180,7 +190,9 @@ private:
     LeaderListNode(Value *V, const BasicBlock *BB, LeaderListNode *Next)
         : Entry(V, BB), Next(Next) {}
   };
-  DenseMap<uint32_t, LeaderListNode> NumToLeaders;
+  // The head nodes of the lists, indexed by value number. A head node without
+  // a value has no leaders.
+  std::vector<LeaderListNode> NumToLeaders;
   BumpPtrAllocator TableAllocator;
 
 public:
@@ -210,12 +222,10 @@ public:
   };
 
   iterator_range<leader_iterator> getLeaders(uint32_t N) {
-    auto I = NumToLeaders.find(N);
-    if (I == NumToLeaders.end()) {
+    if (N >= NumToLeaders.size() || !NumToLeaders[N].Entry.Val)
       return iterator_range(leader_iterator(nullptr), leader_iterator(nullptr));
-    }
 
-    return iterator_range(leader_iterator(&I->second),
+    return iterator_range(leader_iterator(&NumToLeaders[N]),
                           leader_iterator(nullptr));
   }
 
@@ -225,7 +235,7 @@ public:
     // Manually destroy non-head nodes (in BumpPtrAllocator) to properly
     // clean up AssertingVH handles before Reset(). Head nodes are destroyed
     // by NumToLeaders.clear() below.
-    for (auto &[_, HeadNode] : NumToLeaders) {
+    for (LeaderListNode &HeadNode : NumToLeaders) {
       LeaderListNode *N = HeadNode.Next;
       while (N) {
         auto *Next = N->Next;
@@ -1027,7 +1037,7 @@ uint32_t GVNValueTable::lookupOrAddCmp(unsigned Opcode,
 uint32_t GVNValueTable::lookupCmp(unsigned Opcode, CmpInst::Predicate Predicate,
                                   Value *LHS, Value *RHS) {
   Expression Exp = createCmpExpr(Opcode, Predicate, LHS, RHS);
-  return ExpressionNumbering.lookup(Exp);
+  return lookupExpr(Exp);
 }
 
 /// Returns the value number of ptrtoint \p Ptr to \Ty.
@@ -1035,7 +1045,7 @@ uint32_t GVNValueTable::lookupPtrToInt(Value *Ptr, Type *Ty) {
   Expression Exp(Instruction::PtrToInt);
   Exp.Ty = Ty;
   Exp.VarArgs.push_back(lookupOrAdd(Ptr));
-  return ExpressionNumbering.lookup(Exp);
+  return lookupExpr(Exp);
 }
 
 /// Remove all entries from the ValueTable.
@@ -1075,24 +1085,29 @@ void GVNValueTable::verifyRemoved(const Value *V) const {
 
 /// Push a new Value to the LeaderTable onto the list for its value number.
 void GVNLeaderMap::insert(uint32_t N, Value *V, const BasicBlock *BB) {
-  const auto &[It, Inserted] = NumToLeaders.try_emplace(N, V, BB, nullptr);
-  if (!Inserted) {
-    // Key already exists: insert new node after the head.
-    auto *NewSlot = TableAllocator.Allocate<LeaderListNode>();
-    new (NewSlot) LeaderListNode(V, BB, It->second.Next);
-    It->second.Next = NewSlot;
+  // Value numbers are mostly inserted in increasing order.
+  while (N >= NumToLeaders.size())
+    NumToLeaders.emplace_back(nullptr, nullptr, nullptr);
+  LeaderListNode &Head = NumToLeaders[N];
+  if (!Head.Entry.Val) {
+    Head.Entry.Val = V;
+    Head.Entry.BB = BB;
+    return;
   }
+  // N already has leaders: insert new node after the head.
+  auto *NewSlot = TableAllocator.Allocate<LeaderListNode>();
+  new (NewSlot) LeaderListNode(V, BB, Head.Next);
+  Head.Next = NewSlot;
 }
 
 /// Scan the list of values corresponding to a given
 /// value number, and remove the given instruction if encountered.
 void GVNLeaderMap::erase(uint32_t N, Instruction *I, const BasicBlock *BB) {
-  auto It = NumToLeaders.find(N);
-  if (It == NumToLeaders.end())
+  if (N >= NumToLeaders.size() || !NumToLeaders[N].Entry.Val)
     return;
 
   LeaderListNode *Prev = nullptr;
-  LeaderListNode *Curr = &It->second;
+  LeaderListNode *Curr = &NumToLeaders[N];
 
   while (Curr && (Curr->Entry.Val != I || Curr->Entry.BB != BB)) {
     Prev = Curr;
@@ -1108,10 +1123,11 @@ void GVNLeaderMap::erase(uint32_t N, Instruction *I, const BasicBlock *BB) {
     Curr->~LeaderListNode();
     TableAllocator.Deallocate<LeaderListNode>(Curr);
   } else {
-    // Head node (stored by value in DenseMap).
+    // Head node (stored by value in NumToLeaders).
     if (!Curr->Next) {
-      // Only node; erase from map (DenseMap calls the destructor).
-      NumToLeaders.erase(It);
+      // Only node; mark the list as empty.
+      Curr->Entry.Val = nullptr;
+      Curr->Entry.BB = nullptr;
     } else {
       // Move second node's data into head, then destroy second node.
       LeaderListNode *Next = Curr->Next;
@@ -3238,16 +3254,22 @@ bool GVNPassImpl::processMaskedLoad(IntrinsicInst *I) {
 /// Return a pair the first field showing the value number of \p Exp and the
 /// second field showing whether it is a value number newly created.
 std::pair<uint32_t, bool> GVNValueTable::assignExpNewValueNum(Expression &Exp) {
-  uint32_t &E = ExpressionNumbering[Exp];
-  bool CreateNewValNum = !E;
+  ExprLookup Lookup(Exp, Expressions);
+  auto [It, CreateNewValNum] = ExpressionNumbering.insert_as(
+      {{Lookup.Hash, NextExprNumber}, NextValueNumber}, Lookup);
   if (CreateNewValNum) {
     Expressions.push_back(Exp);
     if (ExprIdx.size() < NextValueNumber + 1)
       ExprIdx.resize(NextValueNumber * 2);
-    E = NextValueNumber;
     ExprIdx[NextValueNumber++] = NextExprNumber++;
   }
-  return {E, CreateNewValNum};
+  return {It->second, CreateNewValNum};
+}
+
+/// Returns the value number of \p Exp, or 0 if it has none.
+uint32_t GVNValueTable::lookupExpr(const Expression &Exp) const {
+  auto It = ExpressionNumbering.find_as(ExprLookup(Exp, Expressions));
+  return It != ExpressionNumbering.end() ? It->second : 0;
 }
 
 /// Return whether all the values related with the same \p num are
@@ -3381,7 +3403,7 @@ uint32_t GVNValueTable::phiTranslateImpl(const BasicBlock *Pred,
     }
   }
 
-  if (uint32_t NewNum = ExpressionNumbering.lookup(Exp)) {
+  if (uint32_t NewNum = lookupExpr(Exp)) {
     if (Exp.Opcode == Instruction::Call && NewNum != Num)
       return areCallValsEqual(Num, NewNum, Pred, PhiBlock, LeaderTable) ? NewNum
                                                                         : Num;

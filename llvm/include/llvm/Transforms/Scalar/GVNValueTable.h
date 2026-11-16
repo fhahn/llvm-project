@@ -43,7 +43,16 @@ public:
 
 private:
   DenseMap<Value *, uint32_t> ValueNumbering;
-  DenseMap<Expression, uint32_t> ExpressionNumbering;
+
+  // ExpressionNumbering maps the expressions in Expressions to their value
+  // numbers. Its keys are indices into Expressions, along with their hashes.
+  struct ExprKey {
+    unsigned Hash;
+    uint32_t Idx;
+  };
+  struct ExprKeyInfo;
+  struct ExprLookup;
+  DenseMap<ExprKey, uint32_t, ExprKeyInfo> ExpressionNumbering;
 
   // Expressions is the vector of Expression. ExprIdx is the mapping from
   // value number to the index of Expression in Expressions. We use it
@@ -87,6 +96,7 @@ private:
   bool areCallValsEqual(uint32_t Num, uint32_t NewNum, const BasicBlock *Pred,
                         const BasicBlock *PhiBlock, GVNLeaderMap &LeaderTable);
   std::pair<uint32_t, bool> assignExpNewValueNum(Expression &Exp);
+  uint32_t lookupExpr(const Expression &Exp) const;
   bool areAllValsInBB(uint32_t Num, const BasicBlock *BB,
                       GVNLeaderMap &LeaderTable);
   void addMemoryStateToExp(Instruction *I, Expression &Exp);
