@@ -55,6 +55,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/SparseSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
@@ -75,6 +76,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <cassert>
 #include <iterator>
+#include <optional>
 
 using namespace llvm;
 
@@ -128,7 +130,41 @@ class CopyTracker {
     bool Avail = false;
   };
 
-  DenseMap<MCRegUnit, CopyInfo> Copies;
+  /// The register units that have a copy info in Copies.
+  SparseSet<MCRegUnit, MCRegUnit, MCRegUnitToIndex> TrackedUnits;
+  /// Copy info indexed by register unit, created on first use. Only the
+  /// entries of units in TrackedUnits are meaningful.
+  SmallVector<std::optional<CopyInfo>, 0> Copies;
+
+  CopyInfo *findInfo(MCRegUnit Unit) {
+    return TrackedUnits.contains(Unit) ? &*Copies[static_cast<unsigned>(Unit)]
+                                       : nullptr;
+  }
+
+  /// Track Unit with a default copy info, replacing its current one.
+  CopyInfo &resetInfo(MCRegUnit Unit) {
+    TrackedUnits.insert(Unit);
+    std::optional<CopyInfo> &Info = Copies[static_cast<unsigned>(Unit)];
+    if (!Info)
+      return Info.emplace();
+    Info->MI = nullptr;
+    Info->LastSeenUseInCopy = nullptr;
+    // A fresh set iterates in insertion order while small, a cleared one may
+    // not.
+    if (!Info->SrcUsers.empty())
+      Info->SrcUsers = SmallPtrSet<MachineInstr *, 4>();
+    Info->DefRegs.clear();
+    Info->Avail = false;
+    return *Info;
+  }
+
+  /// Return the copy info for Unit, tracking it with a default one first if
+  /// needed.
+  CopyInfo &getOrInsertInfo(MCRegUnit Unit) {
+    if (CopyInfo *CI = findInfo(Unit))
+      return *CI;
+    return resetInfo(Unit);
+  }
 
   // Memoised sets of register units which are preserved by each register mask,
   // needed to efficiently remove copies which are invalidated by call
@@ -160,11 +196,9 @@ public:
                            const TargetRegisterInfo &TRI) {
     for (MCRegister Reg : Regs) {
       // Source of copy is no longer available for propagation.
-      for (MCRegUnit Unit : TRI.regunits(Reg)) {
-        auto CI = Copies.find(Unit);
-        if (CI != Copies.end())
-          CI->second.Avail = false;
-      }
+      for (MCRegUnit Unit : TRI.regunits(Reg))
+        if (CopyInfo *CI = findInfo(Unit))
+          CI->Avail = false;
     }
   }
 
@@ -173,7 +207,7 @@ public:
                           const TargetInstrInfo &TII, bool UseCopyInstr) {
     // Early exit if there are no copies, as the function wouldn't do anything
     // in that case.
-    if (Copies.empty())
+    if (TrackedUnits.empty())
       return;
 
     // Since Reg might be a subreg of some registers, only invalidate Reg is not
@@ -191,29 +225,27 @@ public:
     };
 
     for (MCRegUnit Unit : TRI.regunits(Reg)) {
-      auto I = Copies.find(Unit);
-      if (I != Copies.end()) {
-        if (MachineInstr *MI = I->second.MI)
+      if (CopyInfo *CI = findInfo(Unit)) {
+        if (MachineInstr *MI = CI->MI)
           InvalidateCopy(MI);
-        if (MachineInstr *MI = I->second.LastSeenUseInCopy)
+        if (MachineInstr *MI = CI->LastSeenUseInCopy)
           InvalidateCopy(MI);
       }
     }
     for (MCRegUnit Unit : RegUnitsToInvalidate)
-      Copies.erase(Unit);
+      TrackedUnits.erase(Unit);
   }
 
   /// Clobber a single register unit, removing it from the tracker's copy maps.
   void clobberRegUnit(MCRegUnit Unit, const TargetRegisterInfo &TRI,
                       const TargetInstrInfo &TII, bool UseCopyInstr) {
-    auto I = Copies.find(Unit);
-    if (I != Copies.end()) {
+    if (CopyInfo *CI = findInfo(Unit)) {
       // When we clobber the source of a copy, we need to clobber everything
       // it defined.
-      markRegsUnavailable(I->second.DefRegs, TRI);
+      markRegsUnavailable(CI->DefRegs, TRI);
       // When we clobber the destination of a copy, we need to clobber the
       // whole register it defined.
-      if (MachineInstr *MI = I->second.MI) {
+      if (MachineInstr *MI = CI->MI) {
         DestSourcePair CopyOperands = *isCopyInstr(*MI, TII, UseCopyInstr);
         auto [Dst, Src] = getDstSrcMCRegs(CopyOperands);
 
@@ -232,22 +264,22 @@ public:
         // L4: early-clobber r9 <- Clobber r9 (L2 is still valid in tracker)
         // L5: r0 = COPY r8     <- Remove NopCopy
         for (MCRegUnit SrcUnit : TRI.regunits(Src)) {
-          auto SrcCopy = Copies.find(SrcUnit);
-          if (SrcCopy != Copies.end() && SrcCopy->second.LastSeenUseInCopy) {
+          CopyInfo *SrcCopy = findInfo(SrcUnit);
+          if (SrcCopy && SrcCopy->LastSeenUseInCopy) {
             // If SrcCopy defines multiple values, we only need
             // to erase the record for Def in DefRegs.
             // NOLINTNEXTLINE(llvm-qualified-auto)
-            for (auto Itr = SrcCopy->second.DefRegs.begin();
-                 Itr != SrcCopy->second.DefRegs.end(); Itr++) {
+            for (auto Itr = SrcCopy->DefRegs.begin();
+                 Itr != SrcCopy->DefRegs.end(); Itr++) {
               if (*Itr == Dst) {
-                SrcCopy->second.DefRegs.erase(Itr);
+                SrcCopy->DefRegs.erase(Itr);
                 // If DefReg becomes empty after removal, we can remove the
                 // SrcCopy from the tracker's copy maps. We only remove those
                 // entries solely record the Def is defined by Src. If an
                 // entry also contains the definition record of other Def'
                 // registers, it cannot be cleared.
-                if (SrcCopy->second.DefRegs.empty() && !SrcCopy->second.MI) {
-                  Copies.erase(SrcCopy);
+                if (SrcCopy->DefRegs.empty() && !SrcCopy->MI) {
+                  TrackedUnits.erase(SrcUnit);
                 }
                 break;
               }
@@ -256,7 +288,7 @@ public:
         }
       }
       // Now we can erase the copy.
-      Copies.erase(Unit);
+      TrackedUnits.erase(Unit);
     }
   }
 
@@ -265,7 +297,7 @@ public:
                        const TargetInstrInfo &TII, bool UseCopyInstr) {
     // Early exit if there are no copies, as the function wouldn't do anything
     // in that case.
-    if (Copies.empty())
+    if (TrackedUnits.empty())
       return;
 
     for (MCRegUnit Unit : TRI.regunits(Reg)) {
@@ -291,11 +323,11 @@ public:
     if (Src != Reg)
       return false;
 
-    auto I = Copies.find(RU);
-    if (I == Copies.end())
+    CopyInfo *CI = findInfo(RU);
+    if (!CI)
       return false;
 
-    I->second.SrcUsers.insert(&MI);
+    CI->SrcUsers.insert(&MI);
     return true;
   }
 
@@ -303,10 +335,10 @@ public:
   SmallPtrSet<MachineInstr *, 4> getSrcUsers(MCRegister Reg,
                                              const TargetRegisterInfo &TRI) {
     MCRegUnit RU = *TRI.regunits(Reg).begin();
-    auto I = Copies.find(RU);
-    if (I == Copies.end())
+    CopyInfo *CI = findInfo(RU);
+    if (!CI)
       return {};
-    return I->second.SrcUsers;
+    return CI->SrcUsers;
   }
 
   /// Add this copy's registers into the tracker's copy maps.
@@ -316,13 +348,16 @@ public:
     auto [Dst, Src] = getDstSrcMCRegs(CopyOperands);
 
     // Remember Dst is defined by the copy.
-    for (MCRegUnit Unit : TRI.regunits(Dst))
-      Copies[Unit] = {MI, nullptr, {}, {}, true};
+    for (MCRegUnit Unit : TRI.regunits(Dst)) {
+      CopyInfo &Info = resetInfo(Unit);
+      Info.MI = MI;
+      Info.Avail = true;
+    }
 
     // Remember source that's copied to Dst. Once it's clobbered, then
     // it's no longer available for copy propagation.
     for (MCRegUnit Unit : TRI.regunits(Src)) {
-      auto &Copy = Copies[Unit];
+      CopyInfo &Copy = getOrInsertInfo(Unit);
       if (!is_contained(Copy.DefRegs, Dst))
         Copy.DefRegs.push_back(Dst);
       Copy.LastSeenUseInCopy = MI;
@@ -330,28 +365,28 @@ public:
   }
 
   bool hasAnyCopies() {
-    return !Copies.empty();
+    return !TrackedUnits.empty();
   }
 
   MachineInstr *findCopyForUnit(MCRegUnit RegUnit,
                                 const TargetRegisterInfo &TRI,
                                 bool MustBeAvailable = false) {
-    auto CI = Copies.find(RegUnit);
-    if (CI == Copies.end())
+    CopyInfo *CI = findInfo(RegUnit);
+    if (!CI)
       return nullptr;
-    if (MustBeAvailable && !CI->second.Avail)
+    if (MustBeAvailable && !CI->Avail)
       return nullptr;
-    return CI->second.MI;
+    return CI->MI;
   }
 
   MachineInstr *findCopyDefViaUnit(MCRegUnit RegUnit,
                                    const TargetRegisterInfo &TRI) {
-    auto CI = Copies.find(RegUnit);
-    if (CI == Copies.end())
+    CopyInfo *CI = findInfo(RegUnit);
+    if (!CI)
       return nullptr;
-    if (CI->second.DefRegs.size() != 1)
+    if (CI->DefRegs.size() != 1)
       return nullptr;
-    MCRegUnit RU = *TRI.regunits(CI->second.DefRegs[0]).begin();
+    MCRegUnit RU = *TRI.regunits(CI->DefRegs[0]).begin();
     return findCopyForUnit(RU, TRI, true);
   }
 
@@ -417,11 +452,11 @@ public:
                                       const TargetInstrInfo &TII,
                                       bool UseCopyInstr) {
     MCRegUnit RU = *TRI.regunits(Reg).begin();
-    auto CI = Copies.find(RU);
-    if (CI == Copies.end() || !CI->second.Avail)
+    CopyInfo *CI = findInfo(RU);
+    if (!CI || !CI->Avail)
       return nullptr;
 
-    MachineInstr *DefCopy = CI->second.MI;
+    MachineInstr *DefCopy = CI->MI;
     DestSourcePair CopyOperands = *isCopyInstr(*DefCopy, TII, UseCopyInstr);
     MCRegister Dst = getDstMCReg(CopyOperands);
     if (!TRI.isSubRegisterEq(Dst, Reg))
@@ -434,7 +469,7 @@ public:
                                const TargetRegisterInfo &TRI,
                                const TargetInstrInfo &TII) {
     SmallVector<MCRegUnit, 8> UnitsToClobber;
-    for (auto &[Unit, _] : Copies)
+    for (MCRegUnit Unit : TrackedUnits)
       if (!PreservedRegUnits.test(static_cast<unsigned>(Unit)))
         UnitsToClobber.push_back(Unit);
 
@@ -443,20 +478,20 @@ public:
       // as unavailable, which leads to issues if the Destination Reg Unit is
       // preserved, and used later. As such, only mark them as unavailable if
       // they are not preserved.
-      auto RegUnitInfo = Copies.find(Unit);
-      if (RegUnitInfo == Copies.end())
+      CopyInfo *RegUnitInfo = findInfo(Unit);
+      if (!RegUnitInfo)
         continue;
 
-      for (MCRegister DstReg : RegUnitInfo->second.DefRegs) {
+      for (MCRegister DstReg : RegUnitInfo->DefRegs) {
         for (MCRegUnit DstUnit : TRI.regunits(DstReg)) {
           if (!PreservedRegUnits.test(static_cast<unsigned>(DstUnit))) {
-            if (auto CI = Copies.find(DstUnit); CI != Copies.end()) {
-              CI->second.Avail = false;
+            if (CopyInfo *CI = findInfo(DstUnit)) {
+              CI->Avail = false;
             }
           }
         }
       }
-      Copies.erase(RegUnitInfo);
+      TrackedUnits.erase(Unit);
     }
   }
 
@@ -464,14 +499,23 @@ public:
   MachineInstr *findLastSeenUseInCopy(MCRegister Reg,
                                       const TargetRegisterInfo &TRI) {
     MCRegUnit RU = *TRI.regunits(Reg).begin();
-    auto CI = Copies.find(RU);
-    if (CI == Copies.end())
+    CopyInfo *CI = findInfo(RU);
+    if (!CI)
       return nullptr;
-    return CI->second.LastSeenUseInCopy;
+    return CI->LastSeenUseInCopy;
+  }
+
+  /// Prepare the tracker for a function using TRI.
+  void init(const TargetRegisterInfo &TRI) {
+    clear();
+    // Register masks may be allocated per function.
+    RegMaskToPreservedRegUnits.clear();
+    Copies.resize(TRI.getNumRegUnits());
+    TrackedUnits.setUniverse(TRI.getNumRegUnits());
   }
 
   void clear() {
-    Copies.clear();
+    TrackedUnits.clear();
   }
 };
 
@@ -485,8 +529,10 @@ class MachineCopyPropagation {
   bool UseCopyInstr;
 
 public:
-  MachineCopyPropagation(const CodeGenOptions &Opts, bool CopyInstr)
-      : Opts(Opts), UseCopyInstr(CopyInstr || Opts.mcp_use_is_copy_instr) {}
+  MachineCopyPropagation(const CodeGenOptions &Opts, CopyTracker &Tracker,
+                         bool CopyInstr)
+      : Opts(Opts), UseCopyInstr(CopyInstr || Opts.mcp_use_is_copy_instr),
+        Tracker(Tracker) {}
 
   bool run(MachineFunction &MF);
 
@@ -534,13 +580,15 @@ private:
   /// Multimap tracking debug users in current BB
   DenseMap<MachineInstr *, SmallPtrSet<MachineInstr *, 2>> CopyDbgUsers;
 
-  CopyTracker Tracker;
+  CopyTracker &Tracker;
 
   bool Changed = false;
 };
 
 class MachineCopyPropagationLegacy : public MachineFunctionPass {
   bool UseCopyInstr;
+  // Kept across functions to reuse its storage.
+  CopyTracker Tracker;
 
 public:
   static char ID; // pass identification
@@ -1606,14 +1654,17 @@ bool MachineCopyPropagationLegacy::runOnMachineFunction(MachineFunction &MF) {
   if (skipFunction(MF.getFunction()))
     return false;
 
-  return MachineCopyPropagation(getCodeGenOptions(MF), UseCopyInstr).run(MF);
+  return MachineCopyPropagation(getCodeGenOptions(MF), Tracker, UseCopyInstr)
+      .run(MF);
 }
 
 PreservedAnalyses
 MachineCopyPropagationPass::run(MachineFunction &MF,
                                 MachineFunctionAnalysisManager &) {
   MFPropsModifier _(*this, MF);
-  if (!MachineCopyPropagation(getCodeGenOptions(MF), UseCopyInstr).run(MF))
+  CopyTracker Tracker;
+  if (!MachineCopyPropagation(getCodeGenOptions(MF), Tracker, UseCopyInstr)
+           .run(MF))
     return PreservedAnalyses::all();
   auto PA = getMachineFunctionPassPreservedAnalyses();
   PA.preserveSet<CFGAnalyses>();
@@ -1630,6 +1681,7 @@ bool MachineCopyPropagation::run(MachineFunction &MF) {
   TRI = MF.getSubtarget().getRegisterInfo();
   TII = MF.getSubtarget().getInstrInfo();
   MRI = &MF.getRegInfo();
+  Tracker.init(*TRI);
 
   for (MachineBasicBlock &MBB : MF) {
     if (IsSpillageCopyElimEnabled)
