@@ -8,6 +8,7 @@
 
 #include "llvm/Option/OptTable.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
@@ -166,6 +167,28 @@ static unsigned matchOption(const StringTable &StrTable,
     }
   }
   return 0;
+}
+
+/// Returns the first option in [Start, End) whose name is a case-insensitive
+/// prefix of \p Name, where all options in the range sort after \p Name. An
+/// option that is not such a prefix only shares some prefix Name[:N] with
+/// \p Name; the next option that is one sorts no lower than Name[:N].
+static const OptTable::Info *
+skipToPrefixOf(const StringTable &StrTable,
+               ArrayRef<StringTable::Offset> PrefixesTable,
+               const OptTable::Info *Start, const OptTable::Info *End,
+               StringRef Name) {
+  while (Start != End) {
+    StringRef OptName = Start->getName(StrTable, PrefixesTable);
+    size_t N = 0, E = std::min(OptName.size(), Name.size());
+    while (N != E && toLower(OptName[N]) == toLower(Name[N]))
+      ++N;
+    if (N == OptName.size())
+      return Start;
+    Start = std::lower_bound(Start + 1, End, Name.take_front(N),
+                             OptNameLess(StrTable, PrefixesTable));
+  }
+  return End;
 }
 
 // Returns true if one of the Prefixes + In.Names matches Option
@@ -461,16 +484,27 @@ std::unique_ptr<Arg> OptTable::internalParseOneArg(
   // prefix it, we iteratively search for the next option which could
   // be a prefix.
   //
-  // FIXME: This is searching much more than necessary, but I am
-  // blanking on the simplest way to make it fast. We can solve this
-  // problem when we move to TableGen.
+  // An option matches Str either with a name that is a prefix of Name, or
+  // with a shorter prefix and a name starting with a prefix character. If
+  // all prefix characters sort before Name, the latter options sort before
+  // Start, so we can skip over the options that are no prefix of Name.
+  unsigned char First = Name.empty() ? 0 : toLower(Name[0]);
+  bool SkipNonPrefixes = all_of(PrefixChars, [First](char C) {
+    return static_cast<unsigned char>(toLower(C)) < First;
+  });
   for (; Start != End; ++Start) {
     unsigned ArgSize = 0;
     // Scan for first option which is a proper prefix.
-    for (; Start != End; ++Start)
+    for (; Start != End; ++Start) {
+      if (SkipNonPrefixes) {
+        Start = skipToPrefixOf(StrTable, PrefixesTable, Start, End, Name);
+        if (Start == End)
+          break;
+      }
       if ((ArgSize =
                matchOption(StrTable, PrefixesTable, Start, Str, IgnoreCase)))
         break;
+    }
     if (Start == End)
       break;
 
