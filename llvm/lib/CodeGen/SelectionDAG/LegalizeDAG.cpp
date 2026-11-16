@@ -90,7 +90,8 @@ class SelectionDAGLegalize {
   const TargetLowering &TLI;
   SelectionDAG &DAG;
 
-  /// The set of nodes which have already been legalized. We hold a
+  /// The set of nodes which have already been legalized, in addition to the
+  /// nodes marked LegalizeVisited (see SelectionDAG::Legalize). We hold a
   /// reference to it in order to update as necessary on node deletion.
   SmallPtrSetImpl<SDNode *> &LegalizedNodes;
 
@@ -214,6 +215,7 @@ public:
 
   void ReplacedNode(SDNode *N) {
     LegalizedNodes.erase(N);
+    N->setLegalizeVisited(false);
     if (UpdatedNodes)
       UpdatedNodes->insert(N);
   }
@@ -6298,7 +6300,19 @@ void SelectionDAGLegalize::PromoteNode(SDNode *Node) {
 void SelectionDAG::Legalize() {
   AssignTopologicalOrder();
 
+  // Legalized nodes are marked with LegalizeVisited. LegalizedNodes only
+  // keeps the addresses of legalized nodes deleted below by DeleteNode, which
+  // does not notify listeners: a node later allocated at such an address
+  // counts as legalized.
   SmallPtrSet<SDNode *, 16> LegalizedNodes;
+  auto IsLegalized = [&LegalizedNodes](SDNode *N) {
+    return N->getLegalizeVisited() || LegalizedNodes.count(N);
+  };
+  auto DeleteDeadNode = [&](SDNode *N) {
+    if (N->getLegalizeVisited())
+      LegalizedNodes.insert(N);
+    DeleteNode(N);
+  };
   // Use a delete listener to remove nodes which were deleted during
   // legalization from LegalizeNodes. This is needed to handle the situation
   // where a new node is allocated by the object pool to the same address of a
@@ -6321,17 +6335,18 @@ void SelectionDAG::Legalize() {
       SDNode *N = &*NI;
       if (N->use_empty() && N != getRoot().getNode()) {
         ++NI;
-        DeleteNode(N);
+        DeleteDeadNode(N);
         continue;
       }
 
-      if (LegalizedNodes.insert(N).second) {
+      if (!IsLegalized(N)) {
+        N->setLegalizeVisited(true);
         AnyLegalized = true;
         Legalizer.LegalizeOp(N);
 
         if (N->use_empty() && N != getRoot().getNode()) {
           ++NI;
-          DeleteNode(N);
+          DeleteDeadNode(N);
         }
       }
     }
@@ -6342,6 +6357,9 @@ void SelectionDAG::Legalize() {
 
   // Remove dead nodes now.
   RemoveDeadNodes();
+
+  for (SDNode &N : allnodes())
+    N.setLegalizeVisited(false);
 }
 
 bool SelectionDAG::LegalizeOp(SDNode *N,
