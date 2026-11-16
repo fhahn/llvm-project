@@ -55,7 +55,7 @@ void SlotIndexesWrapperPass::getAnalysisUsage(AnalysisUsage &au) const {
 }
 
 void SlotIndexes::clear() {
-  mi2iMap.clear();
+  MIEntries.clear();
   MBBRanges.clear();
   idx2MBBMap.clear();
   indexList.clear();
@@ -83,7 +83,7 @@ void SlotIndexes::analyze(MachineFunction &fn) {
          "Index -> MBB mapping non-empty at initial numbering?");
   assert(MBBRanges.empty() &&
          "MBB -> Index mapping non-empty at initial numbering?");
-  assert(mi2iMap.empty() &&
+  assert(MIEntries.empty() &&
          "MachineInstr -> Index mapping non-empty at initial numbering?");
 
   unsigned index = 0;
@@ -105,8 +105,7 @@ void SlotIndexes::analyze(MachineFunction &fn) {
       indexList.push_back(*createEntry(&MI, index += SlotIndex::InstrDist));
 
       // Save this base index in the maps.
-      mi2iMap.insert(std::make_pair(
-          &MI, SlotIndex(&indexList.back(), SlotIndex::Slot_Block)));
+      addEntry(MI, &indexList.back());
     }
 
     // We insert one blank instructions between basic blocks.
@@ -157,27 +156,18 @@ void SlotIndexes::removeMachineInstrFromMaps(MachineInstr &MI,
                                              bool AllowBundled) {
   assert((AllowBundled || !MI.isBundledWithPred()) &&
          "Use removeSingleMachineInstrFromMaps() instead");
-  Mi2IndexMap::iterator mi2iItr = mi2iMap.find(&MI);
-  if (mi2iItr == mi2iMap.end())
+  IndexListEntry *MIEntry = getEntry(MI);
+  if (!MIEntry)
     return;
 
-  SlotIndex MIIndex = mi2iItr->second;
-  IndexListEntry &MIEntry = *MIIndex.listEntry();
-  assert(MIEntry.getInstr() == &MI && "Instruction indexes broken.");
-  mi2iMap.erase(mi2iItr);
   // FIXME: Eventually we want to actually delete these indexes.
-  MIEntry.setInstr(nullptr);
+  MIEntry->setInstr(nullptr);
 }
 
 void SlotIndexes::removeSingleMachineInstrFromMaps(MachineInstr &MI) {
-  Mi2IndexMap::iterator mi2iItr = mi2iMap.find(&MI);
-  if (mi2iItr == mi2iMap.end())
+  IndexListEntry *MIEntry = getEntry(MI);
+  if (!MIEntry)
     return;
-
-  SlotIndex MIIndex = mi2iItr->second;
-  IndexListEntry &MIEntry = *MIIndex.listEntry();
-  assert(MIEntry.getInstr() == &MI && "Instruction indexes broken.");
-  mi2iMap.erase(mi2iItr);
 
   // When removing the first instruction of a bundle update mapping to next
   // instruction.
@@ -187,12 +177,12 @@ void SlotIndexes::removeSingleMachineInstrFromMaps(MachineInstr &MI) {
 
     MachineBasicBlock::instr_iterator Next = std::next(MI.getIterator());
     MachineInstr &NextMI = *Next;
-    MIEntry.setInstr(&NextMI);
-    mi2iMap.insert(std::make_pair(&NextMI, MIIndex));
+    MIEntry->setInstr(&NextMI);
+    NextMI.SlotIndexesEntryNum = MI.SlotIndexesEntryNum;
     return;
   } else {
     // FIXME: Eventually we want to actually delete these indexes.
-    MIEntry.setInstr(nullptr);
+    MIEntry->setInstr(nullptr);
   }
 }
 
@@ -282,7 +272,7 @@ void SlotIndexes::repairIndexesInRange(MachineBasicBlock *MBB,
     MachineInstr *SlotMI = ListI->getInstr();
     MachineInstr *MI = (MBBI != MBB->end() && !pastStart) ? &*MBBI : nullptr;
     bool MBBIAtBegin = MBBI == Begin && (!includeStart || pastStart);
-    bool MIIndexNotFound = MI && !mi2iMap.contains(MI);
+    bool MIIndexNotFound = MI && !hasIndex(*MI);
     bool SlotMIRemoved = false;
 
     if (SlotMI == MI && !MBBIAtBegin) {
