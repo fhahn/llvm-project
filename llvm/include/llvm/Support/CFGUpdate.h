@@ -80,35 +80,29 @@ void LegalizeUpdates(ArrayRef<Update<NodePtr>> AllUpdates,
     Operations[{From, To}] += (U.getKind() == UpdateKind::Insert ? 1 : -1);
   }
 
+  // Emit each edge at its last update, which makes the order consistent
+  // without relying on pointer values within the set. Zeroing the count skips
+  // the edge's earlier updates.
+  // In the future, we should order by something else to minimize the amount
+  // of work needed to perform the series of updates.
   Result.clear();
   Result.reserve(Operations.size());
-  for (auto &Op : Operations) {
-    const int NumInsertions = Op.second;
+  for (const auto &U : reverse(AllUpdates)) {
+    NodePtr From = U.getFrom();
+    NodePtr To = U.getTo();
+    if (InverseGraph)
+      std::swap(From, To); // Reverse edge for postdominators.
+
+    const int NumInsertions = std::exchange(Operations[{From, To}], 0);
     assert(std::abs(NumInsertions) <= 1 && "Unbalanced operations!");
     if (NumInsertions == 0)
       continue;
     const UpdateKind UK =
         NumInsertions > 0 ? UpdateKind::Insert : UpdateKind::Delete;
-    Result.push_back({UK, Op.first.first, Op.first.second});
+    Result.push_back({UK, From, To});
   }
-
-  // Make the order consistent by not relying on pointer values within the
-  // set. Reuse the old Operations map.
-  // In the future, we should sort by something else to minimize the amount
-  // of work needed to perform the series of updates.
-  for (size_t i = 0, e = AllUpdates.size(); i != e; ++i) {
-    const auto &U = AllUpdates[i];
-    if (!InverseGraph)
-      Operations[{U.getFrom(), U.getTo()}] = int(i);
-    else
-      Operations[{U.getTo(), U.getFrom()}] = int(i);
-  }
-
-  llvm::sort(Result, [&](const Update<NodePtr> &A, const Update<NodePtr> &B) {
-    const auto &OpA = Operations[{A.getFrom(), A.getTo()}];
-    const auto &OpB = Operations[{B.getFrom(), B.getTo()}];
-    return ReverseResultOrder ? OpA < OpB : OpA > OpB;
-  });
+  if (ReverseResultOrder)
+    std::reverse(Result.begin(), Result.end());
 }
 
 } // end namespace cfg
