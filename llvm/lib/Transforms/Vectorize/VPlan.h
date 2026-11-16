@@ -982,10 +982,10 @@ public:
 
   LLVM_ABI_FOR_TEST FastMathFlags getFastMathFlagsOrNone() const;
 
-  /// Set the nnan fast-math flag.
-  void setNoNaNs() {
+  /// Set the fast-math flags to \p FMFs.
+  void setFastMathFlags(FastMathFlags FMFs) {
     assert(hasFastMathFlags() && "recipe doesn't have fast-math flags");
-    getFMFsRef().NoNaNs = true;
+    getFMFsRef() = FMFs;
   }
 
   bool hasNoUnsignedWrap() const {
