@@ -375,3 +375,329 @@ loop:
 exit:
   ret void
 }
+
+; The exit value of %iv is (9 + %start)<u nuw>, which is at least 9.
+define void @exit_value_range_nuw(i64 %start) {
+; CHECK-LABEL: 'exit_value_range_nuw'
+; CHECK-NEXT:  Classifying expressions for: @exit_value_range_nuw
+; CHECK-NEXT:    %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop> U: full-set S: full-set Exits: (9 + %start)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nuw i64 %iv, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%loop> U: full-set S: full-set Exits: (10 + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i.next = add i64 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.lcssa = phi i64 [ %iv, %loop ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop> U: full-set S: full-set --> (9 + %start)<u nuw> U: full-set S: full-set
+; CHECK-NEXT:  Determining loop execution counts for: @exit_value_range_nuw
+; CHECK-NEXT:  Loop %loop: backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop: Trip multiple is 10
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+  %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
+  %iv.next = add nuw i64 %iv, 1
+  %i.next = add i64 %i, 1
+  %ec = icmp ne i64 %i.next, 10
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  %iv.lcssa = phi i64 [ %iv, %loop ]
+  ret void
+}
+
+; The exit value of %iv, (%start + %n)<u nuw>, is -1 given its nuw use flags,
+; but in [-1, 99) without them. The exit value of %mul, 64 times that value,
+; does not wrap given the use flags.
+define void @mul_of_exit_value_nuw(i8 range(i8 -2, 0) %start, i8 range(i8 1, 100) %n, i8 %init) {
+; CHECK-LABEL: 'mul_of_exit_value_nuw'
+; CHECK-NEXT:  Classifying expressions for: @mul_of_exit_value_nuw
+; CHECK-NEXT:    %iv = phi i8 [ %start, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><nsw><%loop> U: [-2,0) S: [-2,0) Exits: (%start + %n)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i = phi i8 [ 0, %entry ], [ %i.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,100) S: [0,100) Exits: %n LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %scale = phi i8 [ %init, %entry ], [ 64, %loop ]
+; CHECK-NEXT:    --> %scale U: full-set S: full-set Exits: 64 LoopDispositions: { %loop: Variant }
+; CHECK-NEXT:    %mul = mul i8 %scale, %iv
+; CHECK-NEXT:    --> ({%start,+,1}<nuw><nsw><%loop> * %scale) U: full-set S: full-set Exits: (64 * (%start + %n)<u nuw>) LoopDispositions: { %loop: Variant }
+; CHECK-NEXT:    %iv.next = add nuw i8 %iv, 1
+; CHECK-NEXT:    --> {(1 + %start)<nsw>,+,1}<nsw><%loop> U: [-1,100) S: [-1,100) Exits: (1 + %start + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i.next = add i8 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,101) S: [1,101) Exits: (1 + %n)<nuw><nsw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @mul_of_exit_value_nuw
+; CHECK-NEXT:  Loop %loop: backedge-taken count is %n
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 99
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is %n
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i8 [ %start, %entry ], [ %iv.next, %loop ]
+  %i = phi i8 [ 0, %entry ], [ %i.next, %loop ]
+  %scale = phi i8 [ %init, %entry ], [ 64, %loop ]
+  %mul = mul i8 %scale, %iv
+  %iv.next = add nuw i8 %iv, 1
+  %i.next = add i8 %i, 1
+  %ec = icmp eq i8 %i, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; At the scope of %outer, the start of %j is (9 + %start)<u nuw>, which is -1
+; given its nuw use flags, but in [-1, 4) without them. The exit value of %mul
+; from %inner, 64 * %j, must not keep nsw based on the use flags, and neither
+; must %mul.canon, which computes the same value without them.
+define void @mul_of_addrec_starting_at_exit_value_nuw(i8 range(i8 -10, -5) %start, i8 %init) {
+; CHECK-LABEL: 'mul_of_addrec_starting_at_exit_value_nuw'
+; CHECK-NEXT:  Classifying expressions for: @mul_of_addrec_starting_at_exit_value_nuw
+; CHECK-NEXT:    %start.9 = add i8 %start, 9
+; CHECK-NEXT:    --> (9 + %start)<nsw> U: [-1,4) S: [-1,4)
+; CHECK-NEXT:    %iv = phi i8 [ %start, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><nsw><%loop> U: [-10,0) S: [-10,0) Exits: (9 + %start)<nsw><u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i = phi i8 [ 0, %entry ], [ %i.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nuw i8 %iv, 1
+; CHECK-NEXT:    --> {(1 + %start)<nuw><nsw>,+,1}<nsw><%loop> U: [-9,5) S: [-9,5) Exits: (10 + %start)<nsw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i.next = add i8 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %j = phi i8 [ %iv, %loop ], [ %j.next, %outer.latch ]
+; CHECK-NEXT:    --> {{\{\{}}%start,+,1}<nuw><nsw><%loop>,+,1}<nsw><%outer> U: [-10,2) S: [-10,2) --> {(9 + %start)<nsw><u nuw>,+,1}<nw><%outer> U: [-1,6) S: [-1,6) Exits: (11 + %start)<nsw> LoopDispositions: { %outer: Computable, %inner: Invariant }
+; CHECK-NEXT:    %k = phi i8 [ 0, %loop ], [ %k.next, %outer.latch ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%outer> U: [0,3) S: [0,3) Exits: 2 LoopDispositions: { %outer: Computable, %inner: Invariant }
+; CHECK-NEXT:    %j.canon = phi i8 [ %start.9, %loop ], [ %j.canon.next, %outer.latch ]
+; CHECK-NEXT:    --> {(9 + %start)<nsw>,+,1}<nsw><%outer> U: [-1,6) S: [-1,6) Exits: (11 + %start)<nsw> LoopDispositions: { %outer: Computable, %inner: Invariant }
+; CHECK-NEXT:    %scale = phi i8 [ %init, %outer ], [ 64, %inner ]
+; CHECK-NEXT:    --> %scale U: full-set S: full-set Exits: 64 LoopDispositions: { %inner: Variant, %outer: Variant }
+; CHECK-NEXT:    %l = phi i8 [ 0, %outer ], [ %l.next, %inner ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%inner> U: [0,2) S: [0,2) Exits: 1 LoopDispositions: { %inner: Computable, %outer: Uniform }
+; CHECK-NEXT:    %mul = mul nsw i8 %scale, %j
+; CHECK-NEXT:    --> ({{\{\{}}%start,+,1}<nuw><nsw><%loop>,+,1}<nsw><%outer> * %scale)<nsw> U: full-set S: full-set --> ({(9 + %start)<nsw><u nuw>,+,1}<nsw><%outer> * %scale)<nsw> U: full-set S: full-set Exits: {(64 + (64 * %start)),+,64}<%outer> LoopDispositions: { %inner: Variant, %outer: Variant }
+; CHECK-NEXT:    %l.next = add i8 %l, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%inner> U: [1,3) S: [1,3) Exits: 2 LoopDispositions: { %inner: Computable, %outer: Uniform }
+; CHECK-NEXT:    %mul.canon = mul i8 %j.canon, 64
+; CHECK-NEXT:    --> {(64 + (64 * %start)),+,64}<%outer> U: [0,-63) S: [-128,65) Exits: (-64 + (64 * %start)) LoopDispositions: { %outer: Computable, %inner: Invariant }
+; CHECK-NEXT:    %j.canon.next = add i8 %j.canon, 1
+; CHECK-NEXT:    --> {(10 + %start)<nsw>,+,1}<nuw><nsw><%outer> U: [0,7) S: [0,7) Exits: (12 + %start)<nsw> LoopDispositions: { %outer: Computable, %inner: Invariant }
+; CHECK-NEXT:    %j.next = add i8 %j, 1
+; CHECK-NEXT:    --> {{\{\{}}(1 + %start)<nuw><nsw>,+,1}<nsw><%loop>,+,1}<nsw><%outer> U: [-9,7) S: [-9,7) --> {(10 + %start)<nsw>,+,1}<nuw><nsw><%outer> U: [0,7) S: [0,7) Exits: (12 + %start)<nsw> LoopDispositions: { %outer: Computable, %inner: Invariant }
+; CHECK-NEXT:    %k.next = add i8 %k, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%outer> U: [1,4) S: [1,4) Exits: 3 LoopDispositions: { %outer: Computable, %inner: Invariant }
+; CHECK-NEXT:  Determining loop execution counts for: @mul_of_addrec_starting_at_exit_value_nuw
+; CHECK-NEXT:  Loop %inner: backedge-taken count is i8 1
+; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i8 1
+; CHECK-NEXT:  Loop %inner: symbolic max backedge-taken count is i8 1
+; CHECK-NEXT:  Loop %inner: Trip multiple is 2
+; CHECK-NEXT:  Loop %outer: backedge-taken count is i8 2
+; CHECK-NEXT:  Loop %outer: constant max backedge-taken count is i8 2
+; CHECK-NEXT:  Loop %outer: symbolic max backedge-taken count is i8 2
+; CHECK-NEXT:  Loop %outer: Trip multiple is 3
+; CHECK-NEXT:  Loop %loop: backedge-taken count is i8 9
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 9
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i8 9
+; CHECK-NEXT:  Loop %loop: Trip multiple is 10
+;
+entry:
+  %start.9 = add i8 %start, 9
+  br label %loop
+
+loop:
+  %iv = phi i8 [ %start, %entry ], [ %iv.next, %loop ]
+  %i = phi i8 [ 0, %entry ], [ %i.next, %loop ]
+  %iv.next = add nuw i8 %iv, 1
+  %i.next = add i8 %i, 1
+  %ec = icmp ne i8 %i.next, 10
+  br i1 %ec, label %loop, label %outer
+
+outer:
+  %j = phi i8 [ %iv, %loop ], [ %j.next, %outer.latch ]
+  %k = phi i8 [ 0, %loop ], [ %k.next, %outer.latch ]
+  %j.canon = phi i8 [ %start.9, %loop ], [ %j.canon.next, %outer.latch ]
+  br label %inner
+
+inner:
+  %scale = phi i8 [ %init, %outer ], [ 64, %inner ]
+  %l = phi i8 [ 0, %outer ], [ %l.next, %inner ]
+  %mul = mul nsw i8 %scale, %j
+  call void @use(i8 noundef %mul)
+  %l.next = add i8 %l, 1
+  %ec.inner = icmp ne i8 %l.next, 2
+  br i1 %ec.inner, label %inner, label %outer.latch
+
+outer.latch:
+  %mul.canon = mul i8 %j.canon, 64
+  call void @use(i8 %mul.canon)
+  %j.canon.next = add i8 %j.canon, 1
+  %j.next = add i8 %j, 1
+  %k.next = add i8 %k, 1
+  %ec.outer = icmp ne i8 %k.next, 3
+  br i1 %ec.outer, label %outer, label %exit
+
+exit:
+  ret void
+}
+
+; At the scope of %outer, the step of %j is the exit value (9 + %start)<u nuw>
+; of %iv. The exit value of %x from %inner adds 3 to the start of
+; {0,+,(9 + %start)<u nuw>}<nw><%outer>, which keeps the use of its step, so
+; the result can keep nw.
+define void @add_to_addrec_with_exit_value_step(i64 %start) {
+; CHECK-LABEL: 'add_to_addrec_with_exit_value_step'
+; CHECK-NEXT:  Classifying expressions for: @add_to_addrec_with_exit_value_step
+; CHECK-NEXT:    %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop> U: full-set S: full-set Exits: (9 + %start)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nuw i64 %iv, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%loop> U: full-set S: full-set Exits: (10 + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i.next = add i64 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %j = phi i64 [ 0, %loop ], [ %j.next, %outer.latch ]
+; CHECK-NEXT:    --> {0,+,{%start,+,1}<nuw><%loop>}<nuw><%outer> U: full-set S: full-set --> {0,+,(9 + %start)<u nuw>}<nw><%outer> U: full-set S: full-set Exits: (18 + (2 * %start)) LoopDispositions: { %outer: Computable, %inner: Invariant }
+; CHECK-NEXT:    %k = phi i64 [ 0, %loop ], [ %k.next, %outer.latch ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%outer> U: [0,3) S: [0,3) Exits: 2 LoopDispositions: { %outer: Computable, %inner: Invariant }
+; CHECK-NEXT:    %l = phi i64 [ 0, %outer ], [ %l.next, %inner ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%inner> U: [0,4) S: [0,4) Exits: 3 LoopDispositions: { %inner: Computable, %outer: Uniform }
+; CHECK-NEXT:    %x = add i64 %j, %l
+; CHECK-NEXT:    --> {{\{\{}}0,+,{%start,+,1}<nuw><%loop>}<nuw><%outer>,+,1}<nw><%inner> U: full-set S: full-set --> {{\{\{}}0,+,(9 + %start)<u nuw>}<nw><%outer>,+,1}<nw><%inner> U: full-set S: full-set Exits: {3,+,(9 + %start)<u nuw>}<nw><%outer> LoopDispositions: { %inner: Computable, %outer: Variant }
+; CHECK-NEXT:    %l.next = add i64 %l, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%inner> U: [1,5) S: [1,5) Exits: 4 LoopDispositions: { %inner: Computable, %outer: Uniform }
+; CHECK-NEXT:    %j.next = add nuw i64 %j, %iv
+; CHECK-NEXT:    --> {{\{\{}}%start,+,1}<nuw><%loop>,+,{%start,+,1}<nuw><%loop>}<nw><%outer> U: full-set S: full-set --> {(9 + %start)<u nuw>,+,(9 + %start)<u nuw>}<nw><%outer> U: full-set S: full-set Exits: (27 + (3 * %start)) LoopDispositions: { %outer: Computable, %inner: Invariant }
+; CHECK-NEXT:    %k.next = add i64 %k, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%outer> U: [1,4) S: [1,4) Exits: 3 LoopDispositions: { %outer: Computable, %inner: Invariant }
+; CHECK-NEXT:  Determining loop execution counts for: @add_to_addrec_with_exit_value_step
+; CHECK-NEXT:  Loop %inner: backedge-taken count is i64 3
+; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i64 3
+; CHECK-NEXT:  Loop %inner: symbolic max backedge-taken count is i64 3
+; CHECK-NEXT:  Loop %inner: Trip multiple is 4
+; CHECK-NEXT:  Loop %outer: backedge-taken count is i64 2
+; CHECK-NEXT:  Loop %outer: constant max backedge-taken count is i64 2
+; CHECK-NEXT:  Loop %outer: symbolic max backedge-taken count is i64 2
+; CHECK-NEXT:  Loop %outer: Trip multiple is 3
+; CHECK-NEXT:  Loop %loop: backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop: Trip multiple is 10
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+  %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
+  %iv.next = add nuw i64 %iv, 1
+  %i.next = add i64 %i, 1
+  %ec = icmp ne i64 %i.next, 10
+  br i1 %ec, label %loop, label %outer
+
+outer:
+  %j = phi i64 [ 0, %loop ], [ %j.next, %outer.latch ]
+  %k = phi i64 [ 0, %loop ], [ %k.next, %outer.latch ]
+  br label %inner
+
+inner:
+  %l = phi i64 [ 0, %outer ], [ %l.next, %inner ]
+  %x = add i64 %j, %l
+  %l.next = add i64 %l, 1
+  %ec.inner = icmp ne i64 %l.next, 4
+  br i1 %ec.inner, label %inner, label %outer.latch
+
+outer.latch:
+  %j.next = add nuw i64 %j, %iv
+  %k.next = add i64 %k, 1
+  %ec.outer = icmp ne i64 %k.next, 3
+  br i1 %ec.outer, label %outer, label %exit
+
+exit:
+  ret void
+}
+
+; The exit value of %iv is at least 9 given its nuw use flags, so the umax in
+; the exit value of %umax folds to it if the use flags are kept.
+define void @umax_of_exit_value_nuw(i64 %start) {
+; CHECK-LABEL: 'umax_of_exit_value_nuw'
+; CHECK-NEXT:  Classifying expressions for: @umax_of_exit_value_nuw
+; CHECK-NEXT:    %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop> U: full-set S: full-set Exits: (9 + %start)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %umax = call i64 @llvm.umax.i64(i64 %iv, i64 5)
+; CHECK-NEXT:    --> (5 umax {%start,+,1}<nuw><%loop>) U: [5,0) S: [5,0) Exits: (5 umax (9 + %start)<u nuw>) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nuw i64 %iv, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%loop> U: full-set S: full-set Exits: (10 + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i.next = add i64 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @umax_of_exit_value_nuw
+; CHECK-NEXT:  Loop %loop: backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop: Trip multiple is 10
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+  %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
+  %umax = call i64 @llvm.umax.i64(i64 %iv, i64 5)
+  %iv.next = add nuw i64 %iv, 1
+  %i.next = add i64 %i, 1
+  %ec = icmp ne i64 %i.next, 10
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; The exit value of %iv is not zero given its nuw use flags, so the umin_seq in
+; the exit value of %umin.seq can be a umin if the use flags are kept.
+define void @umin_seq_of_exit_value_nuw(i64 %start, i64 %n) {
+; CHECK-LABEL: 'umin_seq_of_exit_value_nuw'
+; CHECK-NEXT:  Classifying expressions for: @umin_seq_of_exit_value_nuw
+; CHECK-NEXT:    %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop> U: full-set S: full-set Exits: (9 + %start)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %umin = call i64 @llvm.umin.i64(i64 %iv, i64 %n)
+; CHECK-NEXT:    --> ({%start,+,1}<nuw><%loop> umin %n) U: full-set S: full-set Exits: ((9 + %start)<u nuw> umin %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %umin.seq = select i1 %iv.is.zero, i64 0, i64 %umin
+; CHECK-NEXT:    --> ({%start,+,1}<nuw><%loop> umin_seq %n) U: full-set S: full-set Exits: ((9 + %start)<u nuw> umin_seq %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nuw i64 %iv, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%loop> U: full-set S: full-set Exits: (10 + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i.next = add i64 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @umin_seq_of_exit_value_nuw
+; CHECK-NEXT:  Loop %loop: backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop: Trip multiple is 10
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+  %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
+  %umin = call i64 @llvm.umin.i64(i64 %iv, i64 %n)
+  %iv.is.zero = icmp eq i64 %iv, 0
+  %umin.seq = select i1 %iv.is.zero, i64 0, i64 %umin
+  %iv.next = add nuw i64 %iv, 1
+  %i.next = add i64 %i, 1
+  %ec = icmp ne i64 %i.next, 10
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+declare void @use(i8)

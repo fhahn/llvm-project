@@ -78,6 +78,233 @@ exit:
   ret void
 }
 
+; Under the guard %a s> -1, (1 + %a)<nsw> is rewritten to (1 + (0 smax %a)),
+; which does not wrap under the guard and bounds the constant max
+; backedge-taken count.
+define void @rewrite_preserve_add_nsw_constant_max(i32 %a) {
+; CHECK-LABEL: 'rewrite_preserve_add_nsw_constant_max'
+; CHECK-NEXT:  Determining loop execution counts for: @rewrite_preserve_add_nsw_constant_max
+; CHECK-NEXT:  Loop %loop: backedge-taken count is %a
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 2147483646
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is %a
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %add = add nsw i32 %a, 1
+  call void @use(i32 noundef %add)
+  %pre = icmp sgt i32 %a, -1
+  br i1 %pre, label %loop, label %exit
+
+loop:
+  %iv = phi i32 [ 0, %entry ], [ %iv.next, %loop ]
+  call void @clobber()
+  %iv.next = add i32 %iv, 1
+  %ec = icmp eq i32 %iv.next, %add
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Same as @rewrite_preserve_add_nsw_constant_max, but with another guard, whose
+; replacement 300 is not in the range of (zext i8 %b to i32).
+define void @rewrite_preserve_add_nsw_constant_max_other_guard(i32 %a, i8 %b) {
+; CHECK-LABEL: 'rewrite_preserve_add_nsw_constant_max_other_guard'
+; CHECK-NEXT:  Determining loop execution counts for: @rewrite_preserve_add_nsw_constant_max_other_guard
+; CHECK-NEXT:  Loop %loop: backedge-taken count is %a
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 2147483647
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is %a
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %add = add nsw i32 %a, 1
+  call void @use(i32 noundef %add)
+  %b.ext = zext i8 %b to i32
+  %pre = icmp sgt i32 %a, -1
+  %b.300 = icmp eq i32 %b.ext, 300
+  %and = and i1 %pre, %b.300
+  br i1 %and, label %loop, label %exit
+
+loop:
+  %iv = phi i32 [ 0, %entry ], [ %iv.next, %loop ]
+  call void @clobber()
+  %iv.next = add i32 %iv, 1
+  %ec = icmp eq i32 %iv.next, %add
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Same as @rewrite_preserve_add_nsw_constant_max, but the rewritten add is the
+; operand of a zext.
+define void @rewrite_preserve_add_nsw_zext_constant_max(i32 %a) {
+; CHECK-LABEL: 'rewrite_preserve_add_nsw_zext_constant_max'
+; CHECK-NEXT:  Determining loop execution counts for: @rewrite_preserve_add_nsw_zext_constant_max
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (zext i32 (4 + %a)<nsw> to i64))<nsw>
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 2147483646
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (zext i32 (4 + %a)<nsw> to i64))<nsw>
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %add = add nsw i32 %a, 4
+  call void @use(i32 noundef %add)
+  %pre = icmp sgt i32 %a, -4
+  br i1 %pre, label %ph, label %exit
+
+ph:
+  %add.ext = zext nneg i32 %add to i64
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %ph ], [ %iv.next, %loop ]
+  call void @clobber()
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %add.ext
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Under the guard %a s> -1, the step (1 + %a)<nsw> of %iv is rewritten to
+; (1 + (0 smax %a)), which is non-negative given the nsw.
+define void @rewrite_preserve_add_nsw_step(i32 %a, i32 %n) {
+; CHECK-LABEL: 'rewrite_preserve_add_nsw_step'
+; CHECK-NEXT:  Determining loop execution counts for: @rewrite_preserve_add_nsw_step
+; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-1 + (-1 * %a) + %n) /u (1 + %a)<nsw>)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-1 + (-1 * %a) + %n) /u (1 + %a)<nsw>)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %step = add nsw i32 %a, 1
+  call void @use(i32 noundef %step)
+  %pre = icmp sgt i32 %a, -1
+  br i1 %pre, label %loop, label %exit
+
+loop:
+  %iv = phi i32 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.next = add nuw i32 %iv, %step
+  %ec = icmp eq i32 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The guard %a == 16 rewrites the exit count (%a + %y)<nuw> of %loop.2 to
+; (16 + %y), the SCEV of the unguarded %n. The nuw only holds under the guard,
+; so it must not end up on (16 + %y) in the trip count of %loop.1.
+define void @rewrite_flags_only_hold_under_guard(i32 %a, i32 %y) {
+; CHECK-LABEL: 'rewrite_flags_only_hold_under_guard'
+; CHECK-NEXT:  Determining loop execution counts for: @rewrite_flags_only_hold_under_guard
+; CHECK-NEXT:  Loop %loop.2: backedge-taken count is (%a + %y)<nuw>
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (%a + %y)<nuw>
+; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop.1: backedge-taken count is (-1 + (1 umax (16 + %y)<nuw>))
+; CHECK-NEXT:  Loop %loop.1: constant max backedge-taken count is i32 -2
+; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is (-1 + (1 umax (16 + %y)<nuw>))
+; CHECK-NEXT:  Loop %loop.1: Trip multiple is 1
+;
+entry:
+  %add = add nuw i32 %a, %y
+  call void @use(i32 noundef %add)
+  %n = add i32 %y, 16
+  br label %loop.1
+
+loop.1:
+  %iv.1 = phi i32 [ 0, %entry ], [ %iv.1.next, %loop.1 ]
+  %iv.1.next = add i32 %iv.1, 1
+  %ec.1 = icmp ult i32 %iv.1.next, %n
+  br i1 %ec.1, label %loop.1, label %guard
+
+guard:
+  %pre = icmp eq i32 %a, 16
+  br i1 %pre, label %loop.2, label %exit
+
+loop.2:
+  %iv.2 = phi i32 [ 0, %guard ], [ %iv.2.next, %loop.2 ]
+  %iv.2.next = add i32 %iv.2, 1
+  %ec.2 = icmp eq i32 %iv.2, %add
+  br i1 %ec.2, label %exit, label %loop.2
+
+exit:
+  ret void
+}
+
+; Same as @rewrite_flags_only_hold_under_guard, but with a mul.
+define void @rewrite_flags_only_hold_under_guard_mul(i32 %a, i32 %y) {
+; CHECK-LABEL: 'rewrite_flags_only_hold_under_guard_mul'
+; CHECK-NEXT:  Determining loop execution counts for: @rewrite_flags_only_hold_under_guard_mul
+; CHECK-NEXT:  Loop %loop.2: backedge-taken count is (%a * %y)<nuw>
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -16
+; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (%a * %y)<nuw>
+; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop.1: backedge-taken count is (-1 + (1 umax (16 * %y)<nuw>))
+; CHECK-NEXT:  Loop %loop.1: constant max backedge-taken count is i32 -17
+; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is (-1 + (1 umax (16 * %y)<nuw>))
+; CHECK-NEXT:  Loop %loop.1: Trip multiple is 1
+;
+entry:
+  %mul = mul nuw i32 %a, %y
+  call void @use(i32 noundef %mul)
+  %n = mul i32 %y, 16
+  br label %loop.1
+
+loop.1:
+  %iv.1 = phi i32 [ 0, %entry ], [ %iv.1.next, %loop.1 ]
+  %iv.1.next = add i32 %iv.1, 1
+  %ec.1 = icmp ult i32 %iv.1.next, %n
+  br i1 %ec.1, label %loop.1, label %guard
+
+guard:
+  %pre = icmp eq i32 %a, 16
+  br i1 %pre, label %loop.2, label %exit
+
+loop.2:
+  %iv.2 = phi i32 [ 0, %guard ], [ %iv.2.next, %loop.2 ]
+  %iv.2.next = add i32 %iv.2, 1
+  %ec.2 = icmp eq i32 %iv.2, %mul
+  br i1 %ec.2, label %exit, label %loop.2
+
+exit:
+  ret void
+}
+
+; The offset of %gep is (-2^62 + 2 * %y + %z)<nsw>, and the nsw only holds for
+; adding the operands in that order. The guard %z == -2^62 - 16 rewrites it to
+; (2^63 - 16 + 2 * %y) by folding -2^62 and -2^62 - 16, which wraps, so the nsw
+; does not hold for the rewritten add, which is u>= 2^63 for %y >= 8.
+define void @rewrite_nary_add_nsw_folds_constants(ptr %p, i8 %y.in, i64 %z) {
+; CHECK-LABEL: 'rewrite_nary_add_nsw_folds_constants'
+; CHECK-NEXT:  Determining loop execution counts for: @rewrite_nary_add_nsw_folds_constants
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-4611686018427387904 + (2 * (zext i8 %y.in to i64))<nuw><nsw> + %z)<nsw>
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9223372036854775807
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-4611686018427387904 + (2 * (zext i8 %y.in to i64))<nuw><nsw> + %z)<nsw>
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %y = zext i8 %y.in to i64
+  %gep = getelementptr nusw [1 x [2 x i8]], ptr %p, i64 -2305843009213693952, i64 %y, i64 %z
+  store i8 0, ptr %gep
+  %gep.int = ptrtoint ptr %gep to i64
+  %p.int = ptrtoint ptr %p to i64
+  %off = sub i64 %gep.int, %p.int
+  %pre = icmp eq i64 %z, -4611686018427387920
+  br i1 %pre, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ %off, %entry ], [ %iv.next, %loop ]
+  %iv.next = add i64 %iv, -1
+  %ec = icmp eq i64 %iv, 0
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
 declare void @clobber()
 
 
