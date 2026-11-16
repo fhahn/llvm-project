@@ -249,8 +249,27 @@ namespace {
 
 class BlockChain;
 
-/// Type for our function-wide basic block -> block chain mapping.
-using BlockToChainMapType = DenseMap<const MachineBasicBlock *, BlockChain *>;
+/// Type for our function-wide basic block -> block chain mapping, indexed by
+/// the blocks' analysis numbers, which block renumbering doesn't change.
+class BlockToChainMapType {
+  SmallVector<BlockChain *> Chains;
+
+public:
+  BlockChain *&operator[](const MachineBasicBlock *MBB) {
+    unsigned Number = GraphTraits<const MachineBasicBlock *>::getNumber(MBB);
+    if (Number >= Chains.size())
+      Chains.resize(MBB->getParent()->getMaxAnalysisBlockNumber());
+    return Chains[Number];
+  }
+
+  BlockChain *lookup(const MachineBasicBlock *MBB) const {
+    unsigned Number = GraphTraits<const MachineBasicBlock *>::getNumber(MBB);
+    return Number < Chains.size() ? Chains[Number] : nullptr;
+  }
+
+  bool empty() const { return Chains.empty(); }
+  void clear() { Chains.clear(); }
+};
 
 /// A chain of blocks which will be laid out contiguously.
 ///
@@ -452,7 +471,7 @@ class MachineBlockPlacement {
   /// BlockChain it participates in, if any. We use it to, among other things,
   /// allow implicitly defining edges between chains as the existing edges
   /// between basic blocks.
-  DenseMap<const MachineBasicBlock *, BlockChain *> BlockToChain;
+  BlockToChainMapType BlockToChain;
 
 #ifndef NDEBUG
   /// The set of basic blocks that have terminators that cannot be fully
@@ -1681,11 +1700,12 @@ MachineBlockPlacement::selectBestSuccessor(const MachineBasicBlock *BB,
   if (FoundEdge != ComputedEdges.end()) {
     BlockAndTailDupResult Result = FoundEdge->second;
     ComputedEdges.erase(FoundEdge);
-    BlockChain *SuccChain = BlockToChain[Result.BB];
     if (BB->isSuccessor(Result.BB) &&
-        (!BlockFilter || BlockFilter->count(Result.BB)) &&
-        SuccChain != &Chain && Result.BB == *SuccChain->begin())
-      return Result;
+        (!BlockFilter || BlockFilter->count(Result.BB))) {
+      BlockChain *SuccChain = BlockToChain[Result.BB];
+      if (SuccChain != &Chain && Result.BB == *SuccChain->begin())
+        return Result;
+    }
   }
 
   // if BB is part of a trellis, Use the trellis to determine the optimal
@@ -3230,9 +3250,9 @@ bool MachineBlockPlacement::maybeTailDuplicateBlock(
     Removed = true;
 
     // Remove from the Chain and Chain Map
-    if (auto It = BlockToChain.find(RemBB); It != BlockToChain.end()) {
-      It->second->remove(RemBB);
-      BlockToChain.erase(It);
+    if (BlockChain *&RemChain = BlockToChain[RemBB]) {
+      RemChain->remove(RemBB);
+      RemChain = nullptr;
     }
 
     // Handle the unplaced block iterator
