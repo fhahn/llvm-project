@@ -1672,6 +1672,12 @@ public:
   DenseMap<unsigned, std::unique_ptr<ConstantInt>> IntZeroConstants;
   DenseMap<unsigned, std::unique_ptr<ConstantInt>> IntOneConstants;
   DenseMap<APInt, std::unique_ptr<ConstantInt>> IntConstants;
+  /// ConstantInts with small values of the common integer widths, indexed by
+  /// width and value, so that looking them up does not hash the APInt. Filled
+  /// on the first lookup of each value; the maps above own the constants.
+  static constexpr int SmallIntConstantMin = -16;
+  static constexpr int NumSmallIntConstants = 64;
+  ConstantInt *SmallIntConstants[5][NumSmallIntConstants] = {};
   DenseMap<std::pair<ElementCount, APInt>, std::unique_ptr<ConstantInt>>
       IntSplatConstants;
 
