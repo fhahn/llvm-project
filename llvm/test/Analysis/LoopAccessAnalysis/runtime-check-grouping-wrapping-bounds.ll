@@ -394,13 +394,10 @@ exit:
 ; The trip counts of 63 (64 for a[iv /u 2]) keep all accesses within a 64-byte
 ; object for the overlapping inputs given below.
 
-; FIXME: The load of %far = %a + 2^63 + 8 only executes if %c is true, so its
-; address need not be in the same object as a[iv /u 2]. The two are grouped by
-; the sign of their constant difference, which gives GRP1 the bounds
-; [%a + 2^63 + 8, %a + 2^63 + 9), which do not include a[iv /u 2]. If %c is
-; false and %b == %a, the check against GRP0 passes although the accesses
-; overlap. %far must be in its own group, giving an extra check against GRP0,
-; or GRP1's bounds must be computed with umin/umax over its members.
+; The load of %far = %a + 2^63 + 8 only executes if %c is true, so its address
+; need not be in the same object as a[iv /u 2]. Non-affine pointers are only
+; grouped with pointers with the same bounds, so %far and a[iv /u 2] need
+; separate checks against GRP0.
 define void @cond_invariant_and_nonaffine_far_apart(ptr %a, ptr %b, i1 %c) {
 ; CHECK-LABEL: 'cond_invariant_and_nonaffine_far_apart'
 ; CHECK-NEXT:    loop.header:
@@ -412,6 +409,10 @@ define void @cond_invariant_and_nonaffine_far_apart(ptr %a, ptr %b, i1 %c) {
 ; CHECK-NEXT:          %gep.b = getelementptr inbounds nuw i8, ptr %b, i64 %iv
 ; CHECK-NEXT:        Against group GRP1:
 ; CHECK-NEXT:          %far = getelementptr i8, ptr %a, i64 -9223372036854775800
+; CHECK-NEXT:      Check 1:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.b = getelementptr inbounds nuw i8, ptr %b, i64 %iv
+; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %gep.a = getelementptr inbounds nuw i8, ptr %a, i64 %div
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
@@ -420,6 +421,8 @@ define void @cond_invariant_and_nonaffine_far_apart(ptr %a, ptr %b, i1 %c) {
 ; CHECK-NEXT:        Group GRP1:
 ; CHECK-NEXT:          (Low: (-9223372036854775800 + %a) High: (-9223372036854775799 + %a))
 ; CHECK-NEXT:            Member: (-9223372036854775800 + %a)
+; CHECK-NEXT:        Group GRP2:
+; CHECK-NEXT:          (Low: %a High: (32 + %a))
 ; CHECK-NEXT:            Member: (({0,+,1}<nuw><nsw><%loop.header> /u 2) + %a)<nuw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.

@@ -330,6 +330,8 @@ defm : BoolField<"enable-mem-access-versioning", "true",
   "Enable symbolic stride memory access versioning">;
 defm : BoolField<"laa-speculate-unit-stride", "true",
   "Speculate that non-constant strides are unit in LAA">;
+defm : ValueField<"laa-max-nonaffine-range-bytes", "unsigned", "65536",
+  "Maximum number of bytes spanned by the bounds formed from the unsigned range of a non-affine pointer's offset in LAA">;
 // We collect dependences up to this threshold.
 defm : ValueField<"max-dependences", "unsigned", "100",
   "Maximum number of dependences collected by loop-access analysis">;
