@@ -948,7 +948,9 @@ public:
       Operands.push_back(visitOperand(Op));
       Changed |= Op != Operands.back();
     }
-    return !Changed ? Expr : SE.getAddExpr(Operands, Expr->getNoWrapFlags());
+    return !Changed ? Expr
+                    : SE.getAddExpr(Operands,
+                                    Expr->getNoWrapFlagsForRebuild(Operands));
   }
 
   const SCEV *visitUnknown(const SCEVUnknown *Expr) {
@@ -1195,12 +1197,15 @@ static const SCEV *getPreStartForExtend(const SCEVAddRecExpr *AR,
   auto GetExtendExpr = ExtendOpTraits<ExtendOpTy>::GetExtendExpr;
 
   const Loop *L = AR->getLoop();
-  const SCEV *Start = AR->getStart();
-  const SCEV *Step = AR->getStepRecurrence(*SE);
+  SCEVUse Start = AR->getStart();
+  SCEVUse Step = AR->getStepRecurrence(*SE);
 
-  // Check for a simple looking step prior to loop entry.
+  // Check for a simple looking step prior to loop entry. The flags of AR,
+  // which are cached on {PreStart,+,Step}, may depend on the use flags of
+  // Start and Step. PreStart keeps the operand uses of Start, so only the use
+  // flags of Start and Step themselves need checking.
   const SCEVAddExpr *SA = dyn_cast<SCEVAddExpr>(Start);
-  if (!SA)
+  if (!SA || Start.hasUseFlags() || Step.hasUseFlags())
     return nullptr;
 
   // Create an AddExpr for "PreStart" after subtracting Step. Full SCEV
@@ -1443,14 +1448,15 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
 
   // If the operand is an affine AddRec with the no-unsigned-wrap flag, the
   // zero-extension distributes over the recurrence.
-  const SCEV *Start, *Step;
+  const SCEV *Start;
   const Loop *L;
   if (Depth <= Opts.scalar_evolution_max_cast_depth &&
-      match(Op, m_scev_AffineAddRec(m_SCEV(Start), m_SCEV(Step), m_Loop(L)))) {
+      match(Op, m_scev_AffineAddRec(m_SCEV(Start), m_SCEV(), m_Loop(L)))) {
     const auto *AR = cast<SCEVAddRecExpr>(Op);
     if (AR->hasNoUnsignedWrap()) {
       Start = getExtendAddRecStart<SCEVZeroExtendExpr>(AR, Ty, this, Depth + 1);
-      Step = getZeroExtendExpr(Step, Ty, Depth + 1);
+      const SCEV *Step =
+          getZeroExtendExpr(AR->getStepRecurrence(*this), Ty, Depth + 1);
       return getAddRecExpr(Start, Step, L, AR->getNoWrapFlags());
     }
   }
@@ -1490,8 +1496,9 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
   // did not overflow the old, smaller, value, we can zero extend all of the
   // operands (often constants).  This allows analysis of something like
   // this:  for (unsigned char X = 0; X < 100; ++X) { int Y = X; }
-  if (match(Op, m_scev_AffineAddRec(m_SCEV(Start), m_SCEV(Step), m_Loop(L)))) {
+  if (match(Op, m_scev_AffineAddRec(m_SCEV(Start), m_SCEV(), m_Loop(L)))) {
     const auto *AR = cast<SCEVAddRecExpr>(Op);
+    SCEVUse Step = AR->getStepRecurrence(*this);
     unsigned BitWidth = getTypeSizeInBits(AR->getType());
 
     // The no-unsigned-wrap case is handled before the uniquing lookup above.
@@ -1800,14 +1807,15 @@ const SCEV *ScalarEvolution::getSignExtendExprImpl(SCEVUse Op, Type *Ty,
 
   // If the operand is an affine AddRec with the no-signed-wrap flag, the
   // sign-extension distributes over the recurrence.
-  const SCEV *Start, *Step;
+  const SCEV *Start;
   const Loop *L;
   if (Depth <= Opts.scalar_evolution_max_cast_depth &&
-      match(Op, m_scev_AffineAddRec(m_SCEV(Start), m_SCEV(Step), m_Loop(L)))) {
+      match(Op, m_scev_AffineAddRec(m_SCEV(Start), m_SCEV(), m_Loop(L)))) {
     const auto *AR = cast<SCEVAddRecExpr>(Op);
     if (AR->hasNoSignedWrap()) {
       Start = getExtendAddRecStart<SCEVSignExtendExpr>(AR, Ty, this, Depth + 1);
-      Step = getSignExtendExpr(Step, Ty, Depth + 1);
+      const SCEV *Step =
+          getSignExtendExpr(AR->getStepRecurrence(*this), Ty, Depth + 1);
       return getAddRecExpr(Start, Step, L, AR->getNoWrapFlags());
     }
   }
@@ -1880,8 +1888,9 @@ const SCEV *ScalarEvolution::getSignExtendExprImpl(SCEVUse Op, Type *Ty,
   // did not overflow the old, smaller, value, we can sign extend all of the
   // operands (often constants).  This allows analysis of something like
   // this:  for (signed char X = 0; X < 100; ++X) { int Y = X; }
-  if (match(Op, m_scev_AffineAddRec(m_SCEV(Start), m_SCEV(Step), m_Loop(L)))) {
+  if (match(Op, m_scev_AffineAddRec(m_SCEV(Start), m_SCEV(), m_Loop(L)))) {
     const auto *AR = cast<SCEVAddRecExpr>(Op);
+    SCEVUse Step = AR->getStepRecurrence(*this);
     unsigned BitWidth = getTypeSizeInBits(AR->getType());
 
     // The no-signed-wrap case is handled before the uniquing lookup above.
@@ -2814,7 +2823,8 @@ SCEVUse ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
       // Build the new addrec. Propagate the NUW and NSW flags if both the
       // outer add and the inner addrec are guaranteed to have no overflow.
       // Always propagate NW.
-      Flags = AddRec->getNoWrapFlags(setFlags(Flags, SCEV::FlagNW));
+      Flags = AddRec->getNoWrapFlagsForRebuild(AddRecOps,
+                                               setFlags(Flags, SCEV::FlagNW));
       const SCEV *NewRec = getAddRecExpr(AddRecOps, AddRecLoop, Flags);
 
       // If all of the other operands were loop invariant, we are done.
@@ -3115,8 +3125,9 @@ SCEVUse ScalarEvolution::getMulExpr(SmallVectorImpl<SCEVUse> &Ops,
             if (getSignedRangeMin(AddRec) != MinInt)
               FlagsMask = setFlags(FlagsMask, SCEV::FlagNSW);
           }
-          return getAddRecExpr(Operands, AddRec->getLoop(),
-                               AddRec->getNoWrapFlags(FlagsMask));
+          return getAddRecExpr(
+              Operands, AddRec->getLoop(),
+              AddRec->getNoWrapFlagsForRebuild(Operands, FlagsMask));
         }
       }
 
@@ -3233,7 +3244,9 @@ SCEVUse ScalarEvolution::getMulExpr(SmallVectorImpl<SCEVUse> &Ops,
         }
       }
 
-      const SCEV *NewRec = getAddRecExpr(NewOps, AddRec->getLoop(), Flags);
+      const SCEV *NewRec =
+          getAddRecExpr(NewOps, AddRec->getLoop(),
+                        AddRec->getNoWrapFlagsForRebuild(NewOps, Flags));
 
       // If all of the other operands were loop invariant, we are done.
       if (Ops.size() == 1) return NewRec;
@@ -10061,12 +10074,15 @@ const SCEV *ScalarEvolution::getWithOperands(const SCEV *S,
     return getCastExpr(S->getSCEVType(), NewOps[0], S->getType());
   case scAddRecExpr: {
     auto *AddRec = cast<SCEVAddRecExpr>(S);
-    return getAddRecExpr(NewOps, AddRec->getLoop(), AddRec->getNoWrapFlags());
+    return getAddRecExpr(NewOps, AddRec->getLoop(),
+                         AddRec->getNoWrapFlagsForRebuild(NewOps));
   }
   case scAddExpr:
-    return getAddExpr(NewOps, cast<SCEVAddExpr>(S)->getNoWrapFlags());
+    return getAddExpr(NewOps,
+                      cast<SCEVAddExpr>(S)->getNoWrapFlagsForRebuild(NewOps));
   case scMulExpr:
-    return getMulExpr(NewOps, cast<SCEVMulExpr>(S)->getNoWrapFlags());
+    return getMulExpr(NewOps,
+                      cast<SCEVMulExpr>(S)->getNoWrapFlagsForRebuild(NewOps));
   case scUDivExpr:
     return getUDivExpr(NewOps[0], NewOps[1]);
   case scUMaxExpr:
@@ -10087,6 +10103,12 @@ const SCEV *ScalarEvolution::getWithOperands(const SCEV *S,
 }
 
 SCEVUse ScalarEvolution::computeSCEVAtScope(const SCEV *V, const Loop *L) {
+  // Operands that do not change at scope keep their uses.
+  auto GetOpAtScope = [&](SCEVUse Op) {
+    SCEVUse OpAtScope = getSCEVAtScope(Op, L);
+    return OpAtScope == SCEVUse(Op.getPointer()) ? Op : OpAtScope;
+  };
+
   switch (V->getSCEVType()) {
   case scConstant:
   case scVScale:
@@ -10099,7 +10121,7 @@ SCEVUse ScalarEvolution::computeSCEVAtScope(const SCEV *V, const Loop *L) {
     // Avoid performing the look-up in the common case where the specified
     // expression has no loop-variant portions.
     for (unsigned i = 0, e = AddRec->getNumOperands(); i != e; ++i) {
-      SCEVUse OpAtScope = getSCEVAtScope(AddRec->getOperand(i), L);
+      SCEVUse OpAtScope = GetOpAtScope(AddRec->getOperand(i));
       if (OpAtScope == AddRec->getOperand(i))
         continue;
 
@@ -10110,10 +10132,11 @@ SCEVUse ScalarEvolution::computeSCEVAtScope(const SCEV *V, const Loop *L) {
       append_range(NewOps, AddRec->operands().take_front(i));
       NewOps.push_back(OpAtScope);
       for (++i; i != e; ++i)
-        NewOps.push_back(getSCEVAtScope(AddRec->getOperand(i), L));
+        NewOps.push_back(GetOpAtScope(AddRec->getOperand(i)));
 
       const SCEV *FoldedRec = getAddRecExpr(
-          NewOps, AddRec->getLoop(), AddRec->getNoWrapFlags(SCEV::FlagNW));
+          NewOps, AddRec->getLoop(),
+          AddRec->getNoWrapFlagsForRebuild(NewOps, SCEV::FlagNW));
       AddRec = dyn_cast<SCEVAddRecExpr>(FoldedRec);
       // The addrec may be folded to a nonrecurrence, for example, if the
       // induction variable is multiplied by zero after constant folding. Go
@@ -10150,8 +10173,8 @@ SCEVUse ScalarEvolution::computeSCEVAtScope(const SCEV *V, const Loop *L) {
     // Avoid performing the look-up in the common case where the specified
     // expression has no loop-variant portions.
     for (unsigned i = 0, e = Ops.size(); i != e; ++i) {
-      SCEVUse OpAtScope = getSCEVAtScope(Ops[i].getPointer(), L);
-      if (OpAtScope != Ops[i].getPointer()) {
+      SCEVUse OpAtScope = GetOpAtScope(Ops[i]);
+      if (OpAtScope != Ops[i]) {
         // Okay, at least one of these operands is loop variant but might be
         // foldable.  Build a new instance of the folded commutative expression.
         SmallVector<SCEVUse, 8> NewOps;
@@ -10159,10 +10182,8 @@ SCEVUse ScalarEvolution::computeSCEVAtScope(const SCEV *V, const Loop *L) {
         append_range(NewOps, Ops.take_front(i));
         NewOps.push_back(OpAtScope);
 
-        for (++i; i != e; ++i) {
-          OpAtScope = getSCEVAtScope(Ops[i].getPointer(), L);
-          NewOps.push_back(OpAtScope);
-        }
+        for (++i; i != e; ++i)
+          NewOps.push_back(GetOpAtScope(Ops[i]));
 
         return getWithOperands(V, NewOps);
       }
@@ -13278,7 +13299,7 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
         if (AR->hasNoUnsignedWrap()) {
           // Emulate what getZeroExtendExpr would have done during construction
           // if we'd been able to infer the fact just above at that time.
-          const SCEV *Step = AR->getStepRecurrence(*this);
+          SCEVUse Step = AR->getStepRecurrence(*this);
           Type *Ty = ZExt->getType();
           const SCEV *S = getAddRecExpr(
               getExtendAddRecStart<SCEVZeroExtendExpr>(AR, Ty, this, 0),
@@ -15099,7 +15120,7 @@ public:
     if (AR && AR->getLoop() == L && AR->isAffine()) {
       // This couldn't be folded because the operand didn't have the nuw
       // flag. Add the nusw flag as an assumption that we could make.
-      const SCEV *Step = AR->getStepRecurrence(SE);
+      SCEVUse Step = AR->getStepRecurrence(SE);
       Type *Ty = Expr->getType();
       if (addOverflowAssumption(AR, SCEVWrapPredicate::IncrementNUSW))
         return SE.getAddRecExpr(SE.getZeroExtendExpr(AR->getStart(), Ty),
@@ -15115,7 +15136,7 @@ public:
     if (AR && AR->getLoop() == L && AR->isAffine()) {
       // This couldn't be folded because the operand didn't have the nsw
       // flag. Add the nssw flag as an assumption that we could make.
-      const SCEV *Step = AR->getStepRecurrence(SE);
+      SCEVUse Step = AR->getStepRecurrence(SE);
       Type *Ty = Expr->getType();
       if (addOverflowAssumption(AR, SCEVWrapPredicate::IncrementNSSW))
         return SE.getAddRecExpr(SE.getSignExtendExpr(AR->getStart(), Ty),

@@ -220,6 +220,18 @@ public:
 
   bool hasNoSelfWrap() const { return getNoWrapFlags(FlagNW) != FlagNone; }
 
+  /// Return the flags that also hold for this expression rebuilt with the
+  /// operands \p NewOps. The flags may depend on the use flags of operands, so
+  /// they only hold if \p NewOps keeps every operand that is not canonical,
+  /// i.e. has use flags itself or in its operands.
+  SCEVFlags getNoWrapFlagsForRebuild(ArrayRef<SCEVUse> NewOps,
+                                     SCEVFlags Mask = FlagsNoWrapMask) const {
+    for (auto [Old, New] : zip_equal(operands(), NewOps))
+      if (!Old.isCanonical() && Old != New)
+        return FlagNone;
+    return getNoWrapFlags(Mask);
+  }
+
   /// Methods for support type inquiry through isa, cast, and dyn_cast:
   static bool classof(const SCEV *S) {
     return S->getSCEVType() == scAddExpr || S->getSCEVType() == scMulExpr ||
@@ -891,7 +903,7 @@ public:
     }
     return !Changed ? Expr
                     : SE.getAddRecExpr(Operands, Expr->getLoop(),
-                                       Expr->getNoWrapFlags());
+                                       Expr->getNoWrapFlagsForRebuild(Operands));
   }
 
   const SCEV *visitSMaxExpr(const SCEVSMaxExpr *Expr) {

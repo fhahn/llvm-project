@@ -2605,8 +2605,9 @@ private:
   void getReachableBlocks(SmallPtrSetImpl<BasicBlock *> &Reachable,
                           Function &F);
 
-  /// Return the given SCEV expression with a new set of operands.
-  /// This preserves the origial nowrap flags.
+  /// Return the given SCEV expression with a new set of operands. This
+  /// preserves the original nowrap flags, unless \p NewOps changes an operand
+  /// that is not canonical, which the flags may depend on.
   const SCEV *getWithOperands(const SCEV *S, SmallVectorImpl<SCEVUse> &NewOps);
 
   FoldingSet<SCEV> UniqueSCEVs;
