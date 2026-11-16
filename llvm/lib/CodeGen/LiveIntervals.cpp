@@ -545,18 +545,25 @@ void LiveIntervals::extendSegmentsToUses(LiveRange &Segments,
   const LiveInterval &LI = getInterval(Reg);
   const LiveRange &OldRange = getSubRange(LI, LaneMask);
 
-  // Extend intervals to reach all uses in WorkList.
-  while (!WorkList.empty()) {
-    SlotIndex Idx = WorkList.back().first;
-    VNInfo *VNI = WorkList.back().second;
-    WorkList.pop_back();
-    const MachineBasicBlock *MBB = Indexes->getMBBFromIndex(Idx.getPrevSlot());
+  // Segments holds one dead def segment per value. Collect the pieces that
+  // extend values to their uses and merge them in sorted order at the end;
+  // the result is the same as adding each piece to Segments in turn.
+  SmallVector<LiveRange::Segment, 32> Pieces(Segments.segments.begin(),
+                                             Segments.segments.end());
+  SmallVector<std::tuple<SlotIndex, VNInfo *, const MachineBasicBlock *>, 16>
+      Work;
+  for (auto [Idx, VNI] : WorkList)
+    Work.emplace_back(Idx, VNI, Indexes->getMBBFromIndex(Idx.getPrevSlot()));
+  WorkList.clear();
+
+  // Extend intervals to reach all uses in Work.
+  while (!Work.empty()) {
+    auto [Idx, VNI, MBB] = Work.pop_back_val();
     SlotIndex BlockStart = Indexes->getMBBStartIdx(MBB);
 
-    // Extend the live range for VNI to be live at Idx.
-    if (VNInfo *ExtVNI = Segments.extendInBlock(BlockStart, Idx)) {
-      assert(ExtVNI == VNI && "Unexpected existing value number");
-      (void)ExtVNI;
+    // VNI is defined in MBB before Idx: extend its def to Idx.
+    if (BlockStart <= VNI->def && VNI->def < Idx) {
+      Pieces.push_back(LiveRange::Segment(VNI->def, Idx, VNI));
       // Is this a PHIDef we haven't seen before?
       if (!VNI->isPHIDef() || VNI->def != BlockStart ||
           !UsedPHIs.insert(VNI).second)
@@ -570,14 +577,14 @@ void LiveIntervals::extendSegmentsToUses(LiveRange &Segments,
         SlotIndex Stop = Indexes->getMBBEndIdx(Pred);
         // A predecessor is not required to have a live-out value for a PHI.
         if (VNInfo *PVNI = OldRange.getVNInfoBefore(Stop))
-          WorkList.push_back(std::make_pair(Stop, PVNI));
+          Work.emplace_back(Stop, PVNI, Pred);
       }
       continue;
     }
 
     // VNI is live-in to MBB.
     LLVM_DEBUG(dbgs() << " live-in at " << BlockStart << '\n');
-    Segments.addSegment(LiveRange::Segment(BlockStart, Idx, VNI));
+    Pieces.push_back(LiveRange::Segment(BlockStart, Idx, VNI));
 
     // Make sure VNI is live-out from the predecessors.
     for (const MachineBasicBlock *Pred : MBB->predecessors()) {
@@ -589,7 +596,7 @@ void LiveIntervals::extendSegmentsToUses(LiveRange &Segments,
       if (VNInfo *OldVNI = OldRange.getVNInfoBefore(Stop)) {
         assert(OldVNI == VNI && "Wrong value out of predecessor");
         (void)OldVNI;
-        WorkList.push_back(std::make_pair(Stop, VNI));
+        Work.emplace_back(Stop, VNI, Pred);
       } else {
 #ifndef NDEBUG
         // There was no old VNI. Verify that Stop is jointly dominated
@@ -603,6 +610,29 @@ void LiveIntervals::extendSegmentsToUses(LiveRange &Segments,
 #endif
       }
     }
+  }
+
+  // Pieces of one value that overlap or touch form one segment. Pieces with
+  // the same start belong to the same value. Sort by the start's distance from
+  // the first index, which is cheaper to compare than the SlotIndex itself.
+  SlotIndex Zero = Indexes->getZeroIndex();
+  SmallVector<std::pair<unsigned, unsigned>, 32> Order;
+  Order.reserve(Pieces.size());
+  for (auto [I, S] : enumerate(Pieces))
+    Order.emplace_back(Zero.distance(S.start), I);
+  llvm::sort(Order);
+  LiveRange::Segments &Out = Segments.segments;
+  Out.clear();
+  for (unsigned I : make_second_range(Order)) {
+    const LiveRange::Segment &S = Pieces[I];
+    if (!Out.empty() && Out.back().valno == S.valno &&
+        S.start <= Out.back().end) {
+      Out.back().end = std::max(Out.back().end, S.end);
+      continue;
+    }
+    assert((Out.empty() || Out.back().end <= S.start) &&
+           "Cannot overlap two segments with differing ValID's");
+    Out.push_back(S);
   }
 }
 
