@@ -382,7 +382,12 @@ private:
   AssumptionCache &AC;
   const TargetLibraryInfo &TLI;
   DominatorTree &DT;
-  PredIteratorCache PredCache;
+
+  /// Cached predecessor lists, indexed by block number. They are valid for the
+  /// block numbering with epoch PredsEpoch.
+  SmallVector<ArrayRef<BasicBlock *>, 0> Preds;
+  BumpPtrAllocator PredsAllocator;
+  unsigned PredsEpoch = 0;
   EarliestEscapeAnalysis EEA;
 
   unsigned DefaultBlockScanLimit;
@@ -455,7 +460,7 @@ public:
   /// cached info does not necessarily keep.
   LLVM_ABI void invalidateCachedPointerInfo(Value *Ptr);
 
-  /// Clears the PredIteratorCache info.
+  /// Clears the cached predecessor lists.
   ///
   /// This needs to be done when the CFG changes, e.g., due to splitting
   /// critical edges.
@@ -510,6 +515,7 @@ private:
   MemDepResult getCallDependencyFrom(CallBase *Call, bool isReadOnlyCall,
                                      BasicBlock::iterator ScanIt,
                                      BasicBlock *BB);
+  ArrayRef<BasicBlock *> getPreds(BasicBlock *BB);
   void setNonLocalPointerDepVisited(BasicBlock *BB, Value *V);
   bool isNonLocalPointerDepVisited(BasicBlock *BB) const;
   Value *lookupNonLocalPointerDepVisited(BasicBlock *BB) const;
@@ -522,7 +528,9 @@ private:
                                    bool IsIncomplete = false);
   MemDepResult getNonLocalInfoForBlock(Instruction *QueryInst,
                                        const MemoryLocation &Loc, bool isLoad,
-                                       BasicBlock *BB, NonLocalDepInfo *Cache,
+                                       bool isInvariantLoad,
+                                       bool HasInvariantGroup, BasicBlock *BB,
+                                       NonLocalDepInfo *Cache,
                                        unsigned NumSortedEntries,
                                        BatchAAResults &BatchAA);
 

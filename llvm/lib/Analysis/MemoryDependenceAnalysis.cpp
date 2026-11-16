@@ -722,7 +722,7 @@ MemoryDependenceResults::getNonLocalCallDependency(CallBase *QueryCall) {
   } else {
     // Seed DirtyBlocks with each of the preds of QueryInst's block.
     BasicBlock *QueryBB = QueryCall->getParent();
-    append_range(DirtyBlocks, PredCache.get(QueryBB));
+    append_range(DirtyBlocks, getPreds(QueryBB));
     ++NumUncacheNonLocal;
   }
 
@@ -806,7 +806,7 @@ MemoryDependenceResults::getNonLocalCallDependency(CallBase *QueryCall) {
 
       // If the block *is* completely transparent to the load, we need to check
       // the predecessors of this block.  Add them to our worklist.
-      append_range(DirtyBlocks, PredCache.get(DirtyBB));
+      append_range(DirtyBlocks, getPreds(DirtyBB));
     }
   }
 
@@ -882,14 +882,9 @@ void MemoryDependenceResults::getNonLocalPointerDependency(
 /// If we do a lookup, add the result to the cache.
 MemDepResult MemoryDependenceResults::getNonLocalInfoForBlock(
     Instruction *QueryInst, const MemoryLocation &Loc, bool isLoad,
-    BasicBlock *BB, NonLocalDepInfo *Cache, unsigned NumSortedEntries,
+    bool isInvariantLoad, bool HasInvariantGroup, BasicBlock *BB,
+    NonLocalDepInfo *Cache, unsigned NumSortedEntries,
     BatchAAResults &BatchAA) {
-
-  bool isInvariantLoad = false;
-
-  if (QueryInst)
-    isInvariantLoad = QueryInst->hasMetadata(LLVMContext::MD_invariant_load);
-
   // Do a binary search to see if we already have an entry for this block in
   // the cache set.  If so, find it.
   NonLocalDepInfo::iterator Entry = std::upper_bound(
@@ -932,9 +927,14 @@ MemDepResult MemoryDependenceResults::getNonLocalInfoForBlock(
     ++NumUncacheNonLocalPtr;
   }
 
-  // Scan the block for the dependency.
-  MemDepResult Dep = getPointerDependencyFrom(Loc, isLoad, ScanPos, BB,
-                                              QueryInst, nullptr, BatchAA);
+  // Scan the block for the dependency. Only an invariant.group load can
+  // depend on another invariant.group access.
+  MemDepResult Dep =
+      HasInvariantGroup
+          ? getPointerDependencyFrom(Loc, isLoad, ScanPos, BB, QueryInst,
+                                     nullptr, BatchAA)
+          : getSimplePointerDependencyFrom(Loc, isLoad, ScanPos, BB, QueryInst,
+                                           nullptr, BatchAA);
 
   // Don't cache results for invariant load.
   if (isInvariantLoad)
@@ -1003,6 +1003,25 @@ SortNonLocalDepInfoCache(MemoryDependenceResults::NonLocalDepInfo &Cache,
   }
 }
 
+ArrayRef<BasicBlock *> MemoryDependenceResults::getPreds(BasicBlock *BB) {
+  const Function *F = BB->getParent();
+  if (PredsEpoch != F->getBlockNumberEpoch()) {
+    Preds.clear();
+    PredsAllocator.Reset();
+    PredsEpoch = F->getBlockNumberEpoch();
+  }
+  if (BB->getNumber() >= Preds.size())
+    Preds.resize(F->getMaxBlockNumber());
+  ArrayRef<BasicBlock *> &Entry = Preds[BB->getNumber()];
+  if (!Entry.data()) {
+    SmallVector<BasicBlock *, 32> BBPreds(predecessors(BB));
+    BasicBlock **Data = PredsAllocator.Allocate<BasicBlock *>(BBPreds.size());
+    llvm::copy(BBPreds, Data);
+    Entry = ArrayRef(Data, BBPreds.size());
+  }
+  return Entry;
+}
+
 void MemoryDependenceResults::setNonLocalPointerDepVisited(BasicBlock *BB,
                                                            Value *V) {
   NonLocalPointerDepVisited[BB->getNumber()] = {V, NonLocalPointerDepEpoch};
@@ -1053,6 +1072,9 @@ bool MemoryDependenceResults::getNonLocalPointerDepFromBB(
   bool isInvariantLoad = false;
   if (QueryInst)
     isInvariantLoad = QueryInst->hasMetadata(LLVMContext::MD_invariant_load);
+  bool HasInvariantGroup =
+      isa_and_nonnull<LoadInst>(QueryInst) &&
+      QueryInst->hasMetadata(LLVMContext::MD_invariant_group);
 
   // Get the NLPI for CacheKey, inserting one into the map if it doesn't
   // already have one.
@@ -1209,8 +1231,10 @@ bool MemoryDependenceResults::getNonLocalPointerDepFromBB(
       // Get the dependency info for Pointer in BB.  If we have cached
       // information, we will use it, otherwise we compute it.
       LLVM_DEBUG(AssertSorted(*Cache, NumSortedEntries));
-      MemDepResult Dep = getNonLocalInfoForBlock(
-          QueryInst, Loc, isLoad, BB, Cache, NumSortedEntries, BatchAA);
+      MemDepResult Dep =
+          getNonLocalInfoForBlock(QueryInst, Loc, isLoad, isInvariantLoad,
+                                  HasInvariantGroup, BB, Cache,
+                                  NumSortedEntries, BatchAA);
 
       // If we got a Def or Clobber, add this to the list of results.
       if (!Dep.isNonLocal()) {
@@ -1228,7 +1252,7 @@ bool MemoryDependenceResults::getNonLocalPointerDepFromBB(
     if (!Pointer.needsPHITranslationFromBlock(BB)) {
       SkipFirstBlock = false;
       SmallVector<BasicBlock *, 16> NewBlocks;
-      for (BasicBlock *Pred : PredCache.get(BB)) {
+      for (BasicBlock *Pred : getPreds(BB)) {
         // Verify that we haven't looked at this block yet.
         if (!isNonLocalPointerDepVisited(Pred)) {
           setNonLocalPointerDepVisited(Pred, Pointer.getAddr());
@@ -1278,7 +1302,7 @@ bool MemoryDependenceResults::getNonLocalPointerDepFromBB(
     Cache = nullptr;
 
     PredList.clear();
-    for (BasicBlock *Pred : PredCache.get(BB)) {
+    for (BasicBlock *Pred : getPreds(BB)) {
       PredList.push_back(std::make_pair(Pred, Pointer));
 
       // Get the PHI translated pointer in this predecessor.  This can fail if
@@ -1508,7 +1532,8 @@ void MemoryDependenceResults::invalidateCachedPointerInfo(Value *Ptr) {
 }
 
 void MemoryDependenceResults::invalidateCachedPredecessors() {
-  PredCache.clear();
+  Preds.clear();
+  PredsAllocator.Reset();
   EEA.invalidateReachability();
 }
 
