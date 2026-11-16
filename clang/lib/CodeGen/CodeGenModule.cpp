@@ -3699,13 +3699,16 @@ void CodeGenModule::SetInternalFunctionAttributes(GlobalDecl GD,
 }
 
 static void setLinkageForGV(llvm::GlobalValue *GV, const NamedDecl *ND) {
+  // Only weak declarations get a different linkage; check for them first to
+  // avoid computing the linkage and visibility otherwise.
+  if (!ND->hasAttr<WeakAttr>() && !ND->isWeakImported())
+    return;
   // Set linkage and visibility in case we never see a definition.
   LinkageInfo LV = ND->getLinkageAndVisibility();
   // Don't set internal linkage on declarations.
   // "extern_weak" is overloaded in LLVM; we probably should have
   // separate linkage types for this.
-  if (isExternallyVisible(LV.getLinkage()) &&
-      (ND->hasAttr<WeakAttr>() || ND->isWeakImported()))
+  if (isExternallyVisible(LV.getLinkage()))
     GV->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
 }
 
