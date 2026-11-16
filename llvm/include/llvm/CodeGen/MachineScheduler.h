@@ -1025,6 +1025,11 @@ private:
   // For each PIdx, stores the resource group IDs of its subunits
   SmallVector<APInt, 16> ResourceGroupSubUnitMasks;
 
+  /// The scheduling model the tables above were computed for, and the number
+  /// of resource units in it.
+  const MCSchedModel *ResourceTablesModel = nullptr;
+  unsigned NumResourceUnits = 0;
+
 #if LLVM_ENABLE_ABI_BREAKING_CHECKS
   // Remember the greatest possible stall as an upper bound on the number of
   // times we should retry the pending queue because of a hazard.
