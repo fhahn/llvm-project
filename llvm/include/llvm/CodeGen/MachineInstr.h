@@ -172,6 +172,10 @@ private:
   /// defined by this instruction.
   unsigned DebugInstrNum;
 
+  /// Position of this instruction's entry in SlotIndexes, which checks that the
+  /// entry still refers to this instruction before using it.
+  unsigned SlotIndexesEntryNum = ~0u;
+
   /// Internal implementation detail class that provides out-of-line storage for
   /// extra info used by the machine instruction when this info cannot be stored
   /// in-line within the instruction itself.
@@ -352,6 +356,7 @@ private:
 
   // MachineInstrs are pool-allocated and owned by MachineFunction.
   friend class MachineFunction;
+  friend class SlotIndexes;
 
   void
   dumprImpl(const MachineRegisterInfo &MRI, unsigned Depth, unsigned MaxDepth,

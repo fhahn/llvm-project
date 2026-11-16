@@ -316,8 +316,8 @@ class raw_ostream;
 
     MachineFunction *mf = nullptr;
 
-    using Mi2IndexMap = DenseMap<const MachineInstr *, SlotIndex>;
-    Mi2IndexMap mi2iMap;
+    /// The entries of indexed instructions, at their SlotIndexesEntryNum.
+    SmallVector<IndexListEntry *> MIEntries;
 
     /// MBBRanges - Map analysis block number to (start, stop) indexes.
     SmallVector<std::pair<SlotIndex, SlotIndex>, 8> MBBRanges;
@@ -345,6 +345,20 @@ class raw_ostream;
 
     /// Renumber locally after inserting curItr.
     LLVM_ABI void renumberIndexes(IndexList::iterator curItr);
+
+    /// Returns the entry of \p MI, or null if \p MI is not indexed.
+    IndexListEntry *getEntry(const MachineInstr &MI) const {
+      unsigned Num = MI.SlotIndexesEntryNum;
+      if (Num < MIEntries.size() && MIEntries[Num]->getInstr() == &MI)
+        return MIEntries[Num];
+      return nullptr;
+    }
+
+    /// Makes \p Entry the entry of \p MI.
+    void addEntry(MachineInstr &MI, IndexListEntry *Entry) {
+      MI.SlotIndexesEntryNum = MIEntries.size();
+      MIEntries.push_back(Entry);
+    }
 
   public:
     SlotIndexes(SlotIndexes &&) = default;
@@ -382,7 +396,7 @@ class raw_ostream;
     /// Returns true if the given machine instr is mapped to an index,
     /// otherwise returns false.
     bool hasIndex(const MachineInstr &instr) const {
-      return mi2iMap.count(&instr);
+      return getEntry(instr) != nullptr;
     }
 
     /// Returns the base index for the given instruction.
@@ -396,10 +410,10 @@ class raw_ostream;
           IgnoreBundle ? MI
                        : *skipDebugInstructionsForward(BundleStart, BundleEnd);
       assert(!BundleNonDebug.isDebugInstr() &&
-             "Could not use a debug instruction to query mi2iMap.");
-      Mi2IndexMap::const_iterator itr = mi2iMap.find(&BundleNonDebug);
-      assert(itr != mi2iMap.end() && "Instruction not found in maps.");
-      return itr->second;
+             "Could not use a debug instruction to query the index.");
+      IndexListEntry *Entry = getEntry(BundleNonDebug);
+      assert(Entry && "Instruction not found in maps.");
+      return SlotIndex(Entry, SlotIndex::Slot_Block);
     }
 
     /// Returns the instruction for the given index, or null if the given
@@ -447,9 +461,8 @@ class raw_ostream;
         --I;
         if (I->isDebugInstr())
           continue;
-        Mi2IndexMap::const_iterator MapItr = mi2iMap.find(&*I);
-        if (MapItr != mi2iMap.end())
-          return MapItr->second;
+        if (IndexListEntry *Entry = getEntry(*I))
+          return SlotIndex(Entry, SlotIndex::Slot_Block);
       }
     }
 
@@ -466,9 +479,8 @@ class raw_ostream;
           return getMBBEndIdx(MBB);
         if (I->isDebugInstr())
           continue;
-        Mi2IndexMap::const_iterator MapItr = mi2iMap.find(&*I);
-        if (MapItr != mi2iMap.end())
-          return MapItr->second;
+        if (IndexListEntry *Entry = getEntry(*I))
+          return SlotIndex(Entry, SlotIndex::Slot_Block);
       }
     }
 
@@ -554,7 +566,7 @@ class raw_ostream;
     SlotIndex insertMachineInstrInMaps(MachineInstr &MI, bool Late = false) {
       assert(!MI.isInsideBundle() &&
              "Instructions inside bundles should use bundle start's slot.");
-      assert(!mi2iMap.contains(&MI) && "Instr already indexed.");
+      assert(!hasIndex(MI) && "Instr already indexed.");
       // Numbering debug instructions could cause code generation to be
       // affected by debug information.
       assert(!MI.isDebugInstr() && "Cannot number debug instructions.");
@@ -586,9 +598,8 @@ class raw_ostream;
       if (dist == 0)
         renumberIndexes(newItr);
 
-      SlotIndex newIndex(&*newItr, SlotIndex::Slot_Block);
-      mi2iMap.insert(std::make_pair(&MI, newIndex));
-      return newIndex;
+      addEntry(MI, &*newItr);
+      return SlotIndex(&*newItr, SlotIndex::Slot_Block);
     }
 
     /// Removes machine instruction (bundle) \p MI from the mapping.
@@ -609,17 +620,12 @@ class raw_ostream;
     /// maps used by register allocator. \returns the index where the new
     /// instruction was inserted.
     SlotIndex replaceMachineInstrInMaps(MachineInstr &MI, MachineInstr &NewMI) {
-      Mi2IndexMap::iterator mi2iItr = mi2iMap.find(&MI);
-      if (mi2iItr == mi2iMap.end())
+      IndexListEntry *miEntry = getEntry(MI);
+      if (!miEntry)
         return SlotIndex();
-      SlotIndex replaceBaseIndex = mi2iItr->second;
-      IndexListEntry *miEntry(replaceBaseIndex.listEntry());
-      assert(miEntry->getInstr() == &MI &&
-             "Mismatched instruction in index tables.");
       miEntry->setInstr(&NewMI);
-      mi2iMap.erase(mi2iItr);
-      mi2iMap.insert(std::make_pair(&NewMI, replaceBaseIndex));
-      return replaceBaseIndex;
+      NewMI.SlotIndexesEntryNum = MI.SlotIndexesEntryNum;
+      return SlotIndex(miEntry, SlotIndex::Slot_Block);
     }
 
     /// Add the given MachineBasicBlock into the maps.
