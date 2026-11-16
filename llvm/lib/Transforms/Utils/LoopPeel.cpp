@@ -511,7 +511,7 @@ bool llvm::canPeelLastIteration(const Loop &L, ScalarEvolution &SE) {
 /// is known at the second-to-last.
 static bool shouldPeelLastIteration(Loop &L, CmpPredicate Pred,
                                     const SCEVAddRecExpr *LeftAR,
-                                    const SCEV *RightSCEV, ScalarEvolution &SE,
+                                    SCEVUse RightSCEV, ScalarEvolution &SE,
                                     const TargetTransformInfo &TTI) {
   if (!canPeelLastIteration(L, SE))
     return false;

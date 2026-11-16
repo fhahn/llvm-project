@@ -7088,7 +7088,7 @@ ConstantRange ScalarEvolution::getRangeForAffineNoSelfWrappingAR(
   // outside and inside the range [Min(Start, End), Max(Start, End)]. Using that
   // knowledge, let's try to prove that we are dealing with Case 1. It is so if
   // Start <= End and step is positive, or Start >= End and step is negative.
-  const SCEV *Start = applyLoopGuards(AddRec->getStart(), AddRec->getLoop());
+  SCEVUse Start = applyLoopGuards(AddRec->getStart(), AddRec->getLoop());
   ConstantRange StartRange = getRangeRef(Start, SignHint);
   ConstantRange EndRange = getRangeRef(End, SignHint);
   ConstantRange RangeBetween = StartRange.unionWith(EndRange);
@@ -10741,7 +10741,7 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(const SCEV *V,
 
   LoopGuards Guards = LoopGuards::collectOnDemand(L, *this);
   // Specialize step for this loop so we get context sensitive facts below.
-  const SCEV *StepWLG = applyLoopGuards(Step, Guards);
+  SCEVUse StepWLG = applyLoopGuards(Step, Guards);
 
   // For positive steps (counting up until unsigned overflow):
   //   N = -Start/Step (as unsigned)
@@ -11176,23 +11176,23 @@ bool ScalarEvolution::SimplifyICmpOperands(CmpPredicate &Pred, SCEVUse &LHS,
   return Changed;
 }
 
-bool ScalarEvolution::isKnownNegative(const SCEV *S) {
+bool ScalarEvolution::isKnownNegative(SCEVUse S) {
   return getSignedRangeMax(S).isNegative();
 }
 
-bool ScalarEvolution::isKnownPositive(const SCEV *S) {
+bool ScalarEvolution::isKnownPositive(SCEVUse S) {
   return getSignedRangeMin(S).isStrictlyPositive();
 }
 
-bool ScalarEvolution::isKnownNonNegative(const SCEV *S) {
+bool ScalarEvolution::isKnownNonNegative(SCEVUse S) {
   return !getSignedRangeMin(S).isNegative();
 }
 
-bool ScalarEvolution::isKnownNonPositive(const SCEV *S) {
+bool ScalarEvolution::isKnownNonPositive(SCEVUse S) {
   return !getSignedRangeMax(S).isStrictlyPositive();
 }
 
-bool ScalarEvolution::isKnownNonZero(const SCEV *S) {
+bool ScalarEvolution::isKnownNonZero(SCEVUse S) {
   // Query push down for cases where the unsigned range is
   // less than sufficient.
   if (const auto *SExt = dyn_cast<SCEVSignExtendExpr>(S))
@@ -13177,7 +13177,7 @@ bool ScalarEvolution::isImpliedCondOperandsViaRanges(
   return LHSRange.icmp(Pred, ConstRHS);
 }
 
-bool ScalarEvolution::canIVOverflowOnLT(const SCEV *RHS, const SCEV *Stride,
+bool ScalarEvolution::canIVOverflowOnLT(SCEVUse RHS, SCEVUse Stride,
                                         bool IsSigned, bool Invert) {
   assert(isKnownPositive(Stride) && "Positive stride expected!");
 
@@ -13364,7 +13364,7 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
   const SCEV *Stride = IV->getStepRecurrence(*this);
   if (Invert)
     Stride = getNegativeSCEV(Stride);
-  const SCEV *GuardedStride = Stride;
+  SCEVUse GuardedStride = Stride;
 
   // Whether the IV may reach the maximum (or minimum if inverted) value
   // before the exit is taken.
@@ -13373,7 +13373,7 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
   bool PositiveStride = isKnownPositive(Stride);
   // A dominating guard may prove the stride positive.
   if (!PositiveStride) {
-    const SCEV *LoopGuardedStride = applyLoopGuards(Stride, Guards);
+    SCEVUse LoopGuardedStride = applyLoopGuards(Stride, Guards);
     if (isKnownPositive(LoopGuardedStride)) {
       GuardedStride = LoopGuardedStride;
       PositiveStride = true;
@@ -13703,8 +13703,8 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
         };
 
         auto CondGE = IsSigned ? ICmpInst::ICMP_SGE : ICmpInst::ICMP_UGE;
-        const SCEV *GuardedRHS = applyLoopGuards(OrigRHS, Guards);
-        const SCEV *GuardedStart = applyLoopGuards(OrigStart, Guards);
+        SCEVUse GuardedRHS = applyLoopGuards(OrigRHS, Guards);
+        SCEVUse GuardedStart = applyLoopGuards(OrigStart, Guards);
         if (Invert)
           std::swap(GuardedRHS, GuardedStart);
 
@@ -16179,11 +16179,11 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   }
 }
 
-const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
+SCEVUse ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
   return rewrite(Expr, nullptr);
 }
 
-const SCEV *ScalarEvolution::LoopGuards::rewrite(
+SCEVUse ScalarEvolution::LoopGuards::rewrite(
     const SCEV *Expr, function_ref<const SCEV *(const SCEV *)> Lookup) const {
   /// A rewriter to replace SCEV expressions in Map with the corresponding entry
   /// in the map. It skips AddRecExpr because we cannot guarantee that the
@@ -16333,13 +16333,12 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(
   return Rewriter.visit(Expr);
 }
 
-const SCEV *ScalarEvolution::applyLoopGuards(const SCEV *Expr, const Loop *L) {
+SCEVUse ScalarEvolution::applyLoopGuards(const SCEV *Expr, const Loop *L) {
   LoopGuards Guards = LoopGuards::collectOnDemand(L, *this);
   return applyLoopGuards(Expr, Guards);
 }
 
-const SCEV *ScalarEvolution::applyLoopGuards(const SCEV *Expr,
-                                             LoopGuards &Guards) {
+SCEVUse ScalarEvolution::applyLoopGuards(const SCEV *Expr, LoopGuards &Guards) {
   // Loop guards never rewrite constants and AddRecs, so there is no need to
   // collect pending guards for them.
   if (isa<SCEVConstant, SCEVAddRecExpr>(Expr))

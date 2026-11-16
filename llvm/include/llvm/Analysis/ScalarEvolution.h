@@ -1255,19 +1255,19 @@ public:
   }
 
   /// Test if the given expression is known to be negative.
-  LLVM_ABI bool isKnownNegative(const SCEV *S);
+  LLVM_ABI bool isKnownNegative(SCEVUse S);
 
   /// Test if the given expression is known to be positive.
-  LLVM_ABI bool isKnownPositive(const SCEV *S);
+  LLVM_ABI bool isKnownPositive(SCEVUse S);
 
   /// Test if the given expression is known to be non-negative.
-  LLVM_ABI bool isKnownNonNegative(const SCEV *S);
+  LLVM_ABI bool isKnownNonNegative(SCEVUse S);
 
   /// Test if the given expression is known to be non-positive.
-  LLVM_ABI bool isKnownNonPositive(const SCEV *S);
+  LLVM_ABI bool isKnownNonPositive(SCEVUse S);
 
   /// Test if the given expression is known to be non-zero.
-  LLVM_ABI bool isKnownNonZero(const SCEV *S);
+  LLVM_ABI bool isKnownNonZero(SCEVUse S);
 
   /// Returns true if \p Op is guaranteed to not be poison.
   LLVM_ABI static bool isGuaranteedNotToBePoison(const SCEV *Op);
@@ -1617,8 +1617,8 @@ public:
         unsigned Depth);
 
     /// Like rewrite(Expr), but look up rewrites with \p Lookup if set.
-    const SCEV *rewrite(const SCEV *Expr,
-                        function_ref<const SCEV *(const SCEV *)> Lookup) const;
+    SCEVUse rewrite(const SCEV *Expr,
+                    function_ref<const SCEV *(const SCEV *)> Lookup) const;
 
   public:
     /// Return loop guards for loop \p L, which are collected on first use.
@@ -1629,12 +1629,12 @@ public:
     }
 
     /// Try to apply the collected loop guards to \p Expr.
-    LLVM_ABI const SCEV *rewrite(const SCEV *Expr) const;
+    LLVM_ABI SCEVUse rewrite(const SCEV *Expr) const;
   };
 
   /// Try to apply information from loop guards for \p L to \p Expr.
-  LLVM_ABI const SCEV *applyLoopGuards(const SCEV *Expr, const Loop *L);
-  LLVM_ABI const SCEV *applyLoopGuards(const SCEV *Expr, LoopGuards &Guards);
+  LLVM_ABI SCEVUse applyLoopGuards(const SCEV *Expr, const Loop *L);
+  LLVM_ABI SCEVUse applyLoopGuards(const SCEV *Expr, LoopGuards &Guards);
 
   /// Return true if the loop has no abnormal exits. That is, if the loop
   /// is not infinite, it must exit through an explicit edge in the CFG.
@@ -2547,14 +2547,14 @@ private:
 
   /// Return the smallest signed (\p IsSigned) or unsigned value for \p S. If \p
   /// Invert, return it for complement ~S instead.
-  APInt getRangeMin(const SCEV *S, bool IsSigned, bool Invert = false) {
+  APInt getRangeMin(SCEVUse S, bool IsSigned, bool Invert = false) {
     if (Invert)
       return ~getRangeMax(S, IsSigned);
     return IsSigned ? getSignedRangeMin(S) : getUnsignedRangeMin(S);
   }
   /// Return the largest signed (\p IsSigned) or unsigned value for \p S. If \p
   /// Invert, return it for complement ~S instead.
-  APInt getRangeMax(const SCEV *S, bool IsSigned, bool Invert = false) {
+  APInt getRangeMax(SCEVUse S, bool IsSigned, bool Invert = false) {
     if (Invert)
       return ~getRangeMin(S, IsSigned);
     return IsSigned ? getSignedRangeMax(S) : getUnsignedRangeMax(S);
@@ -2577,7 +2577,7 @@ private:
   /// Verify if a linear IV with positive \p Stride can overflow when compared
   /// against the invariant \p RHS with a less-than. If \p Invert is true, both
   /// the IV and \p RHS are inverted
-  bool canIVOverflowOnLT(const SCEV *RHS, const SCEV *Stride, bool IsSigned,
+  bool canIVOverflowOnLT(SCEVUse RHS, SCEVUse Stride, bool IsSigned,
                          bool Invert = false);
 
   /// Get add expr already created or create a new one.

@@ -238,7 +238,7 @@ static bool evaluatePtrAddRecAtMaxBTCWillNotWrap(
   // If Start u< StartPtr, StartOffset wraps to a value above DerefBytes, so
   // the final MaxOffset u<= DerefBytes check rejects it.
   const SCEV *Start = AR->getStart();
-  const SCEV *StartOffset =
+  SCEVUse StartOffset =
       SE.getNoopOrZeroExtend(SE.getMinusSCEV(Start, StartPtr), WiderTy);
 
   MaxBTC = SE.applyLoopGuards(MaxBTC, LoopGuards);
@@ -264,7 +264,7 @@ static bool evaluatePtrAddRecAtMaxBTCWillNotWrap(
   // Compute MaxOffset per direction: for a non-negative step, the exclusive
   // upper offset of the accessed range; for a negative step, the offset of the
   // start of the highest access.
-  const SCEV *MaxOffset;
+  SCEVUse MaxOffset;
   if (IsKnownNonNegative) {
     // Total length in bytes of the accessed range (from the first accessed
     // byte through the end of the last access).
