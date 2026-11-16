@@ -1501,10 +1501,9 @@ bool Sema::CppLookupName(LookupResult &R, Scope *S) {
             VisitedUsingDirectives = true;
           }
 
-          if (CppNamespaceLookup(*this, R, Context, Ctx, UDirs)) {
-            R.resolveKind();
+          // CppNamespaceLookup already resolved the result kind.
+          if (CppNamespaceLookup(*this, R, Context, Ctx, UDirs))
             return true;
-          }
 
           continue;
         }
@@ -1584,10 +1583,9 @@ bool Sema::CppLookupName(LookupResult &R, Scope *S) {
             Found = true;
         }
 
-        if (Found) {
-          R.resolveKind();
+        // CppNamespaceLookup already resolved the result kind.
+        if (Found)
           return true;
-        }
 
         if (R.isForRedeclaration() && !Ctx->isTransparentContext())
           return false;
