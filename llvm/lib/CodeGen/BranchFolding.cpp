@@ -408,44 +408,17 @@ skipBackwardPastNonInstructions(MachineBasicBlock::iterator I,
   return MBB->end();
 }
 
-/// Given two machine basic blocks, return the number of instructions they
-/// actually have in common together at their end. If a common tail is found (at
-/// least by one instruction), then iterators for the first shared instruction
-/// in each block are returned as well.
-///
-/// Non-instructions according to countsAsInstruction are ignored.
-static unsigned ComputeCommonTailLength(MachineBasicBlock *MBB1,
-                                        MachineBasicBlock *MBB2,
-                                        MachineBasicBlock::iterator &I1,
-                                        MachineBasicBlock::iterator &I2) {
-  MachineBasicBlock::iterator MBBI1 = MBB1->end();
-  MachineBasicBlock::iterator MBBI2 = MBB2->end();
-
-  unsigned TailLen = 0;
-  while (true) {
-    MBBI1 = skipBackwardPastNonInstructions(MBBI1, MBB1);
-    MBBI2 = skipBackwardPastNonInstructions(MBBI2, MBB2);
-    if (MBBI1 == MBB1->end() || MBBI2 == MBB2->end())
-      break;
-    if (!MBBI1->isIdenticalTo(*MBBI2) ||
-        !haveSamePseudoProbeContext(*MBBI1, *MBBI2) ||
-        // FIXME: This check is dubious. It's used to get around a problem where
-        // people incorrectly expect inline asm directives to remain in the same
-        // relative order. This is untenable because normal compiler
-        // optimizations (like this one) may reorder and/or merge these
-        // directives.
-        MBBI1->isInlineAsm()) {
-      break;
-    }
-    if (MBBI1->getFlag(MachineInstr::NoMerge) ||
-        MBBI2->getFlag(MachineInstr::NoMerge))
-      break;
-    ++TailLen;
-    I1 = MBBI1;
-    I2 = MBBI2;
-  }
-
-  return TailLen;
+/// Return true if \p MI1 and \p MI2 can be part of a common tail of two
+/// blocks: identical instructions with the same pseudo probe context that can
+/// be merged.
+static bool tailInstrsMatch(MachineInstr &MI1, MachineInstr &MI2) {
+  // FIXME: The inline asm check is dubious. It's used to get around a problem
+  // where people incorrectly expect inline asm directives to remain in the
+  // same relative order. This is untenable because normal compiler
+  // optimizations (like this one) may reorder and/or merge these directives.
+  return MI1.isIdenticalTo(MI2) && haveSamePseudoProbeContext(MI1, MI2) &&
+         !MI1.isInlineAsm() && !MI1.getFlag(MachineInstr::NoMerge) &&
+         !MI2.getFlag(MachineInstr::NoMerge);
 }
 
 void BranchFolder::replaceTailWithBranchTo(MachineBasicBlock::iterator OldInst,
@@ -613,16 +586,14 @@ static bool blockEndsInUnreachable(const MachineBasicBlock *MBB) {
   return !(MBB->back().isReturn() || MBB->back().isIndirectBranch());
 }
 
-/// ProfitableToMerge - Check if two machine basic blocks have a common tail
-/// and decide if it would be profitable to merge those tails.  Return the
-/// length of the common tail and iterators to the first common instruction
-/// in each block.
+/// ProfitableToMerge - Decide if it would be profitable to merge the common
+/// tail of two machine basic blocks.
 /// MBB1, MBB2      The blocks to check
 /// MinCommonTailLength  Minimum size of tail block to be merged.
-/// CommonTailLen   Out parameter to record the size of the shared tail between
-///                 MBB1 and MBB2
-/// I1, I2          Iterator references that will be changed to point to the first
-///                 instruction in the common tail shared by MBB1,MBB2
+/// CommonTailLen   The size of the shared tail between MBB1 and MBB2
+/// I1, I2          Iterators to the first instruction in the common tail shared
+///                 by MBB1,MBB2, which may be moved to the beginning of the
+///                 blocks
 /// SuccBB          A common successor of MBB1, MBB2 which are in a canonical form
 ///                 relative to SuccBB
 /// PredBB          The layout predecessor of SuccBB, if any.
@@ -631,7 +602,7 @@ static bool blockEndsInUnreachable(const MachineBasicBlock *MBB) {
 ///                 thresholds apply to prevent undoing tail-duplication.
 static bool
 ProfitableToMerge(MachineBasicBlock *MBB1, MachineBasicBlock *MBB2,
-                  unsigned MinCommonTailLength, unsigned &CommonTailLen,
+                  unsigned MinCommonTailLength, unsigned CommonTailLen,
                   MachineBasicBlock::iterator &I1,
                   MachineBasicBlock::iterator &I2, MachineBasicBlock *SuccBB,
                   MachineBasicBlock *PredBB,
@@ -649,7 +620,6 @@ ProfitableToMerge(MachineBasicBlock *MBB1, MachineBasicBlock *MBB2,
       return false;
   }
 
-  CommonTailLen = ComputeCommonTailLength(MBB1, MBB2, I1, I2);
   if (CommonTailLen == 0)
     return false;
   LLVM_DEBUG(dbgs() << "Common tail length of " << printMBBReference(*MBB1)
@@ -748,12 +718,79 @@ unsigned BranchFolder::ComputeSameTails(unsigned CurHash,
   SameTails.clear();
   MachineBasicBlock::iterator TrialBBI1, TrialBBI2;
   MPIterator HighestMPIter = std::prev(MergePotentials.end());
+
+  // The instructions at the end of the N-th block from the back of
+  // MergePotentials, collected as far as they were compared.
+  struct BlockTail {
+    MachineBasicBlock *MBB;
+    SmallVector<MachineBasicBlock::iterator, 4> Instrs;
+  };
+  SmallVector<BlockTail> Tails;
+  // Whether a compared instruction is a bundle. tailInstrsMatch is not
+  // transitive for bundles (a debug instruction without a DebugLoc in one
+  // matches any DebugLoc), so lengths are only inferred until one is seen.
+  bool SawBundle = false;
+  auto TailInstr = [&](unsigned N, unsigned Depth) {
+    BlockTail &T = Tails[N];
+    while (T.Instrs.size() <= Depth) {
+      if (!T.Instrs.empty() && T.Instrs.back() == T.MBB->end())
+        return T.MBB->end();
+      T.Instrs.push_back(skipBackwardPastNonInstructions(
+          T.Instrs.empty() ? T.MBB->end() : T.Instrs.back(), T.MBB));
+      if (T.Instrs.back() != T.MBB->end() && T.Instrs.back()->isBundle())
+        SawBundle = true;
+    }
+    return T.Instrs[Depth];
+  };
+  // Return the length of the common tail of blocks N1 and N2, given that
+  // their first Depth instructions match.
+  auto CommonTailLength = [&](unsigned N1, unsigned N2, unsigned Depth) {
+    for (;; ++Depth) {
+      MachineBasicBlock::iterator I1 = TailInstr(N1, Depth);
+      MachineBasicBlock::iterator I2 = TailInstr(N2, Depth);
+      if (I1 == Tails[N1].MBB->end() || I2 == Tails[N2].MBB->end() ||
+          !tailInstrsMatch(*I1, *I2))
+        return Depth;
+    }
+  };
+
+  // Common tail lengths of the current and the previous block with the blocks
+  // before them. As tailInstrsMatch is an equivalence on the instructions
+  // compared so far (no bundles), common tail lengths
+  // satisfy len(X, Y) >= min(len(P, X), len(P, Y)), with equality if
+  // len(P, X) != len(P, Y). So most lengths follow from the previous block's
+  // without comparing instructions.
+  SmallVector<unsigned> TailLens, PrevTailLens;
+  Tails.push_back({HighestMPIter->getBlock(), {}});
+  unsigned Cur = 0;
   for (MPIterator CurMPIter = std::prev(MergePotentials.end()),
                   B = MergePotentials.begin();
-       CurMPIter != B && CurMPIter->getHash() == CurHash; --CurMPIter) {
-    for (MPIterator I = std::prev(CurMPIter); I->getHash() == CurHash; --I) {
+       CurMPIter != B && CurMPIter->getHash() == CurHash; --CurMPIter, ++Cur) {
+    unsigned N = Cur + 1;
+    for (MPIterator I = std::prev(CurMPIter); I->getHash() == CurHash;
+         --I, ++N) {
+      if (N == Tails.size())
+        Tails.push_back({I->getBlock(), {}});
+      if (N >= TailLens.size())
+        TailLens.resize(N + 1);
       unsigned CommonTailLen;
-      if (ProfitableToMerge(CurMPIter->getBlock(), I->getBlock(),
+      if (Cur == 0 || SawBundle)
+        CommonTailLen = CommonTailLength(Cur, N, 0);
+      else if (PrevTailLens[Cur] != PrevTailLens[N])
+        CommonTailLen = std::min(PrevTailLens[Cur], PrevTailLens[N]);
+      else
+        CommonTailLen = CommonTailLength(Cur, N, PrevTailLens[N]);
+      TailLens[N] = CommonTailLen;
+      if (CommonTailLen) {
+        TrialBBI1 = TailInstr(Cur, CommonTailLen - 1);
+        TrialBBI2 = TailInstr(N, CommonTailLen - 1);
+      }
+      // Only a pair with the longest common tail so far, or for the block that
+      // has it an equally long one, can change SameTails.
+      if ((CommonTailLen > maxCommonTailLength ||
+           (CommonTailLen == maxCommonTailLength &&
+            HighestMPIter == CurMPIter)) &&
+          ProfitableToMerge(CurMPIter->getBlock(), I->getBlock(),
                             MinCommonTailLength,
                             CommonTailLen, TrialBBI1, TrialBBI2,
                             SuccBB, PredBB,
@@ -772,6 +809,7 @@ unsigned BranchFolder::ComputeSameTails(unsigned CurHash,
       if (I == B)
         break;
     }
+    std::swap(TailLens, PrevTailLens);
   }
   return maxCommonTailLength;
 }
