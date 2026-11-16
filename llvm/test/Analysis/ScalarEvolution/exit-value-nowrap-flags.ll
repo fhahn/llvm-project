@@ -389,7 +389,7 @@ define void @exit_value_range_nuw(i64 %start) {
 ; CHECK-NEXT:    %i.next = add i64 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.lcssa = phi i64 [ %iv, %loop ]
-; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop> U: full-set S: full-set --> (9 + %start)<u nuw> U: full-set S: full-set
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop> U: full-set S: full-set --> (9 + %start)<u nuw> U: [9,0) S: [9,0)
 ; CHECK-NEXT:  Determining loop execution counts for: @exit_value_range_nuw
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is i64 9
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9
@@ -425,7 +425,7 @@ define void @mul_of_exit_value_nuw(i8 range(i8 -2, 0) %start, i8 range(i8 1, 100
 ; CHECK-NEXT:    %scale = phi i8 [ %init, %entry ], [ 64, %loop ]
 ; CHECK-NEXT:    --> %scale U: full-set S: full-set Exits: 64 LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:    %mul = mul i8 %scale, %iv
-; CHECK-NEXT:    --> ({%start,+,1}<nuw><nsw><%loop> * %scale) U: full-set S: full-set Exits: (64 * (%start + %n)<u nuw>) LoopDispositions: { %loop: Variant }
+; CHECK-NEXT:    --> ({%start,+,1}<nuw><nsw><%loop> * %scale) U: full-set S: full-set Exits: (64 * (%start + %n)<u nuw>)<nsw> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:    %iv.next = add nuw i8 %iv, 1
 ; CHECK-NEXT:    --> {(1 + %start)<nsw>,+,1}<nsw><%loop> U: [-1,100) S: [-1,100) Exits: (1 + %start + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add i8 %i, 1
@@ -632,7 +632,7 @@ define void @umax_of_exit_value_nuw(i64 %start) {
 ; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %umax = call i64 @llvm.umax.i64(i64 %iv, i64 5)
-; CHECK-NEXT:    --> (5 umax {%start,+,1}<nuw><%loop>) U: [5,0) S: [5,0) Exits: (5 umax (9 + %start)<u nuw>) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> (5 umax {%start,+,1}<nuw><%loop>) U: [5,0) S: [5,0) Exits: (9 + %start)<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nuw i64 %iv, 1
 ; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%loop> U: full-set S: full-set Exits: (10 + %start) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add i64 %i, 1
@@ -671,7 +671,7 @@ define void @umin_seq_of_exit_value_nuw(i64 %start, i64 %n) {
 ; CHECK-NEXT:    %umin = call i64 @llvm.umin.i64(i64 %iv, i64 %n)
 ; CHECK-NEXT:    --> ({%start,+,1}<nuw><%loop> umin %n) U: full-set S: full-set Exits: ((9 + %start)<u nuw> umin %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %umin.seq = select i1 %iv.is.zero, i64 0, i64 %umin
-; CHECK-NEXT:    --> ({%start,+,1}<nuw><%loop> umin_seq %n) U: full-set S: full-set Exits: ((9 + %start)<u nuw> umin_seq %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> ({%start,+,1}<nuw><%loop> umin_seq %n) U: full-set S: full-set Exits: ((9 + %start)<u nuw> umin %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nuw i64 %iv, 1
 ; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%loop> U: full-set S: full-set Exits: (10 + %start) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add i64 %i, 1

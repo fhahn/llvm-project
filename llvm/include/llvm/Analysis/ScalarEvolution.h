@@ -818,10 +818,10 @@ public:
              GEPNoWrapFlags BaseNW = GEPNoWrapFlags::none(),
              GEPNoWrapFlags OffsetNW = GEPNoWrapFlags::none());
   LLVM_ABI const SCEV *getAbsExpr(const SCEV *Op, bool IsNSW);
-  LLVM_ABI const SCEV *getMinMaxExpr(SCEVTypes Kind,
-                                     SmallVectorImpl<SCEVUse> &Operands);
-  LLVM_ABI const SCEV *
-  getSequentialMinMaxExpr(SCEVTypes Kind, SmallVectorImpl<SCEVUse> &Operands);
+  LLVM_ABI SCEVUse getMinMaxExpr(SCEVTypes Kind,
+                                 SmallVectorImpl<SCEVUse> &Operands);
+  LLVM_ABI SCEVUse getSequentialMinMaxExpr(SCEVTypes Kind,
+                                           SmallVectorImpl<SCEVUse> &Operands);
   LLVM_ABI const SCEV *getSMaxExpr(SCEVUse LHS, SCEVUse RHS);
   LLVM_ABI const SCEV *getSMaxExpr(SmallVectorImpl<SCEVUse> &Operands);
   LLVM_ABI const SCEV *getUMaxExpr(SCEVUse LHS, SCEVUse RHS);
@@ -1208,45 +1208,47 @@ public:
   // Returns the max constant multiple of S. If S is exactly 0, return 1.
   LLVM_ABI APInt getNonZeroConstantMultiple(const SCEV *S);
 
-  /// Determine the unsigned range for a particular SCEV.
+  /// Determine the unsigned range for a particular SCEV, using the no-wrap
+  /// flags of the use \p S and of the operand uses of its expression.
   /// NOTE: This returns a copy of the reference returned by getRangeRef.
-  ConstantRange getUnsignedRange(const SCEV *S) {
+  ConstantRange getUnsignedRange(SCEVUse S) {
     if (const APInt *C = getConstantAPIntOrNull(S))
       return ConstantRange(*C);
     return getRangeRef(S, HINT_RANGE_UNSIGNED);
   }
 
   /// Determine the min of the unsigned range for a particular SCEV.
-  APInt getUnsignedRangeMin(const SCEV *S) {
+  APInt getUnsignedRangeMin(SCEVUse S) {
     if (const APInt *C = getConstantAPIntOrNull(S))
       return *C;
     return getRangeRef(S, HINT_RANGE_UNSIGNED).getUnsignedMin();
   }
 
   /// Determine the max of the unsigned range for a particular SCEV.
-  APInt getUnsignedRangeMax(const SCEV *S) {
+  APInt getUnsignedRangeMax(SCEVUse S) {
     if (const APInt *C = getConstantAPIntOrNull(S))
       return *C;
     return getRangeRef(S, HINT_RANGE_UNSIGNED).getUnsignedMax();
   }
 
-  /// Determine the signed range for a particular SCEV.
+  /// Determine the signed range for a particular SCEV, using the no-wrap flags
+  /// of the use \p S and of the operand uses of its expression.
   /// NOTE: This returns a copy of the reference returned by getRangeRef.
-  ConstantRange getSignedRange(const SCEV *S) {
+  ConstantRange getSignedRange(SCEVUse S) {
     if (const APInt *C = getConstantAPIntOrNull(S))
       return ConstantRange(*C);
     return getRangeRef(S, HINT_RANGE_SIGNED);
   }
 
   /// Determine the min of the signed range for a particular SCEV.
-  APInt getSignedRangeMin(const SCEV *S) {
+  APInt getSignedRangeMin(SCEVUse S) {
     if (const APInt *C = getConstantAPIntOrNull(S))
       return *C;
     return getRangeRef(S, HINT_RANGE_SIGNED).getSignedMin();
   }
 
   /// Determine the max of the signed range for a particular SCEV.
-  APInt getSignedRangeMax(const SCEV *S) {
+  APInt getSignedRangeMax(SCEVUse S) {
     if (const APInt *C = getConstantAPIntOrNull(S))
       return *C;
     return getRangeRef(S, HINT_RANGE_SIGNED).getSignedMax();
@@ -2004,34 +2006,39 @@ private:
   /// Stores all SCEV that use a given SCEV as its direct operand.
   DenseMap<const SCEV *, SmallPtrSet<const SCEV *, 8> > SCEVUsers;
 
-  /// Memoized results from getRange
-  DenseMap<const SCEV *, ConstantRange> UnsignedRanges;
+  /// Memoized results from getRange, per use, as the use flags refine the
+  /// range of an expression.
+  DenseMap<SCEVUse, ConstantRange> UnsignedRanges;
 
   /// Memoized results from getRange
-  DenseMap<const SCEV *, ConstantRange> SignedRanges;
+  DenseMap<SCEVUse, ConstantRange> SignedRanges;
 
   /// Used to parameterize getRange
   enum RangeSignHint { HINT_RANGE_UNSIGNED, HINT_RANGE_SIGNED };
 
-  /// Set the memoized range for the given SCEV.
-  const ConstantRange &setRange(const SCEV *S, RangeSignHint Hint,
+  /// Set the memoized range for the given use.
+  const ConstantRange &setRange(SCEVUse S, RangeSignHint Hint,
                                 ConstantRange CR) {
-    DenseMap<const SCEV *, ConstantRange> &Cache =
+    DenseMap<SCEVUse, ConstantRange> &Cache =
         Hint == HINT_RANGE_UNSIGNED ? UnsignedRanges : SignedRanges;
 
     auto Pair = Cache.insert_or_assign(S, std::move(CR));
     return Pair.first->second;
   }
 
-  /// Determine the range for a particular SCEV.
+  /// Erase the memoized ranges of \p S and of its uses with flags.
+  void eraseRanges(const SCEV *S);
+
+  /// Determine the range for a particular SCEV, using the no-wrap flags of the
+  /// use \p S and of the operand uses of its expression.
   /// NOTE: This returns a reference to an entry in a cache. It must be
   /// copied if its needed for longer.
-  LLVM_ABI const ConstantRange &getRangeRef(const SCEV *S, RangeSignHint Hint,
+  LLVM_ABI const ConstantRange &getRangeRef(SCEVUse S, RangeSignHint Hint,
                                             unsigned Depth = 0);
 
   /// Determine the range for a particular SCEV, but evaluates ranges for
   /// operands iteratively first.
-  const ConstantRange &getRangeRefIter(const SCEV *S, RangeSignHint Hint);
+  const ConstantRange &getRangeRefIter(SCEVUse S, RangeSignHint Hint);
 
   /// Determines the range for the affine SCEVAddRecExpr {\p Start,+,\p Step},
   /// and whether it may wrap. Helper for \c getRange.
@@ -2608,7 +2615,7 @@ private:
   /// Return the given SCEV expression with a new set of operands. This
   /// preserves the original nowrap flags, unless \p NewOps changes an operand
   /// that is not canonical, which the flags may depend on.
-  const SCEV *getWithOperands(const SCEV *S, SmallVectorImpl<SCEVUse> &NewOps);
+  SCEVUse getWithOperands(const SCEV *S, SmallVectorImpl<SCEVUse> &NewOps);
 
   FoldingSet<SCEV> UniqueSCEVs;
   FoldingSet<SCEVPredicate> UniquePreds;

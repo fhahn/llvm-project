@@ -3755,8 +3755,8 @@ const SCEV *ScalarEvolution::getAbsExpr(const SCEV *Op, bool IsNSW) {
   return getSMaxExpr(Op, getNegativeSCEV(Op, Flags));
 }
 
-const SCEV *ScalarEvolution::getMinMaxExpr(SCEVTypes Kind,
-                                           SmallVectorImpl<SCEVUse> &Ops) {
+SCEVUse ScalarEvolution::getMinMaxExpr(SCEVTypes Kind,
+                                       SmallVectorImpl<SCEVUse> &Ops) {
   assert(SCEVMinMaxExpr::isMinMaxType(Kind) && "Not a SCEVMinMaxExpr!");
   assert(!Ops.empty() && "Cannot get empty (u|s)(min|max)!");
   if (Ops.size() == 1) return Ops[0];
@@ -4113,7 +4113,7 @@ bool ScalarEvolution::canReuseInstruction(
   return true;
 }
 
-const SCEV *
+SCEVUse
 ScalarEvolution::getSequentialMinMaxExpr(SCEVTypes Kind,
                                          SmallVectorImpl<SCEVUse> &Ops) {
   assert(SCEVSequentialMinMaxExpr::isSequentialMinMaxType(Kind) &&
@@ -4475,7 +4475,7 @@ const SCEV *ScalarEvolution::getNotSCEV(const SCEV *V) {
 
   // Fold ~(u|s)(min|max)(~x, ~y) to (u|s)(max|min)(x, y)
   if (const SCEVMinMaxExpr *MME = dyn_cast<SCEVMinMaxExpr>(V)) {
-    auto MatchMinMaxNegation = [&](const SCEVMinMaxExpr *MME) {
+    auto MatchMinMaxNegation = [&](const SCEVMinMaxExpr *MME) -> const SCEV * {
       SmallVector<SCEVUse, 2> MatchedOperands;
       for (const SCEV *Operand : MME->operands()) {
         const SCEV *Matched = MatchNotExpr(Operand);
@@ -6316,9 +6316,21 @@ void ScalarEvolution::setNoWrapFlags(SCEVAddRecExpr *AddRec, SCEVFlags Flags) {
   SCEVFlags NWFlags = Flags & SCEV::FlagsNoWrapMask;
   if (AddRec->getNoWrapFlags(NWFlags) != NWFlags) {
     AddRec->setNoWrapFlags(NWFlags);
-    UnsignedRanges.erase(AddRec);
-    SignedRanges.erase(AddRec);
+    eraseRanges(AddRec);
     ConstantMultipleCache.erase(AddRec);
+  }
+}
+
+void ScalarEvolution::eraseRanges(const SCEV *S) {
+  UnsignedRanges.erase(S);
+  SignedRanges.erase(S);
+  if (!isa<SCEVAddExpr, SCEVMulExpr, SCEVAddRecExpr>(S))
+    return;
+  for (SCEVFlags Flags :
+       {SCEV::FlagNUW, SCEV::FlagNSW, SCEV::FlagNUW | SCEV::FlagNSW}) {
+    SCEVUse U(S, Flags);
+    UnsignedRanges.erase(U);
+    SignedRanges.erase(U);
   }
 }
 
@@ -6466,9 +6478,9 @@ static bool RangeRefPHIAllowedOperands(DominatorTree &DT, PHINode *PHI) {
 }
 
 const ConstantRange &
-ScalarEvolution::getRangeRefIter(const SCEV *S,
+ScalarEvolution::getRangeRefIter(SCEVUse S,
                                  ScalarEvolution::RangeSignHint SignHint) {
-  DenseMap<const SCEV *, ConstantRange> &Cache =
+  DenseMap<SCEVUse, ConstantRange> &Cache =
       SignHint == ScalarEvolution::HINT_RANGE_UNSIGNED ? UnsignedRanges
                                                        : SignedRanges;
   SmallVector<SCEVUse> WorkList;
@@ -6510,6 +6522,8 @@ ScalarEvolution::getRangeRefIter(const SCEV *S,
   AddToWorklist(S);
 
   // Build worklist by queuing operands of N-ary expressions and phi nodes.
+  // Operands are queued without their use flags; the ranges of uses with flags
+  // are computed when the ranges of their users are.
   for (unsigned I = 0; I != WorkList.size(); ++I) {
     const SCEV *P = WorkList[I];
     auto *UnknownS = dyn_cast<SCEVUnknown>(P);
@@ -6550,13 +6564,18 @@ const APInt *ScalarEvolution::getConstantAPIntOrNull(const SCEV *S) {
 /// HINT_RANGE_UNSIGNED (resp. HINT_RANGE_SIGNED) then getRange prefers ranges
 /// with a "cleaner" unsigned (resp. signed) representation.
 const ConstantRange &ScalarEvolution::getRangeRef(
-    const SCEV *S, ScalarEvolution::RangeSignHint SignHint, unsigned Depth) {
-  DenseMap<const SCEV *, ConstantRange> &Cache =
+    SCEVUse S, ScalarEvolution::RangeSignHint SignHint, unsigned Depth) {
+  DenseMap<SCEVUse, ConstantRange> &Cache =
       SignHint == ScalarEvolution::HINT_RANGE_UNSIGNED ? UnsignedRanges
                                                        : SignedRanges;
   ConstantRange::PreferredRangeType RangeType =
       SignHint == ScalarEvolution::HINT_RANGE_UNSIGNED ? ConstantRange::Unsigned
                                                        : ConstantRange::Signed;
+
+  // Drop use flags the expression has gained since the use was created, so
+  // the use shares the cache entry eraseRanges erases.
+  if (S.hasUseFlags())
+    S = SCEVUse(S.getPointer(), S.getUseNoWrapFlags());
 
   // See if we've computed this range already.
   auto I = Cache.find(S);
@@ -6637,23 +6656,24 @@ const ConstantRange &ScalarEvolution::getRangeRef(
           ConservativeResult.intersectWith(LHSRange.urem(RHSRange), RangeType);
     }
     ConstantRange X = getRangeRef(Add->getOperand(0), SignHint, Depth + 1);
+    SCEVFlags NoWrapFlags = S.getNoWrapFlags();
     unsigned WrapType = OBO::AnyWrap;
-    if (Add->hasNoSignedWrap())
+    if (hasFlags(NoWrapFlags, SCEV::FlagNSW))
       WrapType |= OBO::NoSignedWrap;
-    if (Add->hasNoUnsignedWrap())
+    if (hasFlags(NoWrapFlags, SCEV::FlagNUW))
       WrapType |= OBO::NoUnsignedWrap;
-    for (const SCEV *Op : drop_begin(Add->operands()))
+    for (SCEVUse Op : drop_begin(Add->operands()))
       X = X.addWithNoWrap(getRangeRef(Op, SignHint, Depth + 1), WrapType,
                           RangeType);
-    return setRange(Add, SignHint,
+    return setRange(S, SignHint,
                     ConservativeResult.intersectWith(X, RangeType));
   }
   case scMulExpr: {
     const SCEVMulExpr *Mul = cast<SCEVMulExpr>(S);
     ConstantRange X = getRangeRef(Mul->getOperand(0), SignHint, Depth + 1);
-    for (const SCEV *Op : drop_begin(Mul->operands()))
+    for (SCEVUse Op : drop_begin(Mul->operands()))
       X = X.multiply(getRangeRef(Op, SignHint, Depth + 1));
-    return setRange(Mul, SignHint,
+    return setRange(S, SignHint,
                     ConservativeResult.intersectWith(X, RangeType));
   }
   case scUDivExpr: {
@@ -6665,9 +6685,10 @@ const ConstantRange &ScalarEvolution::getRangeRef(
   }
   case scAddRecExpr: {
     const SCEVAddRecExpr *AddRec = cast<SCEVAddRecExpr>(S);
+    SCEVFlags NoWrapFlags = S.getNoWrapFlags();
     // If there's no unsigned wrap, the value will never be less than its
     // initial value.
-    if (AddRec->hasNoUnsignedWrap()) {
+    if (hasFlags(NoWrapFlags, SCEV::FlagNUW)) {
       APInt UnsignedMinValue = getUnsignedRangeMin(AddRec->getStart());
       if (!UnsignedMinValue.isZero())
         ConservativeResult = ConservativeResult.intersectWith(
@@ -6679,7 +6700,7 @@ const ConstantRange &ScalarEvolution::getRangeRef(
     // 1: smaller than initial value if operands are non negative,
     // 2: bigger than initial value if operands are non positive.
     // For both cases, value can not cross signed min/max boundary.
-    if (AddRec->hasNoSignedWrap()) {
+    if (hasFlags(NoWrapFlags, SCEV::FlagNSW)) {
       bool AllNonNeg = true;
       bool AllNonPos = true;
       for (unsigned i = 1, e = AddRec->getNumOperands(); i != e; ++i) {
@@ -6745,7 +6766,7 @@ const ConstantRange &ScalarEvolution::getRangeRef(
       }
     }
 
-    return setRange(AddRec, SignHint, std::move(ConservativeResult));
+    return setRange(S, SignHint, std::move(ConservativeResult));
   }
   case scUMaxExpr:
   case scSMaxExpr:
@@ -10064,8 +10085,8 @@ static Constant *BuildConstantFromSCEV(const SCEV *V) {
   llvm_unreachable("Unknown SCEV kind!");
 }
 
-const SCEV *ScalarEvolution::getWithOperands(const SCEV *S,
-                                             SmallVectorImpl<SCEVUse> &NewOps) {
+SCEVUse ScalarEvolution::getWithOperands(const SCEV *S,
+                                         SmallVectorImpl<SCEVUse> &NewOps) {
   switch (S->getSCEVType()) {
   case scTruncate:
   case scZeroExtend:
@@ -14542,8 +14563,7 @@ void ScalarEvolution::forgetMemoizedResults(ArrayRef<SCEVUse> SCEVs) {
 void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
   LoopDispositions.erase(S);
   BlockDispositions.erase(S);
-  UnsignedRanges.erase(S);
-  SignedRanges.erase(S);
+  eraseRanges(S);
   HasRecMap.erase(S);
   ConstantMultipleCache.erase(S);
 
