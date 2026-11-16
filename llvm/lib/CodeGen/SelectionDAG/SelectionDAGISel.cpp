@@ -3259,12 +3259,24 @@ static bool IsPredicateKnownToFail(
 
 namespace {
 
+/// An entry of the node stack: a node and the index of the entry below it.
+/// Entries are never modified once pushed (except by MatchStateUpdater), so a
+/// stack is identified by its top entry and scopes can share entries.
+struct NodeStackEntry {
+  SDValue Node;
+  unsigned Parent;
+};
+
 struct MatchScope {
   /// FailIndex - If this match fails, this is the index to continue with.
   unsigned FailIndex;
 
-  /// NodeStack - The node stack when the scope was formed.
-  SmallVector<SDValue, 4> NodeStack;
+  /// NodeStackTop - The top of the node stack when the scope was formed.
+  unsigned NodeStackTop;
+
+  /// NumNodeStackEntries - The number of node stack entries when the scope was
+  /// formed.
+  unsigned NumNodeStackEntries;
 
   /// NumRecordedNodes - The number of recorded nodes when the scope was formed.
   unsigned NumRecordedNodes;
@@ -3287,14 +3299,15 @@ class MatchStateUpdater : public SelectionDAG::DAGUpdateListener
 {
   SDNode **NodeToMatch;
   SmallVectorImpl<std::pair<SDValue, SDNode *>> &RecordedNodes;
-  SmallVectorImpl<MatchScope> &MatchScopes;
+  SmallVectorImpl<NodeStackEntry> &NodeStack;
+  unsigned &NodeStackTop;
 
 public:
   MatchStateUpdater(SelectionDAG &DAG, SDNode **NodeToMatch,
                     SmallVectorImpl<std::pair<SDValue, SDNode *>> &RN,
-                    SmallVectorImpl<MatchScope> &MS)
+                    SmallVectorImpl<NodeStackEntry> &NS, unsigned &NSTop)
       : SelectionDAG::DAGUpdateListener(DAG), NodeToMatch(NodeToMatch),
-        RecordedNodes(RN), MatchScopes(MS) {}
+        RecordedNodes(RN), NodeStack(NS), NodeStackTop(NSTop) {}
 
   void NodeDeleted(SDNode *N, SDNode *E) override {
     // Some early-returns here to avoid the search if we deleted the node or
@@ -3314,10 +3327,26 @@ public:
       if (I.first.getNode() == N)
         I.first.setNode(E);
 
-    for (auto &I : MatchScopes)
-      for (auto &J : I.NodeStack)
-        if (J.getNode() == N)
-          J.setNode(E);
+    // Only the node stacks saved in scopes are updated, not the current one.
+    // Give the current stack its own copies of the entries before updating.
+    if (none_of(NodeStack, [N](const NodeStackEntry &Entry) {
+          return Entry.Node.getNode() == N;
+        }))
+      return;
+    unsigned NumOld = NodeStack.size();
+    SmallVector<unsigned, 8> Path;
+    for (unsigned I = NodeStackTop; I != ~0U; I = NodeStack[I].Parent)
+      Path.push_back(I);
+    unsigned Parent = ~0U;
+    for (unsigned I : reverse(Path)) {
+      NodeStack.push_back({NodeStack[I].Node, Parent});
+      Parent = NodeStack.size() - 1;
+    }
+    NodeStackTop = Parent;
+    for (NodeStackEntry &Entry : make_range(NodeStack.begin(),
+                                            NodeStack.begin() + NumOld))
+      if (Entry.Node.getNode() == N)
+        Entry.Node.setNode(E);
   }
 };
 
@@ -3417,9 +3446,21 @@ void SelectionDAGISel::SelectCodeCommon(SDNode *NodeToMatch,
   assert(!NodeToMatch->isMachineOpcode() && "Node already selected!");
 
   // Set up the node stack with NodeToMatch as the only node on the stack.
-  SmallVector<SDValue, 8> NodeStack;
+  // NodeStack holds the entries of the current stack and of the stacks saved
+  // in MatchScopes; NodeStackTop is the top of the current stack.
+  SmallVector<NodeStackEntry, 16> NodeStack;
   SDValue N = SDValue(NodeToMatch, 0);
-  NodeStack.push_back(N);
+  NodeStack.push_back({N, ~0U});
+  unsigned NodeStackTop = 0;
+  auto PushNode = [&](SDValue Node) {
+    NodeStack.push_back({Node, NodeStackTop});
+    NodeStackTop = NodeStack.size() - 1;
+  };
+  auto PopNode = [&]() {
+    NodeStackTop = NodeStack[NodeStackTop].Parent;
+    assert(NodeStackTop != ~0U && "Node stack imbalance!");
+    N = NodeStack[NodeStackTop].Node;
+  };
 
   // MatchScopes - Scopes used when matching, if a match failure happens, this
   // indicates where to continue checking.
@@ -3541,7 +3582,8 @@ void SelectionDAGISel::SelectCodeCommon(SDNode *NodeToMatch,
       // to match.
       MatchScope &NewEntry = MatchScopes.emplace_back();
       NewEntry.FailIndex = FailIndex;
-      NewEntry.NodeStack.append(NodeStack.begin(), NodeStack.end());
+      NewEntry.NodeStackTop = NodeStackTop;
+      NewEntry.NumNodeStackEntries = NodeStack.size();
       NewEntry.NumRecordedNodes = RecordedNodes.size();
       NewEntry.NumMatchedMemRefs = MatchedMemRefs.size();
       NewEntry.InputChain = InputChain;
@@ -3552,8 +3594,8 @@ void SelectionDAGISel::SelectCodeCommon(SDNode *NodeToMatch,
     case OPC_RecordNode: {
       // Remember this node, it may end up being an operand in the pattern.
       SDNode *Parent = nullptr;
-      if (NodeStack.size() > 1)
-        Parent = NodeStack[NodeStack.size()-2].getNode();
+      if (unsigned P = NodeStack[NodeStackTop].Parent; P != ~0U)
+        Parent = NodeStack[P].Node.getNode();
       RecordedNodes.emplace_back(N, Parent);
       continue;
     }
@@ -3600,7 +3642,7 @@ void SelectionDAGISel::SelectCodeCommon(SDNode *NodeToMatch,
       if (ChildNo >= N.getNumOperands())
         break;  // Match fails if out of range child #.
       N = N.getOperand(ChildNo);
-      NodeStack.push_back(N);
+      PushNode(N);
       continue;
     }
 
@@ -3612,7 +3654,7 @@ void SelectionDAGISel::SelectCodeCommon(SDNode *NodeToMatch,
       if (ChildNo >= N.getNumOperands())
         break;  // Match fails if out of range child #.
       N = N.getOperand(ChildNo);
-      NodeStack.push_back(N);
+      PushNode(N);
       continue;
     }
 
@@ -3626,9 +3668,7 @@ void SelectionDAGISel::SelectCodeCommon(SDNode *NodeToMatch,
     case OPC_MoveSibling6:
     case OPC_MoveSibling7: {
       // Pop the current node off the NodeStack.
-      NodeStack.pop_back();
-      assert(!NodeStack.empty() && "Node stack imbalance!");
-      N = NodeStack.back();
+      PopNode();
 
       unsigned SiblingNo = Opcode == OPC_MoveSibling
                                ? MatcherTable[MatcherIndex++]
@@ -3636,14 +3676,12 @@ void SelectionDAGISel::SelectCodeCommon(SDNode *NodeToMatch,
       if (SiblingNo >= N.getNumOperands())
         break; // Match fails if out of range sibling #.
       N = N.getOperand(SiblingNo);
-      NodeStack.push_back(N);
+      PushNode(N);
       continue;
     }
     case OPC_MoveParent:
       // Pop the current node off the NodeStack.
-      NodeStack.pop_back();
-      assert(!NodeStack.empty() && "Node stack imbalance!");
-      N = NodeStack.back();
+      PopNode();
       continue;
 
     case OPC_CheckSame:
@@ -3714,7 +3752,7 @@ void SelectionDAGISel::SelectCodeCommon(SDNode *NodeToMatch,
       std::unique_ptr<MatchStateUpdater> MSU;
       if (ComplexPatternFuncMutatesDAG())
         MSU.reset(new MatchStateUpdater(*CurDAG, &NodeToMatch, RecordedNodes,
-                                        MatchScopes));
+                                        NodeStack, NodeStackTop));
 
       if (!CheckComplexPattern(NodeToMatch, RecordedNodes[RecNo].second,
                                RecordedNodes[RecNo].first, CPNum,
@@ -3979,13 +4017,16 @@ void SelectionDAGISel::SelectCodeCommon(SDNode *NodeToMatch,
       continue;
 
     case OPC_CheckFoldableChainNode: {
-      assert(NodeStack.size() != 1 && "No parent node");
+      unsigned ParentIdx = NodeStack[NodeStackTop].Parent;
+      assert(ParentIdx != ~0U && "No parent node");
+      SDNode *Parent = NodeStack[ParentIdx].Node.getNode();
       // Verify that all intermediate nodes between the root and this one have
       // a single use (ignoring chains, which are handled in UpdateChains).
       bool HasMultipleUses = false;
-      for (unsigned i = 1, e = NodeStack.size()-1; i != e; ++i) {
+      for (unsigned I = ParentIdx; NodeStack[I].Parent != ~0U;
+           I = NodeStack[I].Parent) {
         unsigned NNonChainUses = 0;
-        SDNode *NS = NodeStack[i].getNode();
+        SDNode *NS = NodeStack[I].Node.getNode();
         for (const SDUse &U : NS->uses())
           if (U.getValueType() != MVT::Other)
             if (++NNonChainUses > 1) {
@@ -3998,10 +4039,8 @@ void SelectionDAGISel::SelectCodeCommon(SDNode *NodeToMatch,
 
       // Check to see that the target thinks this is profitable to fold and that
       // we can fold it without inducing cycles in the graph.
-      if (!IsProfitableToFold(N, NodeStack[NodeStack.size()-2].getNode(),
-                              NodeToMatch) ||
-          !IsLegalToFold(N, NodeStack[NodeStack.size()-2].getNode(),
-                         NodeToMatch, OptLevel,
+      if (!IsProfitableToFold(N, Parent, NodeToMatch) ||
+          !IsLegalToFold(N, Parent, NodeToMatch, OptLevel,
                          true/*We validate our own chains*/))
         break;
 
@@ -4554,8 +4593,9 @@ void SelectionDAGISel::SelectCodeCommon(SDNode *NodeToMatch,
       // formed.
       MatchScope &LastScope = MatchScopes.back();
       RecordedNodes.resize(LastScope.NumRecordedNodes);
-      NodeStack.assign(LastScope.NodeStack.begin(), LastScope.NodeStack.end());
-      N = NodeStack.back();
+      NodeStack.truncate(LastScope.NumNodeStackEntries);
+      NodeStackTop = LastScope.NodeStackTop;
+      N = NodeStack[NodeStackTop].Node;
 
       if (LastScope.NumMatchedMemRefs != MatchedMemRefs.size())
         MatchedMemRefs.resize(LastScope.NumMatchedMemRefs);
