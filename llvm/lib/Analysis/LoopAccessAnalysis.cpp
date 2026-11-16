@@ -326,18 +326,20 @@ static bool isKnownNonDecreasingInLoop(const SCEV *S, const Loop *L,
   }
 }
 
-/// Try to bound a loop-variant pointer that is not an affine AddRec.
+/// Try to bound a loop-variant pointer Base + Offset that is not an AddRec.
 ///
-/// If the offset is provably monotonically non-decreasing the accessed range is
-/// bounded by the offset's value at the first iteration (via
-/// SplitIntoInitAndPostInc) and last iteration (via getSCEVAtScope). The
-/// returned range is half-open: \p EltSizeSCEV is added to the address of the
-/// last accessed element to form the end.
+/// If the offset is provably monotonically non-decreasing it is bounded by its
+/// value at the first iteration (via SplitIntoInitAndPostInc) and last
+/// iteration (via getSCEVAtScope). Otherwise, or if those cannot be computed or
+/// are not loop-invariant, it is bounded by its unsigned range. The returned
+/// range is half-open: its end is the address at the offset's upper bound plus
+/// \p EltSizeSCEV, saturating at the end of the address space for the unsigned
+/// range.
 ///
 /// Returns {nullptr, nullptr} if no such bound can be formed.
 static std::pair<const SCEV *, const SCEV *>
-getNonAffineMonotonicBounds(const Loop *Lp, const SCEV *PtrExpr,
-                            const SCEV *EltSizeSCEV, ScalarEvolution *SE) {
+getNonAffineBounds(const Loop *Lp, const SCEV *PtrExpr, const SCEV *EltSizeSCEV,
+                   ScalarEvolution *SE) {
   const auto *PtrAdd = dyn_cast<SCEVAddExpr>(PtrExpr);
   if (!PtrAdd || !PtrAdd->hasNoUnsignedWrap())
     return {nullptr, nullptr};
@@ -345,22 +347,52 @@ getNonAffineMonotonicBounds(const Loop *Lp, const SCEV *PtrExpr,
   const SCEV *Base = *find_if(PtrAdd->operands(), [](const auto &Op) {
     return Op->getType()->isPointerTy();
   });
-  if (isa<SCEVCouldNotCompute>(Base) || !SE->isLoopInvariant(Base, Lp))
+  if (!SE->isLoopInvariant(Base, Lp))
     return {nullptr, nullptr};
 
   const SCEV *Offset = SE->getMinusSCEV(PtrExpr, Base);
-  if (isa<SCEVCouldNotCompute>(Offset) ||
-      !isKnownNonDecreasingInLoop(Offset, Lp, *SE))
-    return {nullptr, nullptr};
+  if (isKnownNonDecreasingInLoop(Offset, Lp, *SE)) {
+    const SCEV *OffStart = SE->SplitIntoInitAndPostInc(Lp, Offset).first;
+    const SCEV *OffEnd = SE->getSCEVAtScope(Offset, Lp->getParentLoop());
+    // Offset contains an AddRec in Lp, so SCEV only applies the GEP's nuw if
+    // the access executes in every iteration (see isSCEVExprNeverPoison).
+    // Hence Base + OffEnd is the last accessed address and adding EltSize
+    // cannot wrap.
+    if (!isa<SCEVCouldNotCompute>(OffStart) &&
+        !isa<SCEVCouldNotCompute>(OffEnd) &&
+        SE->isLoopInvariant(OffStart, Lp) && SE->isLoopInvariant(OffEnd, Lp))
+      return {SE->getAddExpr(Base, OffStart),
+              SE->getAddExpr(Base, OffEnd, EltSizeSCEV)};
+  }
 
-  const SCEV *OffStart = SE->SplitIntoInitAndPostInc(Lp, Offset).first;
-  const SCEV *OffEnd = SE->getSCEVAtScope(Offset, Lp->getParentLoop());
-  if (isa<SCEVCouldNotCompute>(OffStart) || isa<SCEVCouldNotCompute>(OffEnd) ||
-      !SE->isLoopInvariant(OffStart, Lp) || !SE->isLoopInvariant(OffEnd, Lp))
+  // Otherwise bound the offset by its unsigned range, if the bounds span at
+  // most laa-max-nonaffine-range-bytes. Much larger bounds make the runtime
+  // checks fail whenever another object lies within them.
+  const APInt OffMin = SE->getUnsignedRangeMin(Offset);
+  const APInt OffMax = SE->getUnsignedRangeMax(Offset);
+  bool Overflow;
+  const APInt OffMaxEnd =
+      OffMax.uadd_ov(SE->getUnsignedRangeMax(EltSizeSCEV), Overflow);
+  unsigned MaxRangeBytes =
+      getAnalysisOptions(*Lp).laa_max_nonaffine_range_bytes;
+  if (Overflow || (OffMaxEnd - OffMin).ugt(MaxRangeBytes))
     return {nullptr, nullptr};
+  const SCEV *BaseAddr = SE->getPtrToAddrExpr(Base);
+  if (isa<SCEVCouldNotCompute>(BaseAddr))
+    return {nullptr, nullptr};
+  // OffMin is at most any accessed offset, so Base + OffMin does not wrap.
+  // OffMax need not be accessed, so clamp the end to Base + ~Base, the highest
+  // address, as ScalarEvolution does for uadd.sat.
+  const SCEV *End =
+      SE->getUMinExpr(SE->getConstant(OffMaxEnd), SE->getNotSCEV(BaseAddr));
+  return {SE->getAddExpr(Base, SE->getConstant(OffMin)),
+          SE->getAddExpr(Base, End)};
+}
 
-  return {SE->getAddExpr(Base, OffStart),
-          SE->getAddExpr(Base, OffEnd, EltSizeSCEV)};
+/// Return true if \p S is invariant in \p L or an AddRec.
+static bool isLoopInvariantOrAddRec(const SCEV *S, const Loop *L,
+                                    ScalarEvolution &SE) {
+  return SE.isLoopInvariant(S, L) || isa<SCEVAddRecExpr>(S);
 }
 
 std::pair<const SCEV *, const SCEV *> llvm::getStartAndEndForAccess(
@@ -452,10 +484,9 @@ std::pair<const SCEV *, const SCEV *> llvm::getStartAndEndForAccess(
       ScEnd = SE->getAddExpr(SE->getUMaxExpr(Start, LastAddr), EltSizeSCEV);
     }
   } else {
-    // The pointer is loop-variant but not an affine AddRec. Try to form a
-    // tight bound for a monotonic offset (see getNonAffineMonotonicBounds).
-    std::tie(ScStart, ScEnd) =
-        getNonAffineMonotonicBounds(Lp, PtrExpr, EltSizeSCEV, SE);
+    // The pointer is loop-variant but not an AddRec. Try to bound its offset
+    // (see getNonAffineBounds).
+    std::tie(ScStart, ScEnd) = getNonAffineBounds(Lp, PtrExpr, EltSizeSCEV, SE);
     if (!ScStart)
       return {SE->getCouldNotCompute(), SE->getCouldNotCompute()};
   }
@@ -762,6 +793,8 @@ void RuntimePointerChecking::groupChecks(
         assert(!Seen.contains(Pointer) && "pointer already processed");
         Seen.insert(Pointer);
         bool Merged = false;
+        bool PtrHasNonAffineBounds = !isLoopInvariantOrAddRec(
+            Pointers[Pointer].Expr, DC.getInnermostLoop(), *SE);
 
         // Go through all the existing sets and see if we can find one
         // which can include this pointer.
@@ -774,6 +807,19 @@ void RuntimePointerChecking::groupChecks(
             break;
 
           TotalComparisons++;
+
+          // addPointer orders bounds by the sign of their constant
+          // difference, which is only their actual order if they are less than
+          // half of the address space apart. Bounds formed by
+          // getNonAffineBounds need not be accessed addresses and can be far
+          // from other pointers' bounds, so only merge if the group's bounds
+          // stay unchanged.
+          if ((PtrHasNonAffineBounds ||
+               !isLoopInvariantOrAddRec(Pointers[Group.Members.front()].Expr,
+                                        DC.getInnermostLoop(), *SE)) &&
+              (Pointers[Pointer].Start != Group.Low ||
+               Pointers[Pointer].End != Group.High))
+            continue;
 
           if (Group.addPointer(Pointer, *this)) {
             Merged = true;
@@ -2115,8 +2161,7 @@ bool AccessAnalysis::createCheckForAccess(RuntimePointerChecking &RtCheck,
   // are no forked pointers; replaceSymbolicStridesSCEV in this case.
   auto IsLoopInvariantOrAR =
       [&SE, &TheLoop](const PointerIntPair<const SCEV *, 1, bool> &P) {
-        return SE->isLoopInvariant(P.getPointer(), TheLoop) ||
-               isa<SCEVAddRecExpr>(P.getPointer());
+        return isLoopInvariantOrAddRec(P.getPointer(), TheLoop, *SE);
       };
   if (RTCheckPtrs.size() == 2 && all_of(RTCheckPtrs, IsLoopInvariantOrAR)) {
     LLVM_DEBUG(dbgs() << "LAA: Found forked pointer: " << *Ptr << "\n";
@@ -2139,12 +2184,11 @@ bool AccessAnalysis::createCheckForAccess(RuntimePointerChecking &RtCheck,
     if (!AR && Assume)
       AR = PSE.getAsAddRec(Ptr, &Predicates);
     if (!AR || !AR->isAffine()) {
-      // Check if bounds for non-affine monotonic expressions can be formed.
+      // Check if bounds for non-affine expressions can be formed.
       const SCEV *EltSizeSCEV = SE->getStoreSizeOfExpr(
           DL.getIndexType(P.getPointer()->getType()), AccessTy);
       if (!Assume ||
-          !getNonAffineMonotonicBounds(TheLoop, P.getPointer(), EltSizeSCEV, SE)
-               .first)
+          !getNonAffineBounds(TheLoop, P.getPointer(), EltSizeSCEV, SE).first)
         return false;
       continue;
     }
