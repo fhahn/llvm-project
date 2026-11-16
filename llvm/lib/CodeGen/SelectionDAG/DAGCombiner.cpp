@@ -140,8 +140,9 @@ static const MDNode *getCommonMemCacheHint(const RangeT &Nodes) {
 
     /// This records all nodes attempted to be added to the worklist since we
     /// considered a new worklist entry. As we keep do not add duplicate nodes
-    /// in the worklist, this is different from the tail of the worklist.
-    SmallSetVector<SDNode *, 32> PruningList;
+    /// in the worklist, this is different from the tail of the worklist. To
+    /// avoid duplicates, membership is recorded in the node itself.
+    SmallVector<SDNode *, 32> PruningList;
 
     /// Map from candidate StoreNode to the pair of RootNode and count.
     /// The count is used to track how many times we have seen the StoreNode
@@ -179,6 +180,7 @@ static const MDNode *getCommonMemCacheHint(const RangeT &Nodes) {
       // Check any nodes added to the worklist to see if they are prunable.
       while (!PruningList.empty()) {
         auto *N = PruningList.pop_back_val();
+        N->setInCombinerPruningList(false);
         if (N->use_empty())
           recursivelyDeleteUnusedNodes(N);
       }
@@ -218,7 +220,10 @@ static const MDNode *getCommonMemCacheHint(const RangeT &Nodes) {
 
     void ConsiderForPruning(SDNode *N) {
       // Mark this for potential pruning.
-      PruningList.insert(N);
+      if (!N->isInCombinerPruningList()) {
+        N->setInCombinerPruningList(true);
+        PruningList.push_back(N);
+      }
     }
 
     /// Add to the worklist making sure its instance is at the back (next to be
@@ -247,7 +252,10 @@ static const MDNode *getCommonMemCacheHint(const RangeT &Nodes) {
 
     /// Remove all instances of N from the worklist.
     void removeFromWorklist(SDNode *N) {
-      PruningList.remove(N);
+      if (N->isInCombinerPruningList()) {
+        N->setInCombinerPruningList(false);
+        PruningList.erase(find(PruningList, N));
+      }
       StoreRootCountMap.erase(N);
 
       int WorklistIndex = N->getCombinerWorklistIndex();

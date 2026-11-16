@@ -545,8 +545,9 @@ BEGIN_TWO_BYTE_PACK()
     uint16_t HasDebugValue : 1;
     uint16_t IsMemIntrinsic : 1;
     uint16_t IsDivergent : 1;
+    uint16_t InCombinerPruningList : 1;
   };
-  enum { NumSDNodeBits = 3 };
+  enum { NumSDNodeBits = 4 };
 
   class ConstantSDNodeBitfields {
     friend class ConstantSDNode;
@@ -802,6 +803,16 @@ public:
 
   /// Set worklist index for DAGCombiner
   void setCombinerWorklistIndex(int Index) { CombinerWorklistIndex = Index; }
+
+  /// Get pruning list membership for DAGCombiner
+  bool isInCombinerPruningList() const {
+    return SDNodeBits.InCombinerPruningList;
+  }
+
+  /// Set pruning list membership for DAGCombiner
+  void setInCombinerPruningList(bool B) {
+    SDNodeBits.InCombinerPruningList = B;
+  }
 
   /// Get visited state for ScheduleDAGSDNodes::BuildSchedUnits.
   bool getSchedulerWorklistVisited() const { return SchedulerWorklistVisited; }
@@ -1468,7 +1479,7 @@ public:
   /// function should only be used to compute a FoldingSetNodeID value.
   /// The HasDebugValue bit is masked out because CSE map needs to match
   /// nodes with debug info with nodes without debug info. Same is about
-  /// isDivergent bit.
+  /// isDivergent bit and the DAGCombiner pruning list membership bit.
   unsigned getRawSubclassData() const {
     uint16_t Data;
     union {
@@ -1478,6 +1489,7 @@ public:
     memcpy(&RawSDNodeBits, &this->RawSDNodeBits, sizeof(this->RawSDNodeBits));
     SDNodeBits.HasDebugValue = 0;
     SDNodeBits.IsDivergent = false;
+    SDNodeBits.InCombinerPruningList = false;
     memcpy(&Data, &RawSDNodeBits, sizeof(RawSDNodeBits));
     return Data;
   }
