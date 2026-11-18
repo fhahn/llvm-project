@@ -103,29 +103,60 @@ define void @replicating_load_used_as_store_addr_3(ptr noalias %src, ptr noalias
 ; CHECK-LABEL: define void @replicating_load_used_as_store_addr_3(
 ; CHECK-SAME: ptr noalias [[SRC:%.*]], ptr noalias [[DST:%.*]], ptr noalias [[INVAR_DST:%.*]], i8 [[X:%.*]]) #[[ATTR0]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br i1 false, label %[[EXIT:.*]], label %[[VECTOR_MAIN_LOOP_ITER_CHECK:.*]]
+; CHECK:       [[VECTOR_MAIN_LOOP_ITER_CHECK]]:
+; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_PH:.*]], label %[[VECTOR_PH1:.*]]
+; CHECK:       [[VECTOR_PH1]]:
+; CHECK-NEXT:    [[TMP11:%.*]] = xor i8 [[X]], 10
+; CHECK-NEXT:    [[TMP12:%.*]] = zext i8 [[TMP11]] to i64
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP12]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[INDEX1:%.*]] = phi i64 [ 0, %[[VECTOR_PH1]] ], [ [[INDEX_NEXT1:%.*]], %[[VECTOR_PH]] ]
+; CHECK-NEXT:    [[TMP14:%.*]] = load i8, ptr [[TMP13]], align 1
+; CHECK-NEXT:    [[TMP15:%.*]] = zext i8 [[TMP14]] to i32
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i32> poison, i32 [[TMP15]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <16 x i32> [[BROADCAST_SPLATINSERT]], <16 x i32> poison, <16 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP5:%.*]] = xor <16 x i32> [[BROADCAST_SPLAT]], splat (i32 111)
+; CHECK-NEXT:    [[TMP17:%.*]] = zext i32 [[TMP15]] to i64
+; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP17]]
+; CHECK-NEXT:    store i8 0, ptr [[TMP18]], align 1
+; CHECK-NEXT:    store i8 0, ptr [[TMP18]], align 1
+; CHECK-NEXT:    [[TMP20:%.*]] = trunc <16 x i32> [[TMP5]] to <16 x i8>
+; CHECK-NEXT:    [[TMP21:%.*]] = extractelement <16 x i8> [[TMP20]], i64 15
+; CHECK-NEXT:    store i8 [[TMP21]], ptr [[INVAR_DST]], align 1
+; CHECK-NEXT:    [[INDEX_NEXT1]] = add nuw i64 [[INDEX1]], 32
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT1]], 96
+; CHECK-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK1:.*]], label %[[VECTOR_PH]], !llvm.loop [[LOOP5:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK1]]:
+; CHECK-NEXT:    br i1 false, [[EXIT1:label %.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
+; CHECK:       [[VEC_EPILOG_ITER_CHECK]]:
+; CHECK-NEXT:    br i1 false, label %[[EXIT]], label %[[VEC_EPILOG_PH]], !prof [[PROF6:![0-9]+]]
+; CHECK:       [[VEC_EPILOG_PH]]:
+; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ 96, %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = xor i8 [[X]], 10
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext i8 [[TMP0]] to i64
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP1]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP3:%.*]] = load i8, ptr [[TMP2]], align 1
 ; CHECK-NEXT:    [[TMP4:%.*]] = zext i8 [[TMP3]] to i32
-; CHECK-NEXT:    [[TMP5:%.*]] = xor i32 [[TMP4]], 111
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <4 x i32> poison, i32 [[TMP4]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT3:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT2]], <4 x i32> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP16:%.*]] = xor <4 x i32> [[BROADCAST_SPLAT3]], splat (i32 111)
 ; CHECK-NEXT:    [[TMP6:%.*]] = zext i32 [[TMP4]] to i64
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP6]]
 ; CHECK-NEXT:    store i8 0, ptr [[TMP7]], align 1
-; CHECK-NEXT:    [[TMP8:%.*]] = trunc i32 [[TMP5]] to i8
+; CHECK-NEXT:    [[TMP19:%.*]] = trunc <4 x i32> [[TMP16]] to <4 x i8>
+; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x i8> [[TMP19]], i64 3
 ; CHECK-NEXT:    store i8 [[TMP8]], ptr [[INVAR_DST]], align 1
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
-; CHECK-NEXT:    br i1 [[TMP9]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP9]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    br label %[[EXIT:.*]]
+; CHECK-NEXT:    br i1 true, [[EXIT1]], label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    ret void
 ;
 entry:
   br label %loop

@@ -503,8 +503,16 @@ bool vputils::isSingleScalar(const VPValue *VPV) {
     // lanes.
     if (RegionOfR && RegionOfR->isReplicator())
       return false;
-    return Rep->isSingleScalar() || (preservesUniformity(Rep->getOpcode()) &&
-                                     all_of(Rep->operands(), isSingleScalar));
+    // Replicated loads outside replicate regions load all lanes at the same
+    // point, so they load the same value for a single-scalar address. Only
+    // consider simple loads: volatile and atomic loads must not be narrowed,
+    // as the number and order of such accesses must be preserved.
+    bool IsSimpleLoad = Rep->getOpcode() == Instruction::Load &&
+                        !Rep->isPredicated() &&
+                        cast<LoadInst>(Rep->getUnderlyingInstr())->isSimple();
+    return Rep->isSingleScalar() ||
+           ((preservesUniformity(Rep->getOpcode()) || IsSimpleLoad) &&
+            all_of(Rep->operands(), isSingleScalar));
   }
   if (isa<VPWidenGEPRecipe, VPBlendRecipe>(VPV))
     return all_of(VPV->getDefiningRecipe()->operands(), isSingleScalar);

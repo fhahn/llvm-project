@@ -5,8 +5,8 @@
 ; lanes and is executed as a single load. Check its cost.
 define void @speculated_load_loop_invariant_addr(ptr noalias noundef %a, ptr noalias %b, ptr noalias %c) nofree nosync {
 ; CHECK-LABEL: LV: Checking a loop in 'speculated_load_loop_invariant_addr'
-; CHECK: Cost of 2 for VF 2: REPLICATE ir<%l.a> = load ir<%a>
-; CHECK: Cost for VF 2: 9
+; CHECK: Cost of 1 for VF 2: CLONE ir<%l.a> = load ir<%a>
+; CHECK: Cost for VF 2: 8
 ;
 entry:
   call void @llvm.assume(i1 true) [ "align"(ptr %a, i64 4), "dereferenceable"(ptr %a, i64 4) ]
