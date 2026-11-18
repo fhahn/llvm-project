@@ -359,3 +359,36 @@ loop:
 exit:
   ret i4 %iv.1.next
 }
+
+; %iv.0 wraps without being poison, so %cmp is false in the last iteration for
+; %start = -999, even though %iv.1 has the same recurrence and a nuw increment.
+define i1 @cmp_of_phi_sharing_recurrence_one_inc_nuw(i32 %start) {
+; CHECK-LABEL: @cmp_of_phi_sharing_recurrence_one_inc_nuw(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK:       loop:
+; CHECK-NEXT:    [[I:%.*]] = phi i32 [ 0, [[ENTRY:%.*]] ], [ [[I_NEXT:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[I_NEXT]] = add nuw nsw i32 [[I]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i32 [[I_NEXT]], 1000
+; CHECK-NEXT:    br i1 [[EC]], label [[EXIT:%.*]], label [[LOOP]]
+; CHECK:       exit:
+; CHECK-NEXT:    [[CMP_LCSSA:%.*]] = phi i1 [ true, [[LOOP]] ]
+; CHECK-NEXT:    ret i1 [[CMP_LCSSA]]
+;
+entry:
+  br label %loop
+
+loop:
+  %iv.0 = phi i32 [ %start, %entry ], [ %iv.0.next, %loop ]
+  %iv.1 = phi i32 [ %start, %entry ], [ %iv.1.next, %loop ]
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+  %cmp = icmp uge i32 %iv.0, %start
+  %iv.0.next = add i32 %iv.0, 1
+  %iv.1.next = add nuw i32 %iv.1, 1
+  %i.next = add i32 %i, 1
+  %ec = icmp eq i32 %i.next, 1000
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret i1 %cmp
+}

@@ -385,3 +385,48 @@ loop:
 exit:
   ret i4 %iv.1.next
 }
+
+; %iv.0 wraps without being poison and nothing makes it UB for %iv.1.next to
+; be poison, so the recurrence the two phis share cannot be nuw. With nuw,
+; %iv.0.ext is {(zext i32 %start to i64),+,1}, which is wrong for %start = -999:
+; %iv.0 is 0 in the last iteration.
+define void @phis_share_recurrence_one_inc_nuw(i32 %start) {
+; CHECK-LABEL: 'phis_share_recurrence_one_inc_nuw'
+; CHECK-NEXT:  Classifying expressions for: @phis_share_recurrence_one_inc_nuw
+; CHECK-NEXT:    %iv.0 = phi i32 [ %start, %entry ], [ %iv.0.next, %loop ]
+; CHECK-NEXT:    --> {%start,+,1}<nw><%loop> U: full-set S: full-set Exits: (999 + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.1 = phi i32 [ %start, %entry ], [ %iv.1.next, %loop ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop> U: full-set S: full-set Exits: (999 + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,1000) S: [0,1000) Exits: 999 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.0.next = add i32 %iv.0, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%loop> U: full-set S: full-set Exits: (1000 + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.1.next = add nuw i32 %iv.1, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%loop> U: full-set S: full-set Exits: (1000 + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.0.ext = zext i32 %iv.0 to i64
+; CHECK-NEXT:    --> {(zext i32 %start to i64),+,1}<nuw><%loop> U: [0,4294968295) S: [0,4294968295) Exits: (999 + (zext i32 %start to i64))<nuw><nsw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i.next = add i32 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,1001) S: [1,1001) Exits: 1000 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @phis_share_recurrence_one_inc_nuw
+; CHECK-NEXT:  Loop %loop: backedge-taken count is i32 999
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 999
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 999
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1000
+;
+entry:
+  br label %loop
+
+loop:
+  %iv.0 = phi i32 [ %start, %entry ], [ %iv.0.next, %loop ]
+  %iv.1 = phi i32 [ %start, %entry ], [ %iv.1.next, %loop ]
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+  %iv.0.next = add i32 %iv.0, 1
+  %iv.1.next = add nuw i32 %iv.1, 1
+  %iv.0.ext = zext i32 %iv.0 to i64
+  %i.next = add i32 %i, 1
+  %ec = icmp eq i32 %i.next, 1000
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
