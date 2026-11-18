@@ -375,3 +375,74 @@ loop:
 exit:
   ret void
 }
+
+; %j starts at the exit value of %iv, (4 + %start)<u nuw>, which is at least 4.
+; %k starts at %s4 = (4 + %start), which may wrap: neither the range of %s4 nor
+; the constant max backedge-taken count of %loop.3 may use the flags of the
+; exit value, so the former must be the full set and the latter -1.
+; The constant max backedge-taken count of %loop.2 is -5.
+define void @loops_start_at_exit_value_and_its_expr(i32 %start, i32 %m) {
+; CHECK-LABEL: 'loops_start_at_exit_value_and_its_expr'
+; CHECK-NEXT:  Classifying expressions for: @loops_start_at_exit_value_and_its_expr
+; CHECK-NEXT:    %iv = phi i32 [ %start, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop> U: full-set S: full-set Exits: (4 + %start)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,5) S: [0,5) Exits: 4 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nuw i32 %iv, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%loop> U: full-set S: full-set Exits: (5 + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i.next = add i32 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,6) S: [1,6) Exits: 5 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %j = phi i32 [ %iv, %loop ], [ %j.next, %loop.2 ]
+; CHECK-NEXT:    --> {{\{\{}}%start,+,1}<nuw><%loop>,+,1}<%loop.2> U: full-set S: full-set --> {(4 + %start)<u nuw>,+,1}<%loop.2> U: full-set S: full-set Exits: ((4 + %start) umax %m) LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %j.next = add i32 %j, 1
+; CHECK-NEXT:    --> {{\{\{}}(1 + %start),+,1}<nw><%loop>,+,1}<%loop.2> U: full-set S: full-set --> {(5 + %start),+,1}<%loop.2> U: full-set S: full-set Exits: (1 + ((4 + %start) umax %m)) LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %s4 = add i32 %start, 4
+; CHECK-NEXT:    --> (4 + %start) U: full-set S: full-set
+; CHECK-NEXT:    %k = phi i32 [ %s4, %ph.3 ], [ %k.next, %loop.3 ]
+; CHECK-NEXT:    --> {(4 + %start),+,1}<%loop.3> U: full-set S: full-set Exits: ((4 + %start) umax %m) LoopDispositions: { %loop.3: Computable }
+; CHECK-NEXT:    %k.next = add i32 %k, 1
+; CHECK-NEXT:    --> {(5 + %start),+,1}<%loop.3> U: full-set S: full-set Exits: (1 + ((4 + %start) umax %m)) LoopDispositions: { %loop.3: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @loops_start_at_exit_value_and_its_expr
+; CHECK-NEXT:  Loop %loop.3: backedge-taken count is (-4 + (-1 * %start) + ((4 + %start) umax %m))
+; CHECK-NEXT:  Loop %loop.3: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %loop.3: symbolic max backedge-taken count is (-4 + (-1 * %start) + ((4 + %start) umax %m))
+; CHECK-NEXT:  Loop %loop.3: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop.2: backedge-taken count is (-4 + (-1 * %start) + ((4 + %start) umax %m))
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -5
+; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (-4 + (-1 * %start) + ((4 + %start) umax %m))
+; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop: backedge-taken count is i32 4
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 4
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 4
+; CHECK-NEXT:  Loop %loop: Trip multiple is 5
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i32 [ %start, %entry ], [ %iv.next, %loop ]
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+  %iv.next = add nuw i32 %iv, 1
+  %i.next = add i32 %i, 1
+  %ec = icmp ne i32 %i.next, 5
+  br i1 %ec, label %loop, label %loop.2
+
+loop.2:
+  %j = phi i32 [ %iv, %loop ], [ %j.next, %loop.2 ]
+  %j.next = add i32 %j, 1
+  %ec.2 = icmp ult i32 %j, %m
+  br i1 %ec.2, label %loop.2, label %ph.3
+
+ph.3:
+  %s4 = add i32 %start, 4
+  br label %loop.3
+
+loop.3:
+  %k = phi i32 [ %s4, %ph.3 ], [ %k.next, %loop.3 ]
+  %k.next = add i32 %k, 1
+  %ec.3 = icmp ult i32 %k, %m
+  br i1 %ec.3, label %loop.3, label %exit
+
+exit:
+  ret void
+}
