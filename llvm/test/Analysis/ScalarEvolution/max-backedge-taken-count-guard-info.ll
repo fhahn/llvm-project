@@ -1330,6 +1330,88 @@ exit:
   ret void
 }
 
+; The unsigned range checks below have wrapped regions for %n; intersecting
+; them with the range from the dominating != check over-approximates, so the
+; generic rewrite must also be applied.
+define void @range_check_wrapped_region_after_ne_zero(i8 %n) {
+; CHECK-LABEL: 'range_check_wrapped_region_after_ne_zero'
+; CHECK-NEXT:  Classifying expressions for: @range_check_wrapped_region_after_ne_zero
+; CHECK-NEXT:    %n.p2 = add i8 %n, 2
+; CHECK-NEXT:    --> (2 + %n) U: full-set S: full-set
+; CHECK-NEXT:    %iv = phi i8 [ 0, %guard ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><%loop> U: [0,-1) S: [0,-1) Exits: (2 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add i8 %iv, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><%loop> U: [1,0) S: [1,0) Exits: (3 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @range_check_wrapped_region_after_ne_zero
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (2 + %n)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 -2
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (2 + %n)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %n.p2 = add i8 %n, 2
+  %nz = icmp ne i8 %n, 0
+  br i1 %nz, label %guard, label %exit
+
+guard:
+  %rc = icmp ult i8 %n.p2, 5
+  br i1 %rc, label %loop, label %exit
+
+loop:
+  %iv = phi i8 [ 0, %guard ], [ %iv.next, %loop ]
+  %iv.next = add i8 %iv, 1
+  %c = icmp ne i8 %iv, %n.p2
+  br i1 %c, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+define i8 @range_check_wrapped_region_after_ne_offset(i8 %n) {
+; CHECK-LABEL: 'range_check_wrapped_region_after_ne_offset'
+; CHECK-NEXT:  Classifying expressions for: @range_check_wrapped_region_after_ne_offset
+; CHECK-NEXT:    %n.p2 = add i8 %n, 2
+; CHECK-NEXT:    --> (2 + %n) U: full-set S: full-set
+; CHECK-NEXT:    %iv = phi i8 [ 0, %guard ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {0,+,2}<%loop> U: [0,-1) S: [-128,127) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add i8 %iv, 2
+; CHECK-NEXT:    --> {2,+,2}<%loop> U: [0,-1) S: [-128,127) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %r = phi i8 [ 0, %entry ], [ 1, %guard ], [ %iv, %loop ]
+; CHECK-NEXT:    --> %r U: full-set S: full-set
+; CHECK-NEXT:  Determining loop execution counts for: @range_check_wrapped_region_after_ne_offset
+; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Predicated backedge-taken count is ((2 + (zext i8 (2 + %n) to i16))<nuw><nsw> /u 2)
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      {0,+,2}<%loop> Added Flags: <nusw>
+; CHECK-NEXT:  Loop %loop: Predicated constant max backedge-taken count is i16 128
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      {0,+,2}<%loop> Added Flags: <nusw>
+; CHECK-NEXT:  Loop %loop: Predicated symbolic max backedge-taken count is ((2 + (zext i8 (2 + %n) to i16))<nuw><nsw> /u 2)
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      {0,+,2}<%loop> Added Flags: <nusw>
+;
+entry:
+  %n.p2 = add i8 %n, 2
+  %ne = icmp ne i8 %n.p2, 2
+  br i1 %ne, label %guard, label %exit
+
+guard:
+  %rc = icmp ult i8 %n.p2, 200
+  br i1 %rc, label %loop, label %exit
+
+loop:
+  %iv = phi i8 [ 0, %guard ], [ %iv.next, %loop ]
+  %iv.next = add i8 %iv, 2
+  %c = icmp ule i8 %iv, %n.p2
+  br i1 %c, label %loop, label %exit
+
+exit:
+  %r = phi i8 [ 0, %entry ], [ 1, %guard ], [ %iv, %loop ]
+  ret i8 %r
+}
+
 define i32 @ptr_induction_ult_1(ptr %a, ptr %b) {
 ; CHECK-LABEL: 'ptr_induction_ult_1'
 ; CHECK-NEXT:  Classifying expressions for: @ptr_induction_ult_1
