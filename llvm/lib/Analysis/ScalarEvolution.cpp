@@ -13245,10 +13245,15 @@ ScalarEvolution::computeMaxBECountForLT(SCEVUse Start, const SCEV *Stride,
 }
 
 ScalarEvolution::ExitLimit
-ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
+ScalarEvolution::howManyLessThans(const SCEV *LHS, SCEVUse RHSUse,
                                   const Loop *L, bool IsSigned, bool Invert,
                                   bool ControlsOnlyExit, bool AllowPredicates) {
   SmallVector<const SCEVPredicate *> Predicates;
+
+  // RHSUse is RHS as used by the exit condition. Outside the range of the use,
+  // RHS and with it the exit condition is poison, which is UB if the exit is
+  // reached. Only range checks use it; everything else uses the expression.
+  const SCEV *RHS = RHSUse;
 
   LoopGuards Guards = LoopGuards::collectOnDemand(L, *this);
 
@@ -13681,6 +13686,13 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
         };
 
         auto CondGE = IsSigned ? ICmpInst::ICMP_SGE : ICmpInst::ICMP_UGE;
+        // Also compare the ranges, with that of RHSUse if RHS is unconverted.
+        APInt RHSMin = getRangeMin(RHS == OrigRHS ? RHSUse : SCEVUse(RHS),
+                                   IsSigned, Invert);
+        APInt StartMax = getRangeMax(Start, IsSigned, Invert);
+        if (ICmpInst::compare(RHSMin, StartMax, CondGE))
+          return true;
+
         const SCEV *GuardedRHS = applyLoopGuards(OrigRHS, Guards);
         const SCEV *GuardedStart = applyLoopGuards(OrigStart, Guards);
         if (Invert)
