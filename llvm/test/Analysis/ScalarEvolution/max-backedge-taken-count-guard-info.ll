@@ -1339,12 +1339,12 @@ define void @range_check_wrapped_region_after_ne_zero(i8 %n) {
 ; CHECK-NEXT:    %n.p2 = add i8 %n, 2
 ; CHECK-NEXT:    --> (2 + %n) U: full-set S: full-set
 ; CHECK-NEXT:    %iv = phi i8 [ 0, %guard ], [ %iv.next, %loop ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><%loop> U: [0,-1) S: [0,-1) Exits: (2 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,5) S: [0,5) Exits: (2 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add i8 %iv, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><%loop> U: [1,0) S: [1,0) Exits: (3 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,6) S: [1,6) Exits: (3 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @range_check_wrapped_region_after_ne_zero
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (2 + %n)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 -2
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 4
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (2 + %n)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -1373,24 +1373,16 @@ define i8 @range_check_wrapped_region_after_ne_offset(i8 %n) {
 ; CHECK-NEXT:    %n.p2 = add i8 %n, 2
 ; CHECK-NEXT:    --> (2 + %n) U: full-set S: full-set
 ; CHECK-NEXT:    %iv = phi i8 [ 0, %guard ], [ %iv.next, %loop ]
-; CHECK-NEXT:    --> {0,+,2}<%loop> U: [0,-1) S: [-128,127) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,2}<nuw><%loop> U: [0,-1) S: [-128,127) Exits: (2 * (trunc i16 ((2 + (zext i8 (2 + %n) to i16))<nuw><nsw> /u 2) to i8)) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add i8 %iv, 2
-; CHECK-NEXT:    --> {2,+,2}<%loop> U: [0,-1) S: [-128,127) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {2,+,2}<nw><%loop> U: [0,-1) S: [-128,127) Exits: (2 + (2 * (trunc i16 ((2 + (zext i8 (2 + %n) to i16))<nuw><nsw> /u 2) to i8))) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %r = phi i8 [ 0, %entry ], [ 1, %guard ], [ %iv, %loop ]
 ; CHECK-NEXT:    --> %r U: full-set S: full-set
 ; CHECK-NEXT:  Determining loop execution counts for: @range_check_wrapped_region_after_ne_offset
-; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
-; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
-; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
-; CHECK-NEXT:  Loop %loop: Predicated backedge-taken count is ((2 + (zext i8 (2 + %n) to i16))<nuw><nsw> /u 2)
-; CHECK-NEXT:   Predicates:
-; CHECK-NEXT:      {0,+,2}<%loop> Added Flags: <nusw>
-; CHECK-NEXT:  Loop %loop: Predicated constant max backedge-taken count is i16 128
-; CHECK-NEXT:   Predicates:
-; CHECK-NEXT:      {0,+,2}<%loop> Added Flags: <nusw>
-; CHECK-NEXT:  Loop %loop: Predicated symbolic max backedge-taken count is ((2 + (zext i8 (2 + %n) to i16))<nuw><nsw> /u 2)
-; CHECK-NEXT:   Predicates:
-; CHECK-NEXT:      {0,+,2}<%loop> Added Flags: <nusw>
+; CHECK-NEXT:  Loop %loop: backedge-taken count is ((2 + (zext i8 (2 + %n) to i16))<nuw><nsw> /u 2)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i16 128
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((2 + (zext i8 (2 + %n) to i16))<nuw><nsw> /u 2)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
 entry:
   %n.p2 = add i8 %n, 2

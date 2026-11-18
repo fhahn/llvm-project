@@ -15772,7 +15772,7 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
           !C2)
         return false;
 
-      auto ExactRegion =
+      ConstantRange GuardRegion =
           ConstantRange::makeExactICmpRegion(Pred, C2->getAPInt())
               .sub(C1->getAPInt());
 
@@ -15780,8 +15780,8 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       // from prior guards recorded in RewriteMap, or from SCEV's own range
       // analysis.
       const SCEV *RewrittenLHS = GetMaybeRewritten(LHSUnknown);
-      ExactRegion = ExactRegion.intersectWith(SE.getUnsignedRange(RewrittenLHS),
-                                              ConstantRange::Unsigned);
+      ConstantRange ExactRegion = GuardRegion.intersectWith(
+          SE.getUnsignedRange(RewrittenLHS), ConstantRange::Unsigned);
 
       // Bail if the guard is inconsistent with prior facts, or if the range
       // is still not a monotonic non-wrapping interval after tightening.
@@ -15794,7 +15794,9 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       const SCEV *ClampedLHS =
           SE.getUMaxExpr(RegionMin, SE.getUMinExpr(RewrittenLHS, RegionMax));
       AddRewrite(LHSUnknown, RewrittenLHS, ClampedLHS);
-      return true;
+      // If the intersection over-approximates an unsigned guard, the clamp
+      // does not capture it fully; also apply the generic rewrite.
+      return GuardRegion.contains(ExactRegion) || ICmpInst::isSigned(Pred);
     };
     if (MatchRangeCheckIdiom(Predicate, LHS, RHS))
       return;
