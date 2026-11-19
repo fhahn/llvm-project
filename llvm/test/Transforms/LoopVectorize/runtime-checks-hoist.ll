@@ -3051,19 +3051,18 @@ exit:
   ret void
 }
 
-; FIXME: Without inbounds on %src.row, the pointers expanded to the last outer
-; iteration may wrap, so they are not known to cover the accessed range.
+; Bounds are not expanded without inbounds on %src.row, as the pointers expanded
+; to the last outer iteration may wrap.
 define void @expanded_bounds_outer_gep_not_inbounds(ptr %dst, ptr %src, i64 %s, i64 %m, i64 %n) {
 ; CHECK-LABEL: define void @expanded_bounds_outer_gep_not_inbounds(
 ; CHECK-SAME: ptr [[DST:%.*]], ptr [[SRC:%.*]], i64 [[S:%.*]], i64 [[M:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[S]], 2
+; CHECK-NEXT:    [[TMP4:%.*]] = shl i64 [[N]], 2
 ; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[M]], -1
 ; CHECK-NEXT:    [[TMP2:%.*]] = mul i64 [[S]], [[TMP1]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP2]], 2
-; CHECK-NEXT:    [[TMP4:%.*]] = shl i64 [[N]], 2
 ; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[TMP3]], [[TMP4]]
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP5]]
 ; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP5]]
 ; CHECK-NEXT:    br label %[[OUTER:.*]]
 ; CHECK:       [[OUTER]]:
@@ -3073,8 +3072,11 @@ define void @expanded_bounds_outer_gep_not_inbounds(ptr %dst, ptr %src, i64 %s, 
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP13:%.*]] = mul i64 [[OUTER_IV]], [[TMP0]]
+; CHECK-NEXT:    [[TMP14:%.*]] = add i64 [[TMP4]], [[TMP13]]
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP14]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC]], [[SCEVGEP2]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC_ROW]], [[SCEVGEP2]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    [[STRIDE_CHECK:%.*]] = icmp slt i64 [[TMP0]], 0
 ; CHECK-NEXT:    [[TMP6:%.*]] = or i1 [[FOUND_CONFLICT]], [[STRIDE_CHECK]]
@@ -3151,20 +3153,19 @@ exit:
   ret void
 }
 
-; FIXME: The bounds of the select of two pointers are extrapolated to the last outer
-; iteration, which is not known to cover the accessed range of both.
+; Bounds of the select of two pointers are not expanded, as each fork is not
+; known to be accessed.
 define void @expanded_bounds_forked_ptr(ptr %dst, ptr %src, i64 %s, i64 %m, i64 %n, i64 %k) {
 ; CHECK-LABEL: define void @expanded_bounds_forked_ptr(
 ; CHECK-SAME: ptr [[DST:%.*]], ptr [[SRC:%.*]], i64 [[S:%.*]], i64 [[M:%.*]], i64 [[N:%.*]], i64 [[K:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[TMP4:%.*]] = shl i64 [[N]], 2
+; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[TMP4]], 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[S]], 2
 ; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[M]], -1
 ; CHECK-NEXT:    [[TMP2:%.*]] = mul i64 [[S]], [[TMP1]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP2]], 2
-; CHECK-NEXT:    [[TMP4:%.*]] = shl i64 [[N]], 2
 ; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[TMP3]], [[TMP4]]
-; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[TMP5]], 4
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP6]]
 ; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP5]]
 ; CHECK-NEXT:    br label %[[OUTER:.*]]
 ; CHECK:       [[OUTER]]:
@@ -3173,10 +3174,14 @@ define void @expanded_bounds_forked_ptr(ptr %dst, ptr %src, i64 %s, i64 %m, i64 
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP7:%.*]] = freeze ptr [[SRC]]
+; CHECK-NEXT:    [[TMP7:%.*]] = mul i64 [[OUTER_IV]], [[TMP0]]
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP7]]
+; CHECK-NEXT:    [[TMP35:%.*]] = add i64 [[TMP6]], [[TMP7]]
+; CHECK-NEXT:    [[TMP36:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP35]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = freeze ptr [[SCEVGEP]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[TMP8]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[TMP7]], [[SCEVGEP2]]
+; CHECK-NEXT:    [[TMP37:%.*]] = freeze ptr [[TMP36]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[TMP37]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[TMP8]], [[SCEVGEP2]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    [[STRIDE_CHECK:%.*]] = icmp slt i64 [[TMP0]], 0
 ; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[FOUND_CONFLICT]], [[STRIDE_CHECK]]
@@ -3282,20 +3287,19 @@ exit:
   ret void
 }
 
-; FIXME: Without inbounds on %dst.row.next, the pointers expanded to the last outer
-; iteration may wrap, so they are not known to cover the accessed range.
+; Bounds are not expanded without inbounds on %dst.row.next, as the pointers
+; expanded to the last outer iteration may wrap.
 define void @expanded_bounds_ptr_iv_not_inbounds(ptr %dst, ptr %src, i64 %s, i64 %m, i64 %n) {
 ; CHECK-LABEL: define void @expanded_bounds_ptr_iv_not_inbounds(
 ; CHECK-SAME: ptr [[DST:%.*]], ptr [[SRC:%.*]], i64 [[S:%.*]], i64 [[M:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[S]], 2
 ; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[M]], -1
 ; CHECK-NEXT:    [[TMP2:%.*]] = mul i64 [[S]], [[TMP1]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP2]], 2
 ; CHECK-NEXT:    [[TMP4:%.*]] = shl i64 [[N]], 2
 ; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[TMP3]], [[TMP4]]
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP5]]
-; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP5]]
+; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[S]], 2
 ; CHECK-NEXT:    br label %[[OUTER:.*]]
 ; CHECK:       [[OUTER]]:
 ; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
@@ -3305,7 +3309,10 @@ define void @expanded_bounds_ptr_iv_not_inbounds(ptr %dst, ptr %src, i64 %s, i64
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP]]
+; CHECK-NEXT:    [[TMP12:%.*]] = mul i64 [[OUTER_IV]], [[TMP0]]
+; CHECK-NEXT:    [[TMP13:%.*]] = add i64 [[TMP4]], [[TMP12]]
+; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP13]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST_ROW]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC]], [[SCEVGEP2]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    [[STRIDE_CHECK:%.*]] = icmp slt i64 [[TMP0]], 0

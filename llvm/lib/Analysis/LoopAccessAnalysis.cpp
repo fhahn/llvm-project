@@ -634,6 +634,32 @@ isAccessedInAllIterations(const RuntimePointerChecking::PointerInfo &P,
                 });
 }
 
+/// Returns true if \p P only accesses a single object in all iterations of
+/// \p OuterLoop, i.e. it is based on inbounds GEPs of an outer-invariant base.
+static bool accessesSingleObject(const RuntimePointerChecking::PointerInfo &P,
+                                 const Loop *InnerLoop, const Loop *OuterLoop,
+                                 ScalarEvolution &SE) {
+  // A forked pointer may only access one of its forks in an iteration, so the
+  // bounds of a fork are not known to be accessed. The bounds of a pointer
+  // that varies in the inner loop but is not an AddRec are derived from a
+  // monotonic offset (see getNonAffineMonotonicBounds); conservatively do not
+  // expand them either.
+  if (P.IsForked ||
+      (!isa<SCEVAddRecExpr>(P.Expr) && !SE.isLoopInvariant(P.Expr, InnerLoop)))
+    return false;
+  // Inbounds GEPs and header phis advanced by them stay within one object.
+  const Value *Base = P.PointerValue->stripInBoundsOffsets();
+  for (const Loop *L : {InnerLoop, OuterLoop}) {
+    BasicBlock *Incoming, *Backedge;
+    auto *Phi = dyn_cast<PHINode>(Base);
+    if (Phi && Phi->getParent() == L->getHeader() &&
+        L->getIncomingAndBackEdge(Incoming, Backedge) &&
+        Phi->getIncomingValueForBlock(Backedge)->stripInBoundsOffsets() == Phi)
+      Base = Phi->getIncomingValueForBlock(Incoming)->stripInBoundsOffsets();
+  }
+  return OuterLoop->isLoopInvariant(Base);
+}
+
 void RuntimePointerChecking::generateChecks(
     MemoryDepChecker::DepCandidates &DepCands, const LoopInfo &LI) {
   assert(Checks.empty() && "Checks is not empty");
@@ -647,7 +673,8 @@ void RuntimePointerChecking::generateChecks(
   // accesses of all outer iterations up to the trip count, so all of them
   // must reach the latch and the loop nest must be finite. Each pointer must
   // also be accessed in all of them, and the inner loop must only exit from
-  // its latch.
+  // its latch. Finally, the expanded bounds must not wrap, which holds if each
+  // pointer only accesses a single object.
   const Loop *InnerLoop = DC.getInnermostLoop();
   Loop *OuterLoop = InnerLoop->getParentLoop();
   if (HoistRuntimeChecks && OuterLoop &&
@@ -663,7 +690,8 @@ void RuntimePointerChecking::generateChecks(
           match(CG.High, m_scev_AffineAddRec(m_SCEV(), m_scev_Specific(Step),
                                              m_SpecificLoop(OuterLoop))) &&
           all_of(CG.Members, [&](unsigned I) {
-            return isAccessedInAllIterations(Pointers[I], OuterLoop, DC);
+            return isAccessedInAllIterations(Pointers[I], OuterLoop, DC) &&
+                   accessesSingleObject(Pointers[I], InnerLoop, OuterLoop, *SE);
           });
     }
   }
