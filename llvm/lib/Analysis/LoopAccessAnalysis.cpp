@@ -621,6 +621,19 @@ static bool allIterationsReachLatch(const Loop *L, ScalarEvolution &SE) {
   return Latch && L->getExitingBlock() == Latch && SE.loopHasNoAbnormalExits(L);
 }
 
+/// Returns true if \p P is the pointer operand of a load or store that is
+/// executed in every iteration of \p OuterLoop.
+static bool
+isAccessedInAllIterations(const RuntimePointerChecking::PointerInfo &P,
+                          const Loop *OuterLoop, const MemoryDepChecker &DC) {
+  return any_of(DC.getInstructionsForAccess(P.PointerValue, P.IsWritePtr),
+                [&](Instruction *I) {
+                  return getLoadStorePointerOperand(I) == P.PointerValue &&
+                         !LoopAccessInfo::blockNeedsPredication(
+                             I->getParent(), OuterLoop, DC.getDT());
+                });
+}
+
 void RuntimePointerChecking::generateChecks(
     MemoryDepChecker::DepCandidates &DepCands, const LoopInfo &LI) {
   assert(Checks.empty() && "Checks is not empty");
@@ -632,20 +645,26 @@ void RuntimePointerChecking::generateChecks(
   // step and the outer trip count is computable. The step is only checked
   // once, so it must be invariant and shared. The expanded bounds cover the
   // accesses of all outer iterations up to the trip count, so all of them
-  // must reach the latch and the loop nest must be finite.
+  // must reach the latch and the loop nest must be finite. Each pointer must
+  // also be accessed in all of them, and the inner loop must only exit from
+  // its latch.
   const Loop *InnerLoop = DC.getInnermostLoop();
   Loop *OuterLoop = InnerLoop->getParentLoop();
   if (HoistRuntimeChecks && OuterLoop &&
       SE->hasLoopInvariantBackedgeTakenCount(OuterLoop) &&
       allIterationsReachLatch(OuterLoop, *SE) &&
-      isLoopNestFinite(OuterLoop, *SE, LI)) {
+      isLoopNestFinite(OuterLoop, *SE, LI) &&
+      InnerLoop->getExitingBlock() == InnerLoop->getLoopLatch()) {
     for (RuntimeCheckingPtrGroup &CG : CheckingGroups) {
       const SCEV *Step;
       CG.CanExpandToOuterLoop =
           match(CG.Low, m_scev_AffineAddRec(m_SCEV(), m_SCEV(Step),
                                             m_SpecificLoop(OuterLoop))) &&
           match(CG.High, m_scev_AffineAddRec(m_SCEV(), m_scev_Specific(Step),
-                                             m_SpecificLoop(OuterLoop)));
+                                             m_SpecificLoop(OuterLoop))) &&
+          all_of(CG.Members, [&](unsigned I) {
+            return isAccessedInAllIterations(Pointers[I], OuterLoop, DC);
+          });
     }
   }
 
