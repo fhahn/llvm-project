@@ -614,6 +614,13 @@ SmallVector<RuntimePointerCheck, 4> RuntimePointerChecking::generateChecks() {
   return Checks;
 }
 
+/// Returns true if every iteration of \p L reaches its latch, i.e. \p L only
+/// exits from its latch and has no abnormal exits.
+static bool allIterationsReachLatch(const Loop *L, ScalarEvolution &SE) {
+  BasicBlock *Latch = L->getLoopLatch();
+  return Latch && L->getExitingBlock() == Latch && SE.loopHasNoAbnormalExits(L);
+}
+
 void RuntimePointerChecking::generateChecks(
     MemoryDepChecker::DepCandidates &DepCands) {
   assert(Checks.empty() && "Checks is not empty");
@@ -623,11 +630,14 @@ void RuntimePointerChecking::generateChecks(
   // The bounds of a group can be expanded to cover all iterations of the
   // outer loop if they are affine recurrences of the outer loop with the same
   // step and the outer trip count is computable. The step is only checked
-  // once, so it must be invariant and shared.
+  // once, so it must be invariant and shared. The expanded bounds cover the
+  // accesses of all outer iterations up to the trip count, so all of them
+  // must reach the latch.
   const Loop *InnerLoop = DC.getInnermostLoop();
   Loop *OuterLoop = InnerLoop->getParentLoop();
   if (HoistRuntimeChecks && OuterLoop &&
-      SE->hasLoopInvariantBackedgeTakenCount(OuterLoop)) {
+      SE->hasLoopInvariantBackedgeTakenCount(OuterLoop) &&
+      allIterationsReachLatch(OuterLoop, *SE)) {
     for (RuntimeCheckingPtrGroup &CG : CheckingGroups) {
       const SCEV *Step;
       CG.CanExpandToOuterLoop =
