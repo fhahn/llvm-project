@@ -13154,7 +13154,7 @@ bool ScalarEvolution::isImpliedCondOperandsViaRanges(
   return LHSRange.icmp(Pred, ConstRHS);
 }
 
-bool ScalarEvolution::canIVOverflowOnLT(const SCEV *RHS, const SCEV *Stride,
+bool ScalarEvolution::canIVOverflowOnLT(SCEVUse RHS, const SCEV *Stride,
                                         bool IsSigned, bool Invert) {
   assert(isKnownPositive(Stride) && "Positive stride expected!");
 
@@ -13455,9 +13455,11 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, SCEVUse RHSUse,
   } else {
     // Avoid proven overflow cases: this will ensure that the backedge taken
     // count will not generate any unsigned overflow.
-    IVMayOverflow = canIVOverflowOnLT(RHS, GuardedStride, IsSigned, Invert) &&
-                    canIVOverflowOnLT(applyLoopGuards(RHS, Guards),
-                                      GuardedStride, IsSigned, Invert);
+    // The check of the unguarded RHS uses the range of RHSUse.
+    IVMayOverflow =
+        canIVOverflowOnLT(RHSUse, GuardedStride, IsSigned, Invert) &&
+        canIVOverflowOnLT(applyLoopGuards(RHS, Guards), GuardedStride, IsSigned,
+                          Invert);
     if (IVMayOverflow && !NoWrap)
       return getCouldNotCompute();
   }

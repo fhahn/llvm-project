@@ -566,3 +566,126 @@ loop.2:
 exit:
   ret void
 }
+
+; %loop.2 counts down from %m in steps of 10 to the exit value of %iv,
+; (9 + %start)<u nuw>, which is at least 9 = Stride - 1, so %j cannot wrap
+; before the exit is taken. %loop.3 counts down to %s9 = (9 + %start), which may
+; wrap to a value less than 9, below which %k wraps: its backedge-taken count
+; may not use the flags of the exit value and must stay unpredictable.
+; The backedge-taken count of %loop.2 is computed.
+define void @loops_count_down_to_exit_value_and_its_expr(i32 %start, i32 %m) {
+; CHECK-LABEL: 'loops_count_down_to_exit_value_and_its_expr'
+; CHECK-NEXT:  Classifying expressions for: @loops_count_down_to_exit_value_and_its_expr
+; CHECK-NEXT:    %iv = phi i32 [ %start, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop> U: full-set S: full-set Exits: (9 + %start)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nuw i32 %iv, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%loop> U: full-set S: full-set Exits: (10 + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i.next = add i32 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %j = phi i32 [ %m, %loop ], [ %j.next, %loop.2 ]
+; CHECK-NEXT:    --> {%m,+,-10}<%loop.2> U: full-set S: full-set Exits: ((-10 * ((9 + (-1 * ((9 + %start) umin %m)) + %m) /u 10)) + %m) LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %j.next = add i32 %j, -10
+; CHECK-NEXT:    --> {(-10 + %m),+,-10}<%loop.2> U: full-set S: full-set Exits: (-10 + (-10 * ((9 + (-1 * ((9 + %start) umin %m)) + %m) /u 10)) + %m) LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %s9 = add i32 %start, 9
+; CHECK-NEXT:    --> (9 + %start) U: full-set S: full-set
+; CHECK-NEXT:    %k = phi i32 [ %m, %ph.3 ], [ %k.next, %loop.3 ]
+; CHECK-NEXT:    --> {%m,+,-10}<%loop.3> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop.3: Computable }
+; CHECK-NEXT:    %k.next = add i32 %k, -10
+; CHECK-NEXT:    --> {(-10 + %m),+,-10}<%loop.3> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop.3: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @loops_count_down_to_exit_value_and_its_expr
+; CHECK-NEXT:  Loop %loop.3: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop.3: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %loop.3: Unpredictable symbolic max backedge-taken count.
+; CHECK-NEXT:  Loop %loop.2: backedge-taken count is ((9 + (-1 * ((9 + %start) umin %m)) + %m) /u 10)
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 429496729
+; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is ((9 + (-1 * ((9 + %start) umin %m)) + %m) /u 10)
+; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop: backedge-taken count is i32 9
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 9
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 9
+; CHECK-NEXT:  Loop %loop: Trip multiple is 10
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i32 [ %start, %entry ], [ %iv.next, %loop ]
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+  %iv.next = add nuw i32 %iv, 1
+  %i.next = add i32 %i, 1
+  %ec = icmp ne i32 %i.next, 10
+  br i1 %ec, label %loop, label %loop.2
+
+loop.2:
+  %j = phi i32 [ %m, %loop ], [ %j.next, %loop.2 ]
+  %j.next = add i32 %j, -10
+  %ec.2 = icmp ugt i32 %j, %iv
+  br i1 %ec.2, label %loop.2, label %ph.3
+
+ph.3:
+  %s9 = add i32 %start, 9
+  br label %loop.3
+
+loop.3:
+  %k = phi i32 [ %m, %ph.3 ], [ %k.next, %loop.3 ]
+  %k.next = add i32 %k, -10
+  %ec.3 = icmp ugt i32 %k, %s9
+  br i1 %ec.3, label %loop.3, label %exit
+
+exit:
+  ret void
+}
+
+; %loop.2 counts a pointer down from %m in steps of 10 to the exit value of %p,
+; (9 + %start)<u nuw>. Unlike in @loop_counts_up_to_ptr_exit_value, where the
+; converted exit value is compared with Start and stays without flags, the exit
+; value is used before it is converted here, so its flags are used: it is at
+; least 9 = Stride - 1, so %q cannot wrap before the exit is taken.
+; The backedge-taken count of %loop.2 is computed.
+define void @loop_counts_down_to_ptr_exit_value(ptr %start, ptr %m) {
+; CHECK-LABEL: 'loop_counts_down_to_ptr_exit_value'
+; CHECK-NEXT:  Classifying expressions for: @loop_counts_down_to_ptr_exit_value
+; CHECK-NEXT:    %p = phi ptr [ %start, %entry ], [ %p.next, %loop ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop> U: full-set S: full-set Exits: (9 + %start)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %p.next = getelementptr nuw i8, ptr %p, i64 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%loop> U: full-set S: full-set Exits: (10 + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i.next = add i32 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %q = phi ptr [ %m, %loop ], [ %q.next, %loop.2 ]
+; CHECK-NEXT:    --> {%m,+,-10}<%loop.2> U: full-set S: full-set Exits: ((-10 * ((9 + (-1 * ((9 + (ptrtoaddr ptr %start to i64)) umin (ptrtoaddr ptr %m to i64))) + (ptrtoaddr ptr %m to i64)) /u 10)) + %m) LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %q.next = getelementptr i8, ptr %q, i64 -10
+; CHECK-NEXT:    --> {(-10 + %m),+,-10}<%loop.2> U: full-set S: full-set Exits: (-10 + (-10 * ((9 + (-1 * ((9 + (ptrtoaddr ptr %start to i64)) umin (ptrtoaddr ptr %m to i64))) + (ptrtoaddr ptr %m to i64)) /u 10)) + %m) LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @loop_counts_down_to_ptr_exit_value
+; CHECK-NEXT:  Loop %loop.2: backedge-taken count is ((9 + (-1 * ((9 + (ptrtoaddr ptr %start to i64)) umin (ptrtoaddr ptr %m to i64))) + (ptrtoaddr ptr %m to i64)) /u 10)
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i64 1844674407370955161
+; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is ((9 + (-1 * ((9 + (ptrtoaddr ptr %start to i64)) umin (ptrtoaddr ptr %m to i64))) + (ptrtoaddr ptr %m to i64)) /u 10)
+; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop: backedge-taken count is i32 9
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 9
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i32 9
+; CHECK-NEXT:  Loop %loop: Trip multiple is 10
+;
+entry:
+  br label %loop
+
+loop:
+  %p = phi ptr [ %start, %entry ], [ %p.next, %loop ]
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+  %p.next = getelementptr nuw i8, ptr %p, i64 1
+  %i.next = add i32 %i, 1
+  %ec = icmp ne i32 %i.next, 10
+  br i1 %ec, label %loop, label %loop.2
+
+loop.2:
+  %q = phi ptr [ %m, %loop ], [ %q.next, %loop.2 ]
+  %q.next = getelementptr i8, ptr %q, i64 -10
+  %ec.2 = icmp ugt ptr %q, %p
+  br i1 %ec.2, label %loop.2, label %exit
+
+exit:
+  ret void
+}
