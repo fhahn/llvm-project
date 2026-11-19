@@ -618,8 +618,10 @@ public:
                        bool NeedsFreeze, bool IsForked);
 
   /// Generate the checks and store it.  This also performs the grouping
-  /// of pointers to reduce the number of memchecks necessary.
-  LLVM_ABI void generateChecks(MemoryDepChecker::DepCandidates &DepCands);
+  /// of pointers to reduce the number of memchecks necessary. \p LI is used to
+  /// determine whether the bounds can be expanded to the outer loop.
+  LLVM_ABI void generateChecks(MemoryDepChecker::DepCandidates &DepCands,
+                               const LoopInfo &LI);
 
   /// Returns the checks that generateChecks created. They can be used to ensure
   /// no read/write accesses overlap across all loop iterations.

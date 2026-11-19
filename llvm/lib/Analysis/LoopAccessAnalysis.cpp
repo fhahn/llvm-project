@@ -622,7 +622,7 @@ static bool allIterationsReachLatch(const Loop *L, ScalarEvolution &SE) {
 }
 
 void RuntimePointerChecking::generateChecks(
-    MemoryDepChecker::DepCandidates &DepCands) {
+    MemoryDepChecker::DepCandidates &DepCands, const LoopInfo &LI) {
   assert(Checks.empty() && "Checks is not empty");
   groupChecks(DepCands);
   mergeStencilGroups();
@@ -632,12 +632,13 @@ void RuntimePointerChecking::generateChecks(
   // step and the outer trip count is computable. The step is only checked
   // once, so it must be invariant and shared. The expanded bounds cover the
   // accesses of all outer iterations up to the trip count, so all of them
-  // must reach the latch.
+  // must reach the latch and the loop nest must be finite.
   const Loop *InnerLoop = DC.getInnermostLoop();
   Loop *OuterLoop = InnerLoop->getParentLoop();
   if (HoistRuntimeChecks && OuterLoop &&
       SE->hasLoopInvariantBackedgeTakenCount(OuterLoop) &&
-      allIterationsReachLatch(OuterLoop, *SE)) {
+      allIterationsReachLatch(OuterLoop, *SE) &&
+      isLoopNestFinite(OuterLoop, *SE, LI)) {
     for (RuntimeCheckingPtrGroup &CG : CheckingGroups) {
       const SCEV *Step;
       CG.CanExpandToOuterLoop =
@@ -2442,7 +2443,7 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
   }
 
   if (MayNeedRTCheck && (CanDoRT || AllowPartial))
-    RtCheck.generateChecks(DepCands);
+    RtCheck.generateChecks(DepCands, *LI);
 
   LLVM_DEBUG(dbgs() << "LAA: We need to do " << RtCheck.getNumberOfChecks()
                     << " pointer comparisons.\n");
