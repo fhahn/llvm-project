@@ -660,6 +660,18 @@ static bool accessesSingleObject(const RuntimePointerChecking::PointerInfo &P,
   return OuterLoop->isLoopInvariant(Base);
 }
 
+/// Returns true if all predicates in \p Preds are comparisons of values that
+/// are invariant in \p L.
+static bool arePredicatesInvariant(const SCEVPredicate &Preds, const Loop *L,
+                                   ScalarEvolution &SE) {
+  return all_of(cast<SCEVUnionPredicate>(Preds).getPredicates(),
+                [&](const SCEVPredicate *Pred) {
+                  auto *Cmp = dyn_cast<SCEVComparePredicate>(Pred);
+                  return Cmp && SE.isLoopInvariant(Cmp->getLHS(), L) &&
+                         SE.isLoopInvariant(Cmp->getRHS(), L);
+                });
+}
+
 void RuntimePointerChecking::generateChecks(
     MemoryDepChecker::DepCandidates &DepCands, const LoopInfo &LI) {
   assert(Checks.empty() && "Checks is not empty");
@@ -674,14 +686,17 @@ void RuntimePointerChecking::generateChecks(
   // must reach the latch and the loop nest must be finite. Each pointer must
   // also be accessed in all of them, and the inner loop must only exit from
   // its latch. Finally, the expanded bounds must not wrap, which holds if each
-  // pointer only accesses a single object.
+  // pointer only accesses a single object. The bounds only describe the
+  // accesses where the predicates hold, so the predicates must be invariant in
+  // the outer loop.
   const Loop *InnerLoop = DC.getInnermostLoop();
   Loop *OuterLoop = InnerLoop->getParentLoop();
   if (HoistRuntimeChecks && OuterLoop &&
       SE->hasLoopInvariantBackedgeTakenCount(OuterLoop) &&
       allIterationsReachLatch(OuterLoop, *SE) &&
       isLoopNestFinite(OuterLoop, *SE, LI) &&
-      InnerLoop->getExitingBlock() == InnerLoop->getLoopLatch()) {
+      InnerLoop->getExitingBlock() == InnerLoop->getLoopLatch() &&
+      arePredicatesInvariant(DC.getPSE().getPredicate(), OuterLoop, *SE)) {
     for (RuntimeCheckingPtrGroup &CG : CheckingGroups) {
       const SCEV *Step;
       CG.CanExpandToOuterLoop =
