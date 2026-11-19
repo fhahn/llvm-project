@@ -204,10 +204,10 @@ exit:
 define void @test_blend_feeding_replicated_store_2(ptr noalias %src, ptr %dst, i1 %c.0) {
 ; CHECK-LABEL: define void @test_blend_feeding_replicated_store_2(
 ; CHECK-SAME: ptr noalias [[SRC:%.*]], ptr [[DST:%.*]], i1 [[C_0:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_PH:.*]], label %[[VECTOR_PH1:.*]]
+; CHECK-NEXT:    br label %[[VECTOR_PH1:.*]]
 ; CHECK:       [[VECTOR_PH1]]:
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i1> poison, i1 [[C_0]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <16 x i1> [[BROADCAST_SPLATINSERT]], <16 x i1> poison, <16 x i32> zeroinitializer
@@ -369,17 +369,16 @@ define void @test_blend_feeding_replicated_store_2(ptr noalias %src, ptr %dst, i
 ; CHECK-NEXT:    [[TMP71:%.*]] = icmp eq i32 [[INDEX_NEXT]], 96
 ; CHECK-NEXT:    br i1 [[TMP71]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    br i1 false, label %[[EXIT:.*]], label %[[SCALAR_PH:.*]]
+; CHECK-NEXT:    br label %[[SCALAR_PH:.*]]
 ; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF5:![0-9]+]]
+; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH:.*]], label %[[VEC_EPILOG_PH:.*]], !prof [[PROF5:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_PH]]:
-; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i32 [ 96, %[[SCALAR_PH]] ], [ 0, %[[VECTOR_PH]] ]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT31:%.*]] = insertelement <4 x i1> poison, i1 [[C_0]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT32:%.*]] = shufflevector <4 x i1> [[BROADCAST_SPLATINSERT31]], <4 x i1> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP92:%.*]] = xor <4 x i1> [[BROADCAST_SPLAT32]], splat (i1 true)
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
-; CHECK-NEXT:    [[IV1:%.*]] = phi i32 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT44:%.*]], %[[PRED_STORE_CONTINUE43:.*]] ]
+; CHECK-NEXT:    [[IV1:%.*]] = phi i32 [ 96, %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT44:%.*]], %[[PRED_STORE_CONTINUE43:.*]] ]
 ; CHECK-NEXT:    [[GEP_SRC1:%.*]] = getelementptr inbounds i8, ptr [[SRC]], i32 [[IV1]]
 ; CHECK-NEXT:    [[WIDE_LOAD34:%.*]] = load <4 x i8>, ptr [[GEP_SRC1]], align 1
 ; CHECK-NEXT:    [[TMP72:%.*]] = icmp eq <4 x i8> [[WIDE_LOAD34]], zeroinitializer
@@ -426,12 +425,11 @@ define void @test_blend_feeding_replicated_store_2(ptr noalias %src, ptr %dst, i
 ; CHECK-NEXT:    [[TMP91:%.*]] = icmp eq i32 [[INDEX_NEXT44]], 100
 ; CHECK-NEXT:    br i1 [[TMP91]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
-; CHECK-NEXT:    br i1 true, label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]]
+; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[VEC_EPILOG_SCALAR_PH]]:
-; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ 100, %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ 96, %[[SCALAR_PH]] ], [ 0, %[[ENTRY]] ]
 ; CHECK-NEXT:    br label %[[LOOP_HEADER1:.*]]
 ; CHECK:       [[LOOP_HEADER1]]:
-; CHECK-NEXT:    [[IV2:%.*]] = phi i32 [ [[BC_RESUME_VAL]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    [[IV2:%.*]] = phi i32 [ 96, %[[VEC_EPILOG_SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
 ; CHECK-NEXT:    [[GEP_SRC2:%.*]] = getelementptr inbounds i8, ptr [[SRC]], i32 [[IV2]]
 ; CHECK-NEXT:    [[L:%.*]] = load i8, ptr [[GEP_SRC2]], align 1
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp eq i8 [[L]], 0
