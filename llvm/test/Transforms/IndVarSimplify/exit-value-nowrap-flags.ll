@@ -3,8 +3,50 @@
 
 target datalayout = "n8:16:32:64"
 
-define i32 @nuw_kept(i32 %start, i32 %step, i32 %n) {
+define i32 @nuw_kept(i32 %start, i32 %step, i32 %n, ptr %p) {
 ; CHECK-LABEL: define i32 @nuw_kept(
+; CHECK-SAME: i32 [[START:%.*]], i32 [[STEP:%.*]], i32 [[N:%.*]], ptr [[P:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[V:%.*]] = phi i32 [ [[START]], %[[ENTRY]] ], [ [[V_NEXT:%.*]], %[[LATCH:.*]] ]
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds i8, ptr [[P]], i32 [[V]]
+; CHECK-NEXT:    [[L:%.*]] = load i8, ptr [[GEP]], align 1
+; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LATCH]]
+; CHECK:       [[LATCH]]:
+; CHECK-NEXT:    [[V_NEXT]] = add nuw i32 [[V]], [[STEP]]
+; CHECK-NEXT:    br label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = mul nuw i32 [[N]], [[STEP]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i32 [[START]], [[TMP0]]
+; CHECK-NEXT:    ret i32 [[TMP1]]
+;
+entry:
+  br label %loop
+
+loop:
+  %v = phi i32 [ %start, %entry ], [ %v.next, %latch ]
+  %i = phi i32 [ 0, %entry ], [ %i.next, %latch ]
+  ; The load makes poison of %v UB.
+  %gep = getelementptr inbounds i8, ptr %p, i32 %v
+  %l = load i8, ptr %gep
+  %done = icmp eq i32 %i, %n
+  br i1 %done, label %exit, label %latch
+
+latch:
+  %v.next = add nuw i32 %v, %step
+  %i.next = add i32 %i, 1
+  br label %loop
+
+exit:
+  ret i32 %v
+}
+
+; Same as @nuw_kept, but %v being poison is not UB, so the nuw flag of %v.next
+; must not be used for the recurrence: other values with the same start and step
+; share it and may not be poison when it wraps.
+define i32 @nuw_dropped_poison_not_ub(i32 %start, i32 %step, i32 %n) {
+; CHECK-LABEL: define i32 @nuw_dropped_poison_not_ub(
 ; CHECK-SAME: i32 [[START:%.*]], i32 [[STEP:%.*]], i32 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
@@ -36,9 +78,9 @@ exit:
 }
 
 ; Signed recurrence with %start and %step are both known non-negative.
-define i32 @nsw_kept_same_sign(i32 %start.in, i32 %step.in, i32 %n) {
+define i32 @nsw_kept_same_sign(i32 %start.in, i32 %step.in, i32 %n, ptr %p) {
 ; CHECK-LABEL: define i32 @nsw_kept_same_sign(
-; CHECK-SAME: i32 [[START_IN:%.*]], i32 [[STEP_IN:%.*]], i32 [[N:%.*]]) {
+; CHECK-SAME: i32 [[START_IN:%.*]], i32 [[STEP_IN:%.*]], i32 [[N:%.*]], ptr [[P:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[START:%.*]] = and i32 [[START_IN]], 1023
 ; CHECK-NEXT:    [[STEP:%.*]] = and i32 [[STEP_IN]], 1023
@@ -60,6 +102,8 @@ entry:
 loop:
   %v = phi i32 [ %start, %entry ], [ %v.next, %latch ]
   %i = phi i32 [ 0, %entry ], [ %i.next, %latch ]
+  %gep = getelementptr inbounds i8, ptr %p, i32 %v
+  %l = load i8, ptr %gep
   %done = icmp eq i32 %i, %n
   br i1 %done, label %exit, label %latch
 
@@ -73,9 +117,9 @@ exit:
 }
 
 ; Start is non-negative but Step is negative.
-define i32 @nsw_dropped_mixed_signs(i32 %start.in, i32 %step.in, i32 %n) {
+define i32 @nsw_dropped_mixed_signs(i32 %start.in, i32 %step.in, i32 %n, ptr %p) {
 ; CHECK-LABEL: define i32 @nsw_dropped_mixed_signs(
-; CHECK-SAME: i32 [[START_IN:%.*]], i32 [[STEP_IN:%.*]], i32 [[N:%.*]]) {
+; CHECK-SAME: i32 [[START_IN:%.*]], i32 [[STEP_IN:%.*]], i32 [[N:%.*]], ptr [[P:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[START:%.*]] = and i32 [[START_IN]], 1023
 ; CHECK-NEXT:    [[STEP_POS:%.*]] = and i32 [[STEP_IN]], 1023
@@ -98,6 +142,8 @@ entry:
 loop:
   %v = phi i32 [ %start, %entry ], [ %v.next, %latch ]
   %i = phi i32 [ 0, %entry ], [ %i.next, %latch ]
+  %gep = getelementptr inbounds i8, ptr %p, i32 %v
+  %l = load i8, ptr %gep
   %done = icmp eq i32 %i, %n
   br i1 %done, label %exit, label %latch
 
@@ -136,14 +182,19 @@ exit:
 }
 
 ; Start is a sum, so computing the exit value inlines it into %start + BTC.
-define i32 @nuw_dropped_sum_flattened(i32 %a, i32 %b, i32 %n) {
+define i32 @nuw_dropped_sum_flattened(i32 %a, i32 %b, i32 %n, ptr %p) {
 ; CHECK-LABEL: define i32 @nuw_dropped_sum_flattened(
-; CHECK-SAME: i32 [[A:%.*]], i32 [[B:%.*]], i32 [[N:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-SAME: i32 [[A:%.*]], i32 [[B:%.*]], i32 [[N:%.*]], ptr [[P:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[START:%.*]] = add i32 [[A]], [[B]]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LATCH:.*]]
+; CHECK-NEXT:    [[V:%.*]] = phi i32 [ [[START]], %[[ENTRY]] ], [ [[V_NEXT:%.*]], %[[LATCH:.*]] ]
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds i8, ptr [[P]], i32 [[V]]
+; CHECK-NEXT:    [[L:%.*]] = load i8, ptr [[GEP]], align 1
+; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LATCH]]
 ; CHECK:       [[LATCH]]:
+; CHECK-NEXT:    [[V_NEXT]] = add nuw i32 [[V]], 1
 ; CHECK-NEXT:    br label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], [[B]]
@@ -157,6 +208,8 @@ entry:
 loop:
   %v = phi i32 [ %start, %entry ], [ %v.next, %latch ]
   %i = phi i32 [ 0, %entry ], [ %i.next, %latch ]
+  %gep = getelementptr inbounds i8, ptr %p, i32 %v
+  %l = load i8, ptr %gep
   %done = icmp eq i32 %i, %n
   br i1 %done, label %exit, label %latch
 
@@ -170,14 +223,19 @@ exit:
 }
 
 ; Step is a product, so computing the exit value inlines it into BTC * Step.
-define i32 @nuw_dropped_product_flattened(i32 %s1, i32 %s2, i32 %n) {
+define i32 @nuw_dropped_product_flattened(i32 %s1, i32 %s2, i32 %n, ptr %p) {
 ; CHECK-LABEL: define i32 @nuw_dropped_product_flattened(
-; CHECK-SAME: i32 [[S1:%.*]], i32 [[S2:%.*]], i32 [[N:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-SAME: i32 [[S1:%.*]], i32 [[S2:%.*]], i32 [[N:%.*]], ptr [[P:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[STEP:%.*]] = mul i32 [[S1]], [[S2]]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LATCH:.*]]
+; CHECK-NEXT:    [[V:%.*]] = phi i32 [ 0, %[[ENTRY]] ], [ [[V_NEXT:%.*]], %[[LATCH:.*]] ]
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds i8, ptr [[P]], i32 [[V]]
+; CHECK-NEXT:    [[L:%.*]] = load i8, ptr [[GEP]], align 1
+; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LATCH]]
 ; CHECK:       [[LATCH]]:
+; CHECK-NEXT:    [[V_NEXT]] = add nuw i32 [[V]], [[STEP]]
 ; CHECK-NEXT:    br label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 [[N]], [[S2]]
@@ -191,6 +249,8 @@ entry:
 loop:
   %v = phi i32 [ 0, %entry ], [ %v.next, %latch ]
   %i = phi i32 [ 0, %entry ], [ %i.next, %latch ]
+  %gep = getelementptr inbounds i8, ptr %p, i32 %v
+  %l = load i8, ptr %gep
   %done = icmp eq i32 %i, %n
   br i1 %done, label %exit, label %latch
 
@@ -266,9 +326,9 @@ exit:
   ret void
 }
 
-define i32 @no_flag_leak_through_shared_udiv(i32 %start, i32 %n, i1 %c) {
+define i32 @no_flag_leak_through_shared_udiv(i32 %start, i32 %n, i1 %c, ptr %p) {
 ; CHECK-LABEL: define i32 @no_flag_leak_through_shared_udiv(
-; CHECK-SAME: i32 [[START:%.*]], i32 [[N:%.*]], i1 [[C:%.*]]) {
+; CHECK-SAME: i32 [[START:%.*]], i32 [[N:%.*]], i1 [[C:%.*]], ptr [[P:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br i1 [[C]], label %[[PH_1:.*]], label %[[PH_2:.*]]
 ; CHECK:       [[PH_1]]:
@@ -284,8 +344,12 @@ define i32 @no_flag_leak_through_shared_udiv(i32 %start, i32 %n, i1 %c) {
 ; CHECK:       [[PH_2]]:
 ; CHECK-NEXT:    br label %[[LOOP_2_HEADER:.*]]
 ; CHECK:       [[LOOP_2_HEADER]]:
-; CHECK-NEXT:    br i1 true, label %[[EXIT_2:.*]], label %[[LOOP_2_LATCH:.*]]
+; CHECK-NEXT:    [[V2:%.*]] = phi i32 [ [[START]], %[[PH_2]] ], [ [[V2_NEXT:%.*]], %[[LOOP_2_LATCH:.*]] ]
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds i8, ptr [[P]], i32 [[V2]]
+; CHECK-NEXT:    [[L:%.*]] = load i8, ptr [[GEP]], align 1
+; CHECK-NEXT:    br i1 true, label %[[EXIT_2:.*]], label %[[LOOP_2_LATCH]]
 ; CHECK:       [[LOOP_2_LATCH]]:
+; CHECK-NEXT:    [[V2_NEXT]] = add nuw i32 [[V2]], 1
 ; CHECK-NEXT:    br label %[[LOOP_2_HEADER]]
 ; CHECK:       [[EXIT_2]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = add nuw i32 [[N]], [[START]]
@@ -319,6 +383,8 @@ ph.2:
 loop.2.header:
   %v2 = phi i32 [ %start, %ph.2 ], [ %v2.next, %loop.2.latch ]
   %i2 = phi i32 [ 0, %ph.2 ], [ %i2.next, %loop.2.latch ]
+  %gep = getelementptr inbounds i8, ptr %p, i32 %v2
+  %l = load i8, ptr %gep
   %dv2 = udiv i32 %v2, 3
   %done2 = icmp eq i32 %i2, %n
   br i1 %done2, label %exit.2, label %loop.2.latch

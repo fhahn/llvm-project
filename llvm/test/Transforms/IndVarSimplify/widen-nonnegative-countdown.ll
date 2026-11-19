@@ -883,6 +883,6 @@ exit:
   ret void
 }
 
-declare dso_local void @use_ptr(ptr %0)
+declare dso_local void @use_ptr(ptr noundef %0)
 
 

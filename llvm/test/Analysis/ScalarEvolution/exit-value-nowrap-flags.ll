@@ -32,6 +32,56 @@ entry:
 up:
   %x = phi i64 [ %start, %entry ], [ %x.next, %up ]
   %i = phi i32 [ 0, %entry ], [ %i.next, %up ]
+  call void @use(i64 noundef %x)
+  %x.next = add nuw i64 %x, 1
+  %i.next = add i32 %i, 1
+  %c = icmp ult i32 %i.next, 10
+  br i1 %c, label %up, label %down
+
+down:
+  %y = phi i64 [ %x, %up ], [ %y.next, %down ]
+  %y.next = add i64 %y, -1
+  %ec = icmp ugt i64 %y.next, %start
+  br i1 %ec, label %down, label %exit
+
+exit:
+  ret void
+}
+
+; Same as @dec_to_start_of_nuw_addrec, but %x being poison is not UB, so the nuw
+; flag of %x.next must not be used for the recurrence: other values with the
+; same start and step share it and may not be poison when it wraps.
+define void @dec_to_start_of_nuw_addrec_poison_not_ub(i64 %start) {
+; CHECK-LABEL: 'dec_to_start_of_nuw_addrec_poison_not_ub'
+; CHECK-NEXT:  Classifying expressions for: @dec_to_start_of_nuw_addrec_poison_not_ub
+; CHECK-NEXT:    %x = phi i64 [ %start, %entry ], [ %x.next, %up ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%up> U: full-set S: full-set Exits: (9 + %start)<u nuw> LoopDispositions: { %up: Computable }
+; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %up ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%up> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %up: Computable }
+; CHECK-NEXT:    %x.next = add nuw i64 %x, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%up> U: full-set S: full-set Exits: (10 + %start) LoopDispositions: { %up: Computable }
+; CHECK-NEXT:    %i.next = add i32 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%up> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %up: Computable }
+; CHECK-NEXT:    %y = phi i64 [ %x, %up ], [ %y.next, %down ]
+; CHECK-NEXT:    --> {{\{\{}}%start,+,1}<nuw><%up>,+,-1}<nw><%down> U: full-set S: full-set --> {(9 + %start)<u nuw>,+,-1}<nw><%down> U: full-set S: full-set Exits: (1 + ((8 + %start) umin %start)) LoopDispositions: { %down: Computable }
+; CHECK-NEXT:    %y.next = add i64 %y, -1
+; CHECK-NEXT:    --> {{\{\{}}(-1 + %start),+,1}<nw><%up>,+,-1}<nw><%down> U: full-set S: full-set --> {(8 + %start),+,-1}<nw><%down> U: full-set S: full-set Exits: ((8 + %start) umin %start) LoopDispositions: { %down: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @dec_to_start_of_nuw_addrec_poison_not_ub
+; CHECK-NEXT:  Loop %down: backedge-taken count is (8 + (-1 * ((8 + %start) umin %start)) + %start)
+; CHECK-NEXT:  Loop %down: constant max backedge-taken count is i64 8, actual taken count either this or zero.
+; CHECK-NEXT:  Loop %down: symbolic max backedge-taken count is (8 + (-1 * ((8 + %start) umin %start)) + %start), actual taken count either this or zero.
+; CHECK-NEXT:  Loop %down: Trip multiple is 1
+; CHECK-NEXT:  Loop %up: backedge-taken count is i32 9
+; CHECK-NEXT:  Loop %up: constant max backedge-taken count is i32 9
+; CHECK-NEXT:  Loop %up: symbolic max backedge-taken count is i32 9
+; CHECK-NEXT:  Loop %up: Trip multiple is 10
+;
+entry:
+  br label %up
+
+up:
+  %x = phi i64 [ %start, %entry ], [ %x.next, %up ]
+  %i = phi i32 [ 0, %entry ], [ %i.next, %up ]
   %x.next = add nuw i64 %x, 1
   %i.next = add i32 %i, 1
   %c = icmp ult i32 %i.next, 10
@@ -78,6 +128,7 @@ entry:
 up:
   %p = phi ptr [ %start, %entry ], [ %p.next, %up ]
   %i = phi i32 [ 0, %entry ], [ %i.next, %up ]
+  store i8 0, ptr %p
   %p.next = getelementptr nuw i8, ptr %p, i64 1
   %i.next = add i32 %i, 1
   %c = icmp ult i32 %i.next, 10
@@ -278,6 +329,7 @@ entry:
 loop:
   %iv = phi i8 [ 0, %entry ], [ %iv.next, %latch ]
   %j = phi i8 [ 0, %entry ], [ %j.next, %latch ]
+  call void @use.i8(i8 noundef %iv)
   %ec = icmp eq i8 %j, -128
   br i1 %ec, label %exit, label %latch
 
@@ -365,6 +417,7 @@ entry:
 loop:
   %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
   %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+  call void @use(i64 noundef %iv)
   %iv.div = udiv i64 %iv, 3
   %a = add i64 %iv.div, %end.div
   %iv.next = add nuw i64 %iv, %step
@@ -375,3 +428,6 @@ loop:
 exit:
   ret void
 }
+
+declare void @use(i64)
+declare void @use.i8(i8)

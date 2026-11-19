@@ -43,6 +43,7 @@ loop:
   %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
   %iv.div = udiv i64 %iv, 3
   %diff = sub i64 %iv.div, %end.div
+  call void @use(i64 noundef %iv)
   %iv.next = add nuw i64 %iv, %step
   %i.next = add i64 %i, 1
   %c = icmp eq i64 %i, %n
@@ -91,6 +92,7 @@ loop:
   %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
   %iv.div = udiv i64 %iv, 3
   %a = add i64 %iv.div, %end.div
+  call void @use(i64 noundef %iv)
   %iv.next = add nuw i64 %iv, %step
   %i.next = add i64 %i, 1
   %c = icmp eq i64 %i, %n
@@ -145,6 +147,7 @@ loop:
   %iv.div = udiv i64 %iv, 3
   %iv.div.x = mul i64 %iv.div, %x
   %a = add i64 %iv.div.x, %end.div.y
+  call void @use(i64 noundef %iv)
   %iv.next = add nuw i64 %iv, %step
   %i.next = add i64 %i, 1
   %c = icmp eq i64 %i, %n
@@ -193,6 +196,7 @@ loop:
   %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
   %iv.div = udiv i64 %iv, 3
   %iv.smax = call i64 @llvm.smax.i64(i64 %iv.div, i64 %end.div)
+  call void @use(i64 noundef %iv)
   %iv.next = add nuw i64 %iv, %step
   %i.next = add i64 %i, 1
   %c = icmp eq i64 %i, %n
@@ -250,6 +254,7 @@ loop:
   %diff.sext = sub i64 %iv.sext, %end.sext
   %iv.smax = call i32 @llvm.smax.i32(i32 %iv, i32 %x)
   %diff.smax = sub i32 %iv.smax, %end.smax
+  call void @use.i32(i32 noundef %iv)
   %iv.next = add nuw i32 %iv, %step
   %i.next = add i32 %i, 1
   %c = icmp eq i32 %i, %n
@@ -299,6 +304,7 @@ loop:
   %iv = phi i32 [ %start, %entry ], [ %iv.next, %loop ]
   %iv.zext = zext i32 %iv to i64
   %diff.zext = sub i64 %iv.zext, %end.zext
+  call void @use.i32(i32 noundef %iv)
   %iv.next = add nuw i32 %iv, %step
   %i.next = add i32 %i, 1
   %c = icmp eq i32 %i, %n
@@ -352,6 +358,7 @@ entry:
 loop.1:
   %i = phi i64 [ 0, %entry ], [ %i.next, %loop.1 ]
   %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop.1 ]
+  call void @use(i64 noundef %iv)
   %iv.next = add nuw i64 %iv, %step
   %i.next = add i64 %i, 1
   %c = icmp eq i64 %i, %n
@@ -417,6 +424,7 @@ entry:
 loop.1:
   %i = phi i64 [ 0, %entry ], [ %i.next, %loop.1 ]
   %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop.1 ]
+  call void @use(i64 noundef %iv)
   %iv.next = add nuw i64 %iv, %step
   %i.next = add i64 %i, 1
   %c = icmp eq i64 %i, %n
@@ -489,6 +497,7 @@ loop:
   %iv.div.2 = mul i64 %iv.div, 2
   %a = add i64 %iv.div.2, %end.div.3
   %b = add i64 %a, %y.5
+  call void @use(i64 noundef %iv)
   %iv.next = add nuw i64 %iv, %step
   %i.next = add i64 %i, 1
   %c = icmp eq i64 %i, %n
@@ -545,6 +554,7 @@ loop:
   %iv.div = udiv i64 %iv, 3
   %a = add i64 %iv.div, %end.div.4
   %b = add i64 %a, %y.5
+  call void @use(i64 noundef %iv)
   %iv.next = add nuw i64 %iv, %step
   %i.next = add i64 %i, 1
   %c = icmp eq i64 %i, %n
@@ -596,6 +606,7 @@ loop:
   %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
   %iv.div = udiv i64 %iv, 3
   %a = add i64 %iv.div, %end.div.y
+  call void @use(i64 noundef %iv)
   %iv.next = add nuw i64 %iv, %step
   %i.next = add i64 %i, 1
   %c = icmp eq i64 %i, %n
@@ -650,6 +661,7 @@ loop:
   %iv.div = udiv i64 %iv, 3
   %iv.div.y = mul i64 %iv.div, %y
   %a = add i64 %iv.div.y, %end.div.x
+  call void @use(i64 noundef %iv)
   %iv.next = add nuw i64 %iv, %step
   %i.next = add i64 %i, 1
   %c = icmp eq i64 %i, %n
@@ -712,6 +724,7 @@ loop:
   %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
   %iv.div = udiv i64 %iv, 3
   %a = add i64 %py, %iv.div
+  call void @use(i64 noundef %iv)
   %iv.next = add nuw i64 %iv, %step
   %i.next = add i64 %i, 1
   %c = icmp eq i64 %i, %n
@@ -775,6 +788,7 @@ loop.2:
   %i.2 = phi i64 [ 0, %loop.1.exit ], [ %i.2.next, %loop.2 ]
   %iv.2 = phi i64 [ %start, %loop.1.exit ], [ %iv.2.next, %loop.2 ]
   %q2 = udiv i64 %iv.2, 3
+  call void @use(i64 noundef %iv.2)
   %iv.2.next = add nuw i64 %iv.2, %step
   %i.2.next = add i64 %i.2, 1
   %c.2 = icmp eq i64 %i.2, %n
@@ -829,6 +843,7 @@ loop.1:
   %i = phi i64 [ 0, %entry ], [ %i.next, %loop.1 ]
   %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop.1 ]
   %q1 = udiv i64 %iv, 3
+  call void @use(i64 noundef %iv)
   %iv.next = add nuw i64 %iv, %step
   %i.next = add i64 %i, 1
   %c = icmp eq i64 %i, %n
@@ -838,6 +853,7 @@ loop.2:
   %i.2 = phi i64 [ 0, %loop.1 ], [ %i.2.next, %loop.2 ]
   %iv.2 = phi i64 [ %start, %loop.1 ], [ %iv.2.next, %loop.2 ]
   %q2 = udiv i64 %iv.2, 3
+  call void @use(i64 noundef %iv.2)
   %iv.2.next = add nuw i64 %iv.2, %step
   %i.2.next = add i64 %i.2, 1
   %c.2 = icmp eq i64 %i.2, %n
@@ -907,6 +923,7 @@ loop.1:
   %i = phi i64 [ 0, %entry ], [ %i.next, %loop.1 ]
   %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop.1 ]
   %q1 = udiv i64 %iv, 3
+  call void @use(i64 noundef %iv)
   %iv.next = add nuw i64 %iv, %step
   %i.next = add i64 %i, 1
   %c = icmp eq i64 %i, %n
@@ -916,6 +933,7 @@ loop.2:
   %i.2 = phi i64 [ 0, %loop.1 ], [ %i.2.next, %loop.2 ]
   %iv.2 = phi i64 [ %start, %loop.1 ], [ %iv.2.next, %loop.2 ]
   %q2 = udiv i64 %iv.2, 3
+  call void @use(i64 noundef %iv.2)
   %iv.2.next = add nuw i64 %iv.2, %step
   %i.2.next = add i64 %i.2, 1
   %c.2 = icmp eq i64 %i.2, %n
@@ -925,6 +943,7 @@ loop.3:
   %i.3 = phi i64 [ 0, %loop.2 ], [ %i.3.next, %loop.3 ]
   %iv.3 = phi i64 [ %start, %loop.2 ], [ %iv.3.next, %loop.3 ]
   %q3 = udiv i64 %iv.3, 3
+  call void @use(i64 noundef %iv.3)
   %iv.3.next = add nuw i64 %iv.3, %step
   %i.3.next = add i64 %i.3, 1
   %c.3 = icmp eq i64 %i.3, %n
@@ -982,6 +1001,7 @@ loop.1:
   %i = phi i64 [ 0, %entry ], [ %i.next, %loop.1 ]
   %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop.1 ]
   %q1 = udiv i64 %iv, 3
+  call void @use(i64 noundef %iv)
   %iv.next = add nuw i64 %iv, %step
   %i.next = add i64 %i, 1
   %c = icmp eq i64 %i, %n
@@ -991,6 +1011,7 @@ loop.2:
   %i.2 = phi i64 [ 0, %loop.1 ], [ %i.2.next, %loop.2 ]
   %iv.2 = phi i64 [ %start, %loop.1 ], [ %iv.2.next, %loop.2 ]
   %q2 = udiv i64 %iv.2, 3
+  call void @use(i64 noundef %iv.2)
   %iv.2.next = add nuw i64 %iv.2, %step
   %i.2.next = add i64 %i.2, 1
   %c.2 = icmp eq i64 %i.2, %n
@@ -1030,6 +1051,7 @@ entry:
 loop:
   %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
   %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+  call void @use(i64 noundef %iv)
   %iv.next = add nuw i64 %iv, %step
   %i.next = add i64 %i, 1
   %c = icmp eq i64 %i, %n
@@ -1041,5 +1063,56 @@ exit:
   ret void
 }
 
+; Same as @sub_udiv_exit_value, but %iv being poison is not UB, so the nuw flag
+; of %iv.next must not be used for the recurrence: other values with the same
+; start and step share it and may not be poison when it wraps.
+define void @sub_udiv_exit_value_poison_not_ub(i64 %start, i64 %step, i64 %n) {
+; CHECK-LABEL: 'sub_udiv_exit_value_poison_not_ub'
+; CHECK-NEXT:  Classifying expressions for: @sub_udiv_exit_value_poison_not_ub
+; CHECK-NEXT:    %offset = mul i64 %n, %step
+; CHECK-NEXT:    --> (%step * %n) U: full-set S: full-set
+; CHECK-NEXT:    %end = add i64 %start, %offset
+; CHECK-NEXT:    --> ((%step * %n) + %start) U: full-set S: full-set
+; CHECK-NEXT:    %end.div = udiv i64 %end, 3
+; CHECK-NEXT:    --> (((%step * %n) + %start) /u 3) U: [0,6148914691236517206) S: [0,6148914691236517206)
+; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><%loop> U: full-set S: full-set Exits: %n LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {%start,+,%step}<nuw><%loop> U: full-set S: full-set Exits: ((%step * %n)<u nuw> + %start)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.div = udiv i64 %iv, 3
+; CHECK-NEXT:    --> ({%start,+,%step}<nuw><%loop> /u 3) U: [0,6148914691236517206) S: [0,6148914691236517206) Exits: (((%step * %n)<u nuw> + %start)<u nuw> /u 3) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %diff = sub i64 %iv.div, %end.div
+; CHECK-NEXT:    --> ((-1 * (((%step * %n) + %start) /u 3))<nsw> + ({%start,+,%step}<nuw><%loop> /u 3)) U: [-6148914691236517205,6148914691236517206) S: [-6148914691236517205,6148914691236517206) Exits: 0 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nuw i64 %iv, %step
+; CHECK-NEXT:    --> {(%start + %step),+,%step}<nw><%loop> U: full-set S: full-set Exits: (((1 + %n) * %step) + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i.next = add i64 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nw><%loop> U: full-set S: full-set Exits: (1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @sub_udiv_exit_value_poison_not_ub
+; CHECK-NEXT:  Loop %loop: backedge-taken count is %n
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is %n
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %offset = mul i64 %n, %step
+  %end = add i64 %start, %offset
+  %end.div = udiv i64 %end, 3
+  br label %loop
+
+loop:
+  %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
+  %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+  %iv.div = udiv i64 %iv, 3
+  %diff = sub i64 %iv.div, %end.div
+  %iv.next = add nuw i64 %iv, %step
+  %i.next = add i64 %i, 1
+  %c = icmp eq i64 %i, %n
+  br i1 %c, label %exit, label %loop
+
+exit:
+  ret void
+}
+
 declare i64 @get()
 declare void @use(i64)
+declare void @use.i32(i32)

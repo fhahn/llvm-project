@@ -236,7 +236,7 @@ define void @test_udiv_as_shift(ptr %a, i8 %n) nounwind uwtable ssp {
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[I1:%.*]] = phi i8 [ [[I1_INC:%.*]], [[LOOP]] ], [ 0, [[LOOP_PREHEADER]] ]
 ; CHECK-NEXT:    [[I1_INC]] = add nuw nsw i8 [[I1]], 1
-; CHECK-NEXT:    store volatile i8 0, ptr [[A:%.*]], align 1
+; CHECK-NEXT:    store i8 0, ptr [[A:%.*]], align 1
 ; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i8 [[I1_INC]], [[TMP2]]
 ; CHECK-NEXT:    br i1 [[EXITCOND]], label [[LOOP]], label [[EXIT_LOOPEXIT:%.*]]
 ; CHECK:       exit.loopexit:
@@ -253,7 +253,7 @@ loop:
   %i1 = phi i8 [ 0, %entry ], [ %i1.inc, %loop ]
   %i.inc = add nsw i8 %i, 4
   %i1.inc = add i8 %i1, 1
-  store volatile i8 0, ptr %a
+  store i8 0, ptr %a
   %c = icmp slt i8 %i, %n
   br i1 %c, label %loop, label %exit
 

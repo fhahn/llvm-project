@@ -1,6 +1,6 @@
 ; RUN: opt -disable-output "-passes=print<scalar-evolution>" < %s 2>&1 | FileCheck %s
 
-declare i1 @use(i64)
+declare i1 @use(i64 noundef)
 
 define void @f_0() {
 ; CHECK-LABEL: Classifying expressions for: @f_0

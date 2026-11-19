@@ -15,7 +15,8 @@ define void @f(ptr %condition) {
 ; CHECK: %idx.inc2.zext = zext i32 %idx.inc2 to i64
 ; CHECK-NEXT: -->  {2,+,1}<nuw><%loop>
 
-  %c = load volatile i1, ptr %condition
+  %cond.gep = getelementptr inbounds i1, ptr %condition, i32 %idx.inc
+  %c = load volatile i1, ptr %cond.gep
   br i1 %c, label %loop, label %exit
 
  exit:

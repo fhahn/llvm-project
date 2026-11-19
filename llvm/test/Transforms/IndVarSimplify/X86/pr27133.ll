@@ -49,6 +49,6 @@ for.inc:                                          ; preds = %for.cond
   br label %for.cond
 }
 
-declare void @fn1(i64 %idxprom)
+declare void @fn1(i64 noundef %idxprom)
 
 declare i32 @__CxxFrameHandler3(...)

@@ -31,6 +31,7 @@ entry:
 up.header:
   %p = phi ptr [ %start, %entry ], [ %p.next, %up.latch ]
   %v = phi i32 [ %n, %entry ], [ %v.next, %up.latch ]
+  store i8 0, ptr %p
   %pos = icmp sgt i32 %v, 0
   br i1 %pos, label %up.latch, label %down.header
 
@@ -69,6 +70,61 @@ define void @dec_to_start_of_nuw_int_addrec(i64 %start, i32 %n) {
 ; CHECK-NEXT:    %y.next = add i64 %y, -1
 ; CHECK-NEXT:    --> {{\{\{}}(-1 + %start),+,1}<nw><%up.header>,+,-1}<%down.header> U: full-set S: full-set Exits: (-1 + %start) LoopDispositions: { %down.header: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @dec_to_start_of_nuw_int_addrec
+; CHECK-NEXT:  Loop %down.header: backedge-taken count is {0,+,1}<nuw><%up.header>
+; CHECK-NEXT:  Loop %down.header: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %down.header: symbolic max backedge-taken count is {0,+,1}<nuw><%up.header>
+; CHECK-NEXT:  Loop %down.header: Trip multiple is 1
+; CHECK-NEXT:  Loop %up.header: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %up.header: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %up.header: Unpredictable symbolic max backedge-taken count.
+;
+entry:
+  br label %up.header
+
+up.header:
+  %x = phi i64 [ %start, %entry ], [ %x.next, %up.latch ]
+  %v = phi i32 [ %n, %entry ], [ %v.next, %up.latch ]
+  call void @use(i64 noundef %x)
+  %pos = icmp sgt i32 %v, 0
+  br i1 %pos, label %up.latch, label %down.header
+
+up.latch:
+  %x.next = add nuw i64 %x, 1
+  %v.next = mul i32 %v, 10
+  br label %up.header
+
+down.header:
+  %y = phi i64 [ %x, %up.header ], [ %y.next, %down.latch ]
+  %in.range = icmp ugt i64 %y, %start
+  br i1 %in.range, label %down.latch, label %exit
+
+down.latch:
+  %y.next = add i64 %y, -1
+  br label %down.header
+
+exit:
+  ret void
+}
+
+; Same as @dec_to_start_of_nuw_int_addrec, but %x being poison is not UB, so the
+; nuw flag of %x.next must not be used for the recurrence: other values with the
+; same start and step share it and may not be poison when it wraps.
+define void @dec_to_start_of_nuw_int_addrec_poison_not_ub(i64 %start, i32 %n) {
+; CHECK-LABEL: 'dec_to_start_of_nuw_int_addrec_poison_not_ub'
+; CHECK-NEXT:  Classifying expressions for: @dec_to_start_of_nuw_int_addrec_poison_not_ub
+; CHECK-NEXT:    %x = phi i64 [ %start, %entry ], [ %x.next, %up.latch ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%up.header> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %up.header: Computable }
+; CHECK-NEXT:    %v = phi i32 [ %n, %entry ], [ %v.next, %up.latch ]
+; CHECK-NEXT:    --> %v U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %up.header: Variant }
+; CHECK-NEXT:    %x.next = add nuw i64 %x, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%up.header> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %up.header: Computable }
+; CHECK-NEXT:    %v.next = mul i32 %v, 10
+; CHECK-NEXT:    --> (10 * %v) U: [0,-1) S: [-2147483648,2147483647) Exits: <<Unknown>> LoopDispositions: { %up.header: Variant }
+; CHECK-NEXT:    %y = phi i64 [ %x, %up.header ], [ %y.next, %down.latch ]
+; CHECK-NEXT:    --> {{\{\{}}%start,+,1}<nuw><%up.header>,+,-1}<%down.header> U: full-set S: full-set Exits: %start LoopDispositions: { %down.header: Computable }
+; CHECK-NEXT:    %y.next = add i64 %y, -1
+; CHECK-NEXT:    --> {{\{\{}}(-1 + %start),+,1}<nw><%up.header>,+,-1}<%down.header> U: full-set S: full-set Exits: (-1 + %start) LoopDispositions: { %down.header: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @dec_to_start_of_nuw_int_addrec_poison_not_ub
 ; CHECK-NEXT:  Loop %down.header: backedge-taken count is {0,+,1}<nuw><%up.header>
 ; CHECK-NEXT:  Loop %down.header: constant max backedge-taken count is i64 -1
 ; CHECK-NEXT:  Loop %down.header: symbolic max backedge-taken count is {0,+,1}<nuw><%up.header>
@@ -190,6 +246,7 @@ entry:
 up.header:
   %x = phi i64 [ %start, %entry ], [ %x.next, %up.latch ]
   %v = phi i32 [ %n, %entry ], [ %v.next, %up.latch ]
+  call void @use(i64 noundef %x)
   %pos = icmp sgt i32 %v, 0
   br i1 %pos, label %up.latch, label %down.header
 
@@ -242,6 +299,7 @@ entry:
 up.header:
   %x = phi i64 [ %start, %entry ], [ %x.next, %up.latch ]
   %v = phi i32 [ %n, %entry ], [ %v.next, %up.latch ]
+  call void @use(i64 noundef %x)
   %pos = icmp sgt i32 %v, 0
   br i1 %pos, label %up.latch, label %down.header
 
@@ -296,6 +354,7 @@ entry:
 up.header:
   %x = phi i64 [ %start, %entry ], [ %x.next, %up.latch ]
   %v = phi i32 [ %n, %entry ], [ %v.next, %up.latch ]
+  call void @use(i64 noundef %x)
   %pos = icmp sgt i32 %v, 0
   br i1 %pos, label %up.latch, label %down.header
 
@@ -316,3 +375,5 @@ down.latch:
 exit:
   ret void
 }
+
+declare void @use(i64)

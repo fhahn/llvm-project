@@ -40,6 +40,8 @@ for.end:                                          ; preds = %for.cond
 
 @data = external dso_local global [2 x [4 x [18 x i32]]], align 1
 
+declare void @use.i16(i16)
+
 define dso_local void @handle_to_ptr_2(i1 %b0, i1 %b1, i1 %b2) {
 ; CHECK-LABEL: 'handle_to_ptr_2'
 ; CHECK-NEXT:  Loop 'for.cond' has cost = 100000000
@@ -52,10 +54,12 @@ entry:
 for.cond:
   %i.0 = phi i16 [ 0, %entry ], [ %inc18, %for.inc17 ]
   %idxprom = zext i16 %i.0 to i32
+  call void @use.i16(i16 noundef %i.0)
   br i1 %b2, label %for.end19, label %for.cond1
 
 for.cond1:
   %j.0 = phi i16 [ %inc15, %for.inc14 ], [ 0, %for.cond ]
+  call void @use.i16(i16 noundef %j.0)
   br i1 %b1, label %for.inc17, label %for.cond5.preheader
 
 for.cond5.preheader:
@@ -64,6 +68,7 @@ for.cond5.preheader:
 
 for.cond5:
   %k.0 = phi i16 [ %inc, %for.inc ], [ 0, %for.cond5.preheader ]
+  call void @use.i16(i16 noundef %k.0)
   br i1 %b0, label %for.inc14, label %for.inc
 
 for.inc:

@@ -20,6 +20,9 @@ entry:
 outerL:                              ; preds = %entry, %outerLatch
   %e = phi i64 [ poison, %entry ], [ %lcssa, %outerLatch ]
   %c = phi i64 [ 0, %entry ], [ %c.next, %outerLatch ]
+  ; The load makes poison of %c UB.
+  %gep.c = getelementptr inbounds [0 x i8], ptr @a, i64 0, i64 %c
+  %l = load i8, ptr %gep.c
   %e.cmp = icmp slt i64 %e, 6
   br i1 %e.cmp, label %innerL, label %outerLatch
 

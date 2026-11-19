@@ -22,6 +22,8 @@ define void @test(ptr %p, i8 %arg, i64 %arg1, i32 %arg2) {
 ; CHECK-NEXT:    [[PHI:%.*]] = phi i32 [ [[ARG2]], [[ENTRY]] ], [ [[ADD9:%.*]], [[LATCH]] ]
 ; CHECK-NEXT:    [[TMP5:%.*]] = shl i64 [[INDVAR]], 2
 ; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[TMP4]], [[TMP5]]
+; CHECK-NEXT:    [[GEP_PHI:%.*]] = getelementptr inbounds i8, ptr [[P]], i32 [[PHI]]
+; CHECK-NEXT:    [[L:%.*]] = load i8, ptr [[GEP_PHI]], align 1
 ; CHECK-NEXT:    call void @llvm.memset.p0.i64(ptr align 1 [[LOOP_IDIOM_IV]], i8 0, i64 0, i1 false)
 ; CHECK-NEXT:    br label [[LOOP2:%.*]]
 ; CHECK:       loop2:
@@ -48,6 +50,9 @@ entry:
 loop:
   %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
   %phi = phi i32 [ %arg2, %entry ], [ %add9, %latch ]
+  ; The load makes poison of %phi UB.
+  %gep.phi = getelementptr inbounds i8, ptr %p, i32 %phi
+  %l = load i8, ptr %gep.phi
   br label %loop2
 
 loop2:

@@ -6,7 +6,7 @@
 
 target datalayout = "e-m:o-i64:64-i128:128-n32:64-S128"
 
-declare i32 @foo(i32)
+declare i32 @foo(i32 noundef)
 
 define void @test(ptr %p) personality ptr undef {
 ; CHECK-LABEL: @test(
@@ -18,9 +18,9 @@ define void @test(ptr %p) personality ptr undef {
 ; CHECK-NEXT:    [[RES:%.*]] = invoke i32 @foo(i32 returned [[TMP0]])
 ; CHECK-NEXT:            to label [[LOOP_LATCH]] unwind label [[EXIT:%.*]]
 ; CHECK:       loop.latch:
+; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw i64 [[INDVARS_IV]], 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = trunc nuw i64 [[INDVARS_IV]] to i32
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i32 @foo(i32 [[TMP1]])
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add i64 [[INDVARS_IV]], 1
 ; CHECK-NEXT:    br label [[LOOP]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    [[LP:%.*]] = landingpad { ptr, i32 }
@@ -64,8 +64,10 @@ define void @test_critedge(i1 %c, ptr %p) personality ptr undef {
 ; CHECK-NEXT:    br label [[LOOP_LATCH]]
 ; CHECK:       loop.latch:
 ; CHECK-NEXT:    [[PHI:%.*]] = phi i32 [ [[TMP1]], [[LOOP_INVOKE]] ], [ 0, [[LOOP_OTHER]] ]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw i64 [[INDVARS_IV]], 1
+; CHECK-NEXT:    [[TMP4:%.*]] = trunc nuw i64 [[INDVARS_IV_NEXT]] to i32
+; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @foo(i32 [[TMP4]])
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i32 @foo(i32 [[PHI]])
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add i64 [[INDVARS_IV]], 1
 ; CHECK-NEXT:    br label [[LOOP]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    [[LP:%.*]] = landingpad { ptr, i32 }
@@ -91,6 +93,7 @@ loop.latch:
   %ext = zext i32 %iv to i64
   %tmp5 = getelementptr inbounds i8, ptr %p, i64 %ext
   %iv.next = add nuw i32 %iv, 1
+  call i32 @foo(i32 %iv.next)
   call i32 @foo(i32 %phi)
   br label %loop
 

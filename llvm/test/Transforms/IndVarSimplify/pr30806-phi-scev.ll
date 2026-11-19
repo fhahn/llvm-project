@@ -87,5 +87,5 @@ while.end:                                        ; preds = %while.end.loopexit,
   ret void
 }
 
-declare void @bar(ptr, i64) local_unnamed_addr
+declare void @bar(ptr, i64 noundef) local_unnamed_addr
 declare ptr @processBuf(ptr) local_unnamed_addr

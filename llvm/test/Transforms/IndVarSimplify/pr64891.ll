@@ -11,6 +11,7 @@ define i32 @main() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
+; CHECK-NEXT:    store i8 0, ptr null, align 1
 ; CHECK-NEXT:    br label [[LOOP]]
 ;
 entry:
@@ -23,5 +24,6 @@ loop:
   %or = or disjoint i16 %phi, %trunc
   %phi.ext = sext i16 %phi to i64
   %add.ptr = getelementptr i8, ptr null, i64 %phi.ext
+  store i8 0, ptr %add.ptr
   br label %loop
 }

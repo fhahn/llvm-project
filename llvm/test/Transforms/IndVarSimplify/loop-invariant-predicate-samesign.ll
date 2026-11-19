@@ -8,7 +8,7 @@
 ; If the compare may be poison, both must hold for the same picks of its
 ; poison values.
 
-declare void @use(i1)
+declare void @use(i1) willreturn nounwind
 
 ; %cmp must not be replaced with %start samesign >u %inv.
 ; E.g. for %start = 127, %inv = -1, %cmp is poison at %iv = 127, and false at

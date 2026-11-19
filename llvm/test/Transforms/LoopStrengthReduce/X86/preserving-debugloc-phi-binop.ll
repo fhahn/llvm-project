@@ -6,7 +6,7 @@
 
 target datalayout = "n8:16:32:64"
 
-define i32 @foobar6() !dbg !5 {
+define i32 @foobar6(i32 %n) !dbg !5 {
 ; CHECK-LABEL: define i32 @foobar6(
 ; CHECK:  loop:
 ; CHECK:    [[IV_S_:%.*]] = phi double [ -3.220000e+03, %[[ENTRY:.*]] ], [ [[IV_S_NEXT_:%.*]], %loop ], !dbg [[DBG9:![0-9]+]]
@@ -20,10 +20,10 @@ loop:                                             ; preds = %loop, %entry
   %accum = phi i32 [ -3220, %entry ], [ %accum.next, %loop ], !dbg !9
   %iv = phi i32 [ 12, %entry ], [ %iv.next, %loop ], !dbg !10
   %tmp1 = sitofp i32 %accum to double, !dbg !11
-  tail call void @foo(double %tmp1), !dbg !12
+  tail call void @foo(double noundef %tmp1), !dbg !12
   %accum.next = add nsw i32 %accum, 9597741, !dbg !13
   %iv.next = add nuw nsw i32 %iv, 1, !dbg !14
-  %exitcond = icmp ugt i32 %iv, 235, !dbg !15
+  %exitcond = icmp uge i32 %iv, %n, !dbg !15
   br i1 %exitcond, label %exit, label %loop, !dbg !16
 
 exit:                                             ; preds = %loop

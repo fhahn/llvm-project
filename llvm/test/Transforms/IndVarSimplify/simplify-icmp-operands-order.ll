@@ -4,7 +4,7 @@
 target datalayout = "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-n32:64-S128-Fn32"
 
 declare void @use(ptr)
-declare void @use.i64(i64)
+declare void @use.i64(i64 noundef)
 
 define i64 @test_simplifycompare_rhs_constant(i64 %num_bytes, ptr %src) {
 ; CHECK-LABEL: define i64 @test_simplifycompare_rhs_constant(

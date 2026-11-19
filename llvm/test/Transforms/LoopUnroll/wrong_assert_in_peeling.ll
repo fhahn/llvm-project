@@ -3,7 +3,7 @@
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128-ni:1-p2:32:8:8:32-ni:2"
 target triple = "x86_64-unknown-linux-gnu"
 
-define i32 @test() {
+define i32 @test(ptr %p) {
 ; CHECK-LABEL: @test(
 ; CHECK-NEXT:  bb:
 ; CHECK-NEXT:    br label [[BB1:%.*]]
@@ -14,6 +14,8 @@ define i32 @test() {
 ; CHECK-NEXT:    br label [[BB2_PEEL:%.*]]
 ; CHECK:       bb2.peel:
 ; CHECK-NEXT:    [[TMP4_PEEL:%.*]] = add nsw i32 undef, [[TMP]]
+; CHECK-NEXT:    [[GEP_PEEL:%.*]] = getelementptr inbounds i8, ptr [[P:%.*]], i32 undef
+; CHECK-NEXT:    [[L_PEEL:%.*]] = load i8, ptr [[GEP_PEEL]], align 1
 ; CHECK-NEXT:    br label [[BB5_PEEL:%.*]]
 ; CHECK:       bb5.peel:
 ; CHECK-NEXT:    [[TMP6_PEEL:%.*]] = icmp eq i32 undef, 33
@@ -75,6 +77,9 @@ bb1:                                              ; preds = %bb13, %bb
 bb2:                                              ; preds = %bb12, %bb1
   %tmp3 = phi i32 [ undef, %bb1 ], [ %tmp4, %bb12 ]
   %tmp4 = add nsw i32 %tmp3, %tmp
+  ; The load makes poison of %tmp3 UB.
+  %gep = getelementptr inbounds i8, ptr %p, i32 %tmp3
+  %l = load i8, ptr %gep
   br label %bb5
 
 bb5:                                              ; preds = %bb2
