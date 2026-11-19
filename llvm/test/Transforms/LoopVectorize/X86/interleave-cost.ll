@@ -527,8 +527,9 @@ define void @iv_trunc_only_used_by_interleave_group_address(ptr noalias %src, pt
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP11:%.*]] = add i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = trunc i64 [[INDEX]] to i32
-; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[TMP0]], 4
+; CHECK-NEXT:    [[TMP1:%.*]] = trunc i64 [[TMP11]] to i32
 ; CHECK-NEXT:    [[TMP2:%.*]] = shl nuw nsw i32 [[TMP0]], 1
 ; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw nsw i32 [[TMP1]], 1
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i32 [[TMP2]]
