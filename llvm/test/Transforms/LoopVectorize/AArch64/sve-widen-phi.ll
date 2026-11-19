@@ -92,7 +92,7 @@ define void @widen_ptr_phi_unrolled(ptr noalias nocapture %a, ptr noalias nocapt
 ;
 ; CHECK-EPI-TF-LABEL: @widen_ptr_phi_unrolled(
 ; CHECK-EPI-TF-NEXT:  iter.check:
-; CHECK-EPI-TF-NEXT:    br i1 false, label [[VEC_EPILOG_SCALAR_PH:%.*]], label [[VECTOR_MAIN_LOOP_ITER_CHECK:%.*]]
+; CHECK-EPI-TF-NEXT:    br label [[VECTOR_MAIN_LOOP_ITER_CHECK:%.*]]
 ; CHECK-EPI-TF:       vector.main.loop.iter.check:
 ; CHECK-EPI-TF-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-EPI-TF-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 3
@@ -139,7 +139,7 @@ define void @widen_ptr_phi_unrolled(ptr noalias nocapture %a, ptr noalias nocapt
 ; CHECK-EPI-TF-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-EPI-TF-NEXT:    br i1 [[CMP_N]], label [[FOR_EXIT:%.*]], label [[VEC_EPILOG_ITER_CHECK:%.*]]
 ; CHECK-EPI-TF:       vec.epilog.iter.check:
-; CHECK-EPI-TF-NEXT:    br i1 false, label [[VEC_EPILOG_SCALAR_PH]], label [[VEC_EPILOG_PH]]
+; CHECK-EPI-TF-NEXT:    br label [[VEC_EPILOG_PH]]
 ; CHECK-EPI-TF:       vec.epilog.ph:
 ; CHECK-EPI-TF-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], [[VEC_EPILOG_ITER_CHECK]] ], [ 0, [[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-EPI-TF-NEXT:    [[TMP21:%.*]] = call i64 @llvm.vscale.i64()
@@ -171,24 +171,6 @@ define void @widen_ptr_phi_unrolled(ptr noalias nocapture %a, ptr noalias nocapt
 ; CHECK-EPI-TF-NEXT:    br i1 [[TMP31]], label [[VEC_EPILOG_MIDDLE_BLOCK:%.*]], label [[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK-EPI-TF:       vec.epilog.middle.block:
 ; CHECK-EPI-TF-NEXT:    br label [[FOR_EXIT]]
-; CHECK-EPI-TF:       vec.epilog.scalar.ph:
-; CHECK-EPI-TF-NEXT:    br label [[FOR_BODY:%.*]]
-; CHECK-EPI-TF:       for.body:
-; CHECK-EPI-TF-NEXT:    [[PTR_014:%.*]] = phi ptr [ [[INCDEC_PTR1:%.*]], [[FOR_BODY]] ], [ [[C]], [[VEC_EPILOG_SCALAR_PH]] ]
-; CHECK-EPI-TF-NEXT:    [[I_013:%.*]] = phi i64 [ [[INC:%.*]], [[FOR_BODY]] ], [ 0, [[VEC_EPILOG_SCALAR_PH]] ]
-; CHECK-EPI-TF-NEXT:    [[INCDEC_PTR:%.*]] = getelementptr inbounds i32, ptr [[PTR_014]], i64 1
-; CHECK-EPI-TF-NEXT:    [[TMP32:%.*]] = load i32, ptr [[PTR_014]], align 4
-; CHECK-EPI-TF-NEXT:    [[INCDEC_PTR1]] = getelementptr inbounds i32, ptr [[PTR_014]], i64 2
-; CHECK-EPI-TF-NEXT:    [[TMP33:%.*]] = load i32, ptr [[INCDEC_PTR]], align 4
-; CHECK-EPI-TF-NEXT:    [[ADD:%.*]] = add nsw i32 [[TMP32]], 1
-; CHECK-EPI-TF-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[I_013]]
-; CHECK-EPI-TF-NEXT:    store i32 [[ADD]], ptr [[ARRAYIDX]], align 4
-; CHECK-EPI-TF-NEXT:    [[ADD2:%.*]] = add nsw i32 [[TMP33]], 1
-; CHECK-EPI-TF-NEXT:    [[ARRAYIDX3:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[I_013]]
-; CHECK-EPI-TF-NEXT:    store i32 [[ADD2]], ptr [[ARRAYIDX3]], align 4
-; CHECK-EPI-TF-NEXT:    [[INC]] = add nuw nsw i64 [[I_013]], 1
-; CHECK-EPI-TF-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INC]], [[N]]
-; CHECK-EPI-TF-NEXT:    br i1 [[EXITCOND_NOT]], label [[FOR_EXIT]], label [[FOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK-EPI-TF:       for.exit:
 ; CHECK-EPI-TF-NEXT:    ret void
 ;
@@ -284,7 +266,7 @@ define void @widen_2ptrs_phi_unrolled(ptr noalias nocapture %dst, ptr noalias no
 ;
 ; CHECK-EPI-TF-LABEL: @widen_2ptrs_phi_unrolled(
 ; CHECK-EPI-TF-NEXT:  iter.check:
-; CHECK-EPI-TF-NEXT:    br i1 false, label [[VEC_EPILOG_SCALAR_PH:%.*]], label [[VECTOR_MAIN_LOOP_ITER_CHECK:%.*]]
+; CHECK-EPI-TF-NEXT:    br label [[VECTOR_MAIN_LOOP_ITER_CHECK:%.*]]
 ; CHECK-EPI-TF:       vector.main.loop.iter.check:
 ; CHECK-EPI-TF-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-EPI-TF-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 3
@@ -318,7 +300,7 @@ define void @widen_2ptrs_phi_unrolled(ptr noalias nocapture %dst, ptr noalias no
 ; CHECK-EPI-TF-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-EPI-TF-NEXT:    br i1 [[CMP_N]], label [[FOR_COND_CLEANUP:%.*]], label [[VEC_EPILOG_ITER_CHECK:%.*]]
 ; CHECK-EPI-TF:       vec.epilog.iter.check:
-; CHECK-EPI-TF-NEXT:    br i1 false, label [[VEC_EPILOG_SCALAR_PH]], label [[VEC_EPILOG_PH]]
+; CHECK-EPI-TF-NEXT:    br label [[VEC_EPILOG_PH]]
 ; CHECK-EPI-TF:       vec.epilog.ph:
 ; CHECK-EPI-TF-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], [[VEC_EPILOG_ITER_CHECK]] ], [ 0, [[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-EPI-TF-NEXT:    [[TMP12:%.*]] = call i64 @llvm.vscale.i64()
@@ -343,20 +325,6 @@ define void @widen_2ptrs_phi_unrolled(ptr noalias nocapture %dst, ptr noalias no
 ; CHECK-EPI-TF-NEXT:    br i1 [[TMP17]], label [[VEC_EPILOG_MIDDLE_BLOCK:%.*]], label [[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK-EPI-TF:       vec.epilog.middle.block:
 ; CHECK-EPI-TF-NEXT:    br label [[FOR_COND_CLEANUP]]
-; CHECK-EPI-TF:       vec.epilog.scalar.ph:
-; CHECK-EPI-TF-NEXT:    br label [[FOR_BODY:%.*]]
-; CHECK-EPI-TF:       for.body:
-; CHECK-EPI-TF-NEXT:    [[I_011:%.*]] = phi i64 [ [[INC:%.*]], [[FOR_BODY]] ], [ 0, [[VEC_EPILOG_SCALAR_PH]] ]
-; CHECK-EPI-TF-NEXT:    [[S_010:%.*]] = phi ptr [ [[INCDEC_PTR1:%.*]], [[FOR_BODY]] ], [ [[SRC]], [[VEC_EPILOG_SCALAR_PH]] ]
-; CHECK-EPI-TF-NEXT:    [[D_09:%.*]] = phi ptr [ [[INCDEC_PTR:%.*]], [[FOR_BODY]] ], [ [[DST]], [[VEC_EPILOG_SCALAR_PH]] ]
-; CHECK-EPI-TF-NEXT:    [[TMP18:%.*]] = load i32, ptr [[S_010]], align 4
-; CHECK-EPI-TF-NEXT:    [[MUL:%.*]] = shl nsw i32 [[TMP18]], 1
-; CHECK-EPI-TF-NEXT:    store i32 [[MUL]], ptr [[D_09]], align 4
-; CHECK-EPI-TF-NEXT:    [[INCDEC_PTR]] = getelementptr inbounds i32, ptr [[D_09]], i64 1
-; CHECK-EPI-TF-NEXT:    [[INCDEC_PTR1]] = getelementptr inbounds i32, ptr [[S_010]], i64 1
-; CHECK-EPI-TF-NEXT:    [[INC]] = add nuw nsw i64 [[I_011]], 1
-; CHECK-EPI-TF-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INC]], [[N]]
-; CHECK-EPI-TF-NEXT:    br i1 [[EXITCOND_NOT]], label [[FOR_COND_CLEANUP]], label [[FOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK-EPI-TF:       for.cond.cleanup:
 ; CHECK-EPI-TF-NEXT:    ret void
 ;

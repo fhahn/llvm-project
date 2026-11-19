@@ -5657,9 +5657,8 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   RUN_VPLAN_PASS(VPlanTransforms::combineRecipes, BestVPlan);
   // Check if scalar epilogue is required, before simplifying constant branches.
   const bool RequiresScalarEpilogue = BestVPlan.requiresScalarEpilogue();
-  if (EpilogueVecKind == EpilogueVectorizationKind::None)
-    RUN_VPLAN_PASS(VPlanTransforms::removeBranchOnConst, BestVPlan,
-                   /*OnlyLatches=*/false);
+  RUN_VPLAN_PASS(VPlanTransforms::removeBranchOnConst, BestVPlan,
+                 /*OnlyLatches=*/false);
   RUN_VPLAN_PASS(VPlanTransforms::removeDeadRecipes, BestVPlan);
 
   RUN_VPLAN_PASS(VPlanTransforms::convertToConcreteRecipes, BestVPlan);
@@ -5674,11 +5673,8 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   RUN_VPLAN_PASS(VPlanTransforms::expandBranchOnTwoConds, BestVPlan);
   // Convert loops with variable-length stepping after regions are dissolved.
   RUN_VPLAN_PASS(VPlanTransforms::convertToVariableLengthStep, BestVPlan);
-  // Remove dead back-edges for single-iteration loops with BranchOnCond(true).
-  // Only process loop latches to avoid removing edges from the middle block,
-  // which may be needed for epilogue vectorization.
   RUN_VPLAN_PASS(VPlanTransforms::removeBranchOnConst, BestVPlan,
-                 /*OnlyLatches=*/true);
+                 /*OnlyLatches=*/false);
   std::optional<uint64_t> MaxRuntimeStep = getMaxRuntimeElementCount(
       BestVF * BestUF, *OrigLoop->getHeader()->getParent());
 
@@ -7281,19 +7277,18 @@ static void preparePlanForEpilogueVectorLoop(
   }
 
   VPBasicBlock *VectorPH = Plan.getVectorPreheader();
-  assert(VectorPH->getNumPredecessors() == 2 &&
-         VectorPH->getPredecessors()[0] == EpilogueCheck &&
+  assert(VectorPH->getPredecessors()[0] == EpilogueCheck &&
          "vector preheader must be entered from the epilogue check first");
   // Returns the value to resume at for \p ResumeForEpi: a phi in the vector
   // preheader merging the value computed by the main vector loop with the
   // value used when the main vector loop has been bypassed, or the former if
-  // both are equal.
+  // the main vector loop cannot be bypassed or both are equal.
   auto GetResumeValue = [&](VPInstruction *ResumeForEpi,
                             const Twine &Name) -> VPValue * {
     VPValue *MainV = Plan.getOrAddLiveIn(ResumeForEpi->getUnderlyingValue());
     VPValue *BypassV =
         Plan.getOrAddLiveIn(ResumeForEpi->getOperand(1)->getUnderlyingValue());
-    if (MainV == BypassV)
+    if (VectorPH->getSinglePredecessor() || MainV == BypassV)
       return MainV;
     return VPBuilder(VectorPH->getFirstNonPhi())
         .createScalarPhi({MainV, BypassV}, {}, Name);
