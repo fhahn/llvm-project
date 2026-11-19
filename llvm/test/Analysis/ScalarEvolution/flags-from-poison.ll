@@ -518,13 +518,13 @@ define void @test-add-not-header3(ptr %input, i32 %offset, i32 %numIterations,
 ; CHECK-LABEL: 'test-add-not-header3'
 ; CHECK-NEXT:  Classifying expressions for: @test-add-not-header3
 ; CHECK-NEXT:    %i = phi i32 [ %nexti, %loop2 ], [ 0, %entry ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-2147483648) S: [0,-2147483648) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %index32 = add nsw i32 %i, %offset
 ; CHECK-NEXT:    --> {%offset,+,1}<nw><%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %ptr = getelementptr inbounds float, ptr %input, i32 %index32
 ; CHECK-NEXT:    --> ((4 * (sext i32 {%offset,+,1}<nw><%loop> to i64))<nsw> + %input) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %nexti = add nsw i32 %i, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><%loop> U: [1,0) S: [1,0) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nw><%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %cond = load volatile i1, ptr %cond_buf, align 1
 ; CHECK-NEXT:    --> %cond U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @test-add-not-header3
@@ -602,13 +602,13 @@ define void @test-add-not-header5(ptr %input, i32 %offset) {
 ; CHECK-LABEL: 'test-add-not-header5'
 ; CHECK-NEXT:  Classifying expressions for: @test-add-not-header5
 ; CHECK-NEXT:    %i = phi i32 [ %nexti, %loop ], [ 0, %entry ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-2147483648) S: [0,-2147483648) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %index32 = add nsw i32 %i, %offset
-; CHECK-NEXT:    --> {%offset,+,1}<nw><%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {%offset,+,1}<%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %ptr = getelementptr inbounds float, ptr %input, i32 %index32
-; CHECK-NEXT:    --> ((4 * (sext i32 {%offset,+,1}<nw><%loop> to i64))<nsw> + %input) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> ((4 * (sext i32 {%offset,+,1}<%loop> to i64))<nsw> + %input) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %nexti = add nsw i32 %i, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><%loop> U: [1,0) S: [1,0) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @test-add-not-header5
 ; CHECK-NEXT:  Loop %loop: <multiple exits> Unpredictable backedge-taken count.
 ; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
@@ -712,13 +712,13 @@ define void @test-add-not-header8(ptr %input, i32 %offset, i32 %numIterations) {
 ; CHECK-NEXT:    %i = phi i32 [ %nexti, %loop.latch ], [ 0, %entry ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-2147483648) S: [0,-2147483648) Exits: (-1 + %numIterations) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i2 = phi i32 [ %nexti2, %loop.latch ], [ %offset, %entry ]
-; CHECK-NEXT:    --> {%offset,+,1}<nsw><%loop> U: full-set S: full-set Exits: (-1 + %offset + %numIterations) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {%offset,+,1}<%loop> U: full-set S: full-set Exits: (-1 + %offset + %numIterations) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %nexti = add nsw i32 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,-2147483648) S: [1,-2147483648) Exits: %numIterations LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %nexti2 = add nsw i32 %i2, 1
-; CHECK-NEXT:    --> {(1 + %offset),+,1}<nw><%loop> U: full-set S: full-set Exits: (%offset + %numIterations) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(1 + %offset),+,1}<%loop> U: full-set S: full-set Exits: (%offset + %numIterations) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %ptr = getelementptr inbounds float, ptr %input, i32 %nexti2
-; CHECK-NEXT:    --> ((4 * (sext i32 {(1 + %offset),+,1}<nw><%loop> to i64))<nsw> + %input) U: full-set S: full-set Exits: ((4 * (sext i32 (%offset + %numIterations) to i64))<nsw> + %input) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> ((4 * (sext i32 {(1 + %offset),+,1}<%loop> to i64))<nsw> + %input) U: full-set S: full-set Exits: ((4 * (sext i32 (%offset + %numIterations) to i64))<nsw> + %input) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @test-add-not-header8
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %numIterations)
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 -1
@@ -787,13 +787,13 @@ define void @test-add-call2(ptr %input, i32 %offset, i32 %numIterations) {
 ; CHECK-LABEL: 'test-add-call2'
 ; CHECK-NEXT:  Classifying expressions for: @test-add-call2
 ; CHECK-NEXT:    %i = phi i32 [ %nexti, %loop ], [ 0, %entry ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-2147483648) S: [0,-2147483648) Exits: (-1 + %numIterations) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><%loop> U: full-set S: full-set Exits: (-1 + %numIterations) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %index32 = add nsw i32 %i, %offset
 ; CHECK-NEXT:    --> {%offset,+,1}<nw><%loop> U: full-set S: full-set Exits: (-1 + %offset + %numIterations) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %ptr = getelementptr inbounds float, ptr %input, i32 %index32
 ; CHECK-NEXT:    --> ((4 * (sext i32 {%offset,+,1}<nw><%loop> to i64))<nsw> + %input) U: full-set S: full-set Exits: ((4 * (sext i32 (-1 + %offset + %numIterations) to i64))<nsw> + %input) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %nexti = add nsw i32 %i, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><%loop> U: [1,0) S: [1,0) Exits: %numIterations LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nw><%loop> U: full-set S: full-set Exits: %numIterations LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @test-add-call2
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %numIterations)
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 -1

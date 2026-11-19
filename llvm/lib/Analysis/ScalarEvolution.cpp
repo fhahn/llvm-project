@@ -5571,6 +5571,25 @@ static SCEVFlags getNoWrapFlagsForGEP(GEPOperator *GEP, const SCEV *Accum,
   return Flags;
 }
 
+/// Return the no-wrap flags \p Flags of \p BEValueV, the increment of header
+/// phi \p PN, that can be used for the recurrence of \p PN. Poison-generating
+/// flags only guarantee no wrapping until \p BEValueV is poison. The
+/// recurrence is shared by all values with the same start and step, so they
+/// can only be used if \p BEValueV or \p PN being poison is UB.
+static SCEVFlags getNoWrapFlagsForPHI(const PHINode *PN, const Value *BEValueV,
+                                      SCEVFlags Flags) {
+  // Return early if there are no flags.
+  if (Flags == SCEV::FlagNone)
+    return Flags;
+  auto *BEInst = cast<Instruction>(BEValueV);
+  // Flags not derived from poison-generating flags (e.g. a dominating
+  // with.overflow check) hold whenever the backedge is taken.
+  if (!BEInst->hasPoisonGeneratingFlags() || programUndefinedIfPoison(BEInst) ||
+      programUndefinedIfPoison(PN))
+    return Flags;
+  return SCEV::FlagNone;
+}
+
 /// A helper function for createAddRecFromPHI to handle simple cases.
 ///
 /// This function tries to find an AddRec expression for the simplest (yet most
@@ -5619,7 +5638,8 @@ const SCEV *ScalarEvolution::createSimpleAffineAddRec(PHINode *PN,
   }
 
   const SCEV *StartVal = getSCEV(StartValueV);
-  const SCEV *PHISCEV = getAddRecExpr(StartVal, Accum, L, Flags);
+  const SCEV *PHISCEV = getAddRecExpr(
+      StartVal, Accum, L, getNoWrapFlagsForPHI(PN, BEValueV, Flags));
   insertValueToMap(PN, PHISCEV);
 
   if (auto *AR = dyn_cast<SCEVAddRecExpr>(PHISCEV))
@@ -5731,7 +5751,8 @@ const SCEV *ScalarEvolution::createAddRecFromPHI(PHINode *PN) {
         }
 
         const SCEV *StartVal = getSCEV(StartValueV);
-        const SCEV *PHISCEV = getAddRecExpr(StartVal, Accum, L, Flags);
+        const SCEV *PHISCEV = getAddRecExpr(
+            StartVal, Accum, L, getNoWrapFlagsForPHI(PN, BEValueV, Flags));
 
         // Okay, for the entire analysis of this edge we assumed the PHI
         // to be symbolic.  We now need to go back and purge all of the

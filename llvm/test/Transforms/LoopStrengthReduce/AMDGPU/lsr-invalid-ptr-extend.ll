@@ -12,20 +12,24 @@ define amdgpu_kernel void @scaledregtest() local_unnamed_addr {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    br label [[FOR_BODY:%.*]]
 ; CHECK:       loopexit:
+; CHECK-NEXT:    [[CONV:%.*]] = zext i32 [[INC:%.*]] to i64
 ; CHECK-NEXT:    br label [[FOR_BODY_1:%.*]]
 ; CHECK:       for.body.1:
-; CHECK-NEXT:    [[LSR_IV5:%.*]] = phi ptr addrspace(5) [ [[SCEVGEP6:%.*]], [[FOR_BODY_1]] ], [ [[SCEVGEP11_LCSSA:%.*]], [[LOOPEXIT:%.*]] ]
-; CHECK-NEXT:    [[LSR_IV1:%.*]] = phi ptr [ [[SCEVGEP2:%.*]], [[FOR_BODY_1]] ], [ [[SCEVGEP13_LCSSA:%.*]], [[LOOPEXIT]] ]
+; CHECK-NEXT:    [[LSR_IV2:%.*]] = phi i32 [ [[LSR_IV_NEXT2:%.*]], [[FOR_BODY_1]] ], [ [[LSR_IV:%.*]], [[LOOPEXIT:%.*]] ]
+; CHECK-NEXT:    [[CONV_1:%.*]] = phi i64 [ [[CONV_2:%.*]], [[FOR_BODY_1]] ], [ [[CONV]], [[LOOPEXIT]] ]
+; CHECK-NEXT:    [[IDXPROM:%.*]] = trunc i64 [[CONV_1]] to i32
+; CHECK-NEXT:    [[LSR_IV5:%.*]] = getelementptr inbounds ptr, ptr addrspace(5) null, i32 [[IDXPROM]]
 ; CHECK-NEXT:    [[TMP0:%.*]] = load ptr, ptr addrspace(5) [[LSR_IV5]], align 8
+; CHECK-NEXT:    [[LSR_IV1:%.*]] = getelementptr inbounds ptr, ptr null, i64 [[CONV_1]]
 ; CHECK-NEXT:    store ptr [[TMP0]], ptr [[LSR_IV1]], align 8
-; CHECK-NEXT:    [[SCEVGEP2]] = getelementptr i8, ptr [[LSR_IV1]], i64 8
-; CHECK-NEXT:    [[SCEVGEP6]] = getelementptr i8, ptr addrspace(5) [[LSR_IV5]], i32 8
+; CHECK-NEXT:    [[CONV_2]] = zext i32 [[LSR_IV2]] to i64
+; CHECK-NEXT:    [[LSR_IV_NEXT2]] = add i32 [[LSR_IV2]], 1
 ; CHECK-NEXT:    br label [[FOR_BODY_1]]
 ; CHECK:       for.body:
-; CHECK-NEXT:    [[SCEVGEP11_LCSSA]] = phi ptr addrspace(5) [ [[SCEVGEP4:%.*]], [[FOR_BODY]] ], [ inttoptr (i32 64 to ptr addrspace(5)), [[ENTRY:%.*]] ]
-; CHECK-NEXT:    [[SCEVGEP13_LCSSA]] = phi ptr [ [[SCEVGEP:%.*]], [[FOR_BODY]] ], [ inttoptr (i64 64 to ptr), [[ENTRY]] ]
-; CHECK-NEXT:    [[SCEVGEP]] = getelementptr i8, ptr [[SCEVGEP13_LCSSA]], i64 64
-; CHECK-NEXT:    [[SCEVGEP4]] = getelementptr i8, ptr addrspace(5) [[SCEVGEP11_LCSSA]], i32 64
+; CHECK-NEXT:    [[LSR_IV]] = phi i32 [ [[LSR_IV_NEXT:%.*]], [[FOR_BODY]] ], [ 9, [[ENTRY:%.*]] ]
+; CHECK-NEXT:    [[I:%.*]] = phi i32 [ 0, [[ENTRY]] ], [ [[INC]], [[FOR_BODY]] ]
+; CHECK-NEXT:    [[INC]] = add nuw nsw i32 [[I]], 8
+; CHECK-NEXT:    [[LSR_IV_NEXT]] = add i32 [[LSR_IV]], 8
 ; CHECK-NEXT:    br i1 false, label [[LOOPEXIT]], label [[FOR_BODY]]
 ;
 entry:

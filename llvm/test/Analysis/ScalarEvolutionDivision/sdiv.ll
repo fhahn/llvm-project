@@ -89,9 +89,9 @@ exit:
 define void @addrec_step0(i8 %n, i8 %step) {
 ; CHECK-LABEL: 'addrec_step0'
 ; CHECK-NEXT:  Instruction: %div = sdiv i8 %num, %step
-; CHECK-NEXT:    Numerator: {0,+,%step}<nuw><nsw><%loop>
+; CHECK-NEXT:    Numerator: {0,+,%step}<%loop>
 ; CHECK-NEXT:    Denominator: %step
-; CHECK-NEXT:    Quotient: {0,+,1}<%loop>
+; CHECK-NEXT:    Quotient: {0,+,1}<nuw><nsw><%loop>
 ; CHECK-NEXT:    Remainder: 0
 ;
 entry:
@@ -120,9 +120,9 @@ exit:
 define void @addrec_step1(i8 %n, i8 %step) {
 ; CHECK-LABEL: 'addrec_step1'
 ; CHECK-NEXT:  Instruction: %div = sdiv i8 %num, %step
-; CHECK-NEXT:    Numerator: {0,+,%step}<nuw><nsw><%loop.header>
+; CHECK-NEXT:    Numerator: {0,+,%step}<%loop.header>
 ; CHECK-NEXT:    Denominator: %step
-; CHECK-NEXT:    Quotient: {0,+,1}<%loop.header>
+; CHECK-NEXT:    Quotient: {0,+,1}<nuw><%loop.header>
 ; CHECK-NEXT:    Remainder: 0
 ;
 entry:
@@ -157,9 +157,9 @@ exit:
 define void @addrec_a_b(i8 %n, i8 %a, i8 %b) {
 ; CHECK-LABEL: 'addrec_a_b'
 ; CHECK-NEXT:  Instruction: %div = sdiv i8 %num, %step
-; CHECK-NEXT:    Numerator: {0,+,(%a + %b)}<nuw><nsw><%loop>
+; CHECK-NEXT:    Numerator: {0,+,(%a + %b)}<%loop>
 ; CHECK-NEXT:    Denominator: (%a + %b)
-; CHECK-NEXT:    Quotient: {0,+,1}<%loop>
+; CHECK-NEXT:    Quotient: {0,+,1}<nuw><nsw><%loop>
 ; CHECK-NEXT:    Remainder: 0
 ;
 entry:

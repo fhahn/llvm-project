@@ -89,11 +89,11 @@ define void @ptrtoint_addrec_fat_to_addrwidth(ptr addrspace(1) %in) {
 ; CHECK-LABEL: 'ptrtoint_addrec_fat_to_addrwidth'
 ; CHECK-NEXT:  Classifying expressions for: @ptrtoint_addrec_fat_to_addrwidth
 ; CHECK-NEXT:    %iv = phi ptr addrspace(1) [ %in, %entry ], [ %iv.next, %loop ]
-; CHECK-NEXT:    --> {%in,+,4}<nuw><%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {%in,+,4}<%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.int = ptrtoint ptr addrspace(1) %iv to i64
 ; CHECK-NEXT:    --> %iv.int U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:    %iv.next = getelementptr inbounds i32, ptr addrspace(1) %iv, i64 1
-; CHECK-NEXT:    --> {(4 + %in),+,4}<nw><%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(4 + %in),+,4}<%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %c = call i1 @cond()
 ; CHECK-NEXT:    --> %c U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @ptrtoint_addrec_fat_to_addrwidth
@@ -120,11 +120,11 @@ define void @ptrtoint_addrec_unstable(ptr addrspace(2) %in) {
 ; CHECK-LABEL: 'ptrtoint_addrec_unstable'
 ; CHECK-NEXT:  Classifying expressions for: @ptrtoint_addrec_unstable
 ; CHECK-NEXT:    %iv = phi ptr addrspace(2) [ %in, %entry ], [ %iv.next, %loop ]
-; CHECK-NEXT:    --> {%in,+,4}<nuw><%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {%in,+,4}<%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.int = ptrtoint ptr addrspace(2) %iv to i64
 ; CHECK-NEXT:    --> %iv.int U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:    %iv.next = getelementptr inbounds i32, ptr addrspace(2) %iv, i64 1
-; CHECK-NEXT:    --> {(4 + %in),+,4}<nw><%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(4 + %in),+,4}<%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %c = call i1 @cond()
 ; CHECK-NEXT:    --> %c U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @ptrtoint_addrec_unstable

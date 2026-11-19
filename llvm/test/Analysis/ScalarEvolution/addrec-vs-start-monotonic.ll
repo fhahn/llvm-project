@@ -113,21 +113,21 @@ define void @dec_to_start_of_nuw_int_addrec_poison_not_ub(i64 %start, i32 %n) {
 ; CHECK-LABEL: 'dec_to_start_of_nuw_int_addrec_poison_not_ub'
 ; CHECK-NEXT:  Classifying expressions for: @dec_to_start_of_nuw_int_addrec_poison_not_ub
 ; CHECK-NEXT:    %x = phi i64 [ %start, %entry ], [ %x.next, %up.latch ]
-; CHECK-NEXT:    --> {%start,+,1}<nuw><%up.header> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %up.header: Computable }
+; CHECK-NEXT:    --> {%start,+,1}<%up.header> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %up.header: Computable }
 ; CHECK-NEXT:    %v = phi i32 [ %n, %entry ], [ %v.next, %up.latch ]
 ; CHECK-NEXT:    --> %v U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %up.header: Variant }
 ; CHECK-NEXT:    %x.next = add nuw i64 %x, 1
-; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%up.header> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %up.header: Computable }
+; CHECK-NEXT:    --> {(1 + %start),+,1}<%up.header> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %up.header: Computable }
 ; CHECK-NEXT:    %v.next = mul i32 %v, 10
 ; CHECK-NEXT:    --> (10 * %v) U: [0,-1) S: [-2147483648,2147483647) Exits: <<Unknown>> LoopDispositions: { %up.header: Variant }
 ; CHECK-NEXT:    %y = phi i64 [ %x, %up.header ], [ %y.next, %down.latch ]
-; CHECK-NEXT:    --> {{\{\{}}%start,+,1}<nuw><%up.header>,+,-1}<%down.header> U: full-set S: full-set Exits: %start LoopDispositions: { %down.header: Computable }
+; CHECK-NEXT:    --> {{\{\{}}%start,+,1}<%up.header>,+,-1}<%down.header> U: full-set S: full-set Exits: ({%start,+,1}<%up.header> umin %start) LoopDispositions: { %down.header: Computable }
 ; CHECK-NEXT:    %y.next = add i64 %y, -1
-; CHECK-NEXT:    --> {{\{\{}}(-1 + %start),+,1}<nw><%up.header>,+,-1}<%down.header> U: full-set S: full-set Exits: (-1 + %start) LoopDispositions: { %down.header: Computable }
+; CHECK-NEXT:    --> {{\{\{}}(-1 + %start),+,1}<%up.header>,+,-1}<%down.header> U: full-set S: full-set Exits: (-1 + ({%start,+,1}<%up.header> umin %start)) LoopDispositions: { %down.header: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @dec_to_start_of_nuw_int_addrec_poison_not_ub
-; CHECK-NEXT:  Loop %down.header: backedge-taken count is {0,+,1}<nuw><%up.header>
+; CHECK-NEXT:  Loop %down.header: backedge-taken count is ((-1 * ({%start,+,1}<%up.header> umin %start)) + {%start,+,1}<%up.header>)
 ; CHECK-NEXT:  Loop %down.header: constant max backedge-taken count is i64 -1
-; CHECK-NEXT:  Loop %down.header: symbolic max backedge-taken count is {0,+,1}<nuw><%up.header>
+; CHECK-NEXT:  Loop %down.header: symbolic max backedge-taken count is ((-1 * ({%start,+,1}<%up.header> umin %start)) + {%start,+,1}<%up.header>)
 ; CHECK-NEXT:  Loop %down.header: Trip multiple is 1
 ; CHECK-NEXT:  Loop %up.header: Unpredictable backedge-taken count.
 ; CHECK-NEXT:  Loop %up.header: Unpredictable constant max backedge-taken count.

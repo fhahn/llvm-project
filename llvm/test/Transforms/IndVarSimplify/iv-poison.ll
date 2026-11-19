@@ -89,13 +89,13 @@ exit:
 define i4 @iv_hoist_both_adds_nsw_extra_use(i4 %arg) {
 ; CHECK-LABEL: @iv_hoist_both_adds_nsw_extra_use(
 ; CHECK-NEXT:  bb:
-; CHECK-NEXT:    [[DOTNOT_NOT:%.*]] = icmp ult i4 1, [[ARG:%.*]]
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV_0:%.*]] = phi i4 [ 1, [[BB:%.*]] ], [ [[IV_0_NEXT:%.*]], [[LOOP]] ]
-; CHECK-NEXT:    [[IV_0_NEXT]] = add nuw nsw i4 [[IV_0]], 1
+; CHECK-NEXT:    [[IV_0_NEXT]] = add nsw i4 [[IV_0]], 1
 ; CHECK-NEXT:    call void @use(i4 [[IV_0_NEXT]])
 ; CHECK-NEXT:    call void @use(i4 [[IV_0_NEXT]])
+; CHECK-NEXT:    [[DOTNOT_NOT:%.*]] = icmp ult i4 [[IV_0]], [[ARG:%.*]]
 ; CHECK-NEXT:    br i1 [[DOTNOT_NOT]], label [[EXIT:%.*]], label [[LOOP]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    [[IV_1_NEXT_LCSSA:%.*]] = phi i4 [ [[IV_0_NEXT]], [[LOOP]] ]
@@ -121,13 +121,13 @@ exit:
 define i4 @iv_hoist_both_adds_nsw_extra_use_incs_reordered(i4 %arg) {
 ; CHECK-LABEL: @iv_hoist_both_adds_nsw_extra_use_incs_reordered(
 ; CHECK-NEXT:  bb:
-; CHECK-NEXT:    [[DOTNOT_NOT:%.*]] = icmp ult i4 1, [[ARG:%.*]]
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV_0:%.*]] = phi i4 [ 1, [[BB:%.*]] ], [ [[IV_0_NEXT:%.*]], [[LOOP]] ]
-; CHECK-NEXT:    [[IV_0_NEXT]] = add nuw nsw i4 [[IV_0]], 1
+; CHECK-NEXT:    [[IV_0_NEXT]] = add nsw i4 [[IV_0]], 1
 ; CHECK-NEXT:    call void @use(i4 [[IV_0_NEXT]])
 ; CHECK-NEXT:    call void @use(i4 [[IV_0_NEXT]])
+; CHECK-NEXT:    [[DOTNOT_NOT:%.*]] = icmp ult i4 [[IV_0]], [[ARG:%.*]]
 ; CHECK-NEXT:    br i1 [[DOTNOT_NOT]], label [[EXIT:%.*]], label [[LOOP]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    [[IV_1_NEXT_LCSSA:%.*]] = phi i4 [ [[IV_0_NEXT]], [[LOOP]] ]
@@ -213,11 +213,11 @@ common.ret:                                       ; preds = %bb1
 define i4 @iv_hoist_nuw_poison2(i4 %0, i4 %end, i4 %start) {
 ; CHECK-LABEL: @iv_hoist_nuw_poison2(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[DOTNOT_NOT:%.*]] = icmp ult i4 [[START:%.*]], [[END:%.*]]
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[IV_0:%.*]] = phi i4 [ [[START]], [[ENTRY:%.*]] ], [ [[IV_0_NEXT:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[IV_0:%.*]] = phi i4 [ [[START:%.*]], [[ENTRY:%.*]] ], [ [[IV_0_NEXT:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[IV_0_NEXT]] = add i4 [[IV_0]], 1
+; CHECK-NEXT:    [[DOTNOT_NOT:%.*]] = icmp ult i4 [[IV_0]], [[END:%.*]]
 ; CHECK-NEXT:    br i1 [[DOTNOT_NOT]], label [[EXIT:%.*]], label [[LOOP]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    [[IV_1_NEXT_LCSSA:%.*]] = phi i4 [ [[IV_0_NEXT]], [[LOOP]] ]
@@ -269,13 +269,13 @@ exit:
 define i4 @iv_hoist_both_adds_nuw_extra_use(i4 %arg, i4 %start) {
 ; CHECK-LABEL: @iv_hoist_both_adds_nuw_extra_use(
 ; CHECK-NEXT:  bb:
-; CHECK-NEXT:    [[DOTNOT_NOT:%.*]] = icmp ult i4 [[START:%.*]], [[ARG:%.*]]
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[IV_0:%.*]] = phi i4 [ [[START]], [[BB:%.*]] ], [ [[IV_0_NEXT:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[IV_0:%.*]] = phi i4 [ [[START:%.*]], [[BB:%.*]] ], [ [[IV_0_NEXT:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[IV_0_NEXT]] = add nuw i4 [[IV_0]], 1
 ; CHECK-NEXT:    call void @use(i4 [[IV_0_NEXT]])
 ; CHECK-NEXT:    call void @use(i4 [[IV_0_NEXT]])
+; CHECK-NEXT:    [[DOTNOT_NOT:%.*]] = icmp ult i4 [[IV_0]], [[ARG:%.*]]
 ; CHECK-NEXT:    br i1 [[DOTNOT_NOT]], label [[EXIT:%.*]], label [[LOOP]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    [[IV_1_NEXT_LCSSA:%.*]] = phi i4 [ [[IV_0_NEXT]], [[LOOP]] ]
@@ -301,13 +301,13 @@ exit:
 define i4 @iv_hoist_both_adds_nuw_extra_use_incs_reordered(i4 %arg, i4 %start) {
 ; CHECK-LABEL: @iv_hoist_both_adds_nuw_extra_use_incs_reordered(
 ; CHECK-NEXT:  bb:
-; CHECK-NEXT:    [[DOTNOT_NOT:%.*]] = icmp ult i4 [[START:%.*]], [[ARG:%.*]]
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[IV_0:%.*]] = phi i4 [ [[START]], [[BB:%.*]] ], [ [[IV_0_NEXT:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[IV_0:%.*]] = phi i4 [ [[START:%.*]], [[BB:%.*]] ], [ [[IV_0_NEXT:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[IV_0_NEXT]] = add nuw i4 [[IV_0]], 1
 ; CHECK-NEXT:    call void @use(i4 [[IV_0_NEXT]])
 ; CHECK-NEXT:    call void @use(i4 [[IV_0_NEXT]])
+; CHECK-NEXT:    [[DOTNOT_NOT:%.*]] = icmp ult i4 [[IV_0]], [[ARG:%.*]]
 ; CHECK-NEXT:    br i1 [[DOTNOT_NOT]], label [[EXIT:%.*]], label [[LOOP]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    [[IV_1_NEXT_LCSSA:%.*]] = phi i4 [ [[IV_0_NEXT]], [[LOOP]] ]
@@ -333,12 +333,12 @@ exit:
 define i4 @iv_hoist_nuw_poison_extra_use(i4 %0, i4 %end, i4 %start) {
 ; CHECK-LABEL: @iv_hoist_nuw_poison_extra_use(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[DOTNOT_NOT:%.*]] = icmp ult i4 [[START:%.*]], [[END:%.*]]
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[IV_0:%.*]] = phi i4 [ [[START]], [[ENTRY:%.*]] ], [ [[IV_0_NEXT:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[IV_0:%.*]] = phi i4 [ [[START:%.*]], [[ENTRY:%.*]] ], [ [[IV_0_NEXT:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[IV_0_NEXT]] = add i4 [[IV_0]], 1
 ; CHECK-NEXT:    call void @use(i4 [[IV_0_NEXT]])
+; CHECK-NEXT:    [[DOTNOT_NOT:%.*]] = icmp ult i4 [[IV_0]], [[END:%.*]]
 ; CHECK-NEXT:    br i1 [[DOTNOT_NOT]], label [[EXIT:%.*]], label [[LOOP]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    [[IV_1_NEXT_LCSSA:%.*]] = phi i4 [ [[IV_0_NEXT]], [[LOOP]] ]
@@ -367,12 +367,10 @@ define i1 @cmp_of_phi_sharing_recurrence_one_inc_nuw(i32 %start) {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[I:%.*]] = phi i32 [ 0, [[ENTRY:%.*]] ], [ [[I_NEXT:%.*]], [[LOOP]] ]
-; CHECK-NEXT:    [[I_NEXT]] = add nuw nsw i32 [[I]], 1
-; CHECK-NEXT:    [[EC:%.*]] = icmp eq i32 [[I_NEXT]], 1000
-; CHECK-NEXT:    br i1 [[EC]], label [[EXIT:%.*]], label [[LOOP]]
+; CHECK-NEXT:    br i1 true, label [[EXIT:%.*]], label [[LOOP]]
 ; CHECK:       exit:
-; CHECK-NEXT:    [[CMP_LCSSA:%.*]] = phi i1 [ true, [[LOOP]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[START:%.*]], 999
+; CHECK-NEXT:    [[CMP_LCSSA:%.*]] = icmp uge i32 [[TMP0]], [[START]]
 ; CHECK-NEXT:    ret i1 [[CMP_LCSSA]]
 ;
 entry:

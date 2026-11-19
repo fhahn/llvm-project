@@ -15,13 +15,22 @@ define void @fn(i32 noundef %n, ptr %in, ptr %out) #0 {
 ; CHECK:       [[FOR_BODY_PREHEADER]]:
 ; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP33:%.*]] = add i32 [[N]], -1
+; CHECK-NEXT:    [[MUL1:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 3, i32 [[TMP33]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL1]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL1]], 1
+; CHECK-NEXT:    [[TMP34:%.*]] = getelementptr i8, ptr [[OUT]], i32 [[MUL_RESULT]]
+; CHECK-NEXT:    [[TMP35:%.*]] = icmp ult ptr [[TMP34]], [[OUT]]
+; CHECK-NEXT:    [[TMP36:%.*]] = or i1 [[TMP35]], [[MUL_OVERFLOW]]
+; CHECK-NEXT:    br i1 [[TMP36]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK1:.*]]
+; CHECK:       [[VECTOR_MEMCHECK1]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 [[N]], 3
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[OUT]], i32 [[TMP0]]
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[IN]], i32 [[TMP0]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[OUT]], [[SCEVGEP1]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[IN]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_RND_UP:%.*]] = add i32 [[N]], 3
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N_RND_UP]], 3

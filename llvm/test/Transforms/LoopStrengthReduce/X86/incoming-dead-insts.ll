@@ -17,7 +17,7 @@ define i64 @redundant_iv_crit_edge_exit(i64 %n) {
 ; CHECK-NEXT:    [[EARLY_COND:%.*]] = call i1 @cond()
 ; CHECK-NEXT:    br i1 [[EARLY_COND]], label %[[LOOP_LATCH]], label %[[LOOP_HEADER_EXIT_CRIT_EDGE:.*]]
 ; CHECK:       [[LOOP_LATCH]]:
-; CHECK-NEXT:    [[LSR_IV_NEXT]] = add nuw i64 [[LSR_IV]], 1
+; CHECK-NEXT:    [[LSR_IV_NEXT]] = add i64 [[LSR_IV]], 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], [[LSR_IV_NEXT]]
 ; CHECK-NEXT:    [[EXIT_COND:%.*]] = icmp eq i64 [[TMP1]], 3
 ; CHECK-NEXT:    br i1 [[EXIT_COND]], label %[[EXITSPLIT:.*]], label %[[LOOP_HEADER]]

@@ -1078,13 +1078,13 @@ define void @sub_udiv_exit_value_poison_not_ub(i64 %start, i64 %step, i64 %n) {
 ; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><%loop> U: full-set S: full-set Exits: %n LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
-; CHECK-NEXT:    --> {%start,+,%step}<nuw><%loop> U: full-set S: full-set Exits: ((%step * %n)<u nuw> + %start)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {%start,+,%step}<%loop> U: full-set S: full-set Exits: ((%step * %n) + %start) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.div = udiv i64 %iv, 3
-; CHECK-NEXT:    --> ({%start,+,%step}<nuw><%loop> /u 3) U: [0,6148914691236517206) S: [0,6148914691236517206) Exits: (((%step * %n)<u nuw> + %start)<u nuw> /u 3) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> ({%start,+,%step}<%loop> /u 3) U: [0,6148914691236517206) S: [0,6148914691236517206) Exits: (((%step * %n) + %start) /u 3) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %diff = sub i64 %iv.div, %end.div
-; CHECK-NEXT:    --> ((-1 * (((%step * %n) + %start) /u 3))<nsw> + ({%start,+,%step}<nuw><%loop> /u 3)) U: [-6148914691236517205,6148914691236517206) S: [-6148914691236517205,6148914691236517206) Exits: 0 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> ((-1 * (((%step * %n) + %start) /u 3))<nsw> + ({%start,+,%step}<%loop> /u 3)) U: [-6148914691236517205,6148914691236517206) S: [-6148914691236517205,6148914691236517206) Exits: 0 LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nuw i64 %iv, %step
-; CHECK-NEXT:    --> {(%start + %step),+,%step}<nw><%loop> U: full-set S: full-set Exits: (((1 + %n) * %step) + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(%start + %step),+,%step}<%loop> U: full-set S: full-set Exits: (((1 + %n) * %step) + %start) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add i64 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nw><%loop> U: full-set S: full-set Exits: (1 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @sub_udiv_exit_value_poison_not_ub

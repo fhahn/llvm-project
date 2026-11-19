@@ -55,8 +55,8 @@ define i32 @nuw_dropped_poison_not_ub(i32 %start, i32 %step, i32 %n) {
 ; CHECK:       [[LATCH]]:
 ; CHECK-NEXT:    br label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = mul nuw i32 [[N]], [[STEP]]
-; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i32 [[START]], [[TMP0]]
+; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 [[N]], [[STEP]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[START]], [[TMP0]]
 ; CHECK-NEXT:    ret i32 [[TMP1]]
 ;
 entry:

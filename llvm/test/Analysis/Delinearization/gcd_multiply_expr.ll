@@ -33,7 +33,7 @@ define i32 @fn2() {
 ; CHECK-NEXT:  failed to delinearize
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  Inst: %9 = load i8, ptr %arrayidx.i, align 1
-; CHECK-NEXT:  AccessFunction: (sext i32 {({(%1 * %2),+,1}<nw><%for.cond2thread-pre-split.i> + %.pr.i),+,8}<nw><%for.body4.i> to i64)
+; CHECK-NEXT:  AccessFunction: (sext i32 {({(%1 * %2),+,1}<%for.cond2thread-pre-split.i> + %.pr.i),+,8}<nw><%for.body4.i> to i64)
 ; CHECK-NEXT:  failed to delinearize
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  Inst: store i32 %conv.i, ptr @c, align 4
@@ -45,7 +45,7 @@ define i32 @fn2() {
 ; CHECK-NEXT:  failed to delinearize
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  Inst: %10 = load i8, ptr %arrayidx.1.i, align 1
-; CHECK-NEXT:  AccessFunction: (sext i32 {({(1 + (%1 * %2)),+,1}<nw><%for.cond2thread-pre-split.i> + %.pr.i),+,8}<nw><%for.body4.i> to i64)
+; CHECK-NEXT:  AccessFunction: (sext i32 {({(1 + (%1 * %2)),+,1}<%for.cond2thread-pre-split.i> + %.pr.i),+,8}<nw><%for.body4.i> to i64)
 ; CHECK-NEXT:  failed to delinearize
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  Inst: store i32 %conv.1.i, ptr @c, align 4
@@ -57,7 +57,7 @@ define i32 @fn2() {
 ; CHECK-NEXT:  failed to delinearize
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  Inst: %11 = load i8, ptr %arrayidx.2.i, align 1
-; CHECK-NEXT:  AccessFunction: (sext i32 {({(2 + (%1 * %2)),+,1}<nw><%for.cond2thread-pre-split.i> + %.pr.i),+,8}<nw><%for.body4.i> to i64)
+; CHECK-NEXT:  AccessFunction: (sext i32 {({(2 + (%1 * %2)),+,1}<%for.cond2thread-pre-split.i> + %.pr.i),+,8}<nw><%for.body4.i> to i64)
 ; CHECK-NEXT:  failed to delinearize
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  Inst: store i32 %conv.2.i, ptr @c, align 4
@@ -69,7 +69,7 @@ define i32 @fn2() {
 ; CHECK-NEXT:  failed to delinearize
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  Inst: %12 = load i8, ptr %arrayidx.3.i, align 1
-; CHECK-NEXT:  AccessFunction: (sext i32 {({(3 + (%1 * %2)),+,1}<nw><%for.cond2thread-pre-split.i> + %.pr.i),+,8}<nw><%for.body4.i> to i64)
+; CHECK-NEXT:  AccessFunction: (sext i32 {({(3 + (%1 * %2)),+,1}<%for.cond2thread-pre-split.i> + %.pr.i),+,8}<nw><%for.body4.i> to i64)
 ; CHECK-NEXT:  failed to delinearize
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  Inst: store i32 %conv.3.i, ptr @c, align 4
@@ -81,7 +81,7 @@ define i32 @fn2() {
 ; CHECK-NEXT:  failed to delinearize
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  Inst: %13 = load i8, ptr %arrayidx.4.i, align 1
-; CHECK-NEXT:  AccessFunction: (sext i32 {({(4 + (%1 * %2)),+,1}<nw><%for.cond2thread-pre-split.i> + %.pr.i),+,8}<nw><%for.body4.i> to i64)
+; CHECK-NEXT:  AccessFunction: (sext i32 {({(4 + (%1 * %2)),+,1}<%for.cond2thread-pre-split.i> + %.pr.i),+,8}<nw><%for.body4.i> to i64)
 ; CHECK-NEXT:  failed to delinearize
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  Inst: store i32 %conv.4.i, ptr @c, align 4
@@ -93,7 +93,7 @@ define i32 @fn2() {
 ; CHECK-NEXT:  failed to delinearize
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  Inst: %14 = load i8, ptr %arrayidx.5.i, align 1
-; CHECK-NEXT:  AccessFunction: (sext i32 {({(5 + (%1 * %2)),+,1}<nw><%for.cond2thread-pre-split.i> + %.pr.i),+,8}<nw><%for.body4.i> to i64)
+; CHECK-NEXT:  AccessFunction: (sext i32 {({(5 + (%1 * %2)),+,1}<%for.cond2thread-pre-split.i> + %.pr.i),+,8}<nw><%for.body4.i> to i64)
 ; CHECK-NEXT:  failed to delinearize
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  Inst: store i32 %conv.5.i, ptr @c, align 4
@@ -105,7 +105,7 @@ define i32 @fn2() {
 ; CHECK-NEXT:  failed to delinearize
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  Inst: %15 = load i8, ptr %arrayidx.6.i, align 1
-; CHECK-NEXT:  AccessFunction: (sext i32 {({(6 + (%1 * %2)),+,1}<nw><%for.cond2thread-pre-split.i> + %.pr.i),+,8}<nw><%for.body4.i> to i64)
+; CHECK-NEXT:  AccessFunction: (sext i32 {({(6 + (%1 * %2)),+,1}<%for.cond2thread-pre-split.i> + %.pr.i),+,8}<nw><%for.body4.i> to i64)
 ; CHECK-NEXT:  failed to delinearize
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  Inst: store i32 %conv.6.i, ptr @c, align 4
@@ -117,7 +117,7 @@ define i32 @fn2() {
 ; CHECK-NEXT:  failed to delinearize
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  Inst: %16 = load i8, ptr %arrayidx.7.i, align 1
-; CHECK-NEXT:  AccessFunction: (sext i32 {({(7 + (%1 * %2)),+,1}<nw><%for.cond2thread-pre-split.i> + %.pr.i),+,8}<nw><%for.body4.i> to i64)
+; CHECK-NEXT:  AccessFunction: (sext i32 {({(7 + (%1 * %2)),+,1}<%for.cond2thread-pre-split.i> + %.pr.i),+,8}<nw><%for.body4.i> to i64)
 ; CHECK-NEXT:  failed to delinearize
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  Inst: store i32 %conv.7.i, ptr @c, align 4
@@ -129,7 +129,7 @@ define i32 @fn2() {
 ; CHECK-NEXT:  failed to delinearize
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  Inst: %21 = load i8, ptr %arrayidx.ur.i, align 1
-; CHECK-NEXT:  AccessFunction: (sext i32 {({(%1 * %2),+,1}<nw><%for.cond2thread-pre-split.i> + %.ph),+,1}<nw><%for.body4.ur.i> to i64)
+; CHECK-NEXT:  AccessFunction: (sext i32 {({(%1 * %2),+,1}<%for.cond2thread-pre-split.i> + %.ph),+,1}<nw><%for.body4.ur.i> to i64)
 ; CHECK-NEXT:  failed to delinearize
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  Inst: store i32 %conv.ur.i, ptr @c, align 4

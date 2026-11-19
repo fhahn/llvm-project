@@ -387,13 +387,13 @@ define void @test_04(i1 %arg) {
 ; CHECK-LABEL: 'test_04'
 ; CHECK-NEXT:  Classifying expressions for: @test_04
 ; CHECK-NEXT:    %tmp = phi i64 [ 2, %bb ], [ %tmp4, %bb3 ]
-; CHECK-NEXT:    --> {2,+,1}<nuw><nsw><%loop1> U: [2,-9223372036854775808) S: [2,-9223372036854775808) Exits: <<Unknown>> LoopDispositions: { %loop1: Computable }
+; CHECK-NEXT:    --> {2,+,1}<%loop1> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop1: Computable }
 ; CHECK-NEXT:    %tmp2 = trunc i64 %tmp to i32
 ; CHECK-NEXT:    --> {2,+,1}<%loop1> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop1: Computable }
 ; CHECK-NEXT:    %tmp4 = add nuw nsw i64 %tmp, 1
-; CHECK-NEXT:    --> {3,+,1}<nuw><%loop1> U: [3,0) S: [3,0) Exits: <<Unknown>> LoopDispositions: { %loop1: Computable }
+; CHECK-NEXT:    --> {3,+,1}<%loop1> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop1: Computable }
 ; CHECK-NEXT:    %tmp7 = phi i64 [ %tmp15, %loop2 ], [ 2, %loop1 ]
-; CHECK-NEXT:    --> {2,+,1}<nuw><nsw><%loop2> U: [2,9223372036854775807) S: [2,9223372036854775807) Exits: (-1 + (3 smax {2,+,1}<nuw><nsw><%loop1>))<nsw> LoopDispositions: { %loop2: Computable }
+; CHECK-NEXT:    --> {2,+,1}<nuw><nsw><%loop2> U: [2,9223372036854775807) S: [2,9223372036854775807) Exits: (-1 + (3 smax {2,+,1}<%loop1>))<nsw> LoopDispositions: { %loop2: Computable }
 ; CHECK-NEXT:    %tmp8 = load i8, ptr addrspace(1) undef, align 1
 ; CHECK-NEXT:    --> %tmp8 U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop2: Variant }
 ; CHECK-NEXT:    %tmp9 = sext i8 %tmp8 to i64
@@ -407,11 +407,11 @@ define void @test_04(i1 %arg) {
 ; CHECK-NEXT:    %tmp14 = sub i32 %tmp13, %tmp2
 ; CHECK-NEXT:    --> ((sext i8 %tmp8 to i32) + {{\{\{}}(-4 + (trunc i64 undef to i32)),+,-1}<%loop1>,+,-1}<%loop2>) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop2: Variant }
 ; CHECK-NEXT:    %tmp15 = add nuw nsw i64 %tmp7, 1
-; CHECK-NEXT:    --> {3,+,1}<nuw><nsw><%loop2> U: [3,-9223372036854775808) S: [3,-9223372036854775808) Exits: (3 smax {2,+,1}<nuw><nsw><%loop1>) LoopDispositions: { %loop2: Computable }
+; CHECK-NEXT:    --> {3,+,1}<nuw><nsw><%loop2> U: [3,-9223372036854775808) S: [3,-9223372036854775808) Exits: (3 smax {2,+,1}<%loop1>) LoopDispositions: { %loop2: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_04
-; CHECK-NEXT:  Loop %loop2: backedge-taken count is (-3 + (3 smax {2,+,1}<nuw><nsw><%loop1>))<nsw>
+; CHECK-NEXT:  Loop %loop2: backedge-taken count is (-3 + (3 smax {2,+,1}<%loop1>))<nsw>
 ; CHECK-NEXT:  Loop %loop2: constant max backedge-taken count is i64 9223372036854775804
-; CHECK-NEXT:  Loop %loop2: symbolic max backedge-taken count is (-3 + (3 smax {2,+,1}<nuw><nsw><%loop1>))<nsw>
+; CHECK-NEXT:  Loop %loop2: symbolic max backedge-taken count is (-3 + (3 smax {2,+,1}<%loop1>))<nsw>
 ; CHECK-NEXT:  Loop %loop2: Trip multiple is 1
 ; CHECK-NEXT:  Loop %loop1: Unpredictable backedge-taken count.
 ; CHECK-NEXT:  Loop %loop1: Unpredictable constant max backedge-taken count.

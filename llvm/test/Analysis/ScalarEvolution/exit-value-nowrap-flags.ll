@@ -55,7 +55,7 @@ define void @dec_to_start_of_nuw_addrec_poison_not_ub(i64 %start) {
 ; CHECK-LABEL: 'dec_to_start_of_nuw_addrec_poison_not_ub'
 ; CHECK-NEXT:  Classifying expressions for: @dec_to_start_of_nuw_addrec_poison_not_ub
 ; CHECK-NEXT:    %x = phi i64 [ %start, %entry ], [ %x.next, %up ]
-; CHECK-NEXT:    --> {%start,+,1}<nuw><%up> U: full-set S: full-set Exits: (9 + %start)<u nuw> LoopDispositions: { %up: Computable }
+; CHECK-NEXT:    --> {%start,+,1}<nw><%up> U: full-set S: full-set Exits: (9 + %start) LoopDispositions: { %up: Computable }
 ; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %up ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%up> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %up: Computable }
 ; CHECK-NEXT:    %x.next = add nuw i64 %x, 1
@@ -63,7 +63,7 @@ define void @dec_to_start_of_nuw_addrec_poison_not_ub(i64 %start) {
 ; CHECK-NEXT:    %i.next = add i32 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%up> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %up: Computable }
 ; CHECK-NEXT:    %y = phi i64 [ %x, %up ], [ %y.next, %down ]
-; CHECK-NEXT:    --> {{\{\{}}%start,+,1}<nuw><%up>,+,-1}<nw><%down> U: full-set S: full-set --> {(9 + %start)<u nuw>,+,-1}<nw><%down> U: full-set S: full-set Exits: (1 + ((8 + %start) umin %start)) LoopDispositions: { %down: Computable }
+; CHECK-NEXT:    --> {{\{\{}}%start,+,1}<nw><%up>,+,-1}<nw><%down> U: full-set S: full-set --> {(9 + %start),+,-1}<nw><%down> U: full-set S: full-set Exits: (1 + ((8 + %start) umin %start)) LoopDispositions: { %down: Computable }
 ; CHECK-NEXT:    %y.next = add i64 %y, -1
 ; CHECK-NEXT:    --> {{\{\{}}(-1 + %start),+,1}<nw><%up>,+,-1}<nw><%down> U: full-set S: full-set --> {(8 + %start),+,-1}<nw><%down> U: full-set S: full-set Exits: ((8 + %start) umin %start) LoopDispositions: { %down: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @dec_to_start_of_nuw_addrec_poison_not_ub
