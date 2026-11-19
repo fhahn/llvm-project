@@ -567,10 +567,12 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
 
   // If the start values for both Src and Sink also vary according to an outer
   // loop, then it's probably better to avoid creating diff checks because
-  // they may not be hoisted. We should instead let llvm::addRuntimeChecks
-  // do the expanded full range overlap checks, which can be hoisted.
-  if (HoistRuntimeChecks && InnerLoop->getParentLoop() &&
-      isa<SCEVAddRecExpr>(SinkStartInt) && isa<SCEVAddRecExpr>(SrcStartInt)) {
+  // they may not be hoisted. If the bounds of both groups can be expanded to
+  // the outer loop, we should instead let llvm::addRuntimeChecks do the
+  // expanded full range overlap checks, which can be hoisted.
+  if (HoistRuntimeChecks && CGI.CanExpandToOuterLoop &&
+      CGJ.CanExpandToOuterLoop && isa<SCEVAddRecExpr>(SinkStartInt) &&
+      isa<SCEVAddRecExpr>(SrcStartInt)) {
     auto *SrcStartAR = cast<SCEVAddRecExpr>(SrcStartInt);
     auto *SinkStartAR = cast<SCEVAddRecExpr>(SinkStartInt);
     const Loop *StartARLoop = SrcStartAR->getLoop();
@@ -617,6 +619,25 @@ void RuntimePointerChecking::generateChecks(
   assert(Checks.empty() && "Checks is not empty");
   groupChecks(DepCands);
   mergeStencilGroups();
+
+  // The bounds of a group can be expanded to cover all iterations of the
+  // outer loop if they are affine recurrences of the outer loop with the same
+  // step and the outer trip count is computable. The step is only checked
+  // once, so it must be invariant and shared.
+  const Loop *InnerLoop = DC.getInnermostLoop();
+  Loop *OuterLoop = InnerLoop->getParentLoop();
+  if (HoistRuntimeChecks && OuterLoop &&
+      SE->hasLoopInvariantBackedgeTakenCount(OuterLoop)) {
+    for (RuntimeCheckingPtrGroup &CG : CheckingGroups) {
+      const SCEV *Step;
+      CG.CanExpandToOuterLoop =
+          match(CG.Low, m_scev_AffineAddRec(m_SCEV(), m_SCEV(Step),
+                                            m_SpecificLoop(OuterLoop))) &&
+          match(CG.High, m_scev_AffineAddRec(m_SCEV(), m_scev_Specific(Step),
+                                             m_SpecificLoop(OuterLoop)));
+    }
+  }
+
   Checks = generateChecks();
 }
 

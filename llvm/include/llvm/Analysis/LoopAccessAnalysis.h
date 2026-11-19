@@ -534,6 +534,9 @@ struct RuntimeCheckingPtrGroup {
   /// Whether the pointer needs to be frozen after expansion, e.g. because it
   /// may be poison outside the loop.
   bool NeedsFreeze = false;
+  /// Whether the bounds can be expanded to cover all iterations of the parent
+  /// loop of the innermost loop, so the checks can be hoisted out of it.
+  bool CanExpandToOuterLoop = false;
 };
 
 /// A memcheck which made up of a pair of grouped pointers.
