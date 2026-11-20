@@ -902,15 +902,6 @@ bool vputils::isUsedByLoadStoreAddress(const VPValue *V) {
     if (!Seen.insert(Cur).second)
       continue;
 
-    auto *Blend = dyn_cast<VPBlendRecipe>(Cur);
-    // Skip blends that use V only through a compare by checking if any incoming
-    // value was already visited.
-    if (Blend && none_of(seq<unsigned>(0, Blend->getNumIncomingValues()),
-                         [&](unsigned I) {
-                           return Seen.contains(Blend->getIncomingValue(I));
-                         }))
-      continue;
-
     for (VPUser *U : Cur->users()) {
       if (auto *InterleaveR = dyn_cast<VPInterleaveBase>(U))
         if (InterleaveR->getAddr() == Cur)
@@ -930,18 +921,24 @@ bool vputils::isUsedByLoadStoreAddress(const VPValue *V) {
     // The legacy cost model only supports scalarization loads/stores with phi
     // addresses, if the phi is directly used as load/store address. Don't
     // traverse further for Blends and first-order recurrence splices.
-    if (Blend ||
+    if (isa<VPBlendRecipe>(Cur) ||
         match(Cur,
               m_VPInstruction<VPInstruction::FirstOrderRecurrenceSplice>()))
       continue;
 
     // Only traverse further through users that also define a value (and can
-    // thus have their own users walked). Skip when Cur is only used as mask ,
-    // as well as loads: a loaded value does not depend on the load's operand.
+    // thus have their own users walked). Skip users using Cur only as mask,
+    // including blends, as well as loads: a loaded value does not depend on
+    // the load's operand.
     for (VPUser *U : Cur->users()) {
       auto *VPI = dyn_cast<VPInstruction>(U);
       if (VPI && VPI->getMask() == Cur &&
           none_of(VPI->operandsWithoutMask(), equal_to(Cur)))
+        continue;
+      auto *Blend = dyn_cast<VPBlendRecipe>(U);
+      if (Blend && none_of(seq(Blend->getNumIncomingValues()), [&](unsigned I) {
+            return Blend->getIncomingValue(I) == Cur;
+          }))
         continue;
       if (match(U, m_VPInstruction<Instruction::Load>()))
         continue;

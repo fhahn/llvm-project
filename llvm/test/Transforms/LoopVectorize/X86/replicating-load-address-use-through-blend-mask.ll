@@ -9,8 +9,8 @@
 ; mask is also computed from %l.ptr.
 define i32 @load_addr_via_blend_and_mask(ptr %A, ptr %B, i64 %n) {
 ; CHECK-LABEL: 'load_addr_via_blend_and_mask'
-; CHECK:  Cost of 1 for VF 2: WIDEN ir<%l.ptr> = load vp<[[VP6:%[0-9]+]]>, align 8
-; CHECK:  Cost for VF 2: 29 (Estimated cost per lane: 14.5)
+; CHECK:  Cost of 2 for VF 2: REPLICATE ir<%l.ptr> = load ir<%gep.A>
+; CHECK:  Cost for VF 2: 31 (Estimated cost per lane: 15.5)
 ;
 entry:
   br label %loop
@@ -46,8 +46,8 @@ exit:
 ; blend %addr used as address. %addr uses %l.ptr directly only in its mask.
 define i32 @load_addr_via_nested_blend_and_mask(ptr %A, ptr %B, ptr %C, i64 %n) {
 ; CHECK-LABEL: 'load_addr_via_nested_blend_and_mask'
-; CHECK:  Cost of 2 for VF 2: REPLICATE ir<%l.ptr> = load ir<%gep.A>
-; CHECK:  Cost for VF 2: 34 (Estimated cost per lane: 17)
+; CHECK:  Cost of 1 for VF 2: WIDEN ir<%l.ptr> = load vp<[[VP6:%[0-9]+]]>, align 8
+; CHECK:  Cost for VF 2: 32 (Estimated cost per lane: 16)
 ;
 entry:
   br label %loop
