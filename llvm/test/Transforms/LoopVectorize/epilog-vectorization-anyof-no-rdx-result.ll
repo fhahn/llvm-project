@@ -310,46 +310,19 @@ exit:
 define i32 @dead_anyof_reduction2(i8 %start) {
 ; CHECK-LABEL: define i32 @dead_anyof_reduction2(
 ; CHECK-SAME: i8 [[START:%.*]]) {
-; CHECK-NEXT:  [[ITER_CHECK:.*]]:
-; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH:.*]], label %[[VECTOR_MAIN_LOOP_ITER_CHECK:.*]]
-; CHECK:       [[VECTOR_MAIN_LOOP_ITER_CHECK]]:
-; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_PH:.*]], label %[[VECTOR_PH:.*]]
-; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:  [[VECTOR_PH:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
-; CHECK-NEXT:    [[TMP0:%.*]] = icmp eq i32 [[INDEX_NEXT]], 256
-; CHECK-NEXT:    br i1 [[TMP0]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
-; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
-; CHECK:       [[VEC_EPILOG_ITER_CHECK]]:
-; CHECK-NEXT:    br i1 true, label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF3]]
-; CHECK:       [[VEC_EPILOG_PH]]:
-; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i32 [ 256, %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX1:%.*]] = phi i32 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT2:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
-; CHECK-NEXT:    [[INDEX_NEXT2]] = add nuw i32 [[INDEX1]], 2
-; CHECK-NEXT:    [[TMP1:%.*]] = icmp eq i32 [[INDEX_NEXT2]], 256
-; CHECK-NEXT:    br i1 [[TMP1]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
-; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
-; CHECK-NEXT:    br i1 true, label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]]
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_BODY]] ], [ [[INDEX_NEXT2:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
+; CHECK-NEXT:    [[INDEX_NEXT2]] = add nuw i32 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP0:%.*]] = icmp eq i32 [[INDEX_NEXT2]], 256
+; CHECK-NEXT:    br i1 [[TMP0]], label %[[VEC_EPILOG_SCALAR_PH:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_SCALAR_PH]]:
-; CHECK-NEXT:    [[BC_MERGE_RDX3:%.*]] = phi i8 [ 0, %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ 0, %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[ITER_CHECK]] ]
-; CHECK-NEXT:    [[BC_RESUME_VAL4:%.*]] = phi i8 [ 1, %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ 1, %[[VEC_EPILOG_ITER_CHECK]] ], [ 1, %[[ITER_CHECK]] ]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[G_0:%.*]] = phi i8 [ [[SPEC_SELECT:%.*]], %[[LOOP]] ], [ [[BC_MERGE_RDX3]], %[[VEC_EPILOG_SCALAR_PH]] ]
-; CHECK-NEXT:    [[H_0:%.*]] = phi i8 [ [[ADD3:%.*]], %[[LOOP]] ], [ [[BC_RESUME_VAL4]], %[[VEC_EPILOG_SCALAR_PH]] ]
-; CHECK-NEXT:    [[ADD3]] = add i8 [[H_0]], 1
-; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i8 1, 0
-; CHECK-NEXT:    [[SPEC_SELECT]] = select i1 [[CMP]], i8 0, i8 [[G_0]]
-; CHECK-NEXT:    [[EC:%.*]] = icmp eq i8 [[H_0]], 0
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP14:![0-9]+]]
-; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[SPEC_SELECT_LCSSA:%.*]] = phi i8 [ [[SPEC_SELECT]], %[[LOOP]] ], [ 0, %[[MIDDLE_BLOCK]] ], [ 0, %[[VEC_EPILOG_MIDDLE_BLOCK]] ]
-; CHECK-NEXT:    [[RES:%.*]] = zext i8 [[SPEC_SELECT_LCSSA]] to i32
+; CHECK-NEXT:    [[RES:%.*]] = zext i8 0 to i32
 ; CHECK-NEXT:    ret i32 [[RES]]
 ;
 ; CHECK-IL2-LABEL: define i32 @dead_anyof_reduction2(
@@ -361,8 +334,8 @@ define i32 @dead_anyof_reduction2(i8 %start) {
 ; CHECK-IL2:       [[VECTOR_BODY]]:
 ; CHECK-IL2-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-IL2-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 8
-; CHECK-IL2-NEXT:    [[TMP0:%.*]] = icmp eq i32 [[INDEX_NEXT]], 256
-; CHECK-IL2-NEXT:    br i1 [[TMP0]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
+; CHECK-IL2-NEXT:    [[TMP2:%.*]] = icmp eq i32 [[INDEX_NEXT]], 256
+; CHECK-IL2-NEXT:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK-IL2:       [[MIDDLE_BLOCK]]:
 ; CHECK-IL2-NEXT:    br label %[[EXIT:.*]]
 ; CHECK-IL2:       [[EXIT]]:
