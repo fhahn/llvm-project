@@ -258,13 +258,12 @@ define i64 @replicated_with_vector_user_and_live_out(ptr noalias %src, ptr noali
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<[[VP23:%[0-9]+]]> = extract-last-lane vp<[[VP18]]>
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1000>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<exit>:
-; CHECK-NEXT:    IR   %l.lcssa = phi i64 [ %l, %loop ] (extra operand: vp<[[VP23]]> from middle.block)
+; CHECK-NEXT:    IR   %l.lcssa = phi i64 [ %l, %loop ] (extra operand: ir<%l>.3 from middle.block)
 ; CHECK-NEXT:  No successors
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  scalar.ph:

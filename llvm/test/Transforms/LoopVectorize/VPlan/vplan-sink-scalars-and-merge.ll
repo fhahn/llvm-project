@@ -55,7 +55,8 @@ define void @sink1(i32 %k, i32 %x) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    if.0:
 ; CHECK-NEXT:      REPLICATE ir<%add> = add vp<[[VP11]]>, ir<10>
-; CHECK-NEXT:      EMIT vp<[[VP12:%[0-9]+]]> = shl ir<%add>, ir<1>
+; CHECK-NEXT:      EMIT vp<[[VP12:%[0-9]+]]> = pack ir<%add>
+; CHECK-NEXT:      EMIT vp<[[VP13:%[0-9]+]]> = shl vp<[[VP12]]>, ir<1>
 ; CHECK-NEXT:    Successor(s): pred.store
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    <xVFxUF> pred.store: {
@@ -65,7 +66,7 @@ define void @sink1(i32 %k, i32 %x) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.if:
 ; CHECK-NEXT:        REPLICATE ir<%gep.a> = getelementptr inbounds ir<@a>, ir<0>, vp<[[VP9]]>
-; CHECK-NEXT:        REPLICATE store vp<[[VP12]]>, ir<%gep.a>
+; CHECK-NEXT:        REPLICATE store vp<[[VP13]]>, ir<%gep.a>
 ; CHECK-NEXT:      Successor(s): pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.continue:

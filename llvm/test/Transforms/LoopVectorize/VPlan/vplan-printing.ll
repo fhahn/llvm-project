@@ -515,12 +515,13 @@ define void @replicated_with_scalar_and_vector_users(ptr noalias %src, ptr noali
 ; CHECK-NEXT:      WIDEN ir<%idx> = load vp<[[VP5]]>, align 8
 ; CHECK-NEXT:      REPLICATE ir<%gep.src.idx> = getelementptr ir<%src>, ir<%idx>
 ; CHECK-NEXT:      REPLICATE ir<%l> = load ir<%gep.src.idx>
+; CHECK-NEXT:      EMIT vp<[[VP6:%[0-9]+]]> = pack ir<%l>
 ; CHECK-NEXT:      REPLICATE ir<%gep.dst> = getelementptr ir<%dst>, ir<%l>
 ; CHECK-NEXT:      REPLICATE store vp<[[VP4]]>, ir<%gep.dst>
-; CHECK-NEXT:      WIDEN ir<%a> = add ir<%l>, ir<1>
+; CHECK-NEXT:      WIDEN ir<%a> = add vp<[[VP6]]>, ir<1>
 ; CHECK-NEXT:      CLONE ir<%gep.dst.2> = getelementptr ir<%dst.2>, vp<[[VP4]]>
-; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer i64, ir<%gep.dst.2>, ir<1>
-; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%a>, align 8
+; CHECK-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer i64, ir<%gep.dst.2>, ir<1>
+; CHECK-NEXT:      WIDEN store vp<[[VP7]]>, ir<%a>, align 8
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
@@ -1713,10 +1714,11 @@ define i64 @replicated_with_vector_user_and_live_out(ptr noalias %src, ptr noali
 ; CHECK-NEXT:      WIDEN ir<%idx> = load vp<[[VP5]]>, align 8
 ; CHECK-NEXT:      REPLICATE ir<%gep.src.idx> = getelementptr ir<%src>, ir<%idx>
 ; CHECK-NEXT:      REPLICATE ir<%l> = load ir<%gep.src.idx>
-; CHECK-NEXT:      WIDEN ir<%a> = add ir<%l>, ir<1>
+; CHECK-NEXT:      EMIT vp<[[VP6:%[0-9]+]]> = pack ir<%l>
+; CHECK-NEXT:      WIDEN ir<%a> = add vp<[[VP6]]>, ir<1>
 ; CHECK-NEXT:      CLONE ir<%gep.dst> = getelementptr ir<%dst>, vp<[[VP4]]>
-; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer i64, ir<%gep.dst>, ir<1>
-; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%a>, align 8
+; CHECK-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer i64, ir<%gep.dst>, ir<1>
+; CHECK-NEXT:      WIDEN store vp<[[VP7]]>, ir<%a>, align 8
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
@@ -1724,14 +1726,14 @@ define i64 @replicated_with_vector_user_and_live_out(ptr noalias %src, ptr noali
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = extract-last-part ir<%l>
-; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = extract-last-lane vp<[[VP8]]>
+; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = extract-last-part ir<%l>
+; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = extract-last-lane vp<[[VP9]]>
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1000>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<exit>:
-; CHECK-NEXT:    IR   %l.lcssa = phi i64 [ %l, %loop ] (extra operand: vp<[[VP9]]> from middle.block)
+; CHECK-NEXT:    IR   %l.lcssa = phi i64 [ %l, %loop ] (extra operand: vp<[[VP10]]> from middle.block)
 ; CHECK-NEXT:  No successors
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  scalar.ph:
@@ -1796,14 +1798,15 @@ define i64 @replicated_recurrence_with_penultimate_live_out(ptr noalias %src, pt
 ; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
-; CHECK-NEXT:      FIRST-ORDER-RECURRENCE-PHI ir<%for> = phi ir<0>, ir<%l>
+; CHECK-NEXT:      FIRST-ORDER-RECURRENCE-PHI ir<%for> = phi ir<0>, vp<[[PACK:%[0-9]+]]>
 ; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = SCALAR-STEPS vp<[[VP3]]>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      CLONE ir<%gep.src> = getelementptr ir<%src>, vp<[[VP4]]>
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer i64, ir<%gep.src>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%idx> = load vp<[[VP5]]>, align 8
 ; CHECK-NEXT:      REPLICATE ir<%gep.src.idx> = getelementptr ir<%src>, ir<%idx>
 ; CHECK-NEXT:      REPLICATE ir<%l> = load ir<%gep.src.idx>
-; CHECK-NEXT:      EMIT vp<[[VP6:%[0-9]+]]> = first-order splice ir<%for>, ir<%l>
+; CHECK-NEXT:      EMIT vp<[[PACK]]> = pack ir<%l>
+; CHECK-NEXT:      EMIT vp<[[VP6:%[0-9]+]]> = first-order splice ir<%for>, vp<[[PACK]]>
 ; CHECK-NEXT:      WIDEN ir<%a> = add vp<[[VP6]]>, ir<1>
 ; CHECK-NEXT:      CLONE ir<%gep.dst> = getelementptr ir<%dst>, vp<[[VP4]]>
 ; CHECK-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer i64, ir<%gep.dst>, ir<1>

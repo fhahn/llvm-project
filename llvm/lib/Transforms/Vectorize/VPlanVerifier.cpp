@@ -329,12 +329,15 @@ bool VPlanVerifier::verifyVPBasicBlock(const VPBasicBlock *VPBB) {
         if (!verifyLastActiveLaneRecipe(*VPI))
           return false;
         break;
-      case VPInstruction::Pack:
-        if (!isa<VPPredInstPHIRecipe>(VPI->getOperand(0))) {
-          errs() << "Pack operand must be a VPPredInstPHIRecipe\n";
+      case VPInstruction::Pack: {
+        const VPRecipeBase *PackedR = VPI->getOperand(0)->getDefiningRecipe();
+        if (!PackedR || (!isa<VPPredInstPHIRecipe>(PackedR) &&
+                         !vputils::doesGeneratePerAllLanes(PackedR))) {
+          errs() << "Pack operand must be a replicated or predicated value\n";
           return false;
         }
         break;
+      }
       default:
         break;
       }

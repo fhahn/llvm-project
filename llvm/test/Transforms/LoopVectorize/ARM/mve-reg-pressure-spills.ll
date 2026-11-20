@@ -179,7 +179,7 @@ define void @spills_profitable(ptr %in1, ptr %in2, ptr %out, i32 %n, i32 %m) {
 ; CHECK-NOPRESSURE:  LV: Selecting VF: 4.
 ;
 ; CHECK-PRESSURE-LABEL: 'spills_profitable'
-; CHECK-PRESSURE:  LV(REG): Cost of 4 from 2 spills of Generic::ScalarRC
+; CHECK-PRESSURE:  LV(REG): Cost of 4 from 2 spills of Generic::VectorRC
 ; CHECK-PRESSURE:  Cost for VF 2: 1536 (Estimated cost per lane: 768)
 ; CHECK-PRESSURE:  LV(REG): Cost of 6 from 3 spills of Generic::VectorRC
 ; CHECK-PRESSURE:  Cost for VF 4: 45 (Estimated cost per lane: 11.3)

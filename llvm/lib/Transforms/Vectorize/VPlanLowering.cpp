@@ -818,10 +818,12 @@ void VPlanTransforms::materializeConstantVectorTripCount(
 
 /// Returns true if \p U needs the scalars generated for all lanes by \p V
 /// packed into a vector. Users of scalars don't need a vector, and neither do
-/// users extracting the last lane, possibly of the last part: they use the
-/// scalar of the last lane directly.
+/// users extracting the last or penultimate lane, possibly of the last part:
+/// they use the scalars of their lanes directly.
 static bool needsPackedVector(VPValue *V, VPUser *U) {
-  if (U->usesScalars(V) || match(U, m_ExtractLastLane(m_Specific(V))))
+  if (U->usesScalars(V) ||
+      match(U, m_CombineOr(m_ExtractLastLane(m_Specific(V)),
+                           m_ExtractPenultimateElement(m_Specific(V)))))
     return false;
   if (!match(U, m_ExtractLastPart(m_VPValue())))
     return true;
@@ -844,10 +846,27 @@ void VPlanTransforms::materializePacks(VPlan &Plan) {
   if (Plan.hasScalarVFOnly())
     return;
 
+  // Pack replicated values for users that need a vector directly after their
+  // definition.
+  auto LoopRegionBlocks =
+      vp_depth_first_shallow(Plan.getVectorLoopRegion()->getEntry());
+  for (VPBasicBlock *VPBB : concat<VPBasicBlock *>(
+           VPBlockUtils::blocksOnly<VPBasicBlock>(
+               vp_depth_first_shallow(Plan.getEntry())),
+           VPBlockUtils::blocksOnly<VPBasicBlock>(LoopRegionBlocks))) {
+    for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
+      if (!vputils::doesGeneratePerAllLanes(&R))
+        continue;
+      auto *DefR = cast<VPSingleDefRecipe>(&R);
+      VPBuilder Builder = VPBuilder::getToInsertAfter(DefR);
+      packForVectorUsers(DefR, Builder);
+    }
+  }
+
   // Pack predicated values for users that need a vector at the start of the
   // block following their replicate region.
-  for (VPRegionBlock *Region : VPBlockUtils::blocksOnly<VPRegionBlock>(
-           vp_depth_first_shallow(Plan.getVectorLoopRegion()->getEntry()))) {
+  for (VPRegionBlock *Region :
+       VPBlockUtils::blocksOnly<VPRegionBlock>(LoopRegionBlocks)) {
     if (!Region->isReplicator())
       continue;
     // Replicate regions are always followed by a VPBasicBlock.

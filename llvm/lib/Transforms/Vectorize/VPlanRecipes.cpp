@@ -1397,6 +1397,11 @@ InstructionCost VPRecipeWithIRFlags::getCostForRecipeWithOpcode(
           Recipe = ReverseOp->getDefiningRecipe();
           IsReverse = true;
         }
+        // Look through Packs.
+        VPValue *PackedOp;
+        if (Recipe && match(Recipe, m_VPInstruction<VPInstruction::Pack>(
+                                        m_VPValue(PackedOp))))
+          Recipe = PackedOp->getDefiningRecipe();
         if (Recipe)
           CCH = ComputeCCH(Recipe);
       }

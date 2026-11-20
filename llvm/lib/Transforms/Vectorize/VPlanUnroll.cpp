@@ -814,11 +814,11 @@ processLaneForReplicateRegion(VPlan &Plan, Type *IdxTy, unsigned Lane,
   return Old2NewVPValues;
 }
 
-/// Returns the Pack of \p Phi, if any.
-static VPInstruction *getPackUser(VPPhi *Phi) {
+/// Returns the Pack of \p V, if any.
+static VPInstruction *getPackUser(VPValue *V) {
   auto It =
-      find_if(Phi->users(), match_fn(m_VPInstruction<VPInstruction::Pack>()));
-  return It == Phi->user_end() ? nullptr : cast<VPInstruction>(*It);
+      find_if(V->users(), match_fn(m_VPInstruction<VPInstruction::Pack>()));
+  return It == V->user_end() ? nullptr : cast<VPInstruction>(*It);
 }
 
 /// Dissolve a single replicate region by replicating its blocks for each lane
@@ -958,6 +958,19 @@ static void replicateReplicateRegionsByVF(VPlan &Plan, ElementCount VF,
   VPlanTransforms::mergeBlocksIntoPredecessors(Plan);
 }
 
+/// If \p U extracts a single lane of \p V, return the lane for \p VF.
+static std::optional<uint64_t> getExtractedLane(VPUser *U, VPValue *V,
+                                                ElementCount VF) {
+  uint64_t Lane;
+  if (match(U, m_ExtractElement(m_Specific(V), m_ConstantInt(Lane))))
+    return Lane;
+  if (match(U, m_ExtractLastLane(m_Specific(V))))
+    return VF.getKnownMinValue() - 1;
+  if (match(U, m_ExtractPenultimateElement(m_Specific(V))))
+    return VF.getKnownMinValue() - 2;
+  return std::nullopt;
+}
+
 void VPlanTransforms::replicateByVF(VPlan &Plan, ElementCount VF) {
   Type *IdxTy = IntegerType::get(
       Plan.getScalarHeader()->getIRBasicBlock()->getContext(), 32);
@@ -984,6 +997,9 @@ void VPlanTransforms::replicateByVF(VPlan &Plan, ElementCount VF) {
   // The removal of current recipes being replaced by new ones needs to be
   // delayed after Def2LaneDefs is no longer in use.
   SmallVector<VPSingleDefRecipe *> ToRemove;
+  // Packs lowered to BuildVectors, erased after the traversal which may visit
+  // them next.
+  SmallVector<VPInstruction *> LoweredPacks;
   for (VPBasicBlock *VPBB : VPBBsToUnroll) {
     for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
       if (!vputils::doesGeneratePerAllLanes(&R))
@@ -1005,11 +1021,10 @@ void VPlanTransforms::replicateByVF(VPlan &Plan, ElementCount VF) {
             cloneForLane(Plan, Builder, IdxTy, DefR, I, Def2LaneDefs));
 
       Def2LaneDefs[DefR] = LaneDefs;
-      // Pack the lanes for vector users.
-      if (!vputils::onlyScalarValuesUsed(DefR)) {
-        DefR->replaceUsesWithIf(
-            Builder.createNaryOp(VPInstruction::BuildVector, LaneDefs),
-            [DefR](VPUser *U) { return !U->usesScalars(DefR); });
+      if (VPInstruction *Pack = getPackUser(DefR)) {
+        Pack->replaceAllUsesWith(
+            Builder.createNaryOp(VPInstruction::BuildVector, LaneDefs));
+        LoweredPacks.push_back(Pack);
       }
       /// Users that only demand the first lane can use the definition for lane
       /// 0. If DefR is a single scalar, all lanes are equal and all scalar
@@ -1026,16 +1041,19 @@ void VPlanTransforms::replicateByVF(VPlan &Plan, ElementCount VF) {
     }
   }
 
+  for (VPInstruction *Pack : LoweredPacks)
+    Pack->eraseFromParent();
+
   replicateReplicateRegionsByVF(Plan, VF, IdxTy);
-  // Replace the lane extracts created when dissolving replicate regions.
+  // Replace the remaining users, which extract single lanes, some created when
+  // dissolving replicate regions, by the definitions of their lanes.
   for (VPSingleDefRecipe *DefR : reverse(ToRemove)) {
     for (VPUser *U : to_vector(DefR->users())) {
-      uint64_t Lane;
-      [[maybe_unused]] bool Match =
-          match(U, m_ExtractElement(m_Specific(DefR), m_ConstantInt(Lane)));
-      assert(Match && "unexpected remaining user");
+      std::optional<uint64_t> Lane = getExtractedLane(U, DefR, VF);
+      assert(Lane &&
+             "users needing a vector of a replicated value must use Packs");
       auto *Ext = cast<VPInstruction>(U);
-      Ext->replaceAllUsesWith(Def2LaneDefs.at(DefR)[Lane]);
+      Ext->replaceAllUsesWith(Def2LaneDefs.at(DefR)[*Lane]);
       Ext->eraseFromParent();
     }
     DefR->eraseFromParent();

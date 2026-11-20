@@ -169,7 +169,7 @@ define hidden i32 @i32_mac_s8_s16(ptr nocapture noundef readonly %a, ptr nocaptu
 ; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%conv> = sext ir<%0> to i32
 ; CHECK:  Cost of 0 for VF 2: REPLICATE ir<%arrayidx1> = getelementptr inbounds nuw ir<%b>, vp<[[VP5:%[0-9]+]]>
 ; CHECK:  Cost of 6 for VF 2: REPLICATE ir<%1> = load ir<%arrayidx1>
-; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%conv2> = sext ir<%1> to i32
+; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%conv2> = sext vp<[[VP7:%[0-9]+]]> to i32
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%mul> = mul nsw ir<%conv2>, ir<%conv>
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%add> = add ir<%mul>, ir<%res.08>
 ; CHECK:  Cost for VF 2: 16 (Estimated cost per lane: 8)
@@ -178,7 +178,7 @@ define hidden i32 @i32_mac_s8_s16(ptr nocapture noundef readonly %a, ptr nocaptu
 ; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%conv> = sext ir<%0> to i32
 ; CHECK:  Cost of 0 for VF 4: REPLICATE ir<%arrayidx1> = getelementptr inbounds nuw ir<%b>, vp<[[VP5]]>
 ; CHECK:  Cost of 12 for VF 4: REPLICATE ir<%1> = load ir<%arrayidx1>
-; CHECK:  Cost of 0 for VF 4: WIDEN-CAST ir<%conv2> = sext ir<%1> to i32
+; CHECK:  Cost of 0 for VF 4: WIDEN-CAST ir<%conv2> = sext vp<[[VP7]]> to i32
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%mul> = mul nsw ir<%conv2>, ir<%conv>
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%add> = add ir<%mul>, ir<%res.08>
 ; CHECK:  Cost for VF 4: 22 (Estimated cost per lane: 5.5)
@@ -190,7 +190,7 @@ define hidden i32 @i32_mac_s8_s16(ptr nocapture noundef readonly %a, ptr nocaptu
 ; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%conv> = sext ir<%0> to i32
 ; MAX:  Cost of 0 for VF 2: REPLICATE ir<%arrayidx1> = getelementptr inbounds nuw ir<%b>, vp<[[VP5:%[0-9]+]]>
 ; MAX:  Cost of 6 for VF 2: REPLICATE ir<%1> = load ir<%arrayidx1>
-; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%conv2> = sext ir<%1> to i32
+; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%conv2> = sext vp<[[VP7:%[0-9]+]]> to i32
 ; MAX:  Cost of 1 for VF 2: WIDEN ir<%mul> = mul nsw ir<%conv2>, ir<%conv>
 ; MAX:  Cost of 1 for VF 2: WIDEN ir<%add> = add ir<%mul>, ir<%res.08>
 ; MAX:  Cost for VF 2: 16 (Estimated cost per lane: 8)
@@ -199,7 +199,7 @@ define hidden i32 @i32_mac_s8_s16(ptr nocapture noundef readonly %a, ptr nocaptu
 ; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%conv> = sext ir<%0> to i32
 ; MAX:  Cost of 0 for VF 4: REPLICATE ir<%arrayidx1> = getelementptr inbounds nuw ir<%b>, vp<[[VP5]]>
 ; MAX:  Cost of 12 for VF 4: REPLICATE ir<%1> = load ir<%arrayidx1>
-; MAX:  Cost of 0 for VF 4: WIDEN-CAST ir<%conv2> = sext ir<%1> to i32
+; MAX:  Cost of 0 for VF 4: WIDEN-CAST ir<%conv2> = sext vp<[[VP7]]> to i32
 ; MAX:  Cost of 1 for VF 4: WIDEN ir<%mul> = mul nsw ir<%conv2>, ir<%conv>
 ; MAX:  Cost of 1 for VF 4: WIDEN ir<%add> = add ir<%mul>, ir<%res.08>
 ; MAX:  Cost for VF 4: 22 (Estimated cost per lane: 5.5)
@@ -208,7 +208,7 @@ define hidden i32 @i32_mac_s8_s16(ptr nocapture noundef readonly %a, ptr nocaptu
 ; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%conv> = sext ir<%0> to i32
 ; MAX:  Cost of 0 for VF 8: REPLICATE ir<%arrayidx1> = getelementptr inbounds nuw ir<%b>, vp<[[VP5]]>
 ; MAX:  Cost of 24 for VF 8: REPLICATE ir<%1> = load ir<%arrayidx1>
-; MAX:  Cost of 2 for VF 8: WIDEN-CAST ir<%conv2> = sext ir<%1> to i32
+; MAX:  Cost of 2 for VF 8: WIDEN-CAST ir<%conv2> = sext vp<[[VP7]]> to i32
 ; MAX:  Cost of 2 for VF 8: WIDEN ir<%mul> = mul nsw ir<%conv2>, ir<%conv>
 ; MAX:  Cost of 2 for VF 8: WIDEN ir<%add> = add ir<%mul>, ir<%res.08>
 ; MAX:  Cost for VF 8: 40 (Estimated cost per lane: 5)
@@ -217,7 +217,7 @@ define hidden i32 @i32_mac_s8_s16(ptr nocapture noundef readonly %a, ptr nocaptu
 ; MAX:  Cost of 6 for VF 16: WIDEN-CAST ir<%conv> = sext ir<%0> to i32
 ; MAX:  Cost of 0 for VF 16: REPLICATE ir<%arrayidx1> = getelementptr inbounds nuw ir<%b>, vp<[[VP5]]>
 ; MAX:  Cost of 48 for VF 16: REPLICATE ir<%1> = load ir<%arrayidx1>
-; MAX:  Cost of 4 for VF 16: WIDEN-CAST ir<%conv2> = sext ir<%1> to i32
+; MAX:  Cost of 4 for VF 16: WIDEN-CAST ir<%conv2> = sext vp<[[VP7]]> to i32
 ; MAX:  Cost of 4 for VF 16: WIDEN ir<%mul> = mul nsw ir<%conv2>, ir<%conv>
 ; MAX:  Cost of 4 for VF 16: WIDEN ir<%add> = add ir<%mul>, ir<%res.08>
 ; MAX:  Cost for VF 16: 73 (Estimated cost per lane: 4.56)
@@ -518,7 +518,7 @@ define hidden i32 @i32_mac_u8_u16(ptr nocapture noundef readonly %a, ptr nocaptu
 ; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%conv> = zext ir<%0> to i32
 ; CHECK:  Cost of 0 for VF 2: REPLICATE ir<%arrayidx1> = getelementptr inbounds nuw ir<%b>, vp<[[VP5:%[0-9]+]]>
 ; CHECK:  Cost of 6 for VF 2: REPLICATE ir<%1> = load ir<%arrayidx1>
-; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%conv2> = zext ir<%1> to i32
+; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%conv2> = zext vp<[[VP7:%[0-9]+]]> to i32
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%mul> = mul nuw nsw ir<%conv2>, ir<%conv>
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%add> = add ir<%mul>, ir<%res.08>
 ; CHECK:  Cost for VF 2: 16 (Estimated cost per lane: 8)
@@ -527,7 +527,7 @@ define hidden i32 @i32_mac_u8_u16(ptr nocapture noundef readonly %a, ptr nocaptu
 ; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%conv> = zext ir<%0> to i32
 ; CHECK:  Cost of 0 for VF 4: REPLICATE ir<%arrayidx1> = getelementptr inbounds nuw ir<%b>, vp<[[VP5]]>
 ; CHECK:  Cost of 12 for VF 4: REPLICATE ir<%1> = load ir<%arrayidx1>
-; CHECK:  Cost of 0 for VF 4: WIDEN-CAST ir<%conv2> = zext ir<%1> to i32
+; CHECK:  Cost of 0 for VF 4: WIDEN-CAST ir<%conv2> = zext vp<[[VP7]]> to i32
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%mul> = mul nuw nsw ir<%conv2>, ir<%conv>
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%add> = add ir<%mul>, ir<%res.08>
 ; CHECK:  Cost for VF 4: 22 (Estimated cost per lane: 5.5)
@@ -539,7 +539,7 @@ define hidden i32 @i32_mac_u8_u16(ptr nocapture noundef readonly %a, ptr nocaptu
 ; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%conv> = zext ir<%0> to i32
 ; MAX:  Cost of 0 for VF 2: REPLICATE ir<%arrayidx1> = getelementptr inbounds nuw ir<%b>, vp<[[VP5:%[0-9]+]]>
 ; MAX:  Cost of 6 for VF 2: REPLICATE ir<%1> = load ir<%arrayidx1>
-; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%conv2> = zext ir<%1> to i32
+; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%conv2> = zext vp<[[VP7:%[0-9]+]]> to i32
 ; MAX:  Cost of 1 for VF 2: WIDEN ir<%mul> = mul nuw nsw ir<%conv2>, ir<%conv>
 ; MAX:  Cost of 1 for VF 2: WIDEN ir<%add> = add ir<%mul>, ir<%res.08>
 ; MAX:  Cost for VF 2: 16 (Estimated cost per lane: 8)
@@ -548,7 +548,7 @@ define hidden i32 @i32_mac_u8_u16(ptr nocapture noundef readonly %a, ptr nocaptu
 ; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%conv> = zext ir<%0> to i32
 ; MAX:  Cost of 0 for VF 4: REPLICATE ir<%arrayidx1> = getelementptr inbounds nuw ir<%b>, vp<[[VP5]]>
 ; MAX:  Cost of 12 for VF 4: REPLICATE ir<%1> = load ir<%arrayidx1>
-; MAX:  Cost of 0 for VF 4: WIDEN-CAST ir<%conv2> = zext ir<%1> to i32
+; MAX:  Cost of 0 for VF 4: WIDEN-CAST ir<%conv2> = zext vp<[[VP7]]> to i32
 ; MAX:  Cost of 1 for VF 4: WIDEN ir<%mul> = mul nuw nsw ir<%conv2>, ir<%conv>
 ; MAX:  Cost of 1 for VF 4: WIDEN ir<%add> = add ir<%mul>, ir<%res.08>
 ; MAX:  Cost for VF 4: 22 (Estimated cost per lane: 5.5)
@@ -557,7 +557,7 @@ define hidden i32 @i32_mac_u8_u16(ptr nocapture noundef readonly %a, ptr nocaptu
 ; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%conv> = zext ir<%0> to i32
 ; MAX:  Cost of 0 for VF 8: REPLICATE ir<%arrayidx1> = getelementptr inbounds nuw ir<%b>, vp<[[VP5]]>
 ; MAX:  Cost of 24 for VF 8: REPLICATE ir<%1> = load ir<%arrayidx1>
-; MAX:  Cost of 2 for VF 8: WIDEN-CAST ir<%conv2> = zext ir<%1> to i32
+; MAX:  Cost of 2 for VF 8: WIDEN-CAST ir<%conv2> = zext vp<[[VP7]]> to i32
 ; MAX:  Cost of 2 for VF 8: WIDEN ir<%mul> = mul nuw nsw ir<%conv2>, ir<%conv>
 ; MAX:  Cost of 2 for VF 8: WIDEN ir<%add> = add ir<%mul>, ir<%res.08>
 ; MAX:  Cost for VF 8: 40 (Estimated cost per lane: 5)
@@ -566,7 +566,7 @@ define hidden i32 @i32_mac_u8_u16(ptr nocapture noundef readonly %a, ptr nocaptu
 ; MAX:  Cost of 6 for VF 16: WIDEN-CAST ir<%conv> = zext ir<%0> to i32
 ; MAX:  Cost of 0 for VF 16: REPLICATE ir<%arrayidx1> = getelementptr inbounds nuw ir<%b>, vp<[[VP5]]>
 ; MAX:  Cost of 48 for VF 16: REPLICATE ir<%1> = load ir<%arrayidx1>
-; MAX:  Cost of 4 for VF 16: WIDEN-CAST ir<%conv2> = zext ir<%1> to i32
+; MAX:  Cost of 4 for VF 16: WIDEN-CAST ir<%conv2> = zext vp<[[VP7]]> to i32
 ; MAX:  Cost of 4 for VF 16: WIDEN ir<%mul> = mul nuw nsw ir<%conv2>, ir<%conv>
 ; MAX:  Cost of 4 for VF 16: WIDEN ir<%add> = add ir<%mul>, ir<%res.08>
 ; MAX:  Cost for VF 16: 73 (Estimated cost per lane: 4.56)
@@ -1130,26 +1130,26 @@ define hidden void @mac_3d_i32_s8(ptr dead_on_unwind noalias nofree writable wri
 ; CHECK:  Cost of 1 for VF 2: WIDEN-REDUCTION-PHI ir<%10> = phi (add) vp<[[VP3]]>, ir<%34>
 ; CHECK:  Cost of 0 for VF 2: REPLICATE ir<%11> = getelementptr inbounds nuw ir<%1>, vp<[[VP5:%[0-9]+]]>
 ; CHECK:  Cost of 6 for VF 2: REPLICATE ir<%12> = load ir<%11>
-; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%13> = sext ir<%12> to i32
+; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%13> = sext vp<[[VP6:%[0-9]+]]> to i32
 ; CHECK:  Cost of 0 for VF 2: REPLICATE ir<%14> = getelementptr inbounds nuw ir<%2>, vp<[[VP5]]>
 ; CHECK:  Cost of 6 for VF 2: REPLICATE ir<%15> = load ir<%14>
-; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%16> = sext ir<%15> to i32
+; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%16> = sext vp<[[VP7:%[0-9]+]]> to i32
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%17> = mul nsw ir<%16>, ir<%13>
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%18> = add ir<%17>, ir<%8>
 ; CHECK:  Cost of 0 for VF 2: REPLICATE ir<%19> = getelementptr inbounds nuw ir<%11>, ir<1>
 ; CHECK:  Cost of 6 for VF 2: REPLICATE ir<%20> = load ir<%19>
-; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%21> = sext ir<%20> to i32
+; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%21> = sext vp<[[VP8:%[0-9]+]]> to i32
 ; CHECK:  Cost of 0 for VF 2: REPLICATE ir<%22> = getelementptr inbounds nuw ir<%14>, ir<1>
 ; CHECK:  Cost of 6 for VF 2: REPLICATE ir<%23> = load ir<%22>
-; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%24> = sext ir<%23> to i32
+; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%24> = sext vp<[[VP9:%[0-9]+]]> to i32
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%25> = mul nsw ir<%24>, ir<%21>
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%26> = add ir<%25>, ir<%9>
 ; CHECK:  Cost of 0 for VF 2: REPLICATE ir<%27> = getelementptr inbounds nuw ir<%11>, ir<2>
 ; CHECK:  Cost of 6 for VF 2: REPLICATE ir<%28> = load ir<%27>
-; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%29> = sext ir<%28> to i32
+; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%29> = sext vp<[[VP10:%[0-9]+]]> to i32
 ; CHECK:  Cost of 0 for VF 2: REPLICATE ir<%30> = getelementptr inbounds nuw ir<%14>, ir<2>
 ; CHECK:  Cost of 6 for VF 2: REPLICATE ir<%31> = load ir<%30>
-; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%32> = sext ir<%31> to i32
+; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%32> = sext vp<[[VP11:%[0-9]+]]> to i32
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%33> = mul nsw ir<%32>, ir<%29>
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%34> = add ir<%33>, ir<%10>
 ; CHECK:  Cost for VF 2: 49 (Estimated cost per lane: 24.5)
@@ -1158,26 +1158,26 @@ define hidden void @mac_3d_i32_s8(ptr dead_on_unwind noalias nofree writable wri
 ; CHECK:  Cost of 1 for VF 4: WIDEN-REDUCTION-PHI ir<%10> = phi (add) vp<[[VP3]]>, ir<%34>
 ; CHECK:  Cost of 0 for VF 4: REPLICATE ir<%11> = getelementptr inbounds nuw ir<%1>, vp<[[VP5]]>
 ; CHECK:  Cost of 12 for VF 4: REPLICATE ir<%12> = load ir<%11>
-; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%13> = sext ir<%12> to i32
+; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%13> = sext vp<[[VP6]]> to i32
 ; CHECK:  Cost of 0 for VF 4: REPLICATE ir<%14> = getelementptr inbounds nuw ir<%2>, vp<[[VP5]]>
 ; CHECK:  Cost of 12 for VF 4: REPLICATE ir<%15> = load ir<%14>
-; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%16> = sext ir<%15> to i32
+; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%16> = sext vp<[[VP7]]> to i32
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%17> = mul nsw ir<%16>, ir<%13>
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%18> = add ir<%17>, ir<%8>
 ; CHECK:  Cost of 0 for VF 4: REPLICATE ir<%19> = getelementptr inbounds nuw ir<%11>, ir<1>
 ; CHECK:  Cost of 12 for VF 4: REPLICATE ir<%20> = load ir<%19>
-; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%21> = sext ir<%20> to i32
+; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%21> = sext vp<[[VP8]]> to i32
 ; CHECK:  Cost of 0 for VF 4: REPLICATE ir<%22> = getelementptr inbounds nuw ir<%14>, ir<1>
 ; CHECK:  Cost of 12 for VF 4: REPLICATE ir<%23> = load ir<%22>
-; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%24> = sext ir<%23> to i32
+; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%24> = sext vp<[[VP9]]> to i32
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%25> = mul nsw ir<%24>, ir<%21>
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%26> = add ir<%25>, ir<%9>
 ; CHECK:  Cost of 0 for VF 4: REPLICATE ir<%27> = getelementptr inbounds nuw ir<%11>, ir<2>
 ; CHECK:  Cost of 12 for VF 4: REPLICATE ir<%28> = load ir<%27>
-; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%29> = sext ir<%28> to i32
+; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%29> = sext vp<[[VP10]]> to i32
 ; CHECK:  Cost of 0 for VF 4: REPLICATE ir<%30> = getelementptr inbounds nuw ir<%14>, ir<2>
 ; CHECK:  Cost of 12 for VF 4: REPLICATE ir<%31> = load ir<%30>
-; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%32> = sext ir<%31> to i32
+; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%32> = sext vp<[[VP11]]> to i32
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%33> = mul nsw ir<%32>, ir<%29>
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%34> = add ir<%33>, ir<%10>
 ; CHECK:  Cost for VF 4: 91 (Estimated cost per lane: 22.8)
@@ -1189,26 +1189,26 @@ define hidden void @mac_3d_i32_s8(ptr dead_on_unwind noalias nofree writable wri
 ; MAX:  Cost of 1 for VF 2: WIDEN-REDUCTION-PHI ir<%10> = phi (add) vp<[[VP3]]>, ir<%34>
 ; MAX:  Cost of 0 for VF 2: REPLICATE ir<%11> = getelementptr inbounds nuw ir<%1>, vp<[[VP5:%[0-9]+]]>
 ; MAX:  Cost of 6 for VF 2: REPLICATE ir<%12> = load ir<%11>
-; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%13> = sext ir<%12> to i32
+; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%13> = sext vp<[[VP6:%[0-9]+]]> to i32
 ; MAX:  Cost of 0 for VF 2: REPLICATE ir<%14> = getelementptr inbounds nuw ir<%2>, vp<[[VP5]]>
 ; MAX:  Cost of 6 for VF 2: REPLICATE ir<%15> = load ir<%14>
-; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%16> = sext ir<%15> to i32
+; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%16> = sext vp<[[VP7:%[0-9]+]]> to i32
 ; MAX:  Cost of 1 for VF 2: WIDEN ir<%17> = mul nsw ir<%16>, ir<%13>
 ; MAX:  Cost of 1 for VF 2: WIDEN ir<%18> = add ir<%17>, ir<%8>
 ; MAX:  Cost of 0 for VF 2: REPLICATE ir<%19> = getelementptr inbounds nuw ir<%11>, ir<1>
 ; MAX:  Cost of 6 for VF 2: REPLICATE ir<%20> = load ir<%19>
-; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%21> = sext ir<%20> to i32
+; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%21> = sext vp<[[VP8:%[0-9]+]]> to i32
 ; MAX:  Cost of 0 for VF 2: REPLICATE ir<%22> = getelementptr inbounds nuw ir<%14>, ir<1>
 ; MAX:  Cost of 6 for VF 2: REPLICATE ir<%23> = load ir<%22>
-; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%24> = sext ir<%23> to i32
+; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%24> = sext vp<[[VP9:%[0-9]+]]> to i32
 ; MAX:  Cost of 1 for VF 2: WIDEN ir<%25> = mul nsw ir<%24>, ir<%21>
 ; MAX:  Cost of 1 for VF 2: WIDEN ir<%26> = add ir<%25>, ir<%9>
 ; MAX:  Cost of 0 for VF 2: REPLICATE ir<%27> = getelementptr inbounds nuw ir<%11>, ir<2>
 ; MAX:  Cost of 6 for VF 2: REPLICATE ir<%28> = load ir<%27>
-; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%29> = sext ir<%28> to i32
+; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%29> = sext vp<[[VP10:%[0-9]+]]> to i32
 ; MAX:  Cost of 0 for VF 2: REPLICATE ir<%30> = getelementptr inbounds nuw ir<%14>, ir<2>
 ; MAX:  Cost of 6 for VF 2: REPLICATE ir<%31> = load ir<%30>
-; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%32> = sext ir<%31> to i32
+; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%32> = sext vp<[[VP11:%[0-9]+]]> to i32
 ; MAX:  Cost of 1 for VF 2: WIDEN ir<%33> = mul nsw ir<%32>, ir<%29>
 ; MAX:  Cost of 1 for VF 2: WIDEN ir<%34> = add ir<%33>, ir<%10>
 ; MAX:  Cost for VF 2: 49 (Estimated cost per lane: 24.5)
@@ -1217,26 +1217,26 @@ define hidden void @mac_3d_i32_s8(ptr dead_on_unwind noalias nofree writable wri
 ; MAX:  Cost of 1 for VF 4: WIDEN-REDUCTION-PHI ir<%10> = phi (add) vp<[[VP3]]>, ir<%34>
 ; MAX:  Cost of 0 for VF 4: REPLICATE ir<%11> = getelementptr inbounds nuw ir<%1>, vp<[[VP5]]>
 ; MAX:  Cost of 12 for VF 4: REPLICATE ir<%12> = load ir<%11>
-; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%13> = sext ir<%12> to i32
+; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%13> = sext vp<[[VP6]]> to i32
 ; MAX:  Cost of 0 for VF 4: REPLICATE ir<%14> = getelementptr inbounds nuw ir<%2>, vp<[[VP5]]>
 ; MAX:  Cost of 12 for VF 4: REPLICATE ir<%15> = load ir<%14>
-; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%16> = sext ir<%15> to i32
+; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%16> = sext vp<[[VP7]]> to i32
 ; MAX:  Cost of 1 for VF 4: WIDEN ir<%17> = mul nsw ir<%16>, ir<%13>
 ; MAX:  Cost of 1 for VF 4: WIDEN ir<%18> = add ir<%17>, ir<%8>
 ; MAX:  Cost of 0 for VF 4: REPLICATE ir<%19> = getelementptr inbounds nuw ir<%11>, ir<1>
 ; MAX:  Cost of 12 for VF 4: REPLICATE ir<%20> = load ir<%19>
-; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%21> = sext ir<%20> to i32
+; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%21> = sext vp<[[VP8]]> to i32
 ; MAX:  Cost of 0 for VF 4: REPLICATE ir<%22> = getelementptr inbounds nuw ir<%14>, ir<1>
 ; MAX:  Cost of 12 for VF 4: REPLICATE ir<%23> = load ir<%22>
-; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%24> = sext ir<%23> to i32
+; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%24> = sext vp<[[VP9]]> to i32
 ; MAX:  Cost of 1 for VF 4: WIDEN ir<%25> = mul nsw ir<%24>, ir<%21>
 ; MAX:  Cost of 1 for VF 4: WIDEN ir<%26> = add ir<%25>, ir<%9>
 ; MAX:  Cost of 0 for VF 4: REPLICATE ir<%27> = getelementptr inbounds nuw ir<%11>, ir<2>
 ; MAX:  Cost of 12 for VF 4: REPLICATE ir<%28> = load ir<%27>
-; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%29> = sext ir<%28> to i32
+; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%29> = sext vp<[[VP10]]> to i32
 ; MAX:  Cost of 0 for VF 4: REPLICATE ir<%30> = getelementptr inbounds nuw ir<%14>, ir<2>
 ; MAX:  Cost of 12 for VF 4: REPLICATE ir<%31> = load ir<%30>
-; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%32> = sext ir<%31> to i32
+; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%32> = sext vp<[[VP11]]> to i32
 ; MAX:  Cost of 1 for VF 4: WIDEN ir<%33> = mul nsw ir<%32>, ir<%29>
 ; MAX:  Cost of 1 for VF 4: WIDEN ir<%34> = add ir<%33>, ir<%10>
 ; MAX:  Cost for VF 4: 91 (Estimated cost per lane: 22.8)
@@ -1245,47 +1245,47 @@ define hidden void @mac_3d_i32_s8(ptr dead_on_unwind noalias nofree writable wri
 ; MAX:  Cost of 1 for VF 8: WIDEN-REDUCTION-PHI ir<%10> = phi (add) vp<[[VP3]]>, ir<%34>
 ; MAX:  Cost of 0 for VF 8: REPLICATE ir<%11> = getelementptr inbounds nuw ir<%1>, vp<[[VP5]]>
 ; MAX:  Cost of 24 for VF 8: REPLICATE ir<%12> = load ir<%11>
-; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%13> = sext ir<%12> to i32
+; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%13> = sext vp<[[VP6]]> to i32
 ; MAX:  Cost of 0 for VF 8: REPLICATE ir<%14> = getelementptr inbounds nuw ir<%2>, vp<[[VP5]]>
 ; MAX:  Cost of 24 for VF 8: REPLICATE ir<%15> = load ir<%14>
-; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%16> = sext ir<%15> to i32
+; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%16> = sext vp<[[VP7]]> to i32
 ; MAX:  Cost of 2 for VF 8: WIDEN ir<%17> = mul nsw ir<%16>, ir<%13>
 ; MAX:  Cost of 2 for VF 8: WIDEN ir<%18> = add ir<%17>, ir<%8>
 ; MAX:  Cost of 0 for VF 8: REPLICATE ir<%19> = getelementptr inbounds nuw ir<%11>, ir<1>
 ; MAX:  Cost of 24 for VF 8: REPLICATE ir<%20> = load ir<%19>
-; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%21> = sext ir<%20> to i32
+; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%21> = sext vp<[[VP8]]> to i32
 ; MAX:  Cost of 0 for VF 8: REPLICATE ir<%22> = getelementptr inbounds nuw ir<%14>, ir<1>
 ; MAX:  Cost of 24 for VF 8: REPLICATE ir<%23> = load ir<%22>
-; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%24> = sext ir<%23> to i32
+; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%24> = sext vp<[[VP9]]> to i32
 ; MAX:  Cost of 2 for VF 8: WIDEN ir<%25> = mul nsw ir<%24>, ir<%21>
 ; MAX:  Cost of 2 for VF 8: WIDEN ir<%26> = add ir<%25>, ir<%9>
 ; MAX:  Cost of 0 for VF 8: REPLICATE ir<%27> = getelementptr inbounds nuw ir<%11>, ir<2>
 ; MAX:  Cost of 24 for VF 8: REPLICATE ir<%28> = load ir<%27>
-; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%29> = sext ir<%28> to i32
+; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%29> = sext vp<[[VP10]]> to i32
 ; MAX:  Cost of 0 for VF 8: REPLICATE ir<%30> = getelementptr inbounds nuw ir<%14>, ir<2>
 ; MAX:  Cost of 24 for VF 8: REPLICATE ir<%31> = load ir<%30>
-; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%32> = sext ir<%31> to i32
+; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%32> = sext vp<[[VP11]]> to i32
 ; MAX:  Cost of 2 for VF 8: WIDEN ir<%33> = mul nsw ir<%32>, ir<%29>
 ; MAX:  Cost of 2 for VF 8: WIDEN ir<%34> = add ir<%33>, ir<%10>
 ; MAX:  Cost for VF 8: 181 (Estimated cost per lane: 22.6)
-; MAX:  Cost of 1 for VF 16: WIDEN-REDUCTION-PHI ir<%8> = phi (add) vp<[[VP3]]>, vp<[[VP6:%[0-9]+]]> (VF scaled by 1/4)
-; MAX:  Cost of 1 for VF 16: WIDEN-REDUCTION-PHI ir<%9> = phi (add) vp<[[VP3]]>, vp<[[VP7:%[0-9]+]]> (VF scaled by 1/4)
-; MAX:  Cost of 1 for VF 16: WIDEN-REDUCTION-PHI ir<%10> = phi (add) vp<[[VP3]]>, vp<[[VP8:%[0-9]+]]> (VF scaled by 1/4)
+; MAX:  Cost of 1 for VF 16: WIDEN-REDUCTION-PHI ir<%8> = phi (add) vp<[[VP3]]>, vp<[[VP8]]> (VF scaled by 1/4)
+; MAX:  Cost of 1 for VF 16: WIDEN-REDUCTION-PHI ir<%9> = phi (add) vp<[[VP3]]>, vp<[[VP11]]> (VF scaled by 1/4)
+; MAX:  Cost of 1 for VF 16: WIDEN-REDUCTION-PHI ir<%10> = phi (add) vp<[[VP3]]>, vp<[[VP14:%[0-9]+]]> (VF scaled by 1/4)
 ; MAX:  Cost of 0 for VF 16: REPLICATE ir<%11> = getelementptr inbounds nuw ir<%1>, vp<[[VP5]]>
 ; MAX:  Cost of 48 for VF 16: REPLICATE ir<%12> = load ir<%11>
 ; MAX:  Cost of 0 for VF 16: REPLICATE ir<%14> = getelementptr inbounds nuw ir<%2>, vp<[[VP5]]>
 ; MAX:  Cost of 48 for VF 16: REPLICATE ir<%15> = load ir<%14>
-; MAX:  Cost of 2 for VF 16: EXPRESSION vp<[[VP6]]> = ir<%8> + partial.reduce.add (mul nsw (ir<%15> sext to i32), (ir<%12> sext to i32))
+; MAX:  Cost of 2 for VF 16: EXPRESSION vp<[[VP8]]> = ir<%8> + partial.reduce.add (mul nsw (vp<[[VP7]]> sext to i32), (vp<[[VP6]]> sext to i32))
 ; MAX:  Cost of 0 for VF 16: REPLICATE ir<%19> = getelementptr inbounds nuw ir<%11>, ir<1>
 ; MAX:  Cost of 48 for VF 16: REPLICATE ir<%20> = load ir<%19>
 ; MAX:  Cost of 0 for VF 16: REPLICATE ir<%22> = getelementptr inbounds nuw ir<%14>, ir<1>
 ; MAX:  Cost of 48 for VF 16: REPLICATE ir<%23> = load ir<%22>
-; MAX:  Cost of 2 for VF 16: EXPRESSION vp<[[VP7]]> = ir<%9> + partial.reduce.add (mul nsw (ir<%23> sext to i32), (ir<%20> sext to i32))
+; MAX:  Cost of 2 for VF 16: EXPRESSION vp<[[VP11]]> = ir<%9> + partial.reduce.add (mul nsw (vp<[[VP10]]> sext to i32), (vp<[[VP9]]> sext to i32))
 ; MAX:  Cost of 0 for VF 16: REPLICATE ir<%27> = getelementptr inbounds nuw ir<%11>, ir<2>
 ; MAX:  Cost of 48 for VF 16: REPLICATE ir<%28> = load ir<%27>
 ; MAX:  Cost of 0 for VF 16: REPLICATE ir<%30> = getelementptr inbounds nuw ir<%14>, ir<2>
 ; MAX:  Cost of 48 for VF 16: REPLICATE ir<%31> = load ir<%30>
-; MAX:  Cost of 2 for VF 16: EXPRESSION vp<[[VP8]]> = ir<%10> + partial.reduce.add (mul nsw (ir<%31> sext to i32), (ir<%28> sext to i32))
+; MAX:  Cost of 2 for VF 16: EXPRESSION vp<[[VP14]]> = ir<%10> + partial.reduce.add (mul nsw (vp<[[VP13:%[0-9]+]]> sext to i32), (vp<[[VP12:%[0-9]+]]> sext to i32))
 ; MAX:  Cost for VF 16: 301 (Estimated cost per lane: 18.8)
 ; MAX:  LV: Selecting VF: 16.
 ;
@@ -1346,26 +1346,26 @@ define hidden void @mac_3d_u32_s8(ptr dead_on_unwind noalias nofree writable wri
 ; CHECK:  Cost of 1 for VF 2: WIDEN-REDUCTION-PHI ir<%10> = phi (add) vp<[[VP3]]>, ir<%34>
 ; CHECK:  Cost of 0 for VF 2: REPLICATE ir<%11> = getelementptr inbounds nuw ir<%1>, vp<[[VP5:%[0-9]+]]>
 ; CHECK:  Cost of 6 for VF 2: REPLICATE ir<%12> = load ir<%11>
-; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%13> = sext ir<%12> to i32
+; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%13> = sext vp<[[VP6:%[0-9]+]]> to i32
 ; CHECK:  Cost of 0 for VF 2: REPLICATE ir<%14> = getelementptr inbounds nuw ir<%2>, vp<[[VP5]]>
 ; CHECK:  Cost of 6 for VF 2: REPLICATE ir<%15> = load ir<%14>
-; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%16> = sext ir<%15> to i32
+; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%16> = sext vp<[[VP7:%[0-9]+]]> to i32
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%17> = mul nsw ir<%16>, ir<%13>
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%18> = add ir<%17>, ir<%8>
 ; CHECK:  Cost of 0 for VF 2: REPLICATE ir<%19> = getelementptr inbounds nuw ir<%11>, ir<1>
 ; CHECK:  Cost of 6 for VF 2: REPLICATE ir<%20> = load ir<%19>
-; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%21> = sext ir<%20> to i32
+; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%21> = sext vp<[[VP8:%[0-9]+]]> to i32
 ; CHECK:  Cost of 0 for VF 2: REPLICATE ir<%22> = getelementptr inbounds nuw ir<%14>, ir<1>
 ; CHECK:  Cost of 6 for VF 2: REPLICATE ir<%23> = load ir<%22>
-; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%24> = sext ir<%23> to i32
+; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%24> = sext vp<[[VP9:%[0-9]+]]> to i32
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%25> = mul nsw ir<%24>, ir<%21>
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%26> = add ir<%25>, ir<%9>
 ; CHECK:  Cost of 0 for VF 2: REPLICATE ir<%27> = getelementptr inbounds nuw ir<%11>, ir<2>
 ; CHECK:  Cost of 6 for VF 2: REPLICATE ir<%28> = load ir<%27>
-; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%29> = sext ir<%28> to i32
+; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%29> = sext vp<[[VP10:%[0-9]+]]> to i32
 ; CHECK:  Cost of 0 for VF 2: REPLICATE ir<%30> = getelementptr inbounds nuw ir<%14>, ir<2>
 ; CHECK:  Cost of 6 for VF 2: REPLICATE ir<%31> = load ir<%30>
-; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%32> = sext ir<%31> to i32
+; CHECK:  Cost of 0 for VF 2: WIDEN-CAST ir<%32> = sext vp<[[VP11:%[0-9]+]]> to i32
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%33> = mul nsw ir<%32>, ir<%29>
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%34> = add ir<%33>, ir<%10>
 ; CHECK:  Cost for VF 2: 49 (Estimated cost per lane: 24.5)
@@ -1374,26 +1374,26 @@ define hidden void @mac_3d_u32_s8(ptr dead_on_unwind noalias nofree writable wri
 ; CHECK:  Cost of 1 for VF 4: WIDEN-REDUCTION-PHI ir<%10> = phi (add) vp<[[VP3]]>, ir<%34>
 ; CHECK:  Cost of 0 for VF 4: REPLICATE ir<%11> = getelementptr inbounds nuw ir<%1>, vp<[[VP5]]>
 ; CHECK:  Cost of 12 for VF 4: REPLICATE ir<%12> = load ir<%11>
-; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%13> = sext ir<%12> to i32
+; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%13> = sext vp<[[VP6]]> to i32
 ; CHECK:  Cost of 0 for VF 4: REPLICATE ir<%14> = getelementptr inbounds nuw ir<%2>, vp<[[VP5]]>
 ; CHECK:  Cost of 12 for VF 4: REPLICATE ir<%15> = load ir<%14>
-; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%16> = sext ir<%15> to i32
+; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%16> = sext vp<[[VP7]]> to i32
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%17> = mul nsw ir<%16>, ir<%13>
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%18> = add ir<%17>, ir<%8>
 ; CHECK:  Cost of 0 for VF 4: REPLICATE ir<%19> = getelementptr inbounds nuw ir<%11>, ir<1>
 ; CHECK:  Cost of 12 for VF 4: REPLICATE ir<%20> = load ir<%19>
-; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%21> = sext ir<%20> to i32
+; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%21> = sext vp<[[VP8]]> to i32
 ; CHECK:  Cost of 0 for VF 4: REPLICATE ir<%22> = getelementptr inbounds nuw ir<%14>, ir<1>
 ; CHECK:  Cost of 12 for VF 4: REPLICATE ir<%23> = load ir<%22>
-; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%24> = sext ir<%23> to i32
+; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%24> = sext vp<[[VP9]]> to i32
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%25> = mul nsw ir<%24>, ir<%21>
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%26> = add ir<%25>, ir<%9>
 ; CHECK:  Cost of 0 for VF 4: REPLICATE ir<%27> = getelementptr inbounds nuw ir<%11>, ir<2>
 ; CHECK:  Cost of 12 for VF 4: REPLICATE ir<%28> = load ir<%27>
-; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%29> = sext ir<%28> to i32
+; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%29> = sext vp<[[VP10]]> to i32
 ; CHECK:  Cost of 0 for VF 4: REPLICATE ir<%30> = getelementptr inbounds nuw ir<%14>, ir<2>
 ; CHECK:  Cost of 12 for VF 4: REPLICATE ir<%31> = load ir<%30>
-; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%32> = sext ir<%31> to i32
+; CHECK:  Cost of 1 for VF 4: WIDEN-CAST ir<%32> = sext vp<[[VP11]]> to i32
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%33> = mul nsw ir<%32>, ir<%29>
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%34> = add ir<%33>, ir<%10>
 ; CHECK:  Cost for VF 4: 91 (Estimated cost per lane: 22.8)
@@ -1405,26 +1405,26 @@ define hidden void @mac_3d_u32_s8(ptr dead_on_unwind noalias nofree writable wri
 ; MAX:  Cost of 1 for VF 2: WIDEN-REDUCTION-PHI ir<%10> = phi (add) vp<[[VP3]]>, ir<%34>
 ; MAX:  Cost of 0 for VF 2: REPLICATE ir<%11> = getelementptr inbounds nuw ir<%1>, vp<[[VP5:%[0-9]+]]>
 ; MAX:  Cost of 6 for VF 2: REPLICATE ir<%12> = load ir<%11>
-; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%13> = sext ir<%12> to i32
+; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%13> = sext vp<[[VP6:%[0-9]+]]> to i32
 ; MAX:  Cost of 0 for VF 2: REPLICATE ir<%14> = getelementptr inbounds nuw ir<%2>, vp<[[VP5]]>
 ; MAX:  Cost of 6 for VF 2: REPLICATE ir<%15> = load ir<%14>
-; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%16> = sext ir<%15> to i32
+; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%16> = sext vp<[[VP7:%[0-9]+]]> to i32
 ; MAX:  Cost of 1 for VF 2: WIDEN ir<%17> = mul nsw ir<%16>, ir<%13>
 ; MAX:  Cost of 1 for VF 2: WIDEN ir<%18> = add ir<%17>, ir<%8>
 ; MAX:  Cost of 0 for VF 2: REPLICATE ir<%19> = getelementptr inbounds nuw ir<%11>, ir<1>
 ; MAX:  Cost of 6 for VF 2: REPLICATE ir<%20> = load ir<%19>
-; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%21> = sext ir<%20> to i32
+; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%21> = sext vp<[[VP8:%[0-9]+]]> to i32
 ; MAX:  Cost of 0 for VF 2: REPLICATE ir<%22> = getelementptr inbounds nuw ir<%14>, ir<1>
 ; MAX:  Cost of 6 for VF 2: REPLICATE ir<%23> = load ir<%22>
-; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%24> = sext ir<%23> to i32
+; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%24> = sext vp<[[VP9:%[0-9]+]]> to i32
 ; MAX:  Cost of 1 for VF 2: WIDEN ir<%25> = mul nsw ir<%24>, ir<%21>
 ; MAX:  Cost of 1 for VF 2: WIDEN ir<%26> = add ir<%25>, ir<%9>
 ; MAX:  Cost of 0 for VF 2: REPLICATE ir<%27> = getelementptr inbounds nuw ir<%11>, ir<2>
 ; MAX:  Cost of 6 for VF 2: REPLICATE ir<%28> = load ir<%27>
-; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%29> = sext ir<%28> to i32
+; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%29> = sext vp<[[VP10:%[0-9]+]]> to i32
 ; MAX:  Cost of 0 for VF 2: REPLICATE ir<%30> = getelementptr inbounds nuw ir<%14>, ir<2>
 ; MAX:  Cost of 6 for VF 2: REPLICATE ir<%31> = load ir<%30>
-; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%32> = sext ir<%31> to i32
+; MAX:  Cost of 0 for VF 2: WIDEN-CAST ir<%32> = sext vp<[[VP11:%[0-9]+]]> to i32
 ; MAX:  Cost of 1 for VF 2: WIDEN ir<%33> = mul nsw ir<%32>, ir<%29>
 ; MAX:  Cost of 1 for VF 2: WIDEN ir<%34> = add ir<%33>, ir<%10>
 ; MAX:  Cost for VF 2: 49 (Estimated cost per lane: 24.5)
@@ -1433,26 +1433,26 @@ define hidden void @mac_3d_u32_s8(ptr dead_on_unwind noalias nofree writable wri
 ; MAX:  Cost of 1 for VF 4: WIDEN-REDUCTION-PHI ir<%10> = phi (add) vp<[[VP3]]>, ir<%34>
 ; MAX:  Cost of 0 for VF 4: REPLICATE ir<%11> = getelementptr inbounds nuw ir<%1>, vp<[[VP5]]>
 ; MAX:  Cost of 12 for VF 4: REPLICATE ir<%12> = load ir<%11>
-; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%13> = sext ir<%12> to i32
+; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%13> = sext vp<[[VP6]]> to i32
 ; MAX:  Cost of 0 for VF 4: REPLICATE ir<%14> = getelementptr inbounds nuw ir<%2>, vp<[[VP5]]>
 ; MAX:  Cost of 12 for VF 4: REPLICATE ir<%15> = load ir<%14>
-; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%16> = sext ir<%15> to i32
+; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%16> = sext vp<[[VP7]]> to i32
 ; MAX:  Cost of 1 for VF 4: WIDEN ir<%17> = mul nsw ir<%16>, ir<%13>
 ; MAX:  Cost of 1 for VF 4: WIDEN ir<%18> = add ir<%17>, ir<%8>
 ; MAX:  Cost of 0 for VF 4: REPLICATE ir<%19> = getelementptr inbounds nuw ir<%11>, ir<1>
 ; MAX:  Cost of 12 for VF 4: REPLICATE ir<%20> = load ir<%19>
-; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%21> = sext ir<%20> to i32
+; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%21> = sext vp<[[VP8]]> to i32
 ; MAX:  Cost of 0 for VF 4: REPLICATE ir<%22> = getelementptr inbounds nuw ir<%14>, ir<1>
 ; MAX:  Cost of 12 for VF 4: REPLICATE ir<%23> = load ir<%22>
-; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%24> = sext ir<%23> to i32
+; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%24> = sext vp<[[VP9]]> to i32
 ; MAX:  Cost of 1 for VF 4: WIDEN ir<%25> = mul nsw ir<%24>, ir<%21>
 ; MAX:  Cost of 1 for VF 4: WIDEN ir<%26> = add ir<%25>, ir<%9>
 ; MAX:  Cost of 0 for VF 4: REPLICATE ir<%27> = getelementptr inbounds nuw ir<%11>, ir<2>
 ; MAX:  Cost of 12 for VF 4: REPLICATE ir<%28> = load ir<%27>
-; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%29> = sext ir<%28> to i32
+; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%29> = sext vp<[[VP10]]> to i32
 ; MAX:  Cost of 0 for VF 4: REPLICATE ir<%30> = getelementptr inbounds nuw ir<%14>, ir<2>
 ; MAX:  Cost of 12 for VF 4: REPLICATE ir<%31> = load ir<%30>
-; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%32> = sext ir<%31> to i32
+; MAX:  Cost of 1 for VF 4: WIDEN-CAST ir<%32> = sext vp<[[VP11]]> to i32
 ; MAX:  Cost of 1 for VF 4: WIDEN ir<%33> = mul nsw ir<%32>, ir<%29>
 ; MAX:  Cost of 1 for VF 4: WIDEN ir<%34> = add ir<%33>, ir<%10>
 ; MAX:  Cost for VF 4: 91 (Estimated cost per lane: 22.8)
@@ -1461,47 +1461,47 @@ define hidden void @mac_3d_u32_s8(ptr dead_on_unwind noalias nofree writable wri
 ; MAX:  Cost of 1 for VF 8: WIDEN-REDUCTION-PHI ir<%10> = phi (add) vp<[[VP3]]>, ir<%34>
 ; MAX:  Cost of 0 for VF 8: REPLICATE ir<%11> = getelementptr inbounds nuw ir<%1>, vp<[[VP5]]>
 ; MAX:  Cost of 24 for VF 8: REPLICATE ir<%12> = load ir<%11>
-; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%13> = sext ir<%12> to i32
+; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%13> = sext vp<[[VP6]]> to i32
 ; MAX:  Cost of 0 for VF 8: REPLICATE ir<%14> = getelementptr inbounds nuw ir<%2>, vp<[[VP5]]>
 ; MAX:  Cost of 24 for VF 8: REPLICATE ir<%15> = load ir<%14>
-; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%16> = sext ir<%15> to i32
+; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%16> = sext vp<[[VP7]]> to i32
 ; MAX:  Cost of 2 for VF 8: WIDEN ir<%17> = mul nsw ir<%16>, ir<%13>
 ; MAX:  Cost of 2 for VF 8: WIDEN ir<%18> = add ir<%17>, ir<%8>
 ; MAX:  Cost of 0 for VF 8: REPLICATE ir<%19> = getelementptr inbounds nuw ir<%11>, ir<1>
 ; MAX:  Cost of 24 for VF 8: REPLICATE ir<%20> = load ir<%19>
-; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%21> = sext ir<%20> to i32
+; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%21> = sext vp<[[VP8]]> to i32
 ; MAX:  Cost of 0 for VF 8: REPLICATE ir<%22> = getelementptr inbounds nuw ir<%14>, ir<1>
 ; MAX:  Cost of 24 for VF 8: REPLICATE ir<%23> = load ir<%22>
-; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%24> = sext ir<%23> to i32
+; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%24> = sext vp<[[VP9]]> to i32
 ; MAX:  Cost of 2 for VF 8: WIDEN ir<%25> = mul nsw ir<%24>, ir<%21>
 ; MAX:  Cost of 2 for VF 8: WIDEN ir<%26> = add ir<%25>, ir<%9>
 ; MAX:  Cost of 0 for VF 8: REPLICATE ir<%27> = getelementptr inbounds nuw ir<%11>, ir<2>
 ; MAX:  Cost of 24 for VF 8: REPLICATE ir<%28> = load ir<%27>
-; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%29> = sext ir<%28> to i32
+; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%29> = sext vp<[[VP10]]> to i32
 ; MAX:  Cost of 0 for VF 8: REPLICATE ir<%30> = getelementptr inbounds nuw ir<%14>, ir<2>
 ; MAX:  Cost of 24 for VF 8: REPLICATE ir<%31> = load ir<%30>
-; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%32> = sext ir<%31> to i32
+; MAX:  Cost of 3 for VF 8: WIDEN-CAST ir<%32> = sext vp<[[VP11]]> to i32
 ; MAX:  Cost of 2 for VF 8: WIDEN ir<%33> = mul nsw ir<%32>, ir<%29>
 ; MAX:  Cost of 2 for VF 8: WIDEN ir<%34> = add ir<%33>, ir<%10>
 ; MAX:  Cost for VF 8: 181 (Estimated cost per lane: 22.6)
-; MAX:  Cost of 1 for VF 16: WIDEN-REDUCTION-PHI ir<%8> = phi (add) vp<[[VP3]]>, vp<[[VP6:%[0-9]+]]> (VF scaled by 1/4)
-; MAX:  Cost of 1 for VF 16: WIDEN-REDUCTION-PHI ir<%9> = phi (add) vp<[[VP3]]>, vp<[[VP7:%[0-9]+]]> (VF scaled by 1/4)
-; MAX:  Cost of 1 for VF 16: WIDEN-REDUCTION-PHI ir<%10> = phi (add) vp<[[VP3]]>, vp<[[VP8:%[0-9]+]]> (VF scaled by 1/4)
+; MAX:  Cost of 1 for VF 16: WIDEN-REDUCTION-PHI ir<%8> = phi (add) vp<[[VP3]]>, vp<[[VP8]]> (VF scaled by 1/4)
+; MAX:  Cost of 1 for VF 16: WIDEN-REDUCTION-PHI ir<%9> = phi (add) vp<[[VP3]]>, vp<[[VP11]]> (VF scaled by 1/4)
+; MAX:  Cost of 1 for VF 16: WIDEN-REDUCTION-PHI ir<%10> = phi (add) vp<[[VP3]]>, vp<[[VP14:%[0-9]+]]> (VF scaled by 1/4)
 ; MAX:  Cost of 0 for VF 16: REPLICATE ir<%11> = getelementptr inbounds nuw ir<%1>, vp<[[VP5]]>
 ; MAX:  Cost of 48 for VF 16: REPLICATE ir<%12> = load ir<%11>
 ; MAX:  Cost of 0 for VF 16: REPLICATE ir<%14> = getelementptr inbounds nuw ir<%2>, vp<[[VP5]]>
 ; MAX:  Cost of 48 for VF 16: REPLICATE ir<%15> = load ir<%14>
-; MAX:  Cost of 2 for VF 16: EXPRESSION vp<[[VP6]]> = ir<%8> + partial.reduce.add (mul nsw (ir<%15> sext to i32), (ir<%12> sext to i32))
+; MAX:  Cost of 2 for VF 16: EXPRESSION vp<[[VP8]]> = ir<%8> + partial.reduce.add (mul nsw (vp<[[VP7]]> sext to i32), (vp<[[VP6]]> sext to i32))
 ; MAX:  Cost of 0 for VF 16: REPLICATE ir<%19> = getelementptr inbounds nuw ir<%11>, ir<1>
 ; MAX:  Cost of 48 for VF 16: REPLICATE ir<%20> = load ir<%19>
 ; MAX:  Cost of 0 for VF 16: REPLICATE ir<%22> = getelementptr inbounds nuw ir<%14>, ir<1>
 ; MAX:  Cost of 48 for VF 16: REPLICATE ir<%23> = load ir<%22>
-; MAX:  Cost of 2 for VF 16: EXPRESSION vp<[[VP7]]> = ir<%9> + partial.reduce.add (mul nsw (ir<%23> sext to i32), (ir<%20> sext to i32))
+; MAX:  Cost of 2 for VF 16: EXPRESSION vp<[[VP11]]> = ir<%9> + partial.reduce.add (mul nsw (vp<[[VP10]]> sext to i32), (vp<[[VP9]]> sext to i32))
 ; MAX:  Cost of 0 for VF 16: REPLICATE ir<%27> = getelementptr inbounds nuw ir<%11>, ir<2>
 ; MAX:  Cost of 48 for VF 16: REPLICATE ir<%28> = load ir<%27>
 ; MAX:  Cost of 0 for VF 16: REPLICATE ir<%30> = getelementptr inbounds nuw ir<%14>, ir<2>
 ; MAX:  Cost of 48 for VF 16: REPLICATE ir<%31> = load ir<%30>
-; MAX:  Cost of 2 for VF 16: EXPRESSION vp<[[VP8]]> = ir<%10> + partial.reduce.add (mul nsw (ir<%31> sext to i32), (ir<%28> sext to i32))
+; MAX:  Cost of 2 for VF 16: EXPRESSION vp<[[VP14]]> = ir<%10> + partial.reduce.add (mul nsw (vp<[[VP13:%[0-9]+]]> sext to i32), (vp<[[VP12:%[0-9]+]]> sext to i32))
 ; MAX:  Cost for VF 16: 301 (Estimated cost per lane: 18.8)
 ; MAX:  LV: Selecting VF: 16.
 ;

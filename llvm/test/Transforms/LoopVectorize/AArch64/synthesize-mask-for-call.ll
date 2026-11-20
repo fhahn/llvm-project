@@ -30,9 +30,10 @@ target triple = "aarch64-unknown-linux-gnu"
 ; CHECK-NEXT:     vp<[[VEC_PTR:%.+]]> = vector-pointer i64, ir<%gep>
 ; CHECK-NEXT:     WIDEN ir<%load> = load vp<[[VEC_PTR]]>
 ; CHECK-NEXT:     REPLICATE ir<%call> = call @foo(ir<%load>)
+; CHECK-NEXT:     EMIT vp<[[PACK:%.+]]> = pack ir<%call>
 ; CHECK-NEXT:     CLONE ir<%arrayidx> = getelementptr inbounds ir<%a>, vp<[[STEPS]]>
 ; CHECK-NEXT:     vp<[[VEC_PTR2:%.+]]> = vector-pointer inbounds i64, ir<%arrayidx>
-; CHECK-NEXT:     WIDEN store vp<[[VEC_PTR2]]>, ir<%call>
+; CHECK-NEXT:     WIDEN store vp<[[VEC_PTR2]]>, vp<[[PACK]]>
 ; CHECK-NEXT:     EMIT vp<[[CAN_IV_NEXT:%.+]]> = add nuw vp<[[CAN_IV]]>, vp<[[VFxUF]]>
 ; CHECK-NEXT:     EMIT branch-on-count vp<[[CAN_IV_NEXT]]>, vp<[[VTC]]>
 ; CHECK-NEXT:   No successors

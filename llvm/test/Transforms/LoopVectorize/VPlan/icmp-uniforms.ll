@@ -34,7 +34,8 @@ define i32 @more_than_one_use(ptr %a, i64 %n) {
 ; CHECK-NEXT:      WIDEN ir<%tmp0> = select ir<%cond>, ir<0>, ir<%i.next>
 ; CHECK-NEXT:      REPLICATE ir<%tmp1> = getelementptr inbounds ir<%a>, ir<%tmp0>
 ; CHECK-NEXT:      REPLICATE ir<%tmp2> = load ir<%tmp1>
-; CHECK-NEXT:      WIDEN ir<%tmp3> = add ir<%r>, ir<%tmp2>
+; CHECK-NEXT:      EMIT vp<[[VP6:%[0-9]+]]> = pack ir<%tmp2>
+; CHECK-NEXT:      WIDEN ir<%tmp3> = add ir<%r>, vp<[[VP6]]>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
@@ -42,18 +43,18 @@ define i32 @more_than_one_use(ptr %a, i64 %n) {
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = compute-reduction-result (add) ir<%tmp3>
+; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = compute-reduction-result (add) ir<%tmp3>
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq vp<[[VP3]]>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<for.end>, scalar.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<for.end>:
-; CHECK-NEXT:    IR   %tmp4 = phi i32 [ %tmp3, %for.body ] (extra operand: vp<[[VP7]]> from middle.block)
+; CHECK-NEXT:    IR   %tmp4 = phi i32 [ %tmp3, %for.body ] (extra operand: vp<[[VP8]]> from middle.block)
 ; CHECK-NEXT:  No successors
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  scalar.ph:
 ; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP2]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
-; CHECK-NEXT:    EMIT-SCALAR vp<%bc.merge.rdx> = phi [ vp<[[VP7]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.merge.rdx> = phi [ vp<[[VP8]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
 ; CHECK-NEXT:  Successor(s): ir-bb<for.body>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<for.body>:

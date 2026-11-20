@@ -10,11 +10,11 @@ target triple = "i386-apple-darwin"
 define i32 @replicating_loads_and_reduction(ptr %A, ptr %B) {
 ; CHECK-LABEL: 'replicating_loads_and_reduction'
 ; CHECK:  LV(REG): VF = 8
-; CHECK:  LV(REG): RegisterClass: Generic::ScalarRC, 3 registers
-; CHECK:  LV(REG): RegisterClass: Generic::VectorRC, 4 registers
+; CHECK:  LV(REG): RegisterClass: Generic::ScalarRC, 2 registers
+; CHECK:  LV(REG): RegisterClass: Generic::VectorRC, 6 registers
 ; CHECK:  LV(REG): RegisterClass: Generic::ScalarRC, 1 registers
 ; CHECK:  LV: Interleaving because of reductions.
-; CHECK:  LV: Interleave Count is 2
+; CHECK:  LV: Interleaving is not beneficial.
 ;
 entry:
   br label %loop
