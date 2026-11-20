@@ -256,8 +256,495 @@ for.end:
   ret void
 }
 
+define void @packed_with_scalar_and_vector_users(i64 %n, ptr noalias %dst, ptr noalias %dst.2) {
+; CHECK-LABEL: VPlan for loop in 'packed_with_scalar_and_vector_users'
+; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
+; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
+; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in ir<1000> = original trip-count
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<entry>:
+; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:  Successor(s): vector loop
+; CHECK-EMPTY:
+; CHECK-NEXT:  <x1> vector loop: {
+; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-EMPTY:
+; CHECK-NEXT:    vector.body:
+; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = SCALAR-STEPS vp<[[VP3]]>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      WIDEN ir<%c.0> = icmp ult ir<%iv>, ir<10>
+; CHECK-NEXT:    Successor(s): pred.udiv
+; CHECK-EMPTY:
+; CHECK-NEXT:    <xVFxUF> pred.udiv: {
+; CHECK-NEXT:      pred.udiv.entry:
+; CHECK-NEXT:        BRANCH-ON-MASK ir<%c.0> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
+; CHECK-NEXT:      Successor(s): pred.udiv.if, pred.udiv.continue
+; CHECK-EMPTY:
+; CHECK-NEXT:      pred.udiv.if:
+; CHECK-NEXT:        REPLICATE ir<%d> = udiv ir<%n>, vp<[[VP4]]> (S->V)
+; CHECK-NEXT:      Successor(s): pred.udiv.continue
+; CHECK-EMPTY:
+; CHECK-NEXT:      pred.udiv.continue:
+; CHECK-NEXT:        PHI-PREDICATED-INSTRUCTION vp<[[VP5:%[0-9]+]]> = ir<%d>
+; CHECK-NEXT:      No successors
+; CHECK-NEXT:    }
+; CHECK-NEXT:    Successor(s): then.0.0
+; CHECK-EMPTY:
+; CHECK-NEXT:    then.0.0:
+; CHECK-NEXT:      WIDEN ir<%c.1> = icmp ult vp<[[VP5]]>, ir<20> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
+; CHECK-NEXT:      EMIT vp<[[VP6:%[0-9]+]]> = logical-and ir<%c.0>, ir<%c.1>
+; CHECK-NEXT:    Successor(s): pred.store
+; CHECK-EMPTY:
+; CHECK-NEXT:    <xVFxUF> pred.store: {
+; CHECK-NEXT:      pred.store.entry:
+; CHECK-NEXT:        BRANCH-ON-MASK vp<[[VP6]]> (!vplan.execution.frequency 4611686018427387903 (25%, estimated))
+; CHECK-NEXT:      Successor(s): pred.store.if, pred.store.continue
+; CHECK-EMPTY:
+; CHECK-NEXT:      pred.store.if:
+; CHECK-NEXT:        REPLICATE ir<%gep.dst.2> = getelementptr ir<%dst.2>, vp<[[VP4]]>
+; CHECK-NEXT:        REPLICATE store vp<[[VP5]]>, ir<%gep.dst.2>
+; CHECK-NEXT:      Successor(s): pred.store.continue
+; CHECK-EMPTY:
+; CHECK-NEXT:      pred.store.continue:
+; CHECK-NEXT:      No successors
+; CHECK-NEXT:    }
+; CHECK-NEXT:    Successor(s): then.1.1
+; CHECK-EMPTY:
+; CHECK-NEXT:    then.1.1:
+; CHECK-NEXT:      BLEND ir<%p> = ir<0> vp<%5>/ir<%c.0>
+; CHECK-NEXT:      CLONE ir<%gep.dst> = getelementptr ir<%dst>, vp<[[VP4]]>
+; CHECK-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer i64, ir<%gep.dst>, ir<1>
+; CHECK-NEXT:      WIDEN store vp<[[VP7]]>, ir<%p>, align 8
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:    No successors
+; CHECK-NEXT:  }
+; CHECK-NEXT:  Successor(s): middle.block
+; CHECK-EMPTY:
+; CHECK-NEXT:  middle.block:
+; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1000>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
+; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<exit>:
+; CHECK-NEXT:  No successors
+; CHECK-EMPTY:
+; CHECK-NEXT:  scalar.ph:
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP2]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:  Successor(s): ir-bb<loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<loop>:
+; CHECK-NEXT:    IR   %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ] (extra operand: vp<%bc.resume.val> from scalar.ph)
+; CHECK-NEXT:    IR   %c.0 = icmp ult i64 %iv, 10
+; CHECK-NEXT:  No successors
+; CHECK-NEXT:  }
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  %c.0 = icmp ult i64 %iv, 10
+  br i1 %c.0, label %then.0, label %latch
+
+then.0:
+  %d = udiv i64 %n, %iv
+  %c.1 = icmp ult i64 %d, 20
+  br i1 %c.1, label %then.1, label %latch
+
+then.1:
+  %gep.dst.2 = getelementptr i64, ptr %dst.2, i64 %iv
+  store i64 %d, ptr %gep.dst.2, align 8
+  br label %latch
+
+latch:
+  %p = phi i64 [ 0, %loop ], [ %d, %then.0 ], [ %d, %then.1 ]
+  %gep.dst = getelementptr i64, ptr %dst, i64 %iv
+  store i64 %p, ptr %gep.dst, align 8
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 1000
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+define void @predicated_with_only_scalar_users(i64 %n, ptr noalias %dst) {
+; CHECK-LABEL: VPlan for loop in 'predicated_with_only_scalar_users'
+; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
+; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
+; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in ir<1000> = original trip-count
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<entry>:
+; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:  Successor(s): vector loop
+; CHECK-EMPTY:
+; CHECK-NEXT:  <x1> vector loop: {
+; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-EMPTY:
+; CHECK-NEXT:    vector.body:
+; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = SCALAR-STEPS vp<[[VP3]]>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      WIDEN ir<%c.0> = icmp ult ir<%iv>, ir<10>
+; CHECK-NEXT:      WIDEN ir<%c.1> = icmp ugt ir<%iv>, ir<3>
+; CHECK-NEXT:    Successor(s): pred.udiv
+; CHECK-EMPTY:
+; CHECK-NEXT:    <xVFxUF> pred.udiv: {
+; CHECK-NEXT:      pred.udiv.entry:
+; CHECK-NEXT:        BRANCH-ON-MASK ir<%c.0> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
+; CHECK-NEXT:      Successor(s): pred.udiv.if, pred.udiv.continue
+; CHECK-EMPTY:
+; CHECK-NEXT:      pred.udiv.if:
+; CHECK-NEXT:        REPLICATE ir<%d> = udiv ir<%n>, vp<[[VP4]]>
+; CHECK-NEXT:      Successor(s): pred.udiv.continue
+; CHECK-EMPTY:
+; CHECK-NEXT:      pred.udiv.continue:
+; CHECK-NEXT:        PHI-PREDICATED-INSTRUCTION vp<[[VP5:%[0-9]+]]> = ir<%d>
+; CHECK-NEXT:      No successors
+; CHECK-NEXT:    }
+; CHECK-NEXT:    Successor(s): then.0.0
+; CHECK-EMPTY:
+; CHECK-NEXT:    then.0.0:
+; CHECK-NEXT:      EMIT vp<[[VP6:%[0-9]+]]> = logical-and ir<%c.0>, ir<%c.1>
+; CHECK-NEXT:    Successor(s): pred.store
+; CHECK-EMPTY:
+; CHECK-NEXT:    <xVFxUF> pred.store: {
+; CHECK-NEXT:      pred.store.entry:
+; CHECK-NEXT:        BRANCH-ON-MASK vp<[[VP6]]> (!vplan.execution.frequency 4611686018427387903 (25%, estimated))
+; CHECK-NEXT:      Successor(s): pred.store.if, pred.store.continue
+; CHECK-EMPTY:
+; CHECK-NEXT:      pred.store.if:
+; CHECK-NEXT:        REPLICATE ir<%gep.dst> = getelementptr ir<%dst>, vp<[[VP4]]>
+; CHECK-NEXT:        REPLICATE store vp<[[VP5]]>, ir<%gep.dst>
+; CHECK-NEXT:      Successor(s): pred.store.continue
+; CHECK-EMPTY:
+; CHECK-NEXT:      pred.store.continue:
+; CHECK-NEXT:      No successors
+; CHECK-NEXT:    }
+; CHECK-NEXT:    Successor(s): then.1.1
+; CHECK-EMPTY:
+; CHECK-NEXT:    then.1.1:
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:    No successors
+; CHECK-NEXT:  }
+; CHECK-NEXT:  Successor(s): middle.block
+; CHECK-EMPTY:
+; CHECK-NEXT:  middle.block:
+; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1000>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
+; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<exit>:
+; CHECK-NEXT:  No successors
+; CHECK-EMPTY:
+; CHECK-NEXT:  scalar.ph:
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP2]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:  Successor(s): ir-bb<loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<loop>:
+; CHECK-NEXT:    IR   %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ] (extra operand: vp<%bc.resume.val> from scalar.ph)
+; CHECK-NEXT:    IR   %c.0 = icmp ult i64 %iv, 10
+; CHECK-NEXT:    IR   %c.1 = icmp ugt i64 %iv, 3
+; CHECK-NEXT:  No successors
+; CHECK-NEXT:  }
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  %c.0 = icmp ult i64 %iv, 10
+  %c.1 = icmp ugt i64 %iv, 3
+  br i1 %c.0, label %then.0, label %latch
+
+then.0:
+  %d = udiv i64 %n, %iv
+  br i1 %c.1, label %then.1, label %latch
+
+then.1:
+  %gep.dst = getelementptr i64, ptr %dst, i64 %iv
+  store i64 %d, ptr %gep.dst, align 8
+  br label %latch
+
+latch:
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 1000
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
 @AB = common global [1024 x i32] zeroinitializer, align 4
 @CD = common global [1024 x i32] zeroinitializer, align 4
+
+; A replicated load with both scalar users (address of the scattered store) and
+; a vector user (widened add). Only the vector user needs the lanes packed.
+define void @replicated_with_scalar_and_vector_users(ptr noalias %src, ptr noalias %dst, ptr noalias %dst.2) {
+; CHECK-LABEL: VPlan for loop in 'replicated_with_scalar_and_vector_users'
+; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
+; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
+; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in ir<1000> = original trip-count
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<entry>:
+; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:  Successor(s): vector loop
+; CHECK-EMPTY:
+; CHECK-NEXT:  <x1> vector loop: {
+; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-EMPTY:
+; CHECK-NEXT:    vector.body:
+; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = SCALAR-STEPS vp<[[VP3]]>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      CLONE ir<%gep.src> = getelementptr ir<%src>, vp<[[VP4]]>
+; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer i64, ir<%gep.src>, ir<1>
+; CHECK-NEXT:      WIDEN ir<%idx> = load vp<[[VP5]]>, align 8
+; CHECK-NEXT:      REPLICATE ir<%gep.src.idx> = getelementptr ir<%src>, ir<%idx>
+; CHECK-NEXT:      REPLICATE ir<%l> = load ir<%gep.src.idx>
+; CHECK-NEXT:      REPLICATE ir<%gep.dst> = getelementptr ir<%dst>, ir<%l>
+; CHECK-NEXT:      REPLICATE store vp<[[VP4]]>, ir<%gep.dst>
+; CHECK-NEXT:      WIDEN ir<%a> = add ir<%l>, ir<1>
+; CHECK-NEXT:      CLONE ir<%gep.dst.2> = getelementptr ir<%dst.2>, vp<[[VP4]]>
+; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer i64, ir<%gep.dst.2>, ir<1>
+; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%a>, align 8
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:    No successors
+; CHECK-NEXT:  }
+; CHECK-NEXT:  Successor(s): middle.block
+; CHECK-EMPTY:
+; CHECK-NEXT:  middle.block:
+; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1000>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
+; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<exit>:
+; CHECK-NEXT:  No successors
+; CHECK-EMPTY:
+; CHECK-NEXT:  scalar.ph:
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP2]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:  Successor(s): ir-bb<loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<loop>:
+; CHECK-NEXT:    IR   %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ] (extra operand: vp<%bc.resume.val> from scalar.ph)
+; CHECK-NEXT:    IR   %gep.src = getelementptr i64, ptr %src, i64 %iv
+; CHECK-NEXT:    IR   %idx = load i64, ptr %gep.src, align 8
+; CHECK-NEXT:    IR   %gep.src.idx = getelementptr i64, ptr %src, i64 %idx
+; CHECK-NEXT:    IR   %l = load i64, ptr %gep.src.idx, align 8
+; CHECK-NEXT:    IR   %gep.dst = getelementptr i64, ptr %dst, i64 %l
+; CHECK-NEXT:    IR   store i64 %iv, ptr %gep.dst, align 8
+; CHECK-NEXT:    IR   %a = add i64 %l, 1
+; CHECK-NEXT:    IR   %gep.dst.2 = getelementptr i64, ptr %dst.2, i64 %iv
+; CHECK-NEXT:    IR   store i64 %a, ptr %gep.dst.2, align 8
+; CHECK-NEXT:    IR   %iv.next = add i64 %iv, 1
+; CHECK-NEXT:    IR   %ec = icmp eq i64 %iv.next, 1000
+; CHECK-NEXT:  No successors
+; CHECK-NEXT:  }
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.src = getelementptr i64, ptr %src, i64 %iv
+  %idx = load i64, ptr %gep.src, align 8
+  %gep.src.idx = getelementptr i64, ptr %src, i64 %idx
+  %l = load i64, ptr %gep.src.idx, align 8
+  %gep.dst = getelementptr i64, ptr %dst, i64 %l
+  store i64 %iv, ptr %gep.dst, align 8
+  %a = add i64 %l, 1
+  %gep.dst.2 = getelementptr i64, ptr %dst.2, i64 %iv
+  store i64 %a, ptr %gep.dst.2, align 8
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 1000
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; A replicated load whose only non-scalar user is the extract of its last lane
+; for the live-out. No packing is needed.
+define i64 @replicated_with_only_live_out_user(ptr noalias %src, ptr noalias %dst) {
+; CHECK-LABEL: VPlan for loop in 'replicated_with_only_live_out_user'
+; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
+; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
+; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in ir<1000> = original trip-count
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<entry>:
+; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:  Successor(s): vector loop
+; CHECK-EMPTY:
+; CHECK-NEXT:  <x1> vector loop: {
+; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-EMPTY:
+; CHECK-NEXT:    vector.body:
+; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = SCALAR-STEPS vp<[[VP3]]>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      CLONE ir<%gep.src> = getelementptr ir<%src>, vp<[[VP4]]>
+; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer i64, ir<%gep.src>, ir<1>
+; CHECK-NEXT:      WIDEN ir<%idx> = load vp<[[VP5]]>, align 8
+; CHECK-NEXT:      REPLICATE ir<%gep.src.idx> = getelementptr ir<%src>, ir<%idx>
+; CHECK-NEXT:      REPLICATE ir<%l> = load ir<%gep.src.idx>
+; CHECK-NEXT:      REPLICATE ir<%gep.dst> = getelementptr ir<%dst>, ir<%l>
+; CHECK-NEXT:      REPLICATE store vp<[[VP4]]>, ir<%gep.dst>
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:    No successors
+; CHECK-NEXT:  }
+; CHECK-NEXT:  Successor(s): middle.block
+; CHECK-EMPTY:
+; CHECK-NEXT:  middle.block:
+; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = extract-last-part ir<%l>
+; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = extract-last-lane vp<[[VP7]]>
+; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1000>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
+; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<exit>:
+; CHECK-NEXT:    IR   %l.lcssa = phi i64 [ %l, %loop ] (extra operand: vp<[[VP8]]> from middle.block)
+; CHECK-NEXT:  No successors
+; CHECK-EMPTY:
+; CHECK-NEXT:  scalar.ph:
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP2]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:  Successor(s): ir-bb<loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<loop>:
+; CHECK-NEXT:    IR   %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ] (extra operand: vp<%bc.resume.val> from scalar.ph)
+; CHECK-NEXT:    IR   %gep.src = getelementptr i64, ptr %src, i64 %iv
+; CHECK-NEXT:    IR   %idx = load i64, ptr %gep.src, align 8
+; CHECK-NEXT:    IR   %gep.src.idx = getelementptr i64, ptr %src, i64 %idx
+; CHECK-NEXT:    IR   %l = load i64, ptr %gep.src.idx, align 8
+; CHECK-NEXT:    IR   %gep.dst = getelementptr i64, ptr %dst, i64 %l
+; CHECK-NEXT:    IR   store i64 %iv, ptr %gep.dst, align 8
+; CHECK-NEXT:    IR   %iv.next = add i64 %iv, 1
+; CHECK-NEXT:    IR   %ec = icmp eq i64 %iv.next, 1000
+; CHECK-NEXT:  No successors
+; CHECK-NEXT:  }
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.src = getelementptr i64, ptr %src, i64 %iv
+  %idx = load i64, ptr %gep.src, align 8
+  %gep.src.idx = getelementptr i64, ptr %src, i64 %idx
+  %l = load i64, ptr %gep.src.idx, align 8
+  %gep.dst = getelementptr i64, ptr %dst, i64 %l
+  store i64 %iv, ptr %gep.dst, align 8
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 1000
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret i64 %l
+}
+
+; A udiv predicated by the tail-folding mask, used after the loop. The live-out
+; extracts the last active lane, whose index is only known at runtime, so the
+; predicated value is packed.
+define i64 @predicated_live_out_tail_folded(i64 %n, ptr noalias %dst) {
+; CHECK-LABEL: VPlan for loop in 'predicated_live_out_tail_folded'
+; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
+; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
+; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in ir<1001> = original trip-count
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<entry>:
+; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    EMIT vp<%trip.count.minus.1> = sub ir<1001>, ir<1>
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = broadcast vp<%trip.count.minus.1>
+; CHECK-NEXT:  Successor(s): vector loop
+; CHECK-EMPTY:
+; CHECK-NEXT:  <x1> vector loop: {
+; CHECK-NEXT:  vp<[[VP4:%[0-9]+]]> = CANONICAL-IV
+; CHECK-EMPTY:
+; CHECK-NEXT:    vector.body:
+; CHECK-NEXT:      EMIT vp<[[VP6:%[0-9]+]]> = WIDEN-CANONICAL-INDUCTION nuw vp<[[VP4]]>
+; CHECK-NEXT:      EMIT vp<[[VP7:%[0-9]+]]> = icmp ule vp<[[VP6]]>, vp<[[VP3]]>
+; CHECK-NEXT:    Successor(s): pred.store
+; CHECK-EMPTY:
+; CHECK-NEXT:    <xVFxUF> pred.store: {
+; CHECK-NEXT:      pred.store.entry:
+; CHECK-NEXT:        BRANCH-ON-MASK vp<[[VP7]]>
+; CHECK-NEXT:      Successor(s): pred.store.if, pred.store.continue
+; CHECK-EMPTY:
+; CHECK-NEXT:      pred.store.if:
+; CHECK-NEXT:        vp<[[VP8:%[0-9]+]]> = SCALAR-STEPS vp<[[VP4]]>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:        REPLICATE ir<%d> = udiv ir<%n>, vp<[[VP8]]> (S->V)
+; CHECK-NEXT:        REPLICATE ir<%gep.dst> = getelementptr ir<%dst>, vp<[[VP8]]>
+; CHECK-NEXT:        REPLICATE store vp<[[VP8]]>, ir<%gep.dst>
+; CHECK-NEXT:      Successor(s): pred.store.continue
+; CHECK-EMPTY:
+; CHECK-NEXT:      pred.store.continue:
+; CHECK-NEXT:        PHI-PREDICATED-INSTRUCTION vp<[[VP9:%[0-9]+]]> = ir<%d>
+; CHECK-NEXT:      No successors
+; CHECK-NEXT:    }
+; CHECK-NEXT:    Successor(s): loop.1
+; CHECK-EMPTY:
+; CHECK-NEXT:    loop.1:
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:    No successors
+; CHECK-NEXT:  }
+; CHECK-NEXT:  Successor(s): middle.block
+; CHECK-EMPTY:
+; CHECK-NEXT:  middle.block:
+; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = last-active-lane vp<[[VP7]]>
+; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = extract-lane vp<[[VP11]]>, vp<[[VP9]]>
+; CHECK-NEXT:  Successor(s): ir-bb<exit>
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<exit>:
+; CHECK-NEXT:    IR   %d.lcssa = phi i64 [ %d, %loop ] (extra operand: vp<[[VP12]]> from middle.block)
+; CHECK-NEXT:  No successors
+; CHECK-EMPTY:
+; CHECK-NEXT:  scalar.ph:
+; CHECK-NEXT:  Successor(s): ir-bb<loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<loop>:
+; CHECK-NEXT:    IR   %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ] (extra operand: ir<0> from scalar.ph)
+; CHECK-NEXT:    IR   %d = udiv i64 %n, %iv
+; CHECK-NEXT:    IR   %gep.dst = getelementptr i64, ptr %dst, i64 %iv
+; CHECK-NEXT:    IR   store i64 %iv, ptr %gep.dst, align 8
+; CHECK-NEXT:    IR   %iv.next = add i64 %iv, 1
+; CHECK-NEXT:    IR   %ec = icmp eq i64 %iv.next, 1001
+; CHECK-NEXT:  No successors
+; CHECK-NEXT:  }
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %d = udiv i64 %n, %iv
+  %gep.dst = getelementptr i64, ptr %dst, i64 %iv
+  store i64 %iv, ptr %gep.dst, align 8
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 1001
+  br i1 %ec, label %exit, label %loop, !llvm.loop !20
+
+exit:
+  ret i64 %d
+}
 
 define void @print_interleave_groups(i32 %C, i32 %D) {
 ; CHECK-LABEL: VPlan for loop in 'print_interleave_groups'
@@ -1193,11 +1680,186 @@ exit:
   ret void
 }
 
+; A replicated load with a vector user (widened add) and a live-out. The vector
+; user needs the lanes packed, while the live-out extracts the last lane of the
+; replicated load directly.
+define i64 @replicated_with_vector_user_and_live_out(ptr noalias %src, ptr noalias %dst) {
+; CHECK-LABEL: VPlan for loop in 'replicated_with_vector_user_and_live_out'
+; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
+; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
+; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in ir<1000> = original trip-count
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<entry>:
+; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:  Successor(s): vector loop
+; CHECK-EMPTY:
+; CHECK-NEXT:  <x1> vector loop: {
+; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-EMPTY:
+; CHECK-NEXT:    vector.body:
+; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = SCALAR-STEPS vp<[[VP3]]>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      CLONE ir<%gep.src> = getelementptr ir<%src>, vp<[[VP4]]>
+; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer i64, ir<%gep.src>, ir<1>
+; CHECK-NEXT:      WIDEN ir<%idx> = load vp<[[VP5]]>, align 8
+; CHECK-NEXT:      REPLICATE ir<%gep.src.idx> = getelementptr ir<%src>, ir<%idx>
+; CHECK-NEXT:      REPLICATE ir<%l> = load ir<%gep.src.idx>
+; CHECK-NEXT:      WIDEN ir<%a> = add ir<%l>, ir<1>
+; CHECK-NEXT:      CLONE ir<%gep.dst> = getelementptr ir<%dst>, vp<[[VP4]]>
+; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer i64, ir<%gep.dst>, ir<1>
+; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%a>, align 8
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:    No successors
+; CHECK-NEXT:  }
+; CHECK-NEXT:  Successor(s): middle.block
+; CHECK-EMPTY:
+; CHECK-NEXT:  middle.block:
+; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = extract-last-part ir<%l>
+; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = extract-last-lane vp<[[VP8]]>
+; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1000>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
+; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<exit>:
+; CHECK-NEXT:    IR   %l.lcssa = phi i64 [ %l, %loop ] (extra operand: vp<[[VP9]]> from middle.block)
+; CHECK-NEXT:  No successors
+; CHECK-EMPTY:
+; CHECK-NEXT:  scalar.ph:
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP2]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:  Successor(s): ir-bb<loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<loop>:
+; CHECK-NEXT:    IR   %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ] (extra operand: vp<%bc.resume.val> from scalar.ph)
+; CHECK-NEXT:    IR   %gep.src = getelementptr i64, ptr %src, i64 %iv
+; CHECK-NEXT:    IR   %idx = load i64, ptr %gep.src, align 8
+; CHECK-NEXT:    IR   %gep.src.idx = getelementptr i64, ptr %src, i64 %idx
+; CHECK-NEXT:    IR   %l = load i64, ptr %gep.src.idx, align 8
+; CHECK-NEXT:    IR   %a = add i64 %l, 1
+; CHECK-NEXT:    IR   %gep.dst = getelementptr i64, ptr %dst, i64 %iv
+; CHECK-NEXT:    IR   store i64 %a, ptr %gep.dst, align 8
+; CHECK-NEXT:    IR   %iv.next = add i64 %iv, 1
+; CHECK-NEXT:    IR   %ec = icmp eq i64 %iv.next, 1000
+; CHECK-NEXT:  No successors
+; CHECK-NEXT:  }
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.src = getelementptr i64, ptr %src, i64 %iv
+  %idx = load i64, ptr %gep.src, align 8
+  %gep.src.idx = getelementptr i64, ptr %src, i64 %idx
+  %l = load i64, ptr %gep.src.idx, align 8
+  %a = add i64 %l, 1
+  %gep.dst = getelementptr i64, ptr %dst, i64 %iv
+  store i64 %a, ptr %gep.dst, align 8
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 1000
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret i64 %l
+}
+
 !llvm.dbg.cu = !{!0}
 !llvm.module.flags = !{!3, !4}
 
 declare float @foo(float) #0
 declare <2 x float> @vector_foo(<2 x float>, <2 x i1>)
+
+define i64 @replicated_recurrence_with_penultimate_live_out(ptr noalias %src, ptr noalias %dst) {
+; CHECK-LABEL: VPlan for loop in 'replicated_recurrence_with_penultimate_live_out'
+; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
+; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
+; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in ir<1000> = original trip-count
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<entry>:
+; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:  Successor(s): vector loop
+; CHECK-EMPTY:
+; CHECK-NEXT:  <x1> vector loop: {
+; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-EMPTY:
+; CHECK-NEXT:    vector.body:
+; CHECK-NEXT:      FIRST-ORDER-RECURRENCE-PHI ir<%for> = phi ir<0>, ir<%l>
+; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = SCALAR-STEPS vp<[[VP3]]>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      CLONE ir<%gep.src> = getelementptr ir<%src>, vp<[[VP4]]>
+; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer i64, ir<%gep.src>, ir<1>
+; CHECK-NEXT:      WIDEN ir<%idx> = load vp<[[VP5]]>, align 8
+; CHECK-NEXT:      REPLICATE ir<%gep.src.idx> = getelementptr ir<%src>, ir<%idx>
+; CHECK-NEXT:      REPLICATE ir<%l> = load ir<%gep.src.idx>
+; CHECK-NEXT:      EMIT vp<[[VP6:%[0-9]+]]> = first-order splice ir<%for>, ir<%l>
+; CHECK-NEXT:      WIDEN ir<%a> = add vp<[[VP6]]>, ir<1>
+; CHECK-NEXT:      CLONE ir<%gep.dst> = getelementptr ir<%dst>, vp<[[VP4]]>
+; CHECK-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer i64, ir<%gep.dst>, ir<1>
+; CHECK-NEXT:      WIDEN store vp<[[VP7]]>, ir<%a>, align 8
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:    No successors
+; CHECK-NEXT:  }
+; CHECK-NEXT:  Successor(s): middle.block
+; CHECK-EMPTY:
+; CHECK-NEXT:  middle.block:
+; CHECK-NEXT:    EMIT vp<%vector.recur.extract.for.phi> = extract-penultimate-element ir<%l>
+; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = extract-last-part ir<%l>
+; CHECK-NEXT:    EMIT vp<%vector.recur.extract> = extract-last-lane vp<[[VP9]]>
+; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1000>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
+; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<exit>:
+; CHECK-NEXT:    IR   %for.lcssa = phi i64 [ %for, %loop ] (extra operand: vp<%vector.recur.extract.for.phi> from middle.block)
+; CHECK-NEXT:  No successors
+; CHECK-EMPTY:
+; CHECK-NEXT:  scalar.ph:
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP2]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%scalar.recur.init> = phi [ vp<%vector.recur.extract>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:  Successor(s): ir-bb<loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<loop>:
+; CHECK-NEXT:    IR   %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ] (extra operand: vp<%bc.resume.val> from scalar.ph)
+; CHECK-NEXT:    IR   %for = phi i64 [ 0, %entry ], [ %l, %loop ] (extra operand: vp<%scalar.recur.init> from scalar.ph)
+; CHECK-NEXT:    IR   %gep.src = getelementptr i64, ptr %src, i64 %iv
+; CHECK-NEXT:    IR   %idx = load i64, ptr %gep.src, align 8
+; CHECK-NEXT:    IR   %gep.src.idx = getelementptr i64, ptr %src, i64 %idx
+; CHECK-NEXT:    IR   %l = load i64, ptr %gep.src.idx, align 8
+; CHECK-NEXT:    IR   %a = add i64 %for, 1
+; CHECK-NEXT:    IR   %gep.dst = getelementptr i64, ptr %dst, i64 %iv
+; CHECK-NEXT:    IR   store i64 %a, ptr %gep.dst, align 8
+; CHECK-NEXT:    IR   %iv.next = add i64 %iv, 1
+; CHECK-NEXT:    IR   %ec = icmp eq i64 %iv.next, 1000
+; CHECK-NEXT:  No successors
+; CHECK-NEXT:  }
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %for = phi i64 [ 0, %entry ], [ %l, %loop ]
+  %gep.src = getelementptr i64, ptr %src, i64 %iv
+  %idx = load i64, ptr %gep.src, align 8
+  %gep.src.idx = getelementptr i64, ptr %src, i64 %idx
+  %l = load i64, ptr %gep.src.idx, align 8
+  %a = add i64 %for, 1
+  %gep.dst = getelementptr i64, ptr %dst, i64 %iv
+  store i64 %a, ptr %gep.dst, align 8
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 1000
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret i64 %for
+}
 
 ; We need a vector variant in order to allow for vectorization at present, but
 ; we want to test scalarization of conditional calls. If we provide a variant
@@ -1226,3 +1888,5 @@ attributes #0 = { readonly nounwind "vector-function-abi-variant"="_ZGV_LLVM_M2v
 !17 = !DILocation(line: 15, column: 3, scope: !5)
 !18 = !DILocation(line: 16, column: 3, scope: !5)
 !19 = !DILocation(line: 17, column: 3, scope: !5)
+!20 = distinct !{!20, !21}
+!21 = !{!"llvm.loop.vectorize.predicate.enable"}
