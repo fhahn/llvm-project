@@ -3442,6 +3442,19 @@ LoopVectorizationPlanner::selectInterleaveCount(VPlan &Plan, ElementCount VF,
       getSmallBestKnownTC(Opts, PSE, OrigLoop,
                           /*CanUseConstantMax=*/true,
                           /*CanExcludeZeroTrips=*/CM->isEpilogueAllowed());
+  bool IsExactTC = getSmallConstantTripCount(PSE.getSE(), OrigLoop).isNonZero();
+
+  // The plan's trip count may be smaller than the original loop's, e.g. after
+  // replacing symbolic strides by constants.
+  ScalarEvolution &SE = *PSE.getSE();
+  const SCEV *PlanTC = SE.applyLoopGuards(
+      vputils::getSCEVExprForVPValue(Plan.getTripCount(), PSE), OrigLoop);
+  APInt MaxTC = SE.getUnsignedRangeMax(PlanTC);
+  if (!MaxTC.isZero() && MaxTC.getActiveBits() <= 32 &&
+      (!BestKnownTC || MaxTC.ule(BestKnownTC->getKnownMinValue()))) {
+    BestKnownTC = ElementCount::getFixed(MaxTC.getZExtValue());
+    IsExactTC = isa<SCEVConstant>(PlanTC);
+  }
 
   // For fixed length VFs treat a scalable trip count as unknown.
   if (BestKnownTC && (BestKnownTC->isFixed() || VF.isScalable())) {
@@ -3459,7 +3472,7 @@ LoopVectorizationPlanner::selectInterleaveCount(VPlan &Plan, ElementCount VF,
     unsigned InterleaveCountLB = bit_floor(std::max(
         1u, std::min(AvailableTC / (EstimatedVF * 2), MaxInterleaveCount)));
 
-    if (getSmallConstantTripCount(PSE.getSE(), OrigLoop).isNonZero()) {
+    if (IsExactTC) {
       // If the best known trip count is exact, we select between two
       // prospective ICs, where
       //
