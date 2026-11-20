@@ -101,8 +101,9 @@ exit:
 }
 
 ; Trip count is 4 with %stride == 1 and the user forces IC 4.
-; CHECK:      remark: {{.*}} vectorized loop (vectorization width: 2, interleaved count: 4)
-; CHECK-NEXT: remark: {{.*}} Created vector loop never executes due to insufficient trip count.
+; CHECK:      remark: {{.*}} Ignoring UserIC, because the vector loop would never execute
+; CHECK-NEXT: remark: {{.*}} vectorized loop (vectorization width: 2, interleaved count: 2)
+; CHECK-NOT:  Created vector loop never executes
 define void @tc_4_forced_ic(ptr noalias %dst, ptr %src, i64 %stride) {
 entry:
   %n = shl i64 %stride, 2

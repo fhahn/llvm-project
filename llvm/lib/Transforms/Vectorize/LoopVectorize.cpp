@@ -7749,6 +7749,13 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     if (IsInnerLoop)
       IC = LVP.selectInterleaveCount(*BestPlanPtr, VF.Width, VF.Cost);
 
+    if (UserIC > 1 &&
+        LVP.isVectorLoopKnownDead(*BestPlanPtr, VF.Width * UserIC)) {
+      reportVectorizationInfo(
+          "Ignoring UserIC, because the vector loop would never execute",
+          "DeadVectorLoop", ORE, L);
+      UserIC = 0;
+    }
     unsigned SelectedIC = UserIC > 0 ? UserIC : IC;
     //  Optimistically generate runtime checks if they are needed. Drop them if
     //  they turn out to not be profitable.
