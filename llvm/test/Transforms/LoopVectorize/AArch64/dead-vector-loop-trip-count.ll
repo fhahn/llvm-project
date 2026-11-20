@@ -52,6 +52,80 @@ exit:
   ret void
 }
 
+; Trip count is 4 with %stride == 1 and the interleave group for the strided
+; load of %a requires a scalar epilogue.
+; CHECK:      remark: {{.*}} vectorized loop (vectorization width: 2, interleaved count: 4)
+; CHECK-NEXT: remark: {{.*}} Created vector loop never executes due to insufficient trip count.
+define void @tc_4_requires_scalar_epilogue(ptr noalias %dst, ptr %src, ptr %a, i64 %stride) {
+entry:
+  %n = shl i64 %stride, 2
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.next = add nsw i64 %iv, 1
+  %idx = mul i64 %iv, %stride
+  %gep.src = getelementptr i64, ptr %src, i64 %idx
+  %l = load i64, ptr %gep.src, align 8
+  %iv2 = shl nuw nsw i64 %iv, 1
+  %gep.a = getelementptr inbounds i64, ptr %a, i64 %iv2
+  %la = load i64, ptr %gep.a, align 8
+  %add = add i64 %l, %la
+  %gep.dst = getelementptr i64, ptr %dst, i64 %iv
+  store i64 %add, ptr %gep.dst, align 8
+  %ec = icmp slt i64 %iv.next, %n
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; Trip count is 4 with %stride == 1 and the user forces VF 8.
+; CHECK:      remark: {{.*}} vectorized loop (vectorization width: 8, interleaved count: 4)
+; CHECK-NEXT: remark: {{.*}} Created vector loop never executes due to insufficient trip count.
+define void @tc_4_forced_vf(ptr noalias %dst, ptr %src, i64 %stride) {
+entry:
+  %n = shl i64 %stride, 2
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.next = add nsw i64 %iv, 1
+  %idx = mul i64 %iv, %stride
+  %gep.src = getelementptr i64, ptr %src, i64 %idx
+  %l = load i64, ptr %gep.src, align 8
+  %gep.dst = getelementptr i64, ptr %dst, i64 %iv
+  store i64 %l, ptr %gep.dst, align 8
+  %ec = icmp slt i64 %iv.next, %n
+  br i1 %ec, label %loop, label %exit, !llvm.loop !0
+
+exit:
+  ret void
+}
+
+; Trip count is 4 with %stride == 1 and the user forces IC 4.
+; CHECK:      remark: {{.*}} vectorized loop (vectorization width: 2, interleaved count: 4)
+; CHECK-NEXT: remark: {{.*}} Created vector loop never executes due to insufficient trip count.
+define void @tc_4_forced_ic(ptr noalias %dst, ptr %src, i64 %stride) {
+entry:
+  %n = shl i64 %stride, 2
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.next = add nsw i64 %iv, 1
+  %idx = mul i64 %iv, %stride
+  %gep.src = getelementptr i64, ptr %src, i64 %idx
+  %l = load i64, ptr %gep.src, align 8
+  %gep.dst = getelementptr i64, ptr %dst, i64 %iv
+  store i64 %l, ptr %gep.dst, align 8
+  %ec = icmp slt i64 %iv.next, %n
+  br i1 %ec, label %loop, label %exit, !llvm.loop !2
+
+exit:
+  ret void
+}
+
 ; The trip count is at most 12 via the loop guard.
 ; CHECK: remark: <unknown>:0:0: vectorized loop (vectorization width: 4, interleaved count: 1)
 define void @tc_bounded_by_ult_guard(ptr %dst, i64 %n) {
@@ -179,3 +253,8 @@ exit:
 }
 
 ; CHECK-NOT: Created vector loop never executes
+
+!0 = distinct !{!0, !1}
+!1 = !{!"llvm.loop.vectorize.width", i32 8}
+!2 = distinct !{!2, !3}
+!3 = !{!"llvm.loop.interleave.count", i32 4}
