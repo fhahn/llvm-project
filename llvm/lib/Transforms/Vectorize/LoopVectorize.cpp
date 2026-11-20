@@ -7799,6 +7799,17 @@ bool LoopVectorizePass::processLoop(Loop *L) {
       Hints.emitRemarkWithHints();
       return false;
     }
+
+    // Bail out if the minimum iteration check always branches to the scalar
+    // loop.
+    if ((VF.Width.isVector() || SelectedIC > 1) &&
+        (LVP.isVectorLoopKnownDead(*BestPlanPtr, VF.Width * SelectedIC) ||
+         LVP.isVectorLoopKnownDead(*BestPlanPtr, VF.MinProfitableTripCount))) {
+      reportVectorizationFailure(
+          "the vector loop would never execute due to insufficient trip count",
+          "VectorizationDead", ORE, L);
+      return false;
+    }
   }
 
   // Identify the diagnostic messages that should be produced.
