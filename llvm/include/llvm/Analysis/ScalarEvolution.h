@@ -2585,7 +2585,8 @@ private:
   /// Verify if a linear IV with positive \p Stride can overflow when compared
   /// against the invariant \p RHS with a less-than. If \p Invert is true, both
   /// the IV and \p RHS are inverted
-  bool canIVOverflowOnLT(const SCEV *RHS, const SCEV *Stride, bool IsSigned,
+  /// Uses the range of the use \p RHS, which only holds where \p RHS is used.
+  bool canIVOverflowOnLT(SCEVUse RHS, const SCEV *Stride, bool IsSigned,
                          bool Invert = false);
 
   /// Get add expr already created or create a new one.
