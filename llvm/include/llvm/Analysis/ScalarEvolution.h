@@ -292,6 +292,19 @@ protected:
   /// miscellaneous information.
   unsigned short SubclassData = 0;
 
+private:
+  friend class ScalarEvolution;
+  /// ScalarEvolution caches that may have entries for this node, so that
+  /// forgetting it can skip looking it up in the others.
+  enum CacheBits : unsigned char {
+    /// UnsignedRanges and SignedRanges.
+    InRanges = 1 << 0,
+    /// ValuesAtScopesUsers and BECountUsers.
+    InUsers = 1 << 1,
+  };
+  mutable unsigned char CachedIn = 0;
+
+protected:
   /// Pointer to the canonical version of the SCEV, i.e. one where all operands
   /// have no SCEVUse flags.
   const SCEV *CanonicalSCEV = nullptr;
@@ -2018,6 +2031,7 @@ private:
                                 ConstantRange CR) {
     DenseMap<const SCEV *, ConstantRange> &Cache =
         Hint == HINT_RANGE_UNSIGNED ? UnsignedRanges : SignedRanges;
+    S->CachedIn |= SCEV::InRanges;
 
     auto Pair = Cache.insert_or_assign(S, std::move(CR));
     return Pair.first->second;

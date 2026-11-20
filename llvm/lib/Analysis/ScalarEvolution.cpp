@@ -8984,11 +8984,13 @@ ScalarEvolution::computeBackedgeTakenCount(const Loop *L,
   // EL.ConstantMaxNotTaken
   // and MaxBECount, which must be SCEVConstant.
   for (const auto &Pair : ExitCounts) {
-    if (!isa<SCEVConstant>(Pair.second.ExactNotTaken))
-      BECountUsers[Pair.second.ExactNotTaken].insert({L, AllowPredicates});
-    if (!isa<SCEVConstant>(Pair.second.SymbolicMaxNotTaken))
-      BECountUsers[Pair.second.SymbolicMaxNotTaken].insert(
-          {L, AllowPredicates});
+    for (const SCEV *S :
+         {Pair.second.ExactNotTaken, Pair.second.SymbolicMaxNotTaken}) {
+      if (!isa<SCEVConstant>(S)) {
+        S->CachedIn |= SCEV::InUsers;
+        BECountUsers[S].insert({L, AllowPredicates});
+      }
+    }
   }
   return BackedgeTakenInfo(std::move(ExitCounts), CouldComputeBECount,
                            MaxBECount, MaxOrZero);
@@ -9969,8 +9971,10 @@ SCEVUse ScalarEvolution::getSCEVAtScope(const SCEV *V, const Loop *L) {
       // Record the dependency under the bare expression: invalidation walks
       // expressions, and any use flags on C do not change which expression
       // this is the value at scope of.
-      if (!isa<SCEVConstant>(C))
+      if (!isa<SCEVConstant>(C)) {
+        C->CachedIn |= SCEV::InUsers;
         ValuesAtScopesUsers[C.getPointer()].push_back({L, V});
+      }
       break;
     }
   return C;
@@ -14530,8 +14534,10 @@ void ScalarEvolution::forgetMemoizedResults(ArrayRef<SCEVUse> SCEVs) {
 void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
   LoopDispositions.erase(S);
   BlockDispositions.erase(S);
-  UnsignedRanges.erase(S);
-  SignedRanges.erase(S);
+  if (S->CachedIn & SCEV::InRanges) {
+    UnsignedRanges.erase(S);
+    SignedRanges.erase(S);
+  }
   HasRecMap.erase(S);
   ConstantMultipleCache.erase(S);
 
@@ -14559,24 +14565,27 @@ void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
     ValuesAtScopes.erase(ScopeIt);
   }
 
-  auto ScopeUserIt = ValuesAtScopesUsers.find(S);
-  if (ScopeUserIt != ValuesAtScopesUsers.end()) {
-    for (const auto &Pair : ScopeUserIt->second)
-      // The recorded value at scope is a use of S, which may carry no-wrap
-      // flags that are not part of this key.
-      llvm::erase_if(ValuesAtScopes[Pair.second], [&](const auto &LS) {
-        return LS.first == Pair.first && LS.second.getPointer() == S;
-      });
-    ValuesAtScopesUsers.erase(ScopeUserIt);
-  }
+  if (S->CachedIn & SCEV::InUsers) {
+    auto ScopeUserIt = ValuesAtScopesUsers.find(S);
+    if (ScopeUserIt != ValuesAtScopesUsers.end()) {
+      for (const auto &Pair : ScopeUserIt->second)
+        // The recorded value at scope is a use of S, which may carry no-wrap
+        // flags that are not part of this key.
+        llvm::erase_if(ValuesAtScopes[Pair.second], [&](const auto &LS) {
+          return LS.first == Pair.first && LS.second.getPointer() == S;
+        });
+      ValuesAtScopesUsers.erase(ScopeUserIt);
+    }
 
-  auto BEUsersIt = BECountUsers.find(S);
-  if (BEUsersIt != BECountUsers.end()) {
-    // Work on a copy, as forgetBackedgeTakenCounts() will modify the original.
-    auto Copy = BEUsersIt->second;
-    for (const auto &Pair : Copy)
-      forgetBackedgeTakenCounts(Pair.getPointer(), Pair.getInt());
-    BECountUsers.erase(BEUsersIt);
+    auto BEUsersIt = BECountUsers.find(S);
+    if (BEUsersIt != BECountUsers.end()) {
+      // Work on a copy, as forgetBackedgeTakenCounts() will modify the
+      // original.
+      auto Copy = BEUsersIt->second;
+      for (const auto &Pair : Copy)
+        forgetBackedgeTakenCounts(Pair.getPointer(), Pair.getInt());
+      BECountUsers.erase(BEUsersIt);
+    }
   }
 
   auto FoldUser = FoldCacheUser.find(S);
@@ -14585,6 +14594,9 @@ void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
       FoldCache.erase(KV);
     FoldCacheUser.erase(FoldUser);
   }
+
+  // The caches tracked by CachedIn no longer have entries for S.
+  S->CachedIn = 0;
 }
 
 void
