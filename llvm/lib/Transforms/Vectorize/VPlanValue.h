@@ -158,6 +158,9 @@ public:
   const_user_range users() const {
     return const_user_range(user_begin(), user_end());
   }
+  /// Returns the users of this VPValue as recipes; all VPUsers are recipes.
+  inline auto recipe_users();
+  inline auto recipe_users() const;
   bool user_empty() const { return Users.empty(); } // NOLINT
 
   /// Returns true if the value has more than one unique user.

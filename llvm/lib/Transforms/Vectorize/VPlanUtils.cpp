@@ -126,15 +126,14 @@ static bool poisonGuaranteesUB(const VPValue *V) {
     if (!Visited.insert(Current).second)
       continue;
 
-    for (VPUser *U : Current->users()) {
+    for (VPRecipeBase *R : Current->recipe_users()) {
       // Check if Current is used as an address operand for load/store.
-      auto *R = cast<VPRecipeBase>(U);
       if (auto *MemR = dyn_cast<VPWidenMemoryRecipe>(R)) {
         if (MemR->getAddr() == Current)
           return true;
         continue;
       }
-      if (auto *Rep = dyn_cast<VPReplicateRecipe>(U)) {
+      if (auto *Rep = dyn_cast<VPReplicateRecipe>(R)) {
         unsigned Opcode = Rep->getOpcode();
         if ((Opcode == Instruction::Load && Rep->getOperand(0) == Current) ||
             (Opcode == Instruction::Store && Rep->getOperand(1) == Current))
@@ -911,7 +910,7 @@ bool vputils::isUsedByLoadStoreAddress(const VPValue *V) {
                          }))
       continue;
 
-    for (VPUser *U : Cur->users()) {
+    for (VPRecipeBase *U : Cur->recipe_users()) {
       if (auto *InterleaveR = dyn_cast<VPInterleaveBase>(U))
         if (InterleaveR->getAddr() == Cur)
           return true;
@@ -921,7 +920,7 @@ bool vputils::isUsedByLoadStoreAddress(const VPValue *V) {
                                m_Binary<Instruction::Store>(m_VPValue(),
                                                             m_Specific(Cur)))))
         return true;
-      if (auto *MemR = dyn_cast<VPWidenMemoryRecipe>(cast<VPRecipeBase>(U))) {
+      if (auto *MemR = dyn_cast<VPWidenMemoryRecipe>(U)) {
         if (MemR->getAddr() == Cur && MemR->isConsecutive())
           return true;
       }
@@ -1356,12 +1355,11 @@ void vputils::recursivelyDeleteDeadRecipes(VPValue *V) {
   }
 }
 
-SmallVector<VPUser *> vputils::collectUsersRecursively(VPValue *V) {
-  SetVector<VPUser *> Users(llvm::from_range, V->users());
+SmallVector<VPRecipeBase *> vputils::collectUsersRecursively(VPValue *V) {
+  SetVector<VPRecipeBase *> Users(llvm::from_range, V->recipe_users());
   for (unsigned I = 0; I != Users.size(); ++I) {
-    VPRecipeBase *Cur = cast<VPRecipeBase>(Users[I]);
-    for (VPValue *V : Cur->definedValues())
-      Users.insert_range(V->users());
+    for (VPValue *V : Users[I]->definedValues())
+      Users.insert_range(V->recipe_users());
   }
   return Users.takeVector();
 }

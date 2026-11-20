@@ -251,8 +251,7 @@ bool VPlanVerifier::verifyVPBasicBlock(const VPBasicBlock *VPBB) {
         return false;
       }
 
-      for (const VPUser *U : V->users()) {
-        auto *UI = cast<VPRecipeBase>(U);
+      for (const VPRecipeBase *UI : V->recipe_users()) {
         if (isa<VPIRPhi>(UI) &&
             UI->getNumOperands() != UI->getParent()->getNumPredecessors()) {
           errs() << "Phi-like recipe with different number of operands and "

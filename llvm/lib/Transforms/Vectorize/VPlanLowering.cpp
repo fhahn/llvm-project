@@ -764,14 +764,13 @@ void VPlanTransforms::materializeBroadcasts(VPlan &Plan) {
 
     // Add explicit broadcast at the insert point that dominates all users.
     VPBasicBlock::iterator HoistPoint = VectorPreheader->end();
-    for (VPUser *User : VPV->users()) {
+    for (VPRecipeBase *User : VPV->recipe_users()) {
       if (User->usesScalars(VPV))
         continue;
-      if (cast<VPRecipeBase>(User)->getParent() == VectorPreheader)
+      if (User->getParent() == VectorPreheader)
         HoistPoint = VectorPreheader->getFirstNonPhi();
       else
-        assert(VPDT.dominates(VectorPreheader,
-                              cast<VPRecipeBase>(User)->getParent()) &&
+        assert(VPDT.dominates(VectorPreheader, User->getParent()) &&
                "All users must be in the vector preheader or dominated by it");
     }
 

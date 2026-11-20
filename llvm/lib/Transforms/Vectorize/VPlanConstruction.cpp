@@ -699,8 +699,7 @@ createWidenInductionRecipe(PHINode *Phi, VPPhi *PhiR, VPIRValue *Start,
       // Keep the vector extract for exit-block live-out uses of a predicated
       // IV.
       if (IsPredicated &&
-          any_of(ExtractLastLane->users(), [&](VPUser *LaneUser) {
-            auto *R = cast<VPRecipeBase>(LaneUser);
+          any_of(ExtractLastLane->recipe_users(), [&](VPRecipeBase *R) {
             return Plan.isExitBlock(R->getParent());
           }))
         continue;
@@ -776,8 +775,8 @@ sinkRecurrenceUsersAfterPrevious(VPFirstOrderRecurrencePHIRecipe *FOR,
     assert(Current->getNumDefinedValues() == 1 &&
            "only recipes with a single defined value expected");
 
-    for (VPUser *User : Current->getVPSingleValue()->users()) {
-      if (!TryToPushSinkCandidate(cast<VPRecipeBase>(User)))
+    for (VPRecipeBase *User : Current->getVPSingleValue()->recipe_users()) {
+      if (!TryToPushSinkCandidate(User))
         return false;
     }
   }
@@ -813,16 +812,14 @@ static bool hoistPreviousBeforeFORUsers(VPFirstOrderRecurrencePHIRecipe *FOR,
   // Find the closest hoist point by looking at all users of FOR and selecting
   // the recipe dominating all other users.
   VPRecipeBase *HoistPoint = nullptr;
-  for (VPUser *U : FOR->users()) {
-    auto *R = cast<VPRecipeBase>(U);
+  for (VPRecipeBase *R : FOR->recipe_users()) {
     if (!HoistPoint || VPDT.properlyDominates(R, HoistPoint))
       HoistPoint = R;
   }
   // Dominance is only a partial order, so the users of FOR may not have a
   // single user dominating all others. Bail out in that case.
   if (!HoistPoint || HoistPoint->isPhi() ||
-      any_of(FOR->users(), [&VPDT, HoistPoint](VPUser *U) {
-        auto *R = cast<VPRecipeBase>(U);
+      any_of(FOR->recipe_users(), [&VPDT, HoistPoint](VPRecipeBase *R) {
         return HoistPoint != R && !VPDT.properlyDominates(HoistPoint, R);
       }))
     return false;

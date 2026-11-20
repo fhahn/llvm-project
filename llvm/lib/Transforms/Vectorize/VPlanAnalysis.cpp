@@ -47,9 +47,8 @@ void llvm::collectEphemeralRecipesForVPlan(
       auto *OpR = Op->getDefiningRecipe();
       if (!OpR || OpR->mayHaveSideEffects() || EphRecipes.contains(OpR))
         continue;
-      if (any_of(Op->users(), [EphRecipes](VPUser *U) {
-            auto *UR = dyn_cast<VPRecipeBase>(U);
-            return !UR || !EphRecipes.contains(UR);
+      if (any_of(Op->recipe_users(), [EphRecipes](VPRecipeBase *UR) {
+            return !EphRecipes.contains(UR);
           }))
         continue;
       EphRecipes.insert(OpR);

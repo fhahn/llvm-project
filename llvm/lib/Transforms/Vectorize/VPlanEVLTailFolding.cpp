@@ -269,8 +269,7 @@ void VPlanTransforms::optimizeEVLMasks(VPlan &Plan) {
     return;
 
   SmallVector<VPRecipeBase *> OldRecipes;
-  for (VPUser *U : vputils::collectUsersRecursively(HeaderMask)) {
-    VPRecipeBase *R = cast<VPRecipeBase>(U);
+  for (VPRecipeBase *R : vputils::collectUsersRecursively(HeaderMask)) {
     // Transform recipes contained by an expression recipe into EVL recipes.
     if (optimizeExpressionRecipeToEVL(HeaderMask, *R, *EVL, OldRecipes))
       continue;
@@ -318,17 +317,16 @@ void VPlanTransforms::optimizeEVLMasks(VPlan &Plan) {
   //   splice.right(splice.left(poison, x, evl), poison, evl) -> x
   //   vector.reverse(splice.left(poison, x, evl))  -> vp.reverse(x, true, evl)
   //   splice.right(vector.reverse(x), poison, evl) -> vp.reverse(x, true, evl)
-  for (VPUser *U : vputils::collectUsersRecursively(EVL)) {
-    auto *R = cast<VPRecipeBase>(U);
+  for (VPRecipeBase *R : vputils::collectUsersRecursively(EVL)) {
     // Remove potentially dead left splices from the transform above.
-    if (match(U, m_Intrinsic<Intrinsic::vector_splice_left>()) &&
+    if (match(R, m_Intrinsic<Intrinsic::vector_splice_left>()) &&
         R->getVPSingleValue()->getNumUsers() == 0) {
       OldRecipes.push_back(R);
       continue;
     }
 
     VPValue *X;
-    if (match(U, m_Intrinsic<Intrinsic::vector_splice_right>(
+    if (match(R, m_Intrinsic<Intrinsic::vector_splice_right>(
                      m_Intrinsic<Intrinsic::vector_splice_left>(
                          m_Poison(), m_VPValue(X), m_Specific(EVL)),
                      m_Poison(), m_Specific(EVL)))) {
@@ -337,7 +335,7 @@ void VPlanTransforms::optimizeEVLMasks(VPlan &Plan) {
       continue;
     }
 
-    if (!match(U,
+    if (!match(R,
                m_CombineOr(
                    m_Reverse(m_Intrinsic<Intrinsic::vector_splice_left>(
                        m_Poison(), m_VPValue(X), m_Specific(EVL))),

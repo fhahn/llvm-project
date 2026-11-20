@@ -399,10 +399,9 @@ static bool sinkScalarOperands(VPlan &Plan) {
     // All recipe users of SinkCandidate must be in the same block SinkTo or all
     // users outside of SinkTo must only use the first lane of SinkCandidate. In
     // the latter case, we need to duplicate SinkCandidate.
-    auto UsersOutsideSinkTo =
-        make_filter_range(SinkCandidate->users(), [SinkTo](VPUser *U) {
-          return cast<VPRecipeBase>(U)->getParent() != SinkTo;
-        });
+    auto UsersOutsideSinkTo = make_filter_range(
+        SinkCandidate->recipe_users(),
+        [SinkTo](VPRecipeBase *R) { return R->getParent() != SinkTo; });
     if (any_of(UsersOutsideSinkTo, [SinkCandidate](VPUser *U) {
           return !U->usesFirstLaneOnly(SinkCandidate);
         }))
@@ -752,8 +751,7 @@ static bool tryToRemoveDeadCycle(VPRecipeBase *R) {
 
   // The transitive users of PhiR are closed under users, so the cycle is dead
   // if every one of them can be erased.
-  for (VPUser *U : vputils::collectUsersRecursively(PhiR)) {
-    auto *R = cast<VPRecipeBase>(U);
+  for (VPRecipeBase *R : vputils::collectUsersRecursively(PhiR)) {
     // Bail out if a user must be retained, or if it is a phi-like recipe other
     // than PhiR;
     if (R->mayHaveSideEffects() || (R != PhiR && isa<VPPhiAccessors>(R)))
@@ -2560,8 +2558,8 @@ static void licm(VPlan &Plan, const VPDominatorTree &VPDT) {
       // non-successor of the vector loop region. Cannot sink if user is a phi
       // either.
       VPBasicBlock *SinkBB = nullptr;
-      if (any_of(Def->users(), [&SinkBB, &LoopRegion](VPUser *U) {
-            auto *UserR = cast<VPRecipeBase>(U);
+      if (any_of(Def->recipe_users(), [&SinkBB,
+                                       &LoopRegion](VPRecipeBase *UserR) {
             VPBasicBlock *Parent = UserR->getParent();
             // TODO: Support sinking when users are in multiple blocks.
             if (SinkBB && SinkBB != Parent)
@@ -4674,8 +4672,7 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
     // Bail out if any recipe defines a vector value used outside the
     // vector loop region.
     if (any_of(R.definedValues(), [&](VPValue *V) {
-          return any_of(V->users(), [&](VPUser *U) {
-            auto *UR = cast<VPRecipeBase>(U);
+          return any_of(V->recipe_users(), [&](VPRecipeBase *UR) {
             return UR->getParent()->getParent() != VectorLoop;
           });
         }))
@@ -4833,8 +4830,8 @@ void VPlanTransforms::adjustFirstOrderRecurrenceMiddleUsers(VPlan &Plan,
     // extract of the last element from the result of
     // VPInstruction::FirstOrderRecurrenceSplice.
     // TODO: Consider vscale_range info and UF.
-    if (any_of(RecurSplice->users(),
-               [](VPUser *U) { return !cast<VPRecipeBase>(U)->getRegion(); }) &&
+    if (any_of(RecurSplice->recipe_users(),
+               [](VPRecipeBase *R) { return !R->getRegion(); }) &&
         LoopVectorizationPlanner::getDecisionAndClampRange(IsScalableOne,
                                                            Range))
       return;
@@ -5844,9 +5841,10 @@ void VPlanTransforms::createPartialReductions(VPlan &Plan,
   // something that isn't another partial reduction. This is because the
   // extends are intended to be lowered along with the reduction itself.
   auto ExtendUsersValid = [&](VPValue *Ext) {
-    return !isa<VPWidenCastRecipe>(Ext) || all_of(Ext->users(), [&](VPUser *U) {
-      return PartialReductionOps.contains(cast<VPRecipeBase>(U));
-    });
+    return !isa<VPWidenCastRecipe>(Ext) ||
+           all_of(Ext->recipe_users(), [&](VPRecipeBase *R) {
+             return PartialReductionOps.contains(R);
+           });
   };
 
   auto IsProfitablePartialReductionChainForVF =

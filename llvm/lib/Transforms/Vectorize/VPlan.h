@@ -577,6 +577,13 @@ protected:
 #endif
 };
 
+inline auto VPValue::recipe_users() {
+  return map_range(users(), CastTo<VPRecipeBase>);
+}
+inline auto VPValue::recipe_users() const {
+  return map_range(users(), CastTo<VPRecipeBase>);
+}
+
 // Helper macro to define common classof implementations for recipes.
 #define VP_CLASSOF_IMPL(VPRecipeID)                                            \
   static inline bool classof(const VPRecipeBase *R) {                          \

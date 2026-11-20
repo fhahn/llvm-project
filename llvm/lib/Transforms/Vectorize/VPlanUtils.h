@@ -161,8 +161,8 @@ inline VPRecipeBase *findRecipe(VPValue *Start, PredT Pred) {
       continue;
     if (Pred(R))
       return R;
-    for (VPUser *U : Cur->users()) {
-      for (VPValue *V : cast<VPRecipeBase>(U)->definedValues())
+    for (VPRecipeBase *U : Cur->recipe_users()) {
+      for (VPValue *V : U->definedValues())
         Worklist.insert(V);
     }
   }
@@ -219,7 +219,7 @@ bool isDeadRecipe(VPRecipeBase &R);
 void recursivelyDeleteDeadRecipes(VPValue *V);
 
 /// Collect all users of \p V, looking through recipes that define other values.
-SmallVector<VPUser *> collectUsersRecursively(VPValue *V);
+SmallVector<VPRecipeBase *> collectUsersRecursively(VPValue *V);
 
 /// Try to fold \p R using InstSimplifyFolder. Will succeed and return a
 /// non-nullptr VPValue for a handled opcode or intrinsic ID if corresponding \p
