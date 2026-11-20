@@ -26,6 +26,7 @@
 #include "VPlan.h"
 #include "VPlanUtils.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Support/InstructionCost.h"
 #include <optional>
@@ -918,6 +919,9 @@ class LoopVectorizationPlanner {
 
   PredicatedScalarEvolution &PSE;
 
+  /// The loop guards of OrigLoop, collected on first use.
+  ScalarEvolution::LoopGuards OrigLoopGuards;
+
   OptimizationRemarkEmitter *ORE;
 
   /// Lazily fetch BranchProbabilityInfo, independent of BlockFrequencyInfo.
@@ -991,6 +995,10 @@ public:
   /// corresponding best VPlan. Also collect all profitable VFs in
   /// ProfitableVFs.
   std::pair<VectorizationFactor, VPlan *> computeBestVF();
+
+  /// Returns true if the minimum iteration check of \p Plan for \p VFxUF is
+  /// known to always branch to the scalar loop.
+  bool isVectorLoopKnownDead(VPlan &Plan, ElementCount VFxUF);
 
   /// \return The desired interleave count.
   /// If interleave count has been specified by metadata it will be returned.
