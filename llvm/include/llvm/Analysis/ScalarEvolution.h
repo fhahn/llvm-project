@@ -2298,7 +2298,7 @@ private:
   ///
   /// If \p AllowPredicates is set, this call will try to use a minimal set of
   /// SCEV predicates in order to return an exact answer.
-  ExitLimit howManyLessThans(const SCEV *LHS, const SCEV *RHS, const Loop *L,
+  ExitLimit howManyLessThans(const SCEV *LHS, SCEVUse RHSUse, const Loop *L,
                              bool IsSigned, bool Invert, bool ControlsOnlyExit,
                              bool AllowPredicates = false);
 
