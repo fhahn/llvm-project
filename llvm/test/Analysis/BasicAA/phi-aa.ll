@@ -285,13 +285,229 @@ outer:                                            ; preds = %loopexit, %entry
   ret void
 }
 
-; %ptr.outer has an argument and a non-recursive LCSSA phi as incoming values,
-; so BasicAA gives up.
+; %ptr.inner is carried through nested loop phis and an LCSSA phi.
+
+; %ptr.inner is based on argument %start, which may alias argument %q.
 ; CHECK-LABEL: nested_loop_arg
+; CHECK: MayAlias: i8* %ptr.inner, i8* %q
 ; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
-define void @nested_loop_arg(ptr %start, i1 %c) {
+define void @nested_loop_arg(ptr %start, ptr %q, i1 %c) {
 entry:
   %buf = alloca [16 x i8]
+  %lq = load i8, ptr %q
+  br label %outer
+
+outer:
+  %ptr.outer = phi ptr [ %start, %entry ], [ %ptr.next.lcssa, %outer.latch ]
+  br label %inner
+
+inner:
+  %ptr.inner = phi ptr [ %ptr.outer, %outer ], [ %ptr.next, %inner ]
+  %l = load i8, ptr %buf
+  store i8 %l, ptr %ptr.inner
+  %ptr.next = getelementptr inbounds i8, ptr %ptr.inner, i64 1
+  br i1 %c, label %outer.latch, label %inner
+
+outer.latch:
+  %ptr.next.lcssa = phi ptr [ %ptr.next, %inner ]
+  br i1 %c, label %exit, label %outer
+
+exit:
+  ret void
+}
+
+; %ptr.inner is based on a load and %buf is never captured.
+; CHECK-LABEL: nested_loop_load_not_captured
+; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+define void @nested_loop_load_not_captured(ptr %p, i1 %c) {
+entry:
+  %buf = alloca [16 x i8]
+  %start = load ptr, ptr %p
+  br label %outer
+
+outer:
+  %ptr.outer = phi ptr [ %start, %entry ], [ %ptr.next.lcssa, %outer.latch ]
+  br label %inner
+
+inner:
+  %ptr.inner = phi ptr [ %ptr.outer, %outer ], [ %ptr.next, %inner ]
+  %l = load i8, ptr %buf
+  store i8 %l, ptr %ptr.inner
+  %ptr.next = getelementptr inbounds i8, ptr %ptr.inner, i64 1
+  br i1 %c, label %outer.latch, label %inner
+
+outer.latch:
+  %ptr.next.lcssa = phi ptr [ %ptr.next, %inner ]
+  br i1 %c, label %exit, label %outer
+
+exit:
+  ret void
+}
+
+; Both pointers are phis carried through nested loops, in different blocks, and
+; based on distinct allocas.
+; CHECK-LABEL: nested_loop_phis_both_sides
+; CHECK: MayAlias: i8* %pa.inner, i8* %pb.inner
+define void @nested_loop_phis_both_sides(i1 %c) {
+entry:
+  %a = alloca [16 x i8]
+  %b = alloca [16 x i8]
+  br label %outer
+
+outer:
+  %pa.outer = phi ptr [ %a, %entry ], [ %pa.inner, %latch ]
+  %pb.outer = phi ptr [ %b, %entry ], [ %pb.inner, %latch ]
+  br label %inner
+
+inner:
+  %pa.inner = phi ptr [ %pa.outer, %outer ], [ %pa.next, %inner ]
+  %pa.next = getelementptr i8, ptr %pa.inner, i64 1
+  br i1 %c, label %inner, label %inner.b.ph
+
+inner.b.ph:
+  br label %inner.b
+
+inner.b:
+  %pb.inner = phi ptr [ %pb.outer, %inner.b.ph ], [ %pb.next, %inner.b ]
+  load i8, ptr %pa.inner
+  load i8, ptr %pb.inner
+  %pb.next = getelementptr i8, ptr %pb.inner, i64 1
+  br i1 %c, label %inner.b, label %latch
+
+latch:
+  br i1 %c, label %outer, label %exit
+
+exit:
+  ret void
+}
+
+; %ptr.inner is based on a load and %buf is captured before the load.
+; CHECK-LABEL: nested_loop_load_captured
+; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+define void @nested_loop_load_captured(ptr %p, i1 %c) {
+entry:
+  %buf = alloca [16 x i8]
+  call void @inc(ptr %buf)
+  %start = load ptr, ptr %p
+  br label %outer
+
+outer:
+  %ptr.outer = phi ptr [ %start, %entry ], [ %ptr.next.lcssa, %outer.latch ]
+  br label %inner
+
+inner:
+  %ptr.inner = phi ptr [ %ptr.outer, %outer ], [ %ptr.next, %inner ]
+  %l = load i8, ptr %buf
+  store i8 %l, ptr %ptr.inner
+  %ptr.next = getelementptr inbounds i8, ptr %ptr.inner, i64 1
+  br i1 %c, label %outer.latch, label %inner
+
+outer.latch:
+  %ptr.next.lcssa = phi ptr [ %ptr.next, %inner ]
+  br i1 %c, label %exit, label %outer
+
+exit:
+  ret void
+}
+
+; %start is a phi with more incoming values than the visit limit.
+; CHECK-LABEL: nested_loop_phi_too_many_incoming
+; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+define void @nested_loop_phi_too_many_incoming(ptr %a, i32 %x, i1 %c) {
+entry:
+  %buf = alloca [16 x i8]
+  switch i32 %x, label %join [ i32 0, label %bb0
+                                i32 1, label %bb1
+                                i32 2, label %bb2
+                                i32 3, label %bb3
+                                i32 4, label %bb4
+                                i32 5, label %bb5
+                                i32 6, label %bb6
+                                i32 7, label %bb7 ]
+
+bb0:
+  br label %join
+
+bb1:
+  br label %join
+
+bb2:
+  br label %join
+
+bb3:
+  br label %join
+
+bb4:
+  br label %join
+
+bb5:
+  br label %join
+
+bb6:
+  br label %join
+
+bb7:
+  br label %join
+
+join:
+  %start = phi ptr [ %a, %entry ], [ %a, %bb0 ], [ %a, %bb1 ], [ %a, %bb2 ], [ %a, %bb3 ], [ %a, %bb4 ], [ %a, %bb5 ], [ %a, %bb6 ], [ %a, %bb7 ]
+  br label %outer
+
+outer:
+  %ptr.outer = phi ptr [ %start, %join ], [ %ptr.next.lcssa, %outer.latch ]
+  br label %inner
+
+inner:
+  %ptr.inner = phi ptr [ %ptr.outer, %outer ], [ %ptr.next, %inner ]
+  %l = load i8, ptr %buf
+  store i8 %l, ptr %ptr.inner
+  %ptr.next = getelementptr inbounds i8, ptr %ptr.inner, i64 1
+  br i1 %c, label %outer.latch, label %inner
+
+outer.latch:
+  %ptr.next.lcssa = phi ptr [ %ptr.next, %inner ]
+  br i1 %c, label %exit, label %outer
+
+exit:
+  ret void
+}
+
+; Exceeds the limit on visited values.
+; CHECK-LABEL: nested_loop_too_many_values
+; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+define void @nested_loop_too_many_values(ptr %a, ptr %b, ptr %d, ptr %e, i1 %c) {
+entry:
+  %buf = alloca [16 x i8]
+  %s1 = select i1 %c, ptr %a, ptr %b
+  %s2 = select i1 %c, ptr %s1, ptr %d
+  %start = select i1 %c, ptr %s2, ptr %e
+  br label %outer
+
+outer:
+  %ptr.outer = phi ptr [ %start, %entry ], [ %ptr.next.lcssa, %outer.latch ]
+  br label %inner
+
+inner:
+  %ptr.inner = phi ptr [ %ptr.outer, %outer ], [ %ptr.next, %inner ]
+  %l = load i8, ptr %buf
+  store i8 %l, ptr %ptr.inner
+  %ptr.next = getelementptr inbounds i8, ptr %ptr.inner, i64 1
+  br i1 %c, label %outer.latch, label %inner
+
+outer.latch:
+  %ptr.next.lcssa = phi ptr [ %ptr.next, %inner ]
+  br i1 %c, label %exit, label %outer
+
+exit:
+  ret void
+}
+; %ptr.inner may be based on %buf.
+; CHECK-LABEL: nested_loop_select_of_arg_and_alloca
+; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+define void @nested_loop_select_of_arg_and_alloca(ptr %a, i1 %c) {
+entry:
+  %buf = alloca [16 x i8]
+  %start = select i1 %c, ptr %a, ptr %buf
   br label %outer
 
 outer:
@@ -446,5 +662,308 @@ outer.latch.2:
   br i1 %c, label %exit, label %outer
 
 exit:
+  ret void
+}
+
+; The start value of %ptr and %other are selects with the same condition, so
+; %ptr is based on %a if and only if %other is %b and vice versa.
+; CHECK-LABEL: recursive_phi_select_same_cond
+; CHECK: NoAlias: i8* %other, i8* %ptr
+define void @recursive_phi_select_same_cond(i1 %c, i1 %c2) {
+entry:
+  %a = alloca [16 x i8]
+  %b = alloca [16 x i8]
+  call void @inc(ptr %a)
+  call void @inc(ptr %b)
+  %start = select i1 %c, ptr %a, ptr %b
+  %other = select i1 %c, ptr %b, ptr %a
+  br label %loop
+
+loop:
+  %ptr = phi ptr [ %start, %entry ], [ %ptr.next, %loop ]
+  store i8 0, ptr %ptr
+  store i8 1, ptr %other
+  %ptr.next = getelementptr inbounds i8, ptr %ptr, i64 1
+  br i1 %c2, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; %ptr is based on one of many arguments, which cannot alias %buf.
+; CHECK-LABEL: recursive_phi_long_select_chain
+; CHECK: NoAlias: i8* %buf, i8* %ptr
+define void @recursive_phi_long_select_chain(ptr %a0, ptr %a1, ptr %a2, ptr %a3, ptr %a4, ptr %a5, ptr %a6, ptr %a7, ptr %a8, ptr %a9, ptr %a10, ptr %a11, ptr %a12, ptr %a13, ptr %a14, ptr %a15, ptr %a16, ptr %a17, ptr %a18, ptr %a19, ptr %a20, ptr %a21, ptr %a22, ptr %a23, ptr %a24, ptr %a25, ptr %a26, ptr %a27, ptr %a28, ptr %a29, ptr %a30, ptr %a31, ptr %a32, ptr %a33, ptr %a34, ptr %a35, ptr %a36, ptr %a37, ptr %a38, ptr %a39, i1 %c) {
+entry:
+  %buf = alloca [16 x i8]
+  %s1 = select i1 %c, ptr %a0, ptr %a1
+  %s2 = select i1 %c, ptr %s1, ptr %a2
+  %s3 = select i1 %c, ptr %s2, ptr %a3
+  %s4 = select i1 %c, ptr %s3, ptr %a4
+  %s5 = select i1 %c, ptr %s4, ptr %a5
+  %s6 = select i1 %c, ptr %s5, ptr %a6
+  %s7 = select i1 %c, ptr %s6, ptr %a7
+  %s8 = select i1 %c, ptr %s7, ptr %a8
+  %s9 = select i1 %c, ptr %s8, ptr %a9
+  %s10 = select i1 %c, ptr %s9, ptr %a10
+  %s11 = select i1 %c, ptr %s10, ptr %a11
+  %s12 = select i1 %c, ptr %s11, ptr %a12
+  %s13 = select i1 %c, ptr %s12, ptr %a13
+  %s14 = select i1 %c, ptr %s13, ptr %a14
+  %s15 = select i1 %c, ptr %s14, ptr %a15
+  %s16 = select i1 %c, ptr %s15, ptr %a16
+  %s17 = select i1 %c, ptr %s16, ptr %a17
+  %s18 = select i1 %c, ptr %s17, ptr %a18
+  %s19 = select i1 %c, ptr %s18, ptr %a19
+  %s20 = select i1 %c, ptr %s19, ptr %a20
+  %s21 = select i1 %c, ptr %s20, ptr %a21
+  %s22 = select i1 %c, ptr %s21, ptr %a22
+  %s23 = select i1 %c, ptr %s22, ptr %a23
+  %s24 = select i1 %c, ptr %s23, ptr %a24
+  %s25 = select i1 %c, ptr %s24, ptr %a25
+  %s26 = select i1 %c, ptr %s25, ptr %a26
+  %s27 = select i1 %c, ptr %s26, ptr %a27
+  %s28 = select i1 %c, ptr %s27, ptr %a28
+  %s29 = select i1 %c, ptr %s28, ptr %a29
+  %s30 = select i1 %c, ptr %s29, ptr %a30
+  %s31 = select i1 %c, ptr %s30, ptr %a31
+  %s32 = select i1 %c, ptr %s31, ptr %a32
+  %s33 = select i1 %c, ptr %s32, ptr %a33
+  %s34 = select i1 %c, ptr %s33, ptr %a34
+  %s35 = select i1 %c, ptr %s34, ptr %a35
+  %s36 = select i1 %c, ptr %s35, ptr %a36
+  %s37 = select i1 %c, ptr %s36, ptr %a37
+  %s38 = select i1 %c, ptr %s37, ptr %a38
+  %s39 = select i1 %c, ptr %s38, ptr %a39
+  br label %loop
+
+loop:
+  %ptr = phi ptr [ %s39, %entry ], [ %ptr.next, %loop ]
+  store i8 0, ptr %ptr
+  store i8 1, ptr %buf
+  %ptr.next = getelementptr inbounds i8, ptr %ptr, i64 1
+  br i1 %c, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; %p9 is based on arguments through 8 phis with multiple sources including a
+; phi.
+; CHECK-LABEL: phi_sources_at_limit
+; CHECK: MayAlias: i8* %buf, i8* %p9
+define void @phi_sources_at_limit(ptr %a0, ptr %a1, ptr %a2, ptr %a3, ptr %a4, ptr %a5, ptr %a6, ptr %a7, ptr %a8, ptr %a9, i1 %c) {
+entry:
+  %buf = alloca [16 x i8]
+  br i1 %c, label %bb1.l, label %bb1.r
+
+bb1.l:
+  br label %bb1
+
+bb1.r:
+  br label %bb1
+
+bb1:
+  %p1 = phi ptr [ %a0, %bb1.l ], [ %a1, %bb1.r ]
+  br i1 %c, label %bb2.l, label %bb2.r
+
+bb2.l:
+  br label %bb2
+
+bb2.r:
+  br label %bb2
+
+bb2:
+  %p2 = phi ptr [ %p1, %bb2.l ], [ %a2, %bb2.r ]
+  br i1 %c, label %bb3.l, label %bb3.r
+
+bb3.l:
+  br label %bb3
+
+bb3.r:
+  br label %bb3
+
+bb3:
+  %p3 = phi ptr [ %p2, %bb3.l ], [ %a3, %bb3.r ]
+  br i1 %c, label %bb4.l, label %bb4.r
+
+bb4.l:
+  br label %bb4
+
+bb4.r:
+  br label %bb4
+
+bb4:
+  %p4 = phi ptr [ %p3, %bb4.l ], [ %a4, %bb4.r ]
+  br i1 %c, label %bb5.l, label %bb5.r
+
+bb5.l:
+  br label %bb5
+
+bb5.r:
+  br label %bb5
+
+bb5:
+  %p5 = phi ptr [ %p4, %bb5.l ], [ %a5, %bb5.r ]
+  br i1 %c, label %bb6.l, label %bb6.r
+
+bb6.l:
+  br label %bb6
+
+bb6.r:
+  br label %bb6
+
+bb6:
+  %p6 = phi ptr [ %p5, %bb6.l ], [ %a6, %bb6.r ]
+  br i1 %c, label %bb7.l, label %bb7.r
+
+bb7.l:
+  br label %bb7
+
+bb7.r:
+  br label %bb7
+
+bb7:
+  %p7 = phi ptr [ %p6, %bb7.l ], [ %a7, %bb7.r ]
+  br i1 %c, label %bb8.l, label %bb8.r
+
+bb8.l:
+  br label %bb8
+
+bb8.r:
+  br label %bb8
+
+bb8:
+  %p8 = phi ptr [ %p7, %bb8.l ], [ %a8, %bb8.r ]
+  br i1 %c, label %bb9.l, label %bb9.r
+
+bb9.l:
+  br label %bb9
+
+bb9.r:
+  br label %bb9
+
+bb9:
+  %p9 = phi ptr [ %p8, %bb9.l ], [ %a9, %bb9.r ]
+  br i1 %c, label %exit, label %exit
+
+exit:
+  store i8 0, ptr %p9
+  store i8 1, ptr %buf
+  ret void
+}
+
+; %p10 is based on arguments through 9 phis with multiple sources including a
+; phi.
+; CHECK-LABEL: phi_sources_over_limit
+; CHECK: MayAlias: i8* %buf, i8* %p10
+define void @phi_sources_over_limit(ptr %a0, ptr %a1, ptr %a2, ptr %a3, ptr %a4, ptr %a5, ptr %a6, ptr %a7, ptr %a8, ptr %a9, ptr %a10, i1 %c) {
+entry:
+  %buf = alloca [16 x i8]
+  br i1 %c, label %bb1.l, label %bb1.r
+
+bb1.l:
+  br label %bb1
+
+bb1.r:
+  br label %bb1
+
+bb1:
+  %p1 = phi ptr [ %a0, %bb1.l ], [ %a1, %bb1.r ]
+  br i1 %c, label %bb2.l, label %bb2.r
+
+bb2.l:
+  br label %bb2
+
+bb2.r:
+  br label %bb2
+
+bb2:
+  %p2 = phi ptr [ %p1, %bb2.l ], [ %a2, %bb2.r ]
+  br i1 %c, label %bb3.l, label %bb3.r
+
+bb3.l:
+  br label %bb3
+
+bb3.r:
+  br label %bb3
+
+bb3:
+  %p3 = phi ptr [ %p2, %bb3.l ], [ %a3, %bb3.r ]
+  br i1 %c, label %bb4.l, label %bb4.r
+
+bb4.l:
+  br label %bb4
+
+bb4.r:
+  br label %bb4
+
+bb4:
+  %p4 = phi ptr [ %p3, %bb4.l ], [ %a4, %bb4.r ]
+  br i1 %c, label %bb5.l, label %bb5.r
+
+bb5.l:
+  br label %bb5
+
+bb5.r:
+  br label %bb5
+
+bb5:
+  %p5 = phi ptr [ %p4, %bb5.l ], [ %a5, %bb5.r ]
+  br i1 %c, label %bb6.l, label %bb6.r
+
+bb6.l:
+  br label %bb6
+
+bb6.r:
+  br label %bb6
+
+bb6:
+  %p6 = phi ptr [ %p5, %bb6.l ], [ %a6, %bb6.r ]
+  br i1 %c, label %bb7.l, label %bb7.r
+
+bb7.l:
+  br label %bb7
+
+bb7.r:
+  br label %bb7
+
+bb7:
+  %p7 = phi ptr [ %p6, %bb7.l ], [ %a7, %bb7.r ]
+  br i1 %c, label %bb8.l, label %bb8.r
+
+bb8.l:
+  br label %bb8
+
+bb8.r:
+  br label %bb8
+
+bb8:
+  %p8 = phi ptr [ %p7, %bb8.l ], [ %a8, %bb8.r ]
+  br i1 %c, label %bb9.l, label %bb9.r
+
+bb9.l:
+  br label %bb9
+
+bb9.r:
+  br label %bb9
+
+bb9:
+  %p9 = phi ptr [ %p8, %bb9.l ], [ %a9, %bb9.r ]
+  br i1 %c, label %bb10.l, label %bb10.r
+
+bb10.l:
+  br label %bb10
+
+bb10.r:
+  br label %bb10
+
+bb10:
+  %p10 = phi ptr [ %p9, %bb10.l ], [ %a10, %bb10.r ]
+  br i1 %c, label %exit, label %exit
+
+exit:
+  store i8 0, ptr %p10
+  store i8 1, ptr %buf
   ret void
 }
