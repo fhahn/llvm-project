@@ -1057,4 +1057,117 @@ exit:
   ret i32 %load
 }
 
+; %iv.2.next is the increment of %iv.2 and the address of the second member of
+; an interleave group. It is not needed in the vector loop and should not be
+; charged VF times its scalar cost.
+define void @iv_increment_used_as_interleave_group_address(ptr noalias %a, ptr noalias %b, i64 %n) {
+; CHECK-LABEL: define void @iv_increment_used_as_interleave_group_address(
+; CHECK-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[L_PRE:%.*]] = load i16, ptr [[A]], align 2
+; CHECK-NEXT:    [[TMP0:%.*]] = lshr i64 [[N]], 1
+; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i64 [[TMP0]], 1
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP1]], 16
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP2:%.*]] = and i64 [[TMP1]], 15
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP1]], [[TMP2]]
+; CHECK-NEXT:    [[TMP3:%.*]] = shl i64 [[N_VEC]], 1
+; CHECK-NEXT:    [[VECTOR_RECUR_INIT:%.*]] = insertelement <8 x i16> poison, i16 [[L_PRE]], i32 7
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VECTOR_RECUR:%.*]] = phi <8 x i16> [ [[VECTOR_RECUR_INIT]], %[[VECTOR_PH]] ], [ [[STRIDED_VEC4:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP4:%.*]] = shl nuw i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[TMP4]], 16
+; CHECK-NEXT:    [[TMP6:%.*]] = add nuw nsw i64 [[TMP4]], 1
+; CHECK-NEXT:    [[TMP7:%.*]] = add nuw nsw i64 [[TMP5]], 1
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[TMP6]]
+; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[TMP7]]
+; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <16 x i16>, ptr [[TMP8]], align 2
+; CHECK-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <16 x i16> [[WIDE_VEC]], <16 x i16> poison, <8 x i32> <i32 0, i32 2, i32 4, i32 6, i32 8, i32 10, i32 12, i32 14>
+; CHECK-NEXT:    [[STRIDED_VEC1:%.*]] = shufflevector <16 x i16> [[WIDE_VEC]], <16 x i16> poison, <8 x i32> <i32 1, i32 3, i32 5, i32 7, i32 9, i32 11, i32 13, i32 15>
+; CHECK-NEXT:    [[WIDE_VEC2:%.*]] = load <16 x i16>, ptr [[TMP9]], align 2
+; CHECK-NEXT:    [[STRIDED_VEC3:%.*]] = shufflevector <16 x i16> [[WIDE_VEC2]], <16 x i16> poison, <8 x i32> <i32 0, i32 2, i32 4, i32 6, i32 8, i32 10, i32 12, i32 14>
+; CHECK-NEXT:    [[STRIDED_VEC4]] = shufflevector <16 x i16> [[WIDE_VEC2]], <16 x i16> poison, <8 x i32> <i32 1, i32 3, i32 5, i32 7, i32 9, i32 11, i32 13, i32 15>
+; CHECK-NEXT:    [[TMP10:%.*]] = shufflevector <8 x i16> [[VECTOR_RECUR]], <8 x i16> [[STRIDED_VEC1]], <8 x i32> <i32 7, i32 8, i32 9, i32 10, i32 11, i32 12, i32 13, i32 14>
+; CHECK-NEXT:    [[TMP11:%.*]] = shufflevector <8 x i16> [[STRIDED_VEC1]], <8 x i16> [[STRIDED_VEC4]], <8 x i32> <i32 7, i32 8, i32 9, i32 10, i32 11, i32 12, i32 13, i32 14>
+; CHECK-NEXT:    [[TMP12:%.*]] = sext <8 x i16> [[TMP10]] to <8 x i32>
+; CHECK-NEXT:    [[TMP13:%.*]] = sext <8 x i16> [[TMP11]] to <8 x i32>
+; CHECK-NEXT:    [[TMP14:%.*]] = sext <8 x i16> [[STRIDED_VEC]] to <8 x i32>
+; CHECK-NEXT:    [[TMP15:%.*]] = sext <8 x i16> [[STRIDED_VEC3]] to <8 x i32>
+; CHECK-NEXT:    [[TMP16:%.*]] = sext <8 x i16> [[STRIDED_VEC1]] to <8 x i32>
+; CHECK-NEXT:    [[TMP17:%.*]] = sext <8 x i16> [[STRIDED_VEC4]] to <8 x i32>
+; CHECK-NEXT:    [[TMP18:%.*]] = mul nsw <8 x i32> [[TMP12]], [[TMP14]]
+; CHECK-NEXT:    [[TMP19:%.*]] = mul nsw <8 x i32> [[TMP13]], [[TMP15]]
+; CHECK-NEXT:    [[TMP20:%.*]] = mul nsw <8 x i32> [[TMP18]], [[TMP16]]
+; CHECK-NEXT:    [[TMP21:%.*]] = mul nsw <8 x i32> [[TMP19]], [[TMP17]]
+; CHECK-NEXT:    [[TMP22:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[INDEX]]
+; CHECK-NEXT:    [[TMP23:%.*]] = getelementptr inbounds i8, ptr [[TMP22]], i64 32
+; CHECK-NEXT:    store <8 x i32> [[TMP20]], ptr [[TMP22]], align 4
+; CHECK-NEXT:    store <8 x i32> [[TMP21]], ptr [[TMP23]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
+; CHECK-NEXT:    [[TMP24:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP24]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP32:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[VECTOR_RECUR_EXTRACT:%.*]] = extractelement <8 x i16> [[STRIDED_VEC4]], i64 7
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP1]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    [[SCALAR_RECUR_INIT:%.*]] = phi i16 [ [[VECTOR_RECUR_EXTRACT]], %[[MIDDLE_BLOCK]] ], [ [[L_PRE]], %[[ENTRY]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL5:%.*]] = phi i64 [ [[TMP3]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[FOR:%.*]] = phi i16 [ [[SCALAR_RECUR_INIT]], %[[SCALAR_PH]] ], [ [[L_2:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV_2:%.*]] = phi i64 [ [[BC_RESUME_VAL5]], %[[SCALAR_PH]] ], [ [[IV_2_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV_2_1:%.*]] = add nuw nsw i64 [[IV_2]], 1
+; CHECK-NEXT:    [[IV_2_NEXT]] = add nuw nsw i64 [[IV_2]], 2
+; CHECK-NEXT:    [[GEP_1:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[IV_2_1]]
+; CHECK-NEXT:    [[L_1:%.*]] = load i16, ptr [[GEP_1]], align 2
+; CHECK-NEXT:    [[GEP_2:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[IV_2_NEXT]]
+; CHECK-NEXT:    [[L_2]] = load i16, ptr [[GEP_2]], align 2
+; CHECK-NEXT:    [[EXT_FOR:%.*]] = sext i16 [[FOR]] to i32
+; CHECK-NEXT:    [[EXT_1:%.*]] = sext i16 [[L_1]] to i32
+; CHECK-NEXT:    [[EXT_2:%.*]] = sext i16 [[L_2]] to i32
+; CHECK-NEXT:    [[MUL_1:%.*]] = mul nsw i32 [[EXT_FOR]], [[EXT_1]]
+; CHECK-NEXT:    [[MUL_2:%.*]] = mul nsw i32 [[MUL_1]], [[EXT_2]]
+; CHECK-NEXT:    [[GEP_B:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[IV]]
+; CHECK-NEXT:    store i32 [[MUL_2]], ptr [[GEP_B]], align 4
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_2]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP33:![0-9]+]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %l.pre = load i16, ptr %a, align 2
+  br label %loop
+
+loop:
+  %for = phi i16 [ %l.pre, %entry ], [ %l.2, %loop ]
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.2 = phi i64 [ 0, %entry ], [ %iv.2.next, %loop ]
+  %iv.2.1 = add nuw nsw i64 %iv.2, 1
+  %iv.2.next = add nuw nsw i64 %iv.2, 2
+  %gep.1 = getelementptr inbounds i16, ptr %a, i64 %iv.2.1
+  %l.1 = load i16, ptr %gep.1, align 2
+  %gep.2 = getelementptr inbounds i16, ptr %a, i64 %iv.2.next
+  %l.2 = load i16, ptr %gep.2, align 2
+  %ext.for = sext i16 %for to i32
+  %ext.1 = sext i16 %l.1 to i32
+  %ext.2 = sext i16 %l.2 to i32
+  %mul.1 = mul nsw i32 %ext.for, %ext.1
+  %mul.2 = mul nsw i32 %mul.1, %ext.2
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
+  store i32 %mul.2, ptr %gep.b, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.2, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
 attributes #0 = { "target-cpu"="neoverse-v2" vscale_range(1,16) }

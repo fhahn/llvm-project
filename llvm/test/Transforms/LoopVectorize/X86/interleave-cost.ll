@@ -518,6 +518,64 @@ exit:
   ret void
 }
 
+define void @iv_trunc_only_used_by_interleave_group_address(ptr noalias %src, ptr noalias %dst) {
+; CHECK-LABEL: define void @iv_trunc_only_used_by_interleave_group_address(
+; CHECK-SAME: ptr noalias [[SRC:%.*]], ptr noalias [[DST:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = trunc i64 [[INDEX]] to i32
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[TMP0]], 4
+; CHECK-NEXT:    [[TMP2:%.*]] = shl nuw nsw i32 [[TMP0]], 1
+; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw nsw i32 [[TMP1]], 1
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i32 [[TMP2]]
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i32 [[TMP3]]
+; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <8 x i32>, ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <8 x i32> [[WIDE_VEC]], <8 x i32> poison, <4 x i32> <i32 0, i32 2, i32 4, i32 6>
+; CHECK-NEXT:    [[STRIDED_VEC1:%.*]] = shufflevector <8 x i32> [[WIDE_VEC]], <8 x i32> poison, <4 x i32> <i32 1, i32 3, i32 5, i32 7>
+; CHECK-NEXT:    [[WIDE_VEC2:%.*]] = load <8 x i32>, ptr [[TMP5]], align 4
+; CHECK-NEXT:    [[STRIDED_VEC3:%.*]] = shufflevector <8 x i32> [[WIDE_VEC2]], <8 x i32> poison, <4 x i32> <i32 0, i32 2, i32 4, i32 6>
+; CHECK-NEXT:    [[STRIDED_VEC4:%.*]] = shufflevector <8 x i32> [[WIDE_VEC2]], <8 x i32> poison, <4 x i32> <i32 1, i32 3, i32 5, i32 7>
+; CHECK-NEXT:    [[TMP6:%.*]] = add <4 x i32> [[STRIDED_VEC]], [[STRIDED_VEC1]]
+; CHECK-NEXT:    [[TMP7:%.*]] = add <4 x i32> [[STRIDED_VEC3]], [[STRIDED_VEC4]]
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[INDEX]]
+; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i8, ptr [[TMP8]], i64 16
+; CHECK-NEXT:    store <4 x i32> [[TMP6]], ptr [[TMP8]], align 4
+; CHECK-NEXT:    store <4 x i32> [[TMP7]], ptr [[TMP9]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
+; CHECK-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br label %[[EXIT:.*]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.trunc = trunc i64 %iv to i32
+  %idx.0 = shl nuw nsw i32 %iv.trunc, 1
+  %idx.1 = or disjoint i32 %idx.0, 1
+  %gep.src.0 = getelementptr inbounds i32, ptr %src, i32 %idx.0
+  %gep.src.1 = getelementptr inbounds i32, ptr %src, i32 %idx.1
+  %l.0 = load i32, ptr %gep.src.0, align 4
+  %l.1 = load i32, ptr %gep.src.1, align 4
+  %add = add i32 %l.0, %l.1
+  %gep.dst = getelementptr inbounds i32, ptr %dst, i64 %iv
+  store i32 %add, ptr %gep.dst, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 1000
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
 
 
 attributes #0 = { "target-features"="+sse4.2" }
@@ -536,4 +594,5 @@ attributes #1 = { "min-legal-vector-width"="0" "target-cpu"="cascadelake" }
 ; CHECK: [[META9]] = distinct !{[[META9]], [[META5]]}
 ; CHECK: [[LOOP10]] = distinct !{[[LOOP10]], [[META1]], [[META2]]}
 ; CHECK: [[LOOP11]] = distinct !{[[LOOP11]], [[META1]]}
+; CHECK: [[LOOP12]] = distinct !{[[LOOP12]], [[META1]], [[META2]]}
 ;.
