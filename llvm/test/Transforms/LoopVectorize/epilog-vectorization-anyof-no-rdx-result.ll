@@ -319,25 +319,25 @@ define i32 @dead_anyof_reduction2(i8 %start) {
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
-; CHECK-NEXT:    [[TMP0:%.*]] = icmp eq i32 [[INDEX_NEXT]], 256
+; CHECK-NEXT:    [[TMP0:%.*]] = icmp eq i32 [[INDEX_NEXT]], 252
 ; CHECK-NEXT:    br i1 [[TMP0]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
+; CHECK-NEXT:    br i1 false, label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
 ; CHECK:       [[VEC_EPILOG_ITER_CHECK]]:
-; CHECK-NEXT:    br i1 true, label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF3]]
+; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF3]]
 ; CHECK:       [[VEC_EPILOG_PH]]:
-; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i32 [ 256, %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
+; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i32 [ 252, %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX1:%.*]] = phi i32 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT2:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[INDEX_NEXT2]] = add nuw i32 [[INDEX1]], 2
-; CHECK-NEXT:    [[TMP1:%.*]] = icmp eq i32 [[INDEX_NEXT2]], 256
+; CHECK-NEXT:    [[TMP1:%.*]] = icmp eq i32 [[INDEX_NEXT2]], 254
 ; CHECK-NEXT:    br i1 [[TMP1]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
-; CHECK-NEXT:    br i1 true, label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]]
+; CHECK-NEXT:    br i1 false, label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]]
 ; CHECK:       [[VEC_EPILOG_SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_MERGE_RDX3:%.*]] = phi i8 [ 0, %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ 0, %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[ITER_CHECK]] ]
-; CHECK-NEXT:    [[BC_RESUME_VAL4:%.*]] = phi i8 [ 1, %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ 1, %[[VEC_EPILOG_ITER_CHECK]] ], [ 1, %[[ITER_CHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL4:%.*]] = phi i8 [ 0, %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ -2, %[[VEC_EPILOG_ITER_CHECK]] ], [ 2, %[[ITER_CHECK]] ]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[G_0:%.*]] = phi i8 [ [[SPEC_SELECT:%.*]], %[[LOOP]] ], [ [[BC_MERGE_RDX3]], %[[VEC_EPILOG_SCALAR_PH]] ]
@@ -361,12 +361,23 @@ define i32 @dead_anyof_reduction2(i8 %start) {
 ; CHECK-IL2:       [[VECTOR_BODY]]:
 ; CHECK-IL2-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-IL2-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 8
-; CHECK-IL2-NEXT:    [[TMP0:%.*]] = icmp eq i32 [[INDEX_NEXT]], 256
+; CHECK-IL2-NEXT:    [[TMP0:%.*]] = icmp eq i32 [[INDEX_NEXT]], 248
 ; CHECK-IL2-NEXT:    br i1 [[TMP0]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK-IL2:       [[MIDDLE_BLOCK]]:
-; CHECK-IL2-NEXT:    br label %[[EXIT:.*]]
-; CHECK-IL2:       [[EXIT]]:
-; CHECK-IL2-NEXT:    [[RES:%.*]] = zext i8 0 to i32
+; CHECK-IL2-NEXT:    br label %[[SCALAR_PH:.*]]
+; CHECK-IL2:       [[SCALAR_PH]]:
+; CHECK-IL2-NEXT:    br label %[[LOOP:.*]]
+; CHECK-IL2:       [[LOOP]]:
+; CHECK-IL2-NEXT:    [[G_0:%.*]] = phi i8 [ [[SPEC_SELECT:%.*]], %[[LOOP]] ], [ 0, %[[SCALAR_PH]] ]
+; CHECK-IL2-NEXT:    [[H_0:%.*]] = phi i8 [ [[ADD3:%.*]], %[[LOOP]] ], [ -6, %[[SCALAR_PH]] ]
+; CHECK-IL2-NEXT:    [[ADD3]] = add i8 [[H_0]], 1
+; CHECK-IL2-NEXT:    [[CMP:%.*]] = icmp eq i8 1, 0
+; CHECK-IL2-NEXT:    [[SPEC_SELECT]] = select i1 [[CMP]], i8 0, i8 [[G_0]]
+; CHECK-IL2-NEXT:    [[EC:%.*]] = icmp eq i8 [[H_0]], 0
+; CHECK-IL2-NEXT:    br i1 [[EC]], label %[[EXIT1:.*]], label %[[LOOP]], !llvm.loop [[LOOP9:![0-9]+]]
+; CHECK-IL2:       [[EXIT1]]:
+; CHECK-IL2-NEXT:    [[SPEC_SELECT_LCSSA:%.*]] = phi i8 [ [[SPEC_SELECT]], %[[LOOP]] ]
+; CHECK-IL2-NEXT:    [[RES:%.*]] = zext i8 [[SPEC_SELECT_LCSSA]] to i32
 ; CHECK-IL2-NEXT:    ret i32 [[RES]]
 ;
 entry:
@@ -374,7 +385,7 @@ entry:
 
 loop:
   %g.0 = phi i8 [ %spec.select, %loop ], [ 0, %entry ]
-  %h.0 = phi i8 [ %add3, %loop ], [ 1, %entry ]
+  %h.0 = phi i8 [ %add3, %loop ], [ 2, %entry ]
   %add3 = add i8 %h.0, 1
   %cmp = icmp eq i8 1, 0
   %spec.select = select i1 %cmp, i8 0, i8 %g.0
