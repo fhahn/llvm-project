@@ -27,7 +27,6 @@ exit:
 
 ; Trip count is 4 with %stride == 1.
 ; CHECK:      remark: {{.*}} vectorized loop (vectorization width: 2, interleaved count: 2)
-; CHECK-NOT:  Created vector loop never executes
 define void @tc_4(ptr noalias %dst, ptr %src, i64 %stride) {
 entry:
   %n = shl i64 %stride, 2
@@ -51,7 +50,6 @@ exit:
 ; Trip count is 4 with %stride == 1 and the interleave group for the strided
 ; load of %a requires a scalar epilogue.
 ; CHECK:      remark: {{.*}} vectorized loop (vectorization width: 2, interleaved count: 1)
-; CHECK-NOT:  Created vector loop never executes
 define void @tc_4_requires_scalar_epilogue(ptr noalias %dst, ptr %src, ptr %a, i64 %stride) {
 entry:
   %n = shl i64 %stride, 2
@@ -79,7 +77,6 @@ exit:
 ; Trip count is 4 with %stride == 1 and the user forces VF 8.
 ; CHECK:      remark: {{.*}} UserVF ignored because no executable vector loop could be built
 ; CHECK:      remark: {{.*}} vectorized loop (vectorization width: 4, interleaved count: 1)
-; CHECK-NOT:  Created vector loop never executes
 define void @tc_4_forced_vf(ptr noalias %dst, ptr %src, i64 %stride) {
 entry:
   %n = shl i64 %stride, 2
@@ -103,7 +100,6 @@ exit:
 ; Trip count is 4 with %stride == 1 and the user forces IC 4.
 ; CHECK:      remark: {{.*}} Ignoring UserIC, because the vector loop would never execute
 ; CHECK-NEXT: remark: {{.*}} vectorized loop (vectorization width: 2, interleaved count: 2)
-; CHECK-NOT:  Created vector loop never executes
 define void @tc_4_forced_ic(ptr noalias %dst, ptr %src, i64 %stride) {
 entry:
   %n = shl i64 %stride, 2
@@ -248,7 +244,6 @@ exit:
   ret void
 }
 
-; CHECK-NOT: Created vector loop never executes
 
 !0 = distinct !{!0, !1}
 !1 = !{!"llvm.loop.vectorize.width", i32 8}

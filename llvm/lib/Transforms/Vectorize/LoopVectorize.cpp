@@ -5700,18 +5700,9 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
                          EpilogueVectorizationKind::None))
     RUN_VPLAN_PASS(VPlanTransforms::combineRecipes, BestVPlan);
   RUN_VPLAN_PASS(VPlanTransforms::simplifyKnownEVL, BestVPlan, BestVF, PSE);
-  if (BestVPlan.getEntry()->getSingleSuccessor() ==
-      BestVPlan.getScalarPreheader()) {
-    // TODO: The vector loop would be dead, should not even try to vectorize.
-    ORE->emit([&]() {
-      return OptimizationRemarkAnalysis(DEBUG_TYPE, "VectorizationDead",
-                                        OrigLoop->getStartLoc(),
-                                        OrigLoop->getHeader())
-             << "Created vector loop never executes due to insufficient trip "
-                "count.";
-    });
-    return DenseMap<const SCEV *, Value *>();
-  }
+  assert(BestVPlan.getEntry()->getSingleSuccessor() !=
+             BestVPlan.getScalarPreheader() &&
+         "vector loop must not be dead");
 
   // 0. Generate SCEV-dependent code in the entry, including TripCount, before
   // making any changes to the CFG.
