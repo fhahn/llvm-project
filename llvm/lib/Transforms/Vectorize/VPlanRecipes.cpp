@@ -689,6 +689,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case VPInstruction::Not:
   case VPInstruction::Reverse:
   case VPInstruction::Unpack:
+  case VPInstruction::Pack:
   case VPInstruction::NumActiveLanes:
     return 1;
   case Instruction::ICmp:
@@ -1252,6 +1253,8 @@ Value *VPInstruction::generate(VPTransformState &State,
   }
   case VPInstruction::MaskedCond:
     llvm_unreachable("Should have been lowered in VPlanPredicator");
+  case VPInstruction::Pack:
+    llvm_unreachable("Pack must be lowered before execution");
   default:
     llvm_unreachable("Unsupported opcode for instruction");
   }
@@ -1824,6 +1827,7 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
   case VPInstruction::ReductionStartVector:
   case VPInstruction::Reverse:
   case VPInstruction::Unpack:
+  case VPInstruction::Pack:
   case VPInstruction::NumActiveLanes:
     return false;
   case VPInstruction::Intrinsic:
@@ -2002,6 +2006,9 @@ void VPInstruction::printRecipe(raw_ostream &O, const Twine &Indent,
     break;
   case VPInstruction::Unpack:
     O << "unpack";
+    break;
+  case VPInstruction::Pack:
+    O << "pack";
     break;
   case VPInstruction::ExtractLastActive:
     O << "extract-last-active";
@@ -4518,15 +4525,6 @@ void VPReplicateRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
     printFlags(O);
     printOperands(O, SlotTracker);
   }
-
-  // Find if the recipe is used by a widened recipe via an intervening
-  // VPPredInstPHIRecipe. In this case, also pack the scalar values in a vector.
-  if (any_of(users(), [](const VPUser *U) {
-        if (auto *PredR = dyn_cast<VPPredInstPHIRecipe>(U))
-          return !vputils::onlyScalarValuesUsed(PredR);
-        return false;
-      }))
-    O << " (S->V)";
 }
 #endif
 

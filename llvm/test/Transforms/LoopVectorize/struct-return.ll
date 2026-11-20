@@ -875,6 +875,7 @@ define float @struct_return_tail_folded_predicated_for_and_live_outs(ptr noalias
 ; CHECK:       [[PRED_CALL_CONTINUE]]:
 ; CHECK-NEXT:    [[TMP19:%.*]] = phi <2 x float> [ poison, %[[VECTOR_BODY]] ], [ [[TMP11]], %[[PRED_CALL_IF]] ]
 ; CHECK-NEXT:    [[TMP23:%.*]] = phi <2 x float> [ poison, %[[VECTOR_BODY]] ], [ [[TMP9]], %[[PRED_CALL_IF]] ]
+; CHECK-NEXT:    [[TMP31:%.*]] = phi float [ poison, %[[VECTOR_BODY]] ], [ [[TMP12]], %[[PRED_CALL_IF]] ]
 ; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <2 x i1> [[TMP1]], i64 1
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[PRED_CALL_IF1:.*]], label %[[PRED_CALL_CONTINUE2:.*]]
 ; CHECK:       [[PRED_CALL_IF1]]:
@@ -888,12 +889,12 @@ define float @struct_return_tail_folded_predicated_for_and_live_outs(ptr noalias
 ; CHECK:       [[PRED_CALL_CONTINUE2]]:
 ; CHECK-NEXT:    [[TMP26]] = phi <2 x float> [ [[TMP19]], %[[PRED_CALL_CONTINUE]] ], [ [[TMP20]], %[[PRED_CALL_IF1]] ]
 ; CHECK-NEXT:    [[TMP28:%.*]] = phi <2 x float> [ [[TMP23]], %[[PRED_CALL_CONTINUE]] ], [ [[TMP24]], %[[PRED_CALL_IF1]] ]
+; CHECK-NEXT:    [[TMP36:%.*]] = phi float [ poison, %[[PRED_CALL_CONTINUE]] ], [ [[TMP22]], %[[PRED_CALL_IF1]] ]
 ; CHECK-NEXT:    [[TMP27:%.*]] = shufflevector <2 x float> [[VECTOR_RECUR]], <2 x float> [[TMP26]], <2 x i32> <i32 1, i32 2>
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; CHECK:       [[PRED_STORE_IF]]:
 ; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr inbounds float, ptr [[OUT]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP30:%.*]] = extractelement <2 x float> [[TMP27]], i64 0
-; CHECK-NEXT:    [[TMP31:%.*]] = extractelement <2 x float> [[TMP28]], i64 0
 ; CHECK-NEXT:    [[TMP32:%.*]] = fsub float [[TMP30]], [[TMP31]]
 ; CHECK-NEXT:    store float [[TMP32]], ptr [[TMP29]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
@@ -903,7 +904,6 @@ define float @struct_return_tail_folded_predicated_for_and_live_outs(ptr noalias
 ; CHECK-NEXT:    [[TMP33:%.*]] = add i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP34:%.*]] = getelementptr inbounds float, ptr [[OUT]], i64 [[TMP33]]
 ; CHECK-NEXT:    [[TMP35:%.*]] = extractelement <2 x float> [[TMP27]], i64 1
-; CHECK-NEXT:    [[TMP36:%.*]] = extractelement <2 x float> [[TMP28]], i64 1
 ; CHECK-NEXT:    [[TMP37:%.*]] = fsub float [[TMP35]], [[TMP36]]
 ; CHECK-NEXT:    store float [[TMP37]], ptr [[TMP34]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE4]]

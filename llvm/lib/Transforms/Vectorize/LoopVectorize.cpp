@@ -6283,6 +6283,8 @@ void LoopVectorizationPlanner::buildVPlans(VPlan &VPlan1, ElementCount MinVF,
       RUN_VPLAN_PASS(VPlanTransforms::foldPredicateMerge, *Plan, CostCtx);
     }
 
+    RUN_VPLAN_PASS(VPlanTransforms::materializePacks, *Plan);
+
     if (auto P =
             RUN_VPLAN_PASS(VPlanTransforms::narrowInterleaveGroups, *Plan, TTI))
       VPlans.push_back(std::move(P));

@@ -45,6 +45,7 @@ define void @packed_with_scalar_and_vector_users(i64 %n, ptr noalias %dst, ptr n
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    pred.udiv.continue:
 ; CHECK-NEXT:      WIDEN-PHI vp<[[VP14:%[0-9]+]]> = phi [ ir<poison>, vector.body ], [ vp<[[VP13]]>, pred.udiv.if ]
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP31:%[0-9]+]]> = phi [ ir<poison>, vector.body ], [ ir<%d>, pred.udiv.if ]
 ; CHECK-NEXT:      EMIT vp<[[VP15:%[0-9]+]]> = extractelement ir<%c.0>, ir<1>
 ; CHECK-NEXT:      EMIT branch-on-cond vp<[[VP15]]>
 ; CHECK-NEXT:    Successor(s): pred.udiv.if, pred.udiv.continue
@@ -56,6 +57,7 @@ define void @packed_with_scalar_and_vector_users(i64 %n, ptr noalias %dst, ptr n
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    pred.udiv.continue:
 ; CHECK-NEXT:      WIDEN-PHI vp<[[VP18:%[0-9]+]]> = phi [ vp<[[VP14]]>, pred.udiv.continue ], [ vp<[[VP17]]>, pred.udiv.if ]
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP34:%[0-9]+]]> = phi [ ir<poison>, pred.udiv.continue ], [ ir<%d>.1, pred.udiv.if ]
 ; CHECK-NEXT:      EMIT vp<[[VP19:%[0-9]+]]> = extractelement ir<%c.0>.1, ir<0>
 ; CHECK-NEXT:      EMIT branch-on-cond vp<[[VP19]]>
 ; CHECK-NEXT:    Successor(s): pred.udiv.if, pred.udiv.continue
@@ -67,6 +69,7 @@ define void @packed_with_scalar_and_vector_users(i64 %n, ptr noalias %dst, ptr n
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    pred.udiv.continue:
 ; CHECK-NEXT:      WIDEN-PHI vp<[[VP22:%[0-9]+]]> = phi [ ir<poison>, pred.udiv.continue ], [ vp<[[VP21]]>, pred.udiv.if ]
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP37:%[0-9]+]]> = phi [ ir<poison>, pred.udiv.continue ], [ ir<%d>.2, pred.udiv.if ]
 ; CHECK-NEXT:      EMIT vp<[[VP23:%[0-9]+]]> = extractelement ir<%c.0>.1, ir<1>
 ; CHECK-NEXT:      EMIT branch-on-cond vp<[[VP23]]>
 ; CHECK-NEXT:    Successor(s): pred.udiv.if, pred.udiv.continue
@@ -78,6 +81,7 @@ define void @packed_with_scalar_and_vector_users(i64 %n, ptr noalias %dst, ptr n
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    pred.udiv.continue:
 ; CHECK-NEXT:      WIDEN-PHI vp<[[VP26:%[0-9]+]]> = phi [ vp<[[VP22]]>, pred.udiv.continue ], [ vp<[[VP25]]>, pred.udiv.if ]
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP40:%[0-9]+]]> = phi [ ir<poison>, pred.udiv.continue ], [ ir<%d>.3, pred.udiv.if ]
 ; CHECK-NEXT:      WIDEN ir<%c.1> = icmp ult vp<[[VP18]]>, ir<20> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
 ; CHECK-NEXT:      WIDEN ir<%c.1>.1 = icmp ult vp<[[VP26]]>, ir<20> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
 ; CHECK-NEXT:      EMIT vp<[[VP27:%[0-9]+]]> = logical-and ir<%c.0>, ir<%c.1>
@@ -88,7 +92,6 @@ define void @packed_with_scalar_and_vector_users(i64 %n, ptr noalias %dst, ptr n
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    pred.store.if:
 ; CHECK-NEXT:      CLONE ir<%gep.dst.2> = getelementptr ir<%dst.2>, vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<[[VP31:%[0-9]+]]> = extractelement vp<[[VP18]]>, ir<0>
 ; CHECK-NEXT:      CLONE store vp<[[VP31]]>, ir<%gep.dst.2>
 ; CHECK-NEXT:    Successor(s): pred.store.continue
 ; CHECK-EMPTY:
@@ -99,7 +102,6 @@ define void @packed_with_scalar_and_vector_users(i64 %n, ptr noalias %dst, ptr n
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    pred.store.if:
 ; CHECK-NEXT:      CLONE ir<%gep.dst.2>.1 = getelementptr ir<%dst.2>, vp<[[VP7]]>
-; CHECK-NEXT:      EMIT vp<[[VP34:%[0-9]+]]> = extractelement vp<[[VP18]]>, ir<1>
 ; CHECK-NEXT:      CLONE store vp<[[VP34]]>, ir<%gep.dst.2>.1
 ; CHECK-NEXT:    Successor(s): pred.store.continue
 ; CHECK-EMPTY:
@@ -110,7 +112,6 @@ define void @packed_with_scalar_and_vector_users(i64 %n, ptr noalias %dst, ptr n
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    pred.store.if:
 ; CHECK-NEXT:      CLONE ir<%gep.dst.2>.2 = getelementptr ir<%dst.2>, vp<[[VP8]]>
-; CHECK-NEXT:      EMIT vp<[[VP37:%[0-9]+]]> = extractelement vp<[[VP26]]>, ir<0>
 ; CHECK-NEXT:      CLONE store vp<[[VP37]]>, ir<%gep.dst.2>.2
 ; CHECK-NEXT:    Successor(s): pred.store.continue
 ; CHECK-EMPTY:
@@ -121,13 +122,12 @@ define void @packed_with_scalar_and_vector_users(i64 %n, ptr noalias %dst, ptr n
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    pred.store.if:
 ; CHECK-NEXT:      CLONE ir<%gep.dst.2>.3 = getelementptr ir<%dst.2>, vp<[[VP10]]>
-; CHECK-NEXT:      EMIT vp<[[VP40:%[0-9]+]]> = extractelement vp<[[VP26]]>, ir<1>
 ; CHECK-NEXT:      CLONE store vp<[[VP40]]>, ir<%gep.dst.2>.3
 ; CHECK-NEXT:    Successor(s): pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    pred.store.continue:
-; CHECK-NEXT:      BLEND ir<%p> = ir<0> vp<%18>/ir<%c.0>
-; CHECK-NEXT:      BLEND ir<%p>.1 = ir<0> vp<%26>/ir<%c.0>.1
+; CHECK-NEXT:      BLEND ir<%p> = ir<0> vp<%19>/ir<%c.0>
+; CHECK-NEXT:      BLEND ir<%p>.1 = ir<0> vp<%29>/ir<%c.0>.1
 ; CHECK-NEXT:      CLONE ir<%gep.dst> = getelementptr ir<%dst>, vp<[[VP6]]>
 ; CHECK-NEXT:      EMIT vp<[[VP41:%[0-9]+]]> = mul nuw nsw vp<[[VP0]]>, ir<1>
 ; CHECK-NEXT:      vp<[[VP42:%[0-9]+]]> = vector-pointer i64, ir<%gep.dst>, ir<1>

@@ -39,7 +39,7 @@ define void @sink_replicate_region_1(i32 %x, ptr %ptr, ptr noalias %dst) optsize
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.load.if:
 ; CHECK-NEXT:        REPLICATE ir<%gep> = getelementptr ir<%ptr>, vp<[[VP8]]>
-; CHECK-NEXT:        REPLICATE ir<%lv> = load ir<%gep> (S->V)
+; CHECK-NEXT:        REPLICATE ir<%lv> = load ir<%gep>
 ; CHECK-NEXT:      Successor(s): pred.load.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.load.continue:
@@ -49,7 +49,8 @@ define void @sink_replicate_region_1(i32 %x, ptr %ptr, ptr noalias %dst) optsize
 ; CHECK-NEXT:    Successor(s): loop.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.0:
-; CHECK-NEXT:      WIDEN-CAST ir<%conv> = sext vp<[[VP9]]> to i32
+; CHECK-NEXT:      EMIT vp<[[PACK:%[0-9]+]]> = pack vp<[[VP9]]>
+; CHECK-NEXT:      WIDEN-CAST ir<%conv> = sext vp<[[PACK]]> to i32
 ; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = first-order splice ir<%0>, ir<%conv>
 ; CHECK-NEXT:    Successor(s): pred.store
 ; CHECK-EMPTY:
@@ -254,7 +255,7 @@ define i32 @sink_replicate_region_3_reduction(i32 %x, i8 %y, ptr %ptr) optsize {
 ; CHECK-NEXT:      Successor(s): pred.srem.if, pred.srem.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.srem.if:
-; CHECK-NEXT:        REPLICATE ir<%rem> = srem vp<[[VP8]]>, ir<%x> (S->V)
+; CHECK-NEXT:        REPLICATE ir<%rem> = srem vp<[[VP8]]>, ir<%x>
 ; CHECK-NEXT:      Successor(s): pred.srem.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.srem.continue:
@@ -264,7 +265,8 @@ define i32 @sink_replicate_region_3_reduction(i32 %x, i8 %y, ptr %ptr) optsize {
 ; CHECK-NEXT:    Successor(s): loop.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.0:
-; CHECK-NEXT:      WIDEN ir<%add> = add vp<[[VP9]]>, ir<%recur.next>
+; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = pack vp<[[VP9]]>
+; CHECK-NEXT:      WIDEN ir<%add> = add vp<[[VP10]]>, ir<%recur.next>
 ; CHECK-NEXT:      WIDEN ir<%and.red.next> = and ir<%and.red>, ir<%add>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
@@ -352,7 +354,7 @@ define void @sink_replicate_region_4_requires_split_at_end_of_block(i32 %x, ptr 
 ; CHECK-NEXT:      Successor(s): pred.load.if, pred.load.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.load.if:
-; CHECK-NEXT:        REPLICATE ir<%lv> = load ir<%gep> (S->V)
+; CHECK-NEXT:        REPLICATE ir<%lv> = load ir<%gep>
 ; CHECK-NEXT:      Successor(s): pred.load.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.load.continue:
@@ -362,7 +364,8 @@ define void @sink_replicate_region_4_requires_split_at_end_of_block(i32 %x, ptr 
 ; CHECK-NEXT:    Successor(s): loop.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.0:
-; CHECK-NEXT:      WIDEN-CAST ir<%conv> = sext vp<[[VP9]]> to i32
+; CHECK-NEXT:      EMIT vp<[[PACK:%[0-9]+]]> = pack vp<[[VP9]]>
+; CHECK-NEXT:      WIDEN-CAST ir<%conv> = sext vp<[[PACK]]> to i32
 ; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = first-order splice ir<%0>, ir<%conv>
 ; CHECK-NEXT:    Successor(s): pred.load
 ; CHECK-EMPTY:
@@ -372,20 +375,22 @@ define void @sink_replicate_region_4_requires_split_at_end_of_block(i32 %x, ptr 
 ; CHECK-NEXT:      Successor(s): pred.load.if, pred.load.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.load.if:
-; CHECK-NEXT:        REPLICATE ir<%rem> = srem vp<[[VP10]]>, ir<%x> (S->V)
-; CHECK-NEXT:        REPLICATE ir<%lv.2> = load ir<%gep> (S->V)
+; CHECK-NEXT:        REPLICATE ir<%rem> = srem vp<[[VP10]]>, ir<%x>
+; CHECK-NEXT:        REPLICATE ir<%lv.2> = load ir<%gep>
 ; CHECK-NEXT:      Successor(s): pred.load.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.load.continue:
-; CHECK-NEXT:        PHI-PREDICATED-INSTRUCTION vp<[[VP11:%[0-9]+]]> = ir<%rem>
-; CHECK-NEXT:        PHI-PREDICATED-INSTRUCTION vp<[[VP12:%[0-9]+]]> = ir<%lv.2>
+; CHECK-NEXT:        PHI-PREDICATED-INSTRUCTION vp<[[VP12:%[0-9]+]]> = ir<%rem>
+; CHECK-NEXT:        PHI-PREDICATED-INSTRUCTION vp<[[VP13:%[0-9]+]]> = ir<%lv.2>
 ; CHECK-NEXT:      No successors
 ; CHECK-NEXT:    }
 ; CHECK-NEXT:    Successor(s): loop.2
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.2:
-; CHECK-NEXT:      WIDEN ir<%add.1> = add ir<%conv>, vp<[[VP11]]>
-; CHECK-NEXT:      WIDEN-CAST ir<%conv.lv.2> = sext vp<[[VP12]]> to i32
+; CHECK-NEXT:      EMIT vp<[[VP14:%[0-9]+]]> = pack vp<[[VP12]]>
+; CHECK-NEXT:      EMIT vp<[[VP15:%[0-9]+]]> = pack vp<[[VP13]]>
+; CHECK-NEXT:      WIDEN ir<%add.1> = add ir<%conv>, vp<[[VP14]]>
+; CHECK-NEXT:      WIDEN-CAST ir<%conv.lv.2> = sext vp<[[VP15]]> to i32
 ; CHECK-NEXT:      WIDEN ir<%add> = add ir<%add.1>, ir<%conv.lv.2>
 ; CHECK-NEXT:    Successor(s): pred.store
 ; CHECK-EMPTY:

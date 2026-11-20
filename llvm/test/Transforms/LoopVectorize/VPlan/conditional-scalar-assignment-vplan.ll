@@ -200,7 +200,7 @@ define i32 @simple_csa_int_load(ptr noalias %a, ptr noalias %b, i32 %default_val
 ; CHECK-NEXT:      pred.load.if:
 ; CHECK-NEXT:        vp<[[VP7:%[0-9]+]]> = SCALAR-STEPS vp<[[VP3]]>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:        REPLICATE ir<%b.addr> = getelementptr inbounds nuw ir<%b>, vp<[[VP7]]>
-; CHECK-NEXT:        REPLICATE ir<%ld.b> = load ir<%b.addr> (S->V)
+; CHECK-NEXT:        REPLICATE ir<%ld.b> = load ir<%b.addr>
 ; CHECK-NEXT:      Successor(s): pred.load.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.load.continue:
@@ -210,10 +210,11 @@ define i32 @simple_csa_int_load(ptr noalias %a, ptr noalias %b, i32 %default_val
 ; CHECK-NEXT:    Successor(s): if.then.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    if.then.0:
+; CHECK-NEXT:      EMIT vp<[[PACK:%[0-9]+]]> = pack vp<[[VP8]]>
 ; CHECK-NEXT:      EMIT vp<[[VP9:%[0-9]+]]> = freeze ir<%if.cond>
 ; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = any-of vp<[[VP9]]>
 ; CHECK-NEXT:      EMIT vp<[[VP11]]> = select vp<[[VP10]]>, vp<[[VP9]]>, vp<[[VP4]]>
-; CHECK-NEXT:      EMIT vp<[[VP12]]> = select vp<[[VP10]]>, vp<[[VP8]]>, ir<%data.phi>
+; CHECK-NEXT:      EMIT vp<[[VP12]]> = select vp<[[VP10]]>, vp<[[PACK]]>, ir<%data.phi>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors

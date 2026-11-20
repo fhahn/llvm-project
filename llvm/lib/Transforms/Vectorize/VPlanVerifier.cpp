@@ -329,6 +329,12 @@ bool VPlanVerifier::verifyVPBasicBlock(const VPBasicBlock *VPBB) {
         if (!verifyLastActiveLaneRecipe(*VPI))
           return false;
         break;
+      case VPInstruction::Pack:
+        if (!isa<VPPredInstPHIRecipe>(VPI->getOperand(0))) {
+          errs() << "Pack operand must be a VPPredInstPHIRecipe\n";
+          return false;
+        }
+        break;
       default:
         break;
       }

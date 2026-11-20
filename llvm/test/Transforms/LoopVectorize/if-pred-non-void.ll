@@ -928,6 +928,7 @@ define void @predicated_udiv_operand_from_other_region(ptr %a, i1 %c, i1 %c2, i3
 ; CHECK-NEXT:    br label %[[PRED_UDIV_CONTINUE]]
 ; CHECK:       [[PRED_UDIV_CONTINUE]]:
 ; CHECK-NEXT:    [[TMP5:%.*]] = phi <2 x i32> [ poison, %[[VECTOR_BODY]] ], [ [[TMP4]], %[[PRED_UDIV_IF]] ]
+; CHECK-NEXT:    [[TMP11:%.*]] = phi i32 [ poison, %[[VECTOR_BODY]] ], [ [[TMP3]], %[[PRED_UDIV_IF]] ]
 ; CHECK-NEXT:    br i1 [[C]], label %[[PRED_UDIV_IF3:.*]], label %[[PRED_UDIV_CONTINUE4:.*]]
 ; CHECK:       [[PRED_UDIV_IF3]]:
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <2 x i32> [[WIDE_LOAD]], i64 1
@@ -936,10 +937,10 @@ define void @predicated_udiv_operand_from_other_region(ptr %a, i1 %c, i1 %c2, i3
 ; CHECK-NEXT:    br label %[[PRED_UDIV_CONTINUE4]]
 ; CHECK:       [[PRED_UDIV_CONTINUE4]]:
 ; CHECK-NEXT:    [[TMP9:%.*]] = phi <2 x i32> [ [[TMP5]], %[[PRED_UDIV_CONTINUE]] ], [ [[TMP8]], %[[PRED_UDIV_IF3]] ]
+; CHECK-NEXT:    [[TMP16:%.*]] = phi i32 [ poison, %[[PRED_UDIV_CONTINUE]] ], [ [[TMP7]], %[[PRED_UDIV_IF3]] ]
 ; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <2 x i1> [[TMP0]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP10]], label %[[PRED_UDIV_IF5:.*]], label %[[PRED_UDIV_CONTINUE6:.*]]
 ; CHECK:       [[PRED_UDIV_IF5]]:
-; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <2 x i32> [[TMP9]], i64 0
 ; CHECK-NEXT:    [[TMP12:%.*]] = udiv i32 [[TMP11]], [[X]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = insertelement <2 x i32> poison, i32 [[TMP12]], i64 0
 ; CHECK-NEXT:    br label %[[PRED_UDIV_CONTINUE6]]
@@ -948,7 +949,6 @@ define void @predicated_udiv_operand_from_other_region(ptr %a, i1 %c, i1 %c2, i3
 ; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <2 x i1> [[TMP0]], i64 1
 ; CHECK-NEXT:    br i1 [[TMP15]], label %[[PRED_UDIV_IF7:.*]], label %[[PRED_UDIV_CONTINUE8]]
 ; CHECK:       [[PRED_UDIV_IF7]]:
-; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <2 x i32> [[TMP9]], i64 1
 ; CHECK-NEXT:    [[TMP17:%.*]] = udiv i32 [[TMP16]], [[X]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = insertelement <2 x i32> [[TMP14]], i32 [[TMP17]], i64 1
 ; CHECK-NEXT:    br label %[[PRED_UDIV_CONTINUE8]]
@@ -1202,6 +1202,7 @@ define void @predicated_udiv_used_by_call(ptr %a, i1 %c, i32 %x) {
 ; CHECK-NEXT:    br label %[[PRED_UDIV_CONTINUE]]
 ; CHECK:       [[PRED_UDIV_CONTINUE]]:
 ; CHECK-NEXT:    [[TMP4:%.*]] = phi <2 x i32> [ poison, %[[VECTOR_BODY]] ], [ [[TMP3]], %[[PRED_UDIV_IF]] ]
+; CHECK-NEXT:    [[TMP9:%.*]] = phi i32 [ poison, %[[VECTOR_BODY]] ], [ [[TMP2]], %[[PRED_UDIV_IF]] ]
 ; CHECK-NEXT:    br i1 [[C]], label %[[PRED_UDIV_IF1:.*]], label %[[PRED_UDIV_CONTINUE2]]
 ; CHECK:       [[PRED_UDIV_IF1]]:
 ; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <2 x i32> [[WIDE_LOAD]], i64 1
@@ -1210,9 +1211,8 @@ define void @predicated_udiv_used_by_call(ptr %a, i1 %c, i32 %x) {
 ; CHECK-NEXT:    br label %[[PRED_UDIV_CONTINUE2]]
 ; CHECK:       [[PRED_UDIV_CONTINUE2]]:
 ; CHECK-NEXT:    [[TMP8:%.*]] = phi <2 x i32> [ [[TMP4]], %[[PRED_UDIV_CONTINUE]] ], [ [[TMP7]], %[[PRED_UDIV_IF1]] ]
-; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <2 x i32> [[TMP8]], i64 0
+; CHECK-NEXT:    [[TMP11:%.*]] = phi i32 [ poison, %[[PRED_UDIV_CONTINUE]] ], [ [[TMP6]], %[[PRED_UDIV_IF1]] ]
 ; CHECK-NEXT:    [[TMP10:%.*]] = call i32 @foo(i32 [[TMP9]]) #[[ATTR2:[0-9]+]]
-; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <2 x i32> [[TMP8]], i64 1
 ; CHECK-NEXT:    [[TMP12:%.*]] = call i32 @foo(i32 [[TMP11]]) #[[ATTR2]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = insertelement <2 x i32> poison, i32 [[TMP10]], i64 0
 ; CHECK-NEXT:    [[TMP14:%.*]] = insertelement <2 x i32> [[TMP13]], i32 [[TMP12]], i64 1

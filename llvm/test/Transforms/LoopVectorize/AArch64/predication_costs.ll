@@ -23,7 +23,7 @@ target triple = "aarch64--linux-gnu"
 ;   (udiv(2) + extractelement(8) + insertelement(4)) / 2 = 7
 ;
 ; CHECK: Scalarizing and predicating: %tmp4 = udiv i32 %tmp2, %tmp3
-; CHECK: Cost of 7 for VF 2: REPLICATE ir<%tmp4> = udiv ir<%tmp2>, ir<%tmp3> (S->V)
+; CHECK: Cost of 7 for VF 2: REPLICATE ir<%tmp4> = udiv ir<%tmp2>, ir<%tmp3>
 ; CHECK: Precomputed costs for VF 2: 0
 ; CHECK: Cost of 4 for VF 2: BRANCH-ON-MASK ir<%c>
 ;
@@ -145,7 +145,7 @@ for.end:
 ; CHECK: Scalarizing: %tmp3 = add nsw i32 %tmp2, %x
 ; CHECK: Scalarizing and predicating: %tmp4 = udiv i32 %tmp2, %tmp3
 ; CHECK: Cost of 3 for VF 2: profitable to scalarize   %tmp3 = add nsw i32 %tmp2, %x
-; CHECK: Cost of 5 for VF 2: REPLICATE ir<%tmp4> = udiv ir<%tmp2>, ir<%tmp3> (S->V)
+; CHECK: Cost of 5 for VF 2: REPLICATE ir<%tmp4> = udiv ir<%tmp2>, ir<%tmp3>
 ; CHECK: Precomputed costs for VF 2: 3
 ; CHECK: Cost of 4 for VF 2: BRANCH-ON-MASK ir<%c>
 ;
@@ -331,8 +331,8 @@ exit:
 ;
 ; CHECK: Scalarizing and predicating: %tmp2 = udiv i32 %tmp1, %x
 ; CHECK: Scalarizing and predicating: %tmp3 = udiv i32 %tmp2, %y
-; CHECK: Cost of 5 for VF 2: REPLICATE ir<%tmp2> = udiv ir<%tmp1>, ir<%x> (S->V)
-; CHECK: Cost of 2.5 for VF 2: REPLICATE ir<%tmp3> = udiv vp<{{.+}}>, ir<%y> (S->V)
+; CHECK: Cost of 5 for VF 2: REPLICATE ir<%tmp2> = udiv ir<%tmp1>, ir<%x>
+; CHECK: Cost of 2.5 for VF 2: REPLICATE ir<%tmp3> = udiv vp<{{.+}}>, ir<%y>
 ;
 define void @predicated_udiv_operand_from_other_region(ptr %a, i1 %c, i1 %c2, i32 %x, i32 %y, i64 %n) {
 entry:
@@ -377,7 +377,7 @@ for.end:
 ; CHECK: Scalarizing and predicating: %tmp2 = udiv i32 %tmp1, %x
 ; CHECK: Scalarizing and predicating: %tmp3 = udiv i32 %tmp2, %y
 ; CHECK: Cost of 5 for VF 2: REPLICATE ir<%tmp2> = udiv ir<%tmp1>, ir<%x>{{$}}
-; CHECK: Cost of 2.5 for VF 2: REPLICATE ir<%tmp3> = udiv vp<{{.+}}>, ir<%y> (S->V)
+; CHECK: Cost of 2.5 for VF 2: REPLICATE ir<%tmp3> = udiv vp<{{.+}}>, ir<%y>
 ;
 define void @predicated_udiv_operand_from_other_region_no_vector_user(ptr %a, i1 %c, i1 %c2, i32 %x, i32 %y, i64 %n) {
 entry:
@@ -419,7 +419,7 @@ for.end:
 ;
 ; CHECK: Scalarizing and predicating: %tmp2 = load i32, ptr %gep.b, align 4
 ; CHECK: Scalarizing and predicating: %tmp3 = udiv i32 %tmp2, %y
-; CHECK: Cost of 1.5 for VF 2: REPLICATE ir<%tmp3> = udiv vp<{{.+}}>, ir<%y> (S->V)
+; CHECK: Cost of 1.5 for VF 2: REPLICATE ir<%tmp3> = udiv vp<{{.+}}>, ir<%y>
 ;
 define void @predicated_load_operand_from_other_region(ptr %a, ptr %b, i1 %c, i1 %c2, i32 %y, i64 %n) {
 entry:
@@ -465,7 +465,7 @@ for.end:
 ;
 ; CHECK: Scalarizing: %tmp3 = call i32 @foo(i32 %tmp2)
 ; CHECK: Scalarizing and predicating: %tmp2 = udiv i32 %tmp1, %x
-; CHECK: Cost of 5 for VF 2: REPLICATE ir<%tmp2> = udiv ir<%tmp1>, ir<%x> (S->V)
+; CHECK: Cost of 5 for VF 2: REPLICATE ir<%tmp2> = udiv ir<%tmp1>, ir<%x>
 ; CHECK: Cost of 24 for VF 2: REPLICATE ir<%tmp3> = call @foo(vp<{{.+}}>)
 ;
 define void @predicated_udiv_used_by_call(ptr %a, i1 %c, i32 %x, i64 %n) {

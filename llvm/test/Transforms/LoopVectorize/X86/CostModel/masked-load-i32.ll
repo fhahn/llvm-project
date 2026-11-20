@@ -17,10 +17,10 @@ target triple = "x86_64-unknown-linux-gnu"
 define void @test(ptr %B) {
 ; SSE-LABEL: 'test'
 ; SSE:  LV: Found an estimated cost of 1 for VF 1 For instruction: %valB.loaded = load i32, ptr %inB, align 4
-; SSE:  Cost of 3000000 for VF 2: REPLICATE ir<%valB.loaded> = load ir<%inB> (S->V) (!alias.scope !7)
-; SSE:  Cost of 3000000 for VF 4: REPLICATE ir<%valB.loaded> = load ir<%inB> (S->V) (!alias.scope !7)
-; SSE:  Cost of 3000000 for VF 8: REPLICATE ir<%valB.loaded> = load ir<%inB> (S->V) (!alias.scope !7)
-; SSE:  Cost of 3000000 for VF 16: REPLICATE ir<%valB.loaded> = load ir<%inB> (S->V) (!alias.scope !7)
+; SSE:  Cost of 3000000 for VF 2: REPLICATE ir<%valB.loaded> = load ir<%inB> (!alias.scope !7)
+; SSE:  Cost of 3000000 for VF 4: REPLICATE ir<%valB.loaded> = load ir<%inB> (!alias.scope !7)
+; SSE:  Cost of 3000000 for VF 8: REPLICATE ir<%valB.loaded> = load ir<%inB> (!alias.scope !7)
+; SSE:  Cost of 3000000 for VF 16: REPLICATE ir<%valB.loaded> = load ir<%inB> (!alias.scope !7)
 ;
 ; AVX1-LABEL: 'test'
 ; AVX1:  LV: Found an estimated cost of 1 for VF 1 For instruction: %valB.loaded = load i32, ptr %inB, align 4

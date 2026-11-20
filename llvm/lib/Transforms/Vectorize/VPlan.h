@@ -1376,6 +1376,11 @@ public:
     /// scalars extracted from a vector, to be replaced by VF ExtractElement
     /// VPInstructions.
     Unpack,
+    /// Packs the scalars of all lanes of its single operand, a predicated
+    /// value, into a vector. Users needing a vector use the Pack, other users
+    /// the operand. Abstract while VF is unknown; lowered to insert-elements
+    /// and widen phis when dissolving replicate regions.
+    Pack,
     /// Reduce the operands to the final reduction result using the operation
     /// specified via the operation's VPIRFlags.
     ComputeReductionResult,
@@ -1589,7 +1594,7 @@ public:
   /// Returns true if the recipe only uses scalars of operand \p Op.
   bool usesScalars(const VPValue *Op) const override {
     return isSingleScalar() || getOpcode() == VPInstruction::PtrAdd ||
-           usesFirstLaneOnly(Op);
+           getOpcode() == VPInstruction::Pack || usesFirstLaneOnly(Op);
   }
 
   /// Returns true if the recipe only uses the first part of all operands.

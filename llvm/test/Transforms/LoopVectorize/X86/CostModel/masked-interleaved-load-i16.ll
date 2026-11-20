@@ -83,14 +83,14 @@ define void @test2(ptr noalias nocapture %points, i32 %numPoints, ptr noalias no
 ; DISABLED_MASKED_STRIDED-LABEL: 'test2'
 ; DISABLED_MASKED_STRIDED:  LV: Found an estimated cost of 1 for VF 1 For instruction: %i2 = load i16, ptr %arrayidx2, align 2
 ; DISABLED_MASKED_STRIDED:  LV: Found an estimated cost of 1 for VF 1 For instruction: %i4 = load i16, ptr %arrayidx7, align 2
-; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 2: REPLICATE ir<%i2> = load ir<%arrayidx2> (S->V)
-; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 2: REPLICATE ir<%i4> = load ir<%arrayidx7> (S->V)
-; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 4: REPLICATE ir<%i2> = load ir<%arrayidx2> (S->V)
-; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 4: REPLICATE ir<%i4> = load ir<%arrayidx7> (S->V)
-; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 8: REPLICATE ir<%i2> = load ir<%arrayidx2> (S->V)
-; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 8: REPLICATE ir<%i4> = load ir<%arrayidx7> (S->V)
-; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 16: REPLICATE ir<%i2> = load ir<%arrayidx2> (S->V)
-; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 16: REPLICATE ir<%i4> = load ir<%arrayidx7> (S->V)
+; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 2: REPLICATE ir<%i2> = load ir<%arrayidx2>
+; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 2: REPLICATE ir<%i4> = load ir<%arrayidx7>
+; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 4: REPLICATE ir<%i2> = load ir<%arrayidx2>
+; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 4: REPLICATE ir<%i4> = load ir<%arrayidx7>
+; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 8: REPLICATE ir<%i2> = load ir<%arrayidx2>
+; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 8: REPLICATE ir<%i4> = load ir<%arrayidx7>
+; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 16: REPLICATE ir<%i2> = load ir<%arrayidx2>
+; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 16: REPLICATE ir<%i4> = load ir<%arrayidx7>
 ;
 ; ENABLED_MASKED_STRIDED-LABEL: 'test2'
 ; ENABLED_MASKED_STRIDED:  LV: Found an estimated cost of 1 for VF 1 For instruction: %i2 = load i16, ptr %arrayidx2, align 2
@@ -154,10 +154,10 @@ define void @test(ptr noalias nocapture %points, ptr noalias nocapture readonly 
 ; DISABLED_MASKED_STRIDED-LABEL: 'test'
 ; DISABLED_MASKED_STRIDED:  LV: Found an estimated cost of 1 for VF 1 For instruction: %i2 = load i16, ptr %arrayidx, align 2
 ; DISABLED_MASKED_STRIDED:  LV: Found an estimated cost of 1 for VF 1 For instruction: %i4 = load i16, ptr %arrayidx6, align 2
-; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 2: REPLICATE ir<%i4> = load ir<%arrayidx6> (S->V)
-; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 4: REPLICATE ir<%i4> = load ir<%arrayidx6> (S->V)
-; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 8: REPLICATE ir<%i4> = load ir<%arrayidx6> (S->V)
-; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 16: REPLICATE ir<%i4> = load ir<%arrayidx6> (S->V)
+; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 2: REPLICATE ir<%i4> = load ir<%arrayidx6>
+; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 4: REPLICATE ir<%i4> = load ir<%arrayidx6>
+; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 8: REPLICATE ir<%i4> = load ir<%arrayidx6>
+; DISABLED_MASKED_STRIDED:  Cost of 3000000 for VF 16: REPLICATE ir<%i4> = load ir<%arrayidx6>
 ;
 ; ENABLED_MASKED_STRIDED-LABEL: 'test'
 ; ENABLED_MASKED_STRIDED:  LV: Found an estimated cost of 1 for VF 1 For instruction: %i2 = load i16, ptr %arrayidx, align 2

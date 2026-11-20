@@ -43,6 +43,7 @@ define void @predicated_values_packed_and_unpacked(ptr noalias %src, ptr noalias
 ; CHECK-NEXT:    br label %[[PRED_SDIV_CONTINUE]]
 ; CHECK:       [[PRED_SDIV_CONTINUE]]:
 ; CHECK-NEXT:    [[TMP21:%.*]] = phi <4 x i32> [ poison, %[[VECTOR_BODY]] ], [ [[TMP19]], %[[PRED_SDIV_IF]] ]
+; CHECK-NEXT:    [[TMP42:%.*]] = phi i32 [ poison, %[[VECTOR_BODY]] ], [ [[TMP18]], %[[PRED_SDIV_IF]] ]
 ; CHECK-NEXT:    [[TMP22:%.*]] = phi i32 [ poison, %[[VECTOR_BODY]] ], [ [[TMP20]], %[[PRED_SDIV_IF]] ]
 ; CHECK-NEXT:    [[TMP23:%.*]] = extractelement <4 x i1> [[TMP16]], i64 1
 ; CHECK-NEXT:    br i1 [[TMP23]], label %[[PRED_SDIV_IF1:.*]], label %[[PRED_SDIV_CONTINUE2:.*]]
@@ -53,6 +54,7 @@ define void @predicated_values_packed_and_unpacked(ptr noalias %src, ptr noalias
 ; CHECK-NEXT:    br label %[[PRED_SDIV_CONTINUE2]]
 ; CHECK:       [[PRED_SDIV_CONTINUE2]]:
 ; CHECK-NEXT:    [[TMP27:%.*]] = phi <4 x i32> [ [[TMP21]], %[[PRED_SDIV_CONTINUE]] ], [ [[TMP25]], %[[PRED_SDIV_IF1]] ]
+; CHECK-NEXT:    [[TMP46:%.*]] = phi i32 [ poison, %[[PRED_SDIV_CONTINUE]] ], [ [[TMP24]], %[[PRED_SDIV_IF1]] ]
 ; CHECK-NEXT:    [[TMP28:%.*]] = phi i32 [ poison, %[[PRED_SDIV_CONTINUE]] ], [ [[TMP26]], %[[PRED_SDIV_IF1]] ]
 ; CHECK-NEXT:    [[TMP29:%.*]] = extractelement <4 x i1> [[TMP16]], i64 2
 ; CHECK-NEXT:    br i1 [[TMP29]], label %[[PRED_SDIV_IF3:.*]], label %[[PRED_SDIV_CONTINUE4:.*]]
@@ -63,6 +65,7 @@ define void @predicated_values_packed_and_unpacked(ptr noalias %src, ptr noalias
 ; CHECK-NEXT:    br label %[[PRED_SDIV_CONTINUE4]]
 ; CHECK:       [[PRED_SDIV_CONTINUE4]]:
 ; CHECK-NEXT:    [[TMP33:%.*]] = phi <4 x i32> [ [[TMP27]], %[[PRED_SDIV_CONTINUE2]] ], [ [[TMP31]], %[[PRED_SDIV_IF3]] ]
+; CHECK-NEXT:    [[TMP50:%.*]] = phi i32 [ poison, %[[PRED_SDIV_CONTINUE2]] ], [ [[TMP30]], %[[PRED_SDIV_IF3]] ]
 ; CHECK-NEXT:    [[TMP34:%.*]] = phi i32 [ poison, %[[PRED_SDIV_CONTINUE2]] ], [ [[TMP32]], %[[PRED_SDIV_IF3]] ]
 ; CHECK-NEXT:    [[TMP35:%.*]] = extractelement <4 x i1> [[TMP16]], i64 3
 ; CHECK-NEXT:    br i1 [[TMP35]], label %[[PRED_SDIV_IF5:.*]], label %[[PRED_SDIV_CONTINUE6:.*]]
@@ -73,12 +76,12 @@ define void @predicated_values_packed_and_unpacked(ptr noalias %src, ptr noalias
 ; CHECK-NEXT:    br label %[[PRED_SDIV_CONTINUE6]]
 ; CHECK:       [[PRED_SDIV_CONTINUE6]]:
 ; CHECK-NEXT:    [[TMP39:%.*]] = phi <4 x i32> [ [[TMP33]], %[[PRED_SDIV_CONTINUE4]] ], [ [[TMP37]], %[[PRED_SDIV_IF5]] ]
+; CHECK-NEXT:    [[TMP54:%.*]] = phi i32 [ poison, %[[PRED_SDIV_CONTINUE4]] ], [ [[TMP36]], %[[PRED_SDIV_IF5]] ]
 ; CHECK-NEXT:    [[TMP40:%.*]] = phi i32 [ poison, %[[PRED_SDIV_CONTINUE4]] ], [ [[TMP38]], %[[PRED_SDIV_IF5]] ]
 ; CHECK-NEXT:    [[TMP41:%.*]] = getelementptr i32, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[TMP39]], ptr align 4 [[TMP41]], <4 x i1> [[TMP16]])
 ; CHECK-NEXT:    br i1 [[TMP17]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; CHECK:       [[PRED_STORE_IF]]:
-; CHECK-NEXT:    [[TMP42:%.*]] = extractelement <4 x i32> [[TMP39]], i64 0
 ; CHECK-NEXT:    [[TMP43:%.*]] = mul i32 [[TMP42]], [[TMP22]]
 ; CHECK-NEXT:    [[TMP44:%.*]] = zext i32 [[TMP43]] to i64
 ; CHECK-NEXT:    [[TMP45:%.*]] = getelementptr inbounds i8, ptr [[DST_2]], i64 [[TMP44]]
@@ -87,7 +90,6 @@ define void @predicated_values_packed_and_unpacked(ptr noalias %src, ptr noalias
 ; CHECK:       [[PRED_STORE_CONTINUE]]:
 ; CHECK-NEXT:    br i1 [[TMP23]], label %[[PRED_STORE_IF7:.*]], label %[[PRED_STORE_CONTINUE8:.*]]
 ; CHECK:       [[PRED_STORE_IF7]]:
-; CHECK-NEXT:    [[TMP46:%.*]] = extractelement <4 x i32> [[TMP39]], i64 1
 ; CHECK-NEXT:    [[TMP47:%.*]] = mul i32 [[TMP46]], [[TMP28]]
 ; CHECK-NEXT:    [[TMP48:%.*]] = zext i32 [[TMP47]] to i64
 ; CHECK-NEXT:    [[TMP49:%.*]] = getelementptr inbounds i8, ptr [[DST_2]], i64 [[TMP48]]
@@ -96,7 +98,6 @@ define void @predicated_values_packed_and_unpacked(ptr noalias %src, ptr noalias
 ; CHECK:       [[PRED_STORE_CONTINUE8]]:
 ; CHECK-NEXT:    br i1 [[TMP29]], label %[[PRED_STORE_IF9:.*]], label %[[PRED_STORE_CONTINUE10:.*]]
 ; CHECK:       [[PRED_STORE_IF9]]:
-; CHECK-NEXT:    [[TMP50:%.*]] = extractelement <4 x i32> [[TMP39]], i64 2
 ; CHECK-NEXT:    [[TMP51:%.*]] = mul i32 [[TMP50]], [[TMP34]]
 ; CHECK-NEXT:    [[TMP52:%.*]] = zext i32 [[TMP51]] to i64
 ; CHECK-NEXT:    [[TMP53:%.*]] = getelementptr inbounds i8, ptr [[DST_2]], i64 [[TMP52]]
@@ -105,7 +106,6 @@ define void @predicated_values_packed_and_unpacked(ptr noalias %src, ptr noalias
 ; CHECK:       [[PRED_STORE_CONTINUE10]]:
 ; CHECK-NEXT:    br i1 [[TMP35]], label %[[PRED_STORE_IF11:.*]], label %[[PRED_STORE_CONTINUE12]]
 ; CHECK:       [[PRED_STORE_IF11]]:
-; CHECK-NEXT:    [[TMP54:%.*]] = extractelement <4 x i32> [[TMP39]], i64 3
 ; CHECK-NEXT:    [[TMP55:%.*]] = mul i32 [[TMP54]], [[TMP40]]
 ; CHECK-NEXT:    [[TMP56:%.*]] = zext i32 [[TMP55]] to i64
 ; CHECK-NEXT:    [[TMP57:%.*]] = getelementptr inbounds i8, ptr [[DST_2]], i64 [[TMP56]]

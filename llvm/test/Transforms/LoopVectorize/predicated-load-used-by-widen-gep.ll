@@ -21,18 +21,22 @@ define void @pred_load_ptr_used_as_widen_gep_base(ptr noalias %src, ptr noalias 
 ; CHECK:       [[PRED_LOAD_IF]]:
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds ptr, ptr [[SRC]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = load ptr, ptr [[TMP3]], align 8
+; CHECK-NEXT:    [[TMP9:%.*]] = insertelement <2 x ptr> poison, ptr [[TMP4]], i64 0
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE]]
 ; CHECK:       [[PRED_LOAD_CONTINUE]]:
-; CHECK-NEXT:    [[TMP5:%.*]] = phi ptr [ poison, %[[VECTOR_BODY]] ], [ [[TMP4]], %[[PRED_LOAD_IF]] ]
+; CHECK-NEXT:    [[TMP13:%.*]] = phi <2 x ptr> [ poison, %[[VECTOR_BODY]] ], [ [[TMP9]], %[[PRED_LOAD_IF]] ]
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <2 x i1> [[TMP1]], i64 1
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[PRED_LOAD_IF1:.*]], label %[[PRED_LOAD_CONTINUE2]]
 ; CHECK:       [[PRED_LOAD_IF1]]:
+; CHECK-NEXT:    [[TMP14:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds ptr, ptr [[SRC]], i64 [[TMP14]]
+; CHECK-NEXT:    [[TMP11:%.*]] = load ptr, ptr [[TMP10]], align 8
+; CHECK-NEXT:    [[TMP12:%.*]] = insertelement <2 x ptr> [[TMP13]], ptr [[TMP11]], i64 1
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE2]]
 ; CHECK:       [[PRED_LOAD_CONTINUE2]]:
-; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr i8, ptr [[TMP5]], i64 4
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x ptr> poison, ptr [[WIDE_GEP]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x ptr> [[BROADCAST_SPLATINSERT]], <2 x ptr> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP1]], <2 x ptr> [[BROADCAST_SPLAT]], <2 x ptr> splat (ptr null)
+; CHECK-NEXT:    [[TMP15:%.*]] = phi <2 x ptr> [ [[TMP13]], %[[PRED_LOAD_CONTINUE]] ], [ [[TMP12]], %[[PRED_LOAD_IF1]] ]
+; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr i8, <2 x ptr> [[TMP15]], i64 4
+; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP1]], <2 x ptr> [[WIDE_GEP]], <2 x ptr> splat (ptr null)
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds ptr, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <2 x ptr> [[PREDPHI]], ptr [[TMP7]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
@@ -91,36 +95,44 @@ define void @pred_load_ptr_used_as_widen_gep_base_ic2(ptr noalias %src, ptr noal
 ; CHECK:       [[PRED_LOAD_IF]]:
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds ptr, ptr [[SRC]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = load ptr, ptr [[TMP5]], align 8
+; CHECK-NEXT:    [[TMP18:%.*]] = insertelement <2 x ptr> poison, ptr [[TMP6]], i64 0
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE]]
 ; CHECK:       [[PRED_LOAD_CONTINUE]]:
-; CHECK-NEXT:    [[TMP7:%.*]] = phi ptr [ poison, %[[VECTOR_BODY]] ], [ [[TMP6]], %[[PRED_LOAD_IF]] ]
+; CHECK-NEXT:    [[TMP19:%.*]] = phi <2 x ptr> [ poison, %[[VECTOR_BODY]] ], [ [[TMP18]], %[[PRED_LOAD_IF]] ]
 ; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <2 x i1> [[TMP2]], i64 1
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[PRED_LOAD_IF2:.*]], label %[[PRED_LOAD_CONTINUE3:.*]]
 ; CHECK:       [[PRED_LOAD_IF2]]:
+; CHECK-NEXT:    [[TMP21:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr inbounds ptr, ptr [[SRC]], i64 [[TMP21]]
+; CHECK-NEXT:    [[TMP28:%.*]] = load ptr, ptr [[TMP27]], align 8
+; CHECK-NEXT:    [[TMP20:%.*]] = insertelement <2 x ptr> [[TMP19]], ptr [[TMP28]], i64 1
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE3]]
 ; CHECK:       [[PRED_LOAD_CONTINUE3]]:
+; CHECK-NEXT:    [[TMP29:%.*]] = phi <2 x ptr> [ [[TMP19]], %[[PRED_LOAD_CONTINUE]] ], [ [[TMP20]], %[[PRED_LOAD_IF2]] ]
 ; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <2 x i1> [[TMP3]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[PRED_LOAD_IF4:.*]], label %[[PRED_LOAD_CONTINUE5:.*]]
 ; CHECK:       [[PRED_LOAD_IF4]]:
 ; CHECK-NEXT:    [[TMP10:%.*]] = add i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds ptr, ptr [[SRC]], i64 [[TMP10]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = load ptr, ptr [[TMP11]], align 8
+; CHECK-NEXT:    [[TMP22:%.*]] = insertelement <2 x ptr> poison, ptr [[TMP12]], i64 0
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE5]]
 ; CHECK:       [[PRED_LOAD_CONTINUE5]]:
-; CHECK-NEXT:    [[TMP13:%.*]] = phi ptr [ poison, %[[PRED_LOAD_CONTINUE3]] ], [ [[TMP12]], %[[PRED_LOAD_IF4]] ]
+; CHECK-NEXT:    [[TMP23:%.*]] = phi <2 x ptr> [ poison, %[[PRED_LOAD_CONTINUE3]] ], [ [[TMP22]], %[[PRED_LOAD_IF4]] ]
 ; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <2 x i1> [[TMP3]], i64 1
 ; CHECK-NEXT:    br i1 [[TMP14]], label %[[PRED_LOAD_IF6:.*]], label %[[PRED_LOAD_CONTINUE7]]
 ; CHECK:       [[PRED_LOAD_IF6]]:
+; CHECK-NEXT:    [[TMP24:%.*]] = add i64 [[INDEX]], 3
+; CHECK-NEXT:    [[TMP25:%.*]] = getelementptr inbounds ptr, ptr [[SRC]], i64 [[TMP24]]
+; CHECK-NEXT:    [[TMP26:%.*]] = load ptr, ptr [[TMP25]], align 8
+; CHECK-NEXT:    [[TMP30:%.*]] = insertelement <2 x ptr> [[TMP23]], ptr [[TMP26]], i64 1
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE7]]
 ; CHECK:       [[PRED_LOAD_CONTINUE7]]:
-; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr i8, ptr [[TMP7]], i64 4
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x ptr> poison, ptr [[WIDE_GEP]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x ptr> [[BROADCAST_SPLATINSERT]], <2 x ptr> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[WIDE_GEP8:%.*]] = getelementptr i8, ptr [[TMP13]], i64 4
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT9:%.*]] = insertelement <2 x ptr> poison, ptr [[WIDE_GEP8]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT10:%.*]] = shufflevector <2 x ptr> [[BROADCAST_SPLATINSERT9]], <2 x ptr> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP2]], <2 x ptr> [[BROADCAST_SPLAT]], <2 x ptr> splat (ptr null)
-; CHECK-NEXT:    [[PREDPHI11:%.*]] = select <2 x i1> [[TMP3]], <2 x ptr> [[BROADCAST_SPLAT10]], <2 x ptr> splat (ptr null)
+; CHECK-NEXT:    [[TMP31:%.*]] = phi <2 x ptr> [ [[TMP23]], %[[PRED_LOAD_CONTINUE5]] ], [ [[TMP30]], %[[PRED_LOAD_IF6]] ]
+; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr i8, <2 x ptr> [[TMP29]], i64 4
+; CHECK-NEXT:    [[WIDE_GEP8:%.*]] = getelementptr i8, <2 x ptr> [[TMP31]], i64 4
+; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP2]], <2 x ptr> [[WIDE_GEP]], <2 x ptr> splat (ptr null)
+; CHECK-NEXT:    [[PREDPHI11:%.*]] = select <2 x i1> [[TMP3]], <2 x ptr> [[WIDE_GEP8]], <2 x ptr> splat (ptr null)
 ; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr inbounds ptr, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds i8, ptr [[TMP15]], i64 16
 ; CHECK-NEXT:    store <2 x ptr> [[PREDPHI]], ptr [[TMP15]], align 8
@@ -178,18 +190,22 @@ define void @pred_load_used_as_widen_gep_index(ptr noalias %src, ptr noalias %ds
 ; CHECK:       [[PRED_LOAD_IF]]:
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = load i64, ptr [[TMP3]], align 8
+; CHECK-NEXT:    [[TMP9:%.*]] = insertelement <2 x i64> poison, i64 [[TMP4]], i64 0
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE]]
 ; CHECK:       [[PRED_LOAD_CONTINUE]]:
-; CHECK-NEXT:    [[TMP5:%.*]] = phi i64 [ poison, %[[VECTOR_BODY]] ], [ [[TMP4]], %[[PRED_LOAD_IF]] ]
+; CHECK-NEXT:    [[TMP13:%.*]] = phi <2 x i64> [ poison, %[[VECTOR_BODY]] ], [ [[TMP9]], %[[PRED_LOAD_IF]] ]
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <2 x i1> [[TMP1]], i64 1
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[PRED_LOAD_IF1:.*]], label %[[PRED_LOAD_CONTINUE2]]
 ; CHECK:       [[PRED_LOAD_IF1]]:
+; CHECK-NEXT:    [[TMP14:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i64 [[TMP14]]
+; CHECK-NEXT:    [[TMP11:%.*]] = load i64, ptr [[TMP10]], align 8
+; CHECK-NEXT:    [[TMP12:%.*]] = insertelement <2 x i64> [[TMP13]], i64 [[TMP11]], i64 1
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE2]]
 ; CHECK:       [[PRED_LOAD_CONTINUE2]]:
-; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr [4 x i8], ptr [[BASE]], i64 [[TMP5]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x ptr> poison, ptr [[WIDE_GEP]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x ptr> [[BROADCAST_SPLATINSERT]], <2 x ptr> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP1]], <2 x ptr> [[BROADCAST_SPLAT]], <2 x ptr> splat (ptr null)
+; CHECK-NEXT:    [[TMP15:%.*]] = phi <2 x i64> [ [[TMP13]], %[[PRED_LOAD_CONTINUE]] ], [ [[TMP12]], %[[PRED_LOAD_IF1]] ]
+; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr [4 x i8], ptr [[BASE]], <2 x i64> [[TMP15]]
+; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP1]], <2 x ptr> [[WIDE_GEP]], <2 x ptr> splat (ptr null)
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds ptr, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <2 x ptr> [[PREDPHI]], ptr [[TMP7]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2

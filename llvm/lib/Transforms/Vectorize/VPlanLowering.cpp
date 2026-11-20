@@ -816,6 +816,49 @@ void VPlanTransforms::materializeConstantVectorTripCount(
     Plan.getVectorTripCount().setUnderlyingValue(ConstVecTC->getValue());
 }
 
+/// Returns true if \p U needs the scalars generated for all lanes by \p V
+/// packed into a vector. Users of scalars don't need a vector, and neither do
+/// users extracting the last lane, possibly of the last part: they use the
+/// scalar of the last lane directly.
+static bool needsPackedVector(VPValue *V, VPUser *U) {
+  if (U->usesScalars(V) || match(U, m_ExtractLastLane(m_Specific(V))))
+    return false;
+  if (!match(U, m_ExtractLastPart(m_VPValue())))
+    return true;
+  auto *LastPart = cast<VPInstruction>(U);
+  return any_of(LastPart->users(), bind_front<needsPackedVector>(LastPart));
+}
+
+/// Pack the scalars of \p DefR at the insert point of \p Builder for the users
+/// of \p DefR that need a vector.
+static void packForVectorUsers(VPSingleDefRecipe *DefR, VPBuilder &Builder) {
+  auto NeedsPackedVector = bind_front<needsPackedVector>(DefR);
+  if (none_of(DefR->users(), NeedsPackedVector))
+    return;
+  auto *Pack =
+      Builder.createNaryOp(VPInstruction::Pack, {DefR}, DefR->getDebugLoc());
+  DefR->replaceUsesWithIf(Pack, NeedsPackedVector);
+}
+
+void VPlanTransforms::materializePacks(VPlan &Plan) {
+  if (Plan.hasScalarVFOnly())
+    return;
+
+  // Pack predicated values for users that need a vector at the start of the
+  // block following their replicate region.
+  for (VPRegionBlock *Region : VPBlockUtils::blocksOnly<VPRegionBlock>(
+           vp_depth_first_shallow(Plan.getVectorLoopRegion()->getEntry()))) {
+    if (!Region->isReplicator())
+      continue;
+    // Replicate regions are always followed by a VPBasicBlock.
+    VPBuilder Builder(
+        cast<VPBasicBlock>(Region->getSingleSuccessor())->getFirstNonPhi());
+    for (VPPredInstPHIRecipe &PredR :
+         make_isa_range<VPPredInstPHIRecipe>(*Region->getExitingBasicBlock()))
+      packForVectorUsers(&PredR, Builder);
+  }
+}
+
 void VPlanTransforms::materializeUnpacks(VPlan &Plan) {
   if (Plan.hasScalarVFOnly())
     return;

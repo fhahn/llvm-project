@@ -194,7 +194,7 @@ define void @print_replicate_predicated_phi(i64 %n, ptr %x) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.udiv.if:
 ; CHECK-NEXT:        vp<[[VP6:%[0-9]+]]> = SCALAR-STEPS vp<[[VP4]]>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:        REPLICATE ir<%tmp4> = udiv ir<%n>, vp<[[VP6]]> (S->V)
+; CHECK-NEXT:        REPLICATE ir<%tmp4> = udiv ir<%n>, vp<[[VP6]]>
 ; CHECK-NEXT:      Successor(s): pred.udiv.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.udiv.continue:
@@ -204,7 +204,8 @@ define void @print_replicate_predicated_phi(i64 %n, ptr %x) {
 ; CHECK-NEXT:    Successor(s): if.then.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    if.then.0:
-; CHECK-NEXT:      BLEND ir<%d> = ir<0> vp<%7>/ir<%cmp>
+; CHECK-NEXT:      EMIT vp<[[PACK:%[0-9]+]]> = pack vp<[[VP7]]>
+; CHECK-NEXT:      BLEND ir<%d> = ir<0> vp<%8>/ir<%cmp>
 ; CHECK-NEXT:      CLONE ir<%idx> = getelementptr ir<%x>, vp<[[VP5]]>
 ; CHECK-NEXT:      vp<[[VP8:%[0-9]+]]> = vector-pointer i64, ir<%idx>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP8]]>, ir<%d>, align 8
@@ -285,7 +286,7 @@ define void @packed_with_scalar_and_vector_users(i64 %n, ptr noalias %dst, ptr n
 ; CHECK-NEXT:      Successor(s): pred.udiv.if, pred.udiv.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.udiv.if:
-; CHECK-NEXT:        REPLICATE ir<%d> = udiv ir<%n>, vp<[[VP4]]> (S->V)
+; CHECK-NEXT:        REPLICATE ir<%d> = udiv ir<%n>, vp<[[VP4]]>
 ; CHECK-NEXT:      Successor(s): pred.udiv.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.udiv.continue:
@@ -295,7 +296,8 @@ define void @packed_with_scalar_and_vector_users(i64 %n, ptr noalias %dst, ptr n
 ; CHECK-NEXT:    Successor(s): then.0.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    then.0.0:
-; CHECK-NEXT:      WIDEN ir<%c.1> = icmp ult vp<[[VP5]]>, ir<20> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
+; CHECK-NEXT:      EMIT vp<[[PACK:%[0-9]+]]> = pack vp<[[VP5]]>
+; CHECK-NEXT:      WIDEN ir<%c.1> = icmp ult vp<[[PACK]]>, ir<20> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
 ; CHECK-NEXT:      EMIT vp<[[VP6:%[0-9]+]]> = logical-and ir<%c.0>, ir<%c.1>
 ; CHECK-NEXT:    Successor(s): pred.store
 ; CHECK-EMPTY:
@@ -315,7 +317,7 @@ define void @packed_with_scalar_and_vector_users(i64 %n, ptr noalias %dst, ptr n
 ; CHECK-NEXT:    Successor(s): then.1.1
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    then.1.1:
-; CHECK-NEXT:      BLEND ir<%p> = ir<0> vp<%5>/ir<%c.0>
+; CHECK-NEXT:      BLEND ir<%p> = ir<0> vp<%6>/ir<%c.0>
 ; CHECK-NEXT:      CLONE ir<%gep.dst> = getelementptr ir<%dst>, vp<[[VP4]]>
 ; CHECK-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer i64, ir<%gep.dst>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP7]]>, ir<%p>, align 8
@@ -690,7 +692,7 @@ define i64 @predicated_live_out_tail_folded(i64 %n, ptr noalias %dst) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.if:
 ; CHECK-NEXT:        vp<[[VP8:%[0-9]+]]> = SCALAR-STEPS vp<[[VP4]]>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:        REPLICATE ir<%d> = udiv ir<%n>, vp<[[VP8]]> (S->V)
+; CHECK-NEXT:        REPLICATE ir<%d> = udiv ir<%n>, vp<[[VP8]]>
 ; CHECK-NEXT:        REPLICATE ir<%gep.dst> = getelementptr ir<%dst>, vp<[[VP8]]>
 ; CHECK-NEXT:        REPLICATE store vp<[[VP8]]>, ir<%gep.dst>
 ; CHECK-NEXT:      Successor(s): pred.store.continue
@@ -702,6 +704,7 @@ define i64 @predicated_live_out_tail_folded(i64 %n, ptr noalias %dst) {
 ; CHECK-NEXT:    Successor(s): loop.1
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.1:
+; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = pack vp<[[VP9]]>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
@@ -710,7 +713,7 @@ define i64 @predicated_live_out_tail_folded(i64 %n, ptr noalias %dst) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = last-active-lane vp<[[VP7]]>
-; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = extract-lane vp<[[VP11]]>, vp<[[VP9]]>
+; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = extract-lane vp<[[VP11]]>, vp<[[VP10]]>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<exit>:
@@ -889,7 +892,7 @@ define void @recipe_debug_loc_location(ptr nocapture %src) !dbg !5 {
 ; CHECK-NEXT:      Successor(s): pred.sdiv.if, pred.sdiv.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.sdiv.if:
-; CHECK-NEXT:        REPLICATE ir<%sd1> = sdiv ir<%psd>, ir<%lsd> (S->V), !dbg /tmp/s.c:12:3
+; CHECK-NEXT:        REPLICATE ir<%sd1> = sdiv ir<%psd>, ir<%lsd>, !dbg /tmp/s.c:12:3
 ; CHECK-NEXT:      Successor(s): pred.sdiv.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.sdiv.continue:
@@ -899,7 +902,8 @@ define void @recipe_debug_loc_location(ptr nocapture %src) !dbg !5 {
 ; CHECK-NEXT:    Successor(s): if.then.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    if.then.0:
-; CHECK-NEXT:      BLEND ir<%ysd.0> = ir<%psd> vp<%9>/vp<[[VP8]]>, !dbg /tmp/s.c:14:3
+; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = pack vp<[[VP9]]>, !dbg /tmp/s.c:12:3
+; CHECK-NEXT:      BLEND ir<%ysd.0> = ir<%psd> vp<%10>/vp<[[VP8]]>, !dbg /tmp/s.c:14:3
 ; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<%ysd.0>, align 4, !dbg /tmp/s.c:15:3
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
@@ -1294,8 +1298,8 @@ define void @print_call_flags(ptr readonly %src, ptr noalias %dest, i64 %n) {
 ; CHECK-NEXT:      Successor(s): pred.call.if, pred.call.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.call.if:
-; CHECK-NEXT:        REPLICATE ir<%foo.ret.1> = call nnan ninf nsz @foo(ir<%ld.value>) (S->V)
-; CHECK-NEXT:        REPLICATE ir<%foo.ret.2> = call @foo(ir<%ld.value>) (S->V)
+; CHECK-NEXT:        REPLICATE ir<%foo.ret.1> = call nnan ninf nsz @foo(ir<%ld.value>)
+; CHECK-NEXT:        REPLICATE ir<%foo.ret.2> = call @foo(ir<%ld.value>)
 ; CHECK-NEXT:      Successor(s): pred.call.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.call.continue:
@@ -1306,7 +1310,9 @@ define void @print_call_flags(ptr readonly %src, ptr noalias %dest, i64 %n) {
 ; CHECK-NEXT:    Successor(s): if.then.1
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    if.then.1:
-; CHECK-NEXT:      WIDEN ir<%fadd> = fadd vp<[[VP6]]>, vp<[[VP7]]>
+; CHECK-NEXT:      EMIT vp<[[PACK:%[0-9]+]]> = pack vp<[[VP6]]>
+; CHECK-NEXT:      EMIT vp<[[VP9:%[0-9]+]]> = pack vp<[[VP7]]>
+; CHECK-NEXT:      WIDEN ir<%fadd> = fadd vp<[[PACK]]>, vp<[[VP9]]>
 ; CHECK-NEXT:      BLEND ir<%st.value> = ir<%ld.value> ir<%fadd>/ir<%ifcond>
 ; CHECK-NEXT:      CLONE ir<%st.addr> = getelementptr inbounds ir<%dest>, vp<[[VP4]]>
 ; CHECK-NEXT:      vp<[[VP8:%[0-9]+]]> = vector-pointer inbounds float, ir<%st.addr>, ir<1>

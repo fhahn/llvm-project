@@ -56,6 +56,7 @@ define i16 @predicated_load_live_out_last_lane(ptr dereferenceable(40) noalias %
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE6]]
 ; CHECK:       [[PRED_LOAD_CONTINUE6]]:
 ; CHECK-NEXT:    [[TMP26:%.*]] = phi <4 x i16> [ [[TMP22]], %[[PRED_LOAD_CONTINUE4]] ], [ [[TMP25]], %[[PRED_LOAD_IF5]] ]
+; CHECK-NEXT:    [[TMP35:%.*]] = phi i16 [ poison, %[[PRED_LOAD_CONTINUE4]] ], [ [[TMP24]], %[[PRED_LOAD_IF5]] ]
 ; CHECK-NEXT:    [[TMP27:%.*]] = add nsw <4 x i16> [[TMP26]], splat (i16 1)
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; CHECK:       [[PRED_STORE_IF]]:
@@ -87,7 +88,6 @@ define i16 @predicated_load_live_out_last_lane(ptr dereferenceable(40) noalias %
 ; CHECK-NEXT:    [[TMP34:%.*]] = or i1 [[TMP32]], [[TMP33]]
 ; CHECK-NEXT:    br i1 [[TMP34]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP35:%.*]] = extractelement <4 x i16> [[TMP26]], i64 3
 ; CHECK-NEXT:    [[TMP36:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP5]], i1 false)
 ; CHECK-NEXT:    [[TMP37:%.*]] = add i64 [[INDEX]], [[TMP36]]
 ; CHECK-NEXT:    [[TMP38:%.*]] = icmp eq i64 [[TMP37]], 20

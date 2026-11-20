@@ -512,6 +512,10 @@ struct VPlanTransforms {
   /// Add explicit Unpack recipes to extract scalars from vectors as needed.
   static void materializeUnpacks(VPlan &Plan);
 
+  /// Add explicit Packs for predicated values (VPPredInstPHIRecipes) used as
+  /// vectors.
+  static void materializePacks(VPlan &Plan);
+
   /// Materialize UF, VF and VFxUF to be computed explicitly using
   /// VPInstructions.
   static void materializeFactors(VPlan &Plan, VPBasicBlock *VectorPH,

@@ -779,10 +779,11 @@ static void convertRecipesInRegionBlocksToSingleScalar(VPlan &Plan, Type *IdxTy,
 }
 
 /// Update recipes in the cloned blocks rooted at \p NewEntry to match \p Lane,
-/// using the original blocks rooted at \p OldEntry as reference.
-static void processLaneForReplicateRegion(VPlan &Plan, Type *IdxTy,
-                                          unsigned Lane, VPBasicBlock *OldEntry,
-                                          VPBasicBlock *NewEntry) {
+/// using the original blocks rooted at \p OldEntry as reference. Returns the
+/// map from values defined in the original blocks to their clones.
+static DenseMap<VPValue *, VPValue *>
+processLaneForReplicateRegion(VPlan &Plan, Type *IdxTy, unsigned Lane,
+                              VPBasicBlock *OldEntry, VPBasicBlock *NewEntry) {
   DenseMap<VPValue *, VPValue *> Old2NewVPValues;
   VPValue *IdxLane = Plan.getConstantInt(IdxTy, Lane);
   for (const auto &[OldBB, NewBB] :
@@ -807,19 +808,17 @@ static void processLaneForReplicateRegion(VPlan &Plan, Type *IdxTy,
         assert(match(NewR.getOperand(1), m_ZeroInt()) &&
                "extract indices must be zero");
         NewR.setOperand(1, IdxLane);
-      } else if (auto *NewPhi = dyn_cast<VPPhi>(&NewR)) {
-        auto *OldPhi = cast<VPPhi>(&OldR);
-        assert(vputils::onlyFirstLaneUsed(OldPhi) &&
-               "VPPhis expected to have only first lane used");
-        auto *BVUser = dyn_cast_or_null<VPInstruction>(OldPhi->getSingleUser());
-        if (BVUser && match(BVUser, m_BuildVector())) {
-          assert(BVUser->getOperand(0) == OldPhi &&
-                 "Unexpected first operand of build vector user");
-          BVUser->setOperand(Lane, NewPhi);
-        }
       }
     }
   }
+  return Old2NewVPValues;
+}
+
+/// Returns the Pack of \p Phi, if any.
+static VPInstruction *getPackUser(VPPhi *Phi) {
+  auto It =
+      find_if(Phi->users(), match_fn(m_VPInstruction<VPInstruction::Pack>()));
+  return It == Phi->user_end() ? nullptr : cast<VPInstruction>(*It);
 }
 
 /// Dissolve a single replicate region by replicating its blocks for each lane
@@ -853,31 +852,21 @@ static void dissolveReplicateRegion(VPRegionBlock *Region, ElementCount VF,
     return;
   }
 
-  // Create a BuildVector in successor block for every VPPhi in (first lane's)
-  // exiting block not only used by its first lane. All their operands are
-  // initialized to poison and will be replaced when processing each clone,
-  // except for the operand of the first lane which set here.
-  // BuildVectors of values with vector users are recorded to be replaced later
-  // by chains of insert-element and widen phis. Their scalar users keep
-  // extracting lanes, to avoid keeping the per-lane phis live as well. For
-  // values only used as scalars, combineRecipes folds the lane extracts to the
-  // per-lane phis.
+  // Collect the per-lane phis of every VPPhi in (first lane's) exiting block
+  // not only used by its first lane. A Pack is replaced by its phi if only its
+  // first lane is used. The Pack's users must be checked, not the phi's: users
+  // of the single-scalar phi may only use its first lane, e.g. widened GEPs.
   unsigned NumLanes = VF.getFixedValue();
-  SmallVector<VPInstruction *> BuildVectors;
+  MapVector<VPPhi *, SmallVector<VPPhi *>> PhiToLanePhis;
   for (auto &R : FirstLaneExiting->phis()) {
     auto *Phi = cast<VPPhi>(&R);
-    if (vputils::onlyFirstLaneUsed(Phi))
-      continue;
-
-    Type *ScalarTy = Phi->getScalarType();
-    VPValue *Poison = Plan.getPoison(ScalarTy);
-    SmallVector<VPValue *> BVOps(NumLanes, Poison);
-    auto *BV = new VPInstruction(VPInstruction::BuildVector, BVOps);
-    if (!vputils::onlyScalarValuesOrLanesUsed(Phi))
-      BuildVectors.push_back(BV);
-    Phi->replaceAllUsesWith(BV);
-    BV->setOperand(0, Phi);
-    BV->insertBefore(Successor->getFirstNonPhi());
+    VPInstruction *Pack = getPackUser(Phi);
+    if (Pack && vputils::onlyFirstLaneUsed(Pack)) {
+      Pack->replaceAllUsesWith(Phi);
+      Pack->eraseFromParent();
+    }
+    if (!vputils::onlyFirstLaneUsed(Phi))
+      PhiToLanePhis[Phi].assign(NumLanes, Phi);
   }
 
   // Clone converted blocks for remaining lanes and process each in reverse
@@ -888,9 +877,12 @@ static void dissolveReplicateRegion(VPRegionBlock *Region, ElementCount VF,
         VPBlockUtils::cloneFrom(FirstLaneEntry);
     for (VPBlockBase *VPB : vp_depth_first_shallow(CurrentLaneEntry))
       VPB->setParent(ParentRegion);
-    processLaneForReplicateRegion(Plan, IdxTy, Lane,
-                                  cast<VPBasicBlock>(FirstLaneEntry),
-                                  cast<VPBasicBlock>(CurrentLaneEntry));
+    DenseMap<VPValue *, VPValue *> Old2NewVPValues =
+        processLaneForReplicateRegion(Plan, IdxTy, Lane,
+                                      cast<VPBasicBlock>(FirstLaneEntry),
+                                      cast<VPBasicBlock>(CurrentLaneEntry));
+    for (auto &[Phi, LanePhis] : PhiToLanePhis)
+      LanePhis[Lane] = cast<VPPhi>(Old2NewVPValues.lookup(Phi));
     VPBlockUtils::connectBlocks(CurrentLaneExiting, NextLaneEntry);
     NextLaneEntry = CurrentLaneEntry;
   }
@@ -902,29 +894,43 @@ static void dissolveReplicateRegion(VPRegionBlock *Region, ElementCount VF,
   VPBlockUtils::connectBlocks(Predecessor, FirstLaneEntry);
   VPBlockUtils::connectBlocks(FirstLaneExiting, NextLaneEntry);
 
-  // Fold BuildVector fed by scalar phis into VPWidenPHIRecipes with
-  // InsertElement per lane.
-  // TODO: check if this folding should be dropped.
-  for (VPInstruction *BV : BuildVectors) {
-    assert(BV->getNumOperands() == NumLanes &&
-           "BuildVector must have one operand per lane");
-    for (const auto &[Idx, Op] : enumerate(BV->operands())) {
-      auto *ScalarPhi = cast<VPPhi>(Op);
-      auto DL = ScalarPhi->getDebugLoc();
-      auto *PredOp = cast<VPSingleDefRecipe>(ScalarPhi->getOperand(1));
-      VPValue *Poison = ScalarPhi->getOperand(0);
-      VPValue *PrevVal = Idx == 0 ? Poison : BV->getOperand(Idx - 1);
-      auto Builder = VPBuilder::getToInsertAfter(PredOp->getDefiningRecipe());
-      auto *Insert = Builder.createNaryOp(
-          Instruction::InsertElement,
-          {PrevVal, PredOp, Plan.getConstantInt(64, Idx)}, DL);
-      Builder.setInsertPoint(ScalarPhi);
-      auto *NewPhi = Builder.createWidenPhi({PrevVal, Insert}, DL);
-      ScalarPhi->replaceAllUsesWith(NewPhi);
-      ScalarPhi->eraseFromParent();
+  for (auto &[Phi, LanePhis] : PhiToLanePhis) {
+    // Lower the Pack of the phi to a chain of insert-elements and widen phis,
+    // one per lane.
+    if (VPInstruction *Pack = getPackUser(Phi)) {
+      VPValue *Packed = Plan.getPoison(Pack->getScalarType());
+      for (const auto &[Idx, LanePhi] : enumerate(LanePhis)) {
+        auto DL = LanePhi->getDebugLoc();
+        auto *PredOp = cast<VPSingleDefRecipe>(LanePhi->getOperand(1));
+        auto Builder = VPBuilder::getToInsertAfter(PredOp);
+        auto *Insert = Builder.createNaryOp(
+            Instruction::InsertElement,
+            {Packed, PredOp, Plan.getConstantInt(64, Idx)}, DL);
+        Builder.setInsertPoint(LanePhi);
+        Packed = Builder.createWidenPhi({Packed, Insert}, DL);
+      }
+      Pack->replaceAllUsesWith(Packed);
+      Pack->eraseFromParent();
     }
-    BV->replaceAllUsesWith(BV->getOperand(NumLanes - 1));
-    BV->eraseFromParent();
+
+    // Replace lane extracts of the phi by the per-lane phis. Its other users
+    // use the first lane, or are replicated recipes removed by replicateByVF.
+    for (VPUser *U : to_vector(Phi->users())) {
+      uint64_t Lane;
+      if (match(U, m_ExtractLastLane(m_Specific(Phi)))) {
+        Lane = NumLanes - 1;
+      } else if (!match(U, m_ExtractElement(m_Specific(Phi),
+                                            m_ConstantInt(Lane)))) {
+        assert(U->usesScalars(Phi) && "users needing a vector must use Packs");
+        continue;
+      }
+      auto *Extract = cast<VPInstruction>(U);
+      Extract->replaceAllUsesWith(LanePhis[Lane]);
+      Extract->eraseFromParent();
+    }
+    for (VPPhi *LanePhi : LanePhis)
+      if (LanePhi->user_empty())
+        LanePhi->eraseFromParent();
   }
 }
 

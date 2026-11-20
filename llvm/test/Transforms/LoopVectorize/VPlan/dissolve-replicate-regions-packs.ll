@@ -37,6 +37,7 @@ define void @packed_with_scalar_and_vector_users(i64 %n, ptr noalias %dst, ptr n
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    pred.udiv.continue:
 ; CHECK-NEXT:      WIDEN-PHI vp<[[VP10:%[0-9]+]]> = phi [ ir<poison>, vector.body ], [ vp<[[VP9]]>, pred.udiv.if ]
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP18:%[0-9]+]]> = phi [ ir<poison>, vector.body ], [ ir<%d>, pred.udiv.if ]
 ; CHECK-NEXT:      EMIT vp<[[VP11:%[0-9]+]]> = extractelement ir<%c.0>, ir<1>
 ; CHECK-NEXT:      EMIT branch-on-cond vp<[[VP11]]>
 ; CHECK-NEXT:    Successor(s): pred.udiv.if, pred.udiv.continue
@@ -48,6 +49,7 @@ define void @packed_with_scalar_and_vector_users(i64 %n, ptr noalias %dst, ptr n
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    pred.udiv.continue:
 ; CHECK-NEXT:      WIDEN-PHI vp<[[VP14:%[0-9]+]]> = phi [ vp<[[VP10]]>, pred.udiv.continue ], [ vp<[[VP13]]>, pred.udiv.if ]
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP21:%[0-9]+]]> = phi [ ir<poison>, pred.udiv.continue ], [ ir<%d>.1, pred.udiv.if ]
 ; CHECK-NEXT:      WIDEN ir<%c.1> = icmp ult vp<[[VP14]]>, ir<20> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
 ; CHECK-NEXT:      EMIT vp<[[VP15:%[0-9]+]]> = logical-and ir<%c.0>, ir<%c.1>
 ; CHECK-NEXT:      EMIT vp<[[VP16:%[0-9]+]]> = extractelement vp<[[VP15]]>, ir<0>
@@ -56,7 +58,6 @@ define void @packed_with_scalar_and_vector_users(i64 %n, ptr noalias %dst, ptr n
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    pred.store.if:
 ; CHECK-NEXT:      CLONE ir<%gep.dst.2> = getelementptr ir<%dst.2>, vp<[[VP5]]>
-; CHECK-NEXT:      EMIT vp<[[VP18:%[0-9]+]]> = extractelement vp<[[VP14]]>, ir<0>
 ; CHECK-NEXT:      CLONE store vp<[[VP18]]>, ir<%gep.dst.2>
 ; CHECK-NEXT:    Successor(s): pred.store.continue
 ; CHECK-EMPTY:
@@ -67,12 +68,11 @@ define void @packed_with_scalar_and_vector_users(i64 %n, ptr noalias %dst, ptr n
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    pred.store.if:
 ; CHECK-NEXT:      CLONE ir<%gep.dst.2>.1 = getelementptr ir<%dst.2>, vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<[[VP21:%[0-9]+]]> = extractelement vp<[[VP14]]>, ir<1>
 ; CHECK-NEXT:      CLONE store vp<[[VP21]]>, ir<%gep.dst.2>.1
 ; CHECK-NEXT:    Successor(s): pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    pred.store.continue:
-; CHECK-NEXT:      BLEND ir<%p> = ir<0> vp<%14>/ir<%c.0>
+; CHECK-NEXT:      BLEND ir<%p> = ir<0> vp<%15>/ir<%c.0>
 ; CHECK-NEXT:      CLONE ir<%gep.dst> = getelementptr ir<%dst>, vp<[[VP5]]>
 ; CHECK-NEXT:      vp<[[VP22:%[0-9]+]]> = vector-pointer i64, ir<%gep.dst>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP22]]>, ir<%p>, align 8
@@ -174,7 +174,6 @@ define void @predicated_with_only_scalar_users(i64 %n, ptr noalias %dst) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    pred.udiv.continue:
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP12:%[0-9]+]]> = phi [ ir<poison>, pred.udiv.continue ], [ ir<%d>.1, pred.udiv.if ]
-; CHECK-NEXT:      EMIT vp<[[VP13:%[0-9]+]]> = buildvector vp<[[VP9]]>, vp<[[VP12]]>
 ; CHECK-NEXT:      EMIT vp<[[VP14:%[0-9]+]]> = logical-and ir<%c.0>, ir<%c.1>
 ; CHECK-NEXT:      EMIT vp<[[VP15:%[0-9]+]]> = extractelement vp<[[VP14]]>, ir<0>
 ; CHECK-NEXT:      EMIT branch-on-cond vp<[[VP15]]>
@@ -182,8 +181,7 @@ define void @predicated_with_only_scalar_users(i64 %n, ptr noalias %dst) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    pred.store.if:
 ; CHECK-NEXT:      CLONE ir<%gep.dst> = getelementptr ir<%dst>, vp<[[VP5]]>
-; CHECK-NEXT:      EMIT vp<[[VP17:%[0-9]+]]> = extractelement vp<[[VP13]]>, ir<0>
-; CHECK-NEXT:      CLONE store vp<[[VP17]]>, ir<%gep.dst>
+; CHECK-NEXT:      CLONE store vp<[[VP9]]>, ir<%gep.dst>
 ; CHECK-NEXT:    Successor(s): pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    pred.store.continue:
@@ -193,8 +191,7 @@ define void @predicated_with_only_scalar_users(i64 %n, ptr noalias %dst) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    pred.store.if:
 ; CHECK-NEXT:      CLONE ir<%gep.dst>.1 = getelementptr ir<%dst>, vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<[[VP20:%[0-9]+]]> = extractelement vp<[[VP13]]>, ir<1>
-; CHECK-NEXT:      CLONE store vp<[[VP20]]>, ir<%gep.dst>.1
+; CHECK-NEXT:      CLONE store vp<[[VP12]]>, ir<%gep.dst>.1
 ; CHECK-NEXT:    Successor(s): pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    pred.store.continue:

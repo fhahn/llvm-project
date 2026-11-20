@@ -272,7 +272,7 @@ define void @sink3(i32 %k) {
 ; CHECK-NEXT:      pred.load.if:
 ; CHECK-NEXT:        vp<[[VP9:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5]]>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:        REPLICATE ir<%gep.b> = getelementptr inbounds ir<@b>, ir<0>, vp<[[VP9]]>
-; CHECK-NEXT:        REPLICATE ir<%lv.b> = load ir<%gep.b> (S->V)
+; CHECK-NEXT:        REPLICATE ir<%lv.b> = load ir<%gep.b>
 ; CHECK-NEXT:      Successor(s): pred.load.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.load.continue:
@@ -282,7 +282,8 @@ define void @sink3(i32 %k) {
 ; CHECK-NEXT:    Successor(s): loop.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.0:
-; CHECK-NEXT:      WIDEN ir<%add> = add vp<[[VP10]]>, ir<10>
+; CHECK-NEXT:      EMIT vp<[[VP11:%[0-9]+]]> = pack vp<[[VP10]]>
+; CHECK-NEXT:      WIDEN ir<%add> = add vp<[[VP11]]>, ir<10>
 ; CHECK-NEXT:      WIDEN ir<%mul> = mul ir<%iv>, ir<%add>
 ; CHECK-NEXT:    Successor(s): pred.store
 ; CHECK-EMPTY:
@@ -485,7 +486,7 @@ define void @pred_cfg1(i32 %k, i32 %j) {
 ; CHECK-NEXT:      pred.load.if:
 ; CHECK-NEXT:        vp<[[VP10:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5]]>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:        REPLICATE ir<%gep.b> = getelementptr inbounds ir<@b>, ir<0>, vp<[[VP10]]>
-; CHECK-NEXT:        REPLICATE ir<%lv.b> = load ir<%gep.b> (S->V)
+; CHECK-NEXT:        REPLICATE ir<%lv.b> = load ir<%gep.b>
 ; CHECK-NEXT:      Successor(s): pred.load.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.load.continue:
@@ -495,7 +496,8 @@ define void @pred_cfg1(i32 %k, i32 %j) {
 ; CHECK-NEXT:    Successor(s): then.0.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    then.0.0:
-; CHECK-NEXT:      BLEND ir<%p> = ir<0> vp<%11>/ir<%c.1>
+; CHECK-NEXT:      EMIT vp<[[VP12:%[0-9]+]]> = pack vp<[[VP11]]>
+; CHECK-NEXT:      BLEND ir<%p> = ir<0> vp<%12>/ir<%c.1>
 ; CHECK-NEXT:    Successor(s): pred.store
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    <xVFxUF> pred.store: {
@@ -606,7 +608,7 @@ define void @pred_cfg2(i32 %k, i32 %j) {
 ; CHECK-NEXT:      pred.load.if:
 ; CHECK-NEXT:        vp<[[VP10:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5]]>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:        REPLICATE ir<%gep.b> = getelementptr inbounds ir<@b>, ir<0>, vp<[[VP10]]>
-; CHECK-NEXT:        REPLICATE ir<%lv.b> = load ir<%gep.b> (S->V)
+; CHECK-NEXT:        REPLICATE ir<%lv.b> = load ir<%gep.b>
 ; CHECK-NEXT:      Successor(s): pred.load.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.load.continue:
@@ -616,7 +618,8 @@ define void @pred_cfg2(i32 %k, i32 %j) {
 ; CHECK-NEXT:    Successor(s): then.0.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    then.0.0:
-; CHECK-NEXT:      BLEND ir<%p> = ir<0> vp<%11>/ir<%c.0>
+; CHECK-NEXT:      EMIT vp<[[PACK:%[0-9]+]]> = pack vp<[[VP11]]>
+; CHECK-NEXT:      BLEND ir<%p> = ir<0> vp<%12>/ir<%c.0>
 ; CHECK-NEXT:      EMIT vp<[[VP12:%[0-9]+]]> = logical-and vp<[[VP8]]>, ir<%c.1>
 ; CHECK-NEXT:    Successor(s): pred.store
 ; CHECK-EMPTY:
@@ -735,7 +738,7 @@ define void @pred_cfg3(i32 %k, i32 %j) {
 ; CHECK-NEXT:      pred.load.if:
 ; CHECK-NEXT:        vp<[[VP10:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5]]>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:        REPLICATE ir<%gep.b> = getelementptr inbounds ir<@b>, ir<0>, vp<[[VP10]]>
-; CHECK-NEXT:        REPLICATE ir<%lv.b> = load ir<%gep.b> (S->V)
+; CHECK-NEXT:        REPLICATE ir<%lv.b> = load ir<%gep.b>
 ; CHECK-NEXT:      Successor(s): pred.load.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.load.continue:
@@ -745,7 +748,8 @@ define void @pred_cfg3(i32 %k, i32 %j) {
 ; CHECK-NEXT:    Successor(s): then.0.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    then.0.0:
-; CHECK-NEXT:      BLEND ir<%p> = ir<0> vp<%11>/ir<%c.0>
+; CHECK-NEXT:      EMIT vp<[[VP12:%[0-9]+]]> = pack vp<[[VP11]]>
+; CHECK-NEXT:      BLEND ir<%p> = ir<0> vp<%12>/ir<%c.0>
 ; CHECK-NEXT:    Successor(s): pred.store
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    <xVFxUF> pred.store: {
@@ -861,9 +865,9 @@ define void @merge_3_replicate_region(i32 %k, i32 %j) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.if:
 ; CHECK-NEXT:        REPLICATE ir<%gep.a> = getelementptr inbounds ir<@a>, ir<0>, vp<[[VP9]]>
-; CHECK-NEXT:        REPLICATE ir<%lv.a> = load ir<%gep.a> (S->V)
+; CHECK-NEXT:        REPLICATE ir<%lv.a> = load ir<%gep.a>
 ; CHECK-NEXT:        REPLICATE ir<%gep.b> = getelementptr inbounds ir<@b>, ir<0>, vp<[[VP9]]>
-; CHECK-NEXT:        REPLICATE ir<%lv.b> = load ir<%gep.b> (S->V)
+; CHECK-NEXT:        REPLICATE ir<%lv.b> = load ir<%gep.b>
 ; CHECK-NEXT:        REPLICATE ir<%gep.c> = getelementptr inbounds ir<@c>, ir<0>, vp<[[VP9]]>
 ; CHECK-NEXT:        REPLICATE store ir<%lv.a>, ir<%gep.c>
 ; CHECK-NEXT:        REPLICATE store ir<%lv.b>, ir<%gep.a>
@@ -877,9 +881,11 @@ define void @merge_3_replicate_region(i32 %k, i32 %j) {
 ; CHECK-NEXT:    Successor(s): loop.3
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.3:
+; CHECK-NEXT:      EMIT vp<[[PACK:%[0-9]+]]> = pack vp<[[VP10]]>
+; CHECK-NEXT:      EMIT vp<[[VP13:%[0-9]+]]> = pack vp<[[VP11]]>
 ; CHECK-NEXT:      WIDEN ir<%c.0> = icmp ult ir<%iv>, ir<%j>
 ; CHECK-NEXT:      EMIT vp<[[VP12:%[0-9]+]]> = logical-and vp<[[VP8]]>, ir<%c.0>
-; CHECK-NEXT:      WIDEN ir<%mul> = mul vp<[[VP10]]>, vp<[[VP11]]>
+; CHECK-NEXT:      WIDEN ir<%mul> = mul vp<[[PACK]]>, vp<[[VP13]]>
 ; CHECK-NEXT:    Successor(s): pred.store
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    <xVFxUF> pred.store: {
@@ -1071,7 +1077,7 @@ define void @recipe_in_merge_candidate_used_by_first_order_recurrence(i32 %k) {
 ; CHECK-NEXT:  vp<[[VP5:%[0-9]+]]> = CANONICAL-IV
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
-; CHECK-NEXT:      FIRST-ORDER-RECURRENCE-PHI ir<%for> = phi ir<0>, vp<[[VP10:%[0-9]+]]>
+; CHECK-NEXT:      FIRST-ORDER-RECURRENCE-PHI ir<%for> = phi ir<0>, vp<[[PACK:%[0-9]+]]>
 ; CHECK-NEXT:      EMIT vp<[[VP7:%[0-9]+]]> = WIDEN-CANONICAL-INDUCTION nuw vp<[[VP5]]>
 ; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = icmp ule vp<[[VP7]]>, vp<[[VP4]]>
 ; CHECK-NEXT:      vp<[[VP9:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5]]>, ir<1>, vp<[[VP0]]>
@@ -1084,17 +1090,18 @@ define void @recipe_in_merge_candidate_used_by_first_order_recurrence(i32 %k) {
 ; CHECK-NEXT:      Successor(s): pred.load.if, pred.load.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.load.if:
-; CHECK-NEXT:        REPLICATE ir<%lv.a> = load ir<%gep.a> (S->V)
+; CHECK-NEXT:        REPLICATE ir<%lv.a> = load ir<%gep.a>
 ; CHECK-NEXT:      Successor(s): pred.load.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.load.continue:
-; CHECK-NEXT:        PHI-PREDICATED-INSTRUCTION vp<[[VP10]]> = ir<%lv.a>
+; CHECK-NEXT:        PHI-PREDICATED-INSTRUCTION vp<[[VP10:%[0-9]+]]> = ir<%lv.a>
 ; CHECK-NEXT:      No successors
 ; CHECK-NEXT:    }
 ; CHECK-NEXT:    Successor(s): loop.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.0:
-; CHECK-NEXT:      EMIT vp<[[VP11:%[0-9]+]]> = first-order splice ir<%for>, vp<[[VP10]]>
+; CHECK-NEXT:      EMIT vp<[[PACK]]> = pack vp<[[VP10]]>
+; CHECK-NEXT:      EMIT vp<[[VP11:%[0-9]+]]> = first-order splice ir<%for>, vp<[[PACK]]>
 ; CHECK-NEXT:    Successor(s): pred.store
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    <xVFxUF> pred.store: {

@@ -18,26 +18,26 @@ target triple = "x86_64-unknown-linux-gnu"
 define void @test() {
 ; SSE-LABEL: 'test'
 ; SSE:  LV: Found an estimated cost of 1 for VF 1 For instruction: %valB.loaded = load i32, ptr %inB, align 4
-; SSE:  Cost of 3000000 for VF 2: REPLICATE ir<%valB.loaded> = load ir<%inB> (S->V)
-; SSE:  Cost of 3000000 for VF 4: REPLICATE ir<%valB.loaded> = load ir<%inB> (S->V)
-; SSE:  Cost of 3000000 for VF 8: REPLICATE ir<%valB.loaded> = load ir<%inB> (S->V)
-; SSE:  Cost of 3000000 for VF 16: REPLICATE ir<%valB.loaded> = load ir<%inB> (S->V)
+; SSE:  Cost of 3000000 for VF 2: REPLICATE ir<%valB.loaded> = load ir<%inB>
+; SSE:  Cost of 3000000 for VF 4: REPLICATE ir<%valB.loaded> = load ir<%inB>
+; SSE:  Cost of 3000000 for VF 8: REPLICATE ir<%valB.loaded> = load ir<%inB>
+; SSE:  Cost of 3000000 for VF 16: REPLICATE ir<%valB.loaded> = load ir<%inB>
 ;
 ; AVX1-LABEL: 'test'
 ; AVX1:  LV: Found an estimated cost of 1 for VF 1 For instruction: %valB.loaded = load i32, ptr %inB, align 4
-; AVX1:  Cost of 3000000 for VF 2: REPLICATE ir<%valB.loaded> = load ir<%inB> (S->V)
-; AVX1:  Cost of 3000000 for VF 4: REPLICATE ir<%valB.loaded> = load ir<%inB> (S->V)
-; AVX1:  Cost of 3000000 for VF 8: REPLICATE ir<%valB.loaded> = load ir<%inB> (S->V)
-; AVX1:  Cost of 3000000 for VF 16: REPLICATE ir<%valB.loaded> = load ir<%inB> (S->V)
-; AVX1:  Cost of 3000000 for VF 32: REPLICATE ir<%valB.loaded> = load ir<%inB> (S->V)
+; AVX1:  Cost of 3000000 for VF 2: REPLICATE ir<%valB.loaded> = load ir<%inB>
+; AVX1:  Cost of 3000000 for VF 4: REPLICATE ir<%valB.loaded> = load ir<%inB>
+; AVX1:  Cost of 3000000 for VF 8: REPLICATE ir<%valB.loaded> = load ir<%inB>
+; AVX1:  Cost of 3000000 for VF 16: REPLICATE ir<%valB.loaded> = load ir<%inB>
+; AVX1:  Cost of 3000000 for VF 32: REPLICATE ir<%valB.loaded> = load ir<%inB>
 ;
 ; AVX2-SLOWGATHER-LABEL: 'test'
 ; AVX2-SLOWGATHER:  LV: Found an estimated cost of 1 for VF 1 For instruction: %valB.loaded = load i32, ptr %inB, align 4
-; AVX2-SLOWGATHER:  Cost of 3000000 for VF 2: REPLICATE ir<%valB.loaded> = load ir<%inB> (S->V)
-; AVX2-SLOWGATHER:  Cost of 3000000 for VF 4: REPLICATE ir<%valB.loaded> = load ir<%inB> (S->V)
-; AVX2-SLOWGATHER:  Cost of 3000000 for VF 8: REPLICATE ir<%valB.loaded> = load ir<%inB> (S->V)
-; AVX2-SLOWGATHER:  Cost of 3000000 for VF 16: REPLICATE ir<%valB.loaded> = load ir<%inB> (S->V)
-; AVX2-SLOWGATHER:  Cost of 3000000 for VF 32: REPLICATE ir<%valB.loaded> = load ir<%inB> (S->V)
+; AVX2-SLOWGATHER:  Cost of 3000000 for VF 2: REPLICATE ir<%valB.loaded> = load ir<%inB>
+; AVX2-SLOWGATHER:  Cost of 3000000 for VF 4: REPLICATE ir<%valB.loaded> = load ir<%inB>
+; AVX2-SLOWGATHER:  Cost of 3000000 for VF 8: REPLICATE ir<%valB.loaded> = load ir<%inB>
+; AVX2-SLOWGATHER:  Cost of 3000000 for VF 16: REPLICATE ir<%valB.loaded> = load ir<%inB>
+; AVX2-SLOWGATHER:  Cost of 3000000 for VF 32: REPLICATE ir<%valB.loaded> = load ir<%inB>
 ;
 ; AVX2-FASTGATHER-LABEL: 'test'
 ; AVX2-FASTGATHER:  LV: Found an estimated cost of 1 for VF 1 For instruction: %valB.loaded = load i32, ptr %inB, align 4
