@@ -725,7 +725,7 @@ define void @inc_from_exit_value_of_nuw_addrec_and_its_expr(i32 %start, i32 %n) 
 ; CHECK-NEXT:  Loop %loop.3: symbolic max backedge-taken count is (-4 + (-1 * %start) + ((4 + %start) umax %n))
 ; CHECK-NEXT:  Loop %loop.3: Trip multiple is 1
 ; CHECK-NEXT:  Loop %loop.2: backedge-taken count is (-4 + (-1 * %start) + ((4 + %start) umax %n))
-; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -5
 ; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (-4 + (-1 * %start) + ((4 + %start) umax %n))
 ; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
 ; CHECK-NEXT:  Loop %loop.1: backedge-taken count is i32 4

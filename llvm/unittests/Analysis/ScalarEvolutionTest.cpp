@@ -1693,6 +1693,64 @@ TEST_F(ScalarEvolutionsTest, ApplyLoopGuards) {
   });
 }
 
+TEST_F(ScalarEvolutionsTest, ForgetAllLoopsForgetsRangesOfUses) {
+  LLVMContext C;
+  SMDiagnostic Err;
+  std::unique_ptr<Module> M = parseAssemblyString(
+      R"(define void @f(i1 %c, i64 %x, i64 %end, i64 %n) {
+      entry:
+        br i1 %c, label %then, label %merge
+
+      then:
+        %neg = or i64 %x, -9223372036854775808
+        br label %merge
+
+      merge:
+        %start = phi i64 [ -7, %entry ], [ %neg, %then ]
+        br label %loop.1
+
+      loop.1:
+        %iv.1 = phi i64 [ %start, %merge ], [ %iv.1.next, %loop.1 ]
+        %i = phi i64 [ 0, %merge ], [ %i.next, %loop.1 ]
+        %iv.1.next = add nuw i64 %iv.1, 1
+        %i.next = add i64 %i, 1
+        %ec.1 = icmp ult i64 %i.next, 10
+        br i1 %ec.1, label %loop.1, label %loop.2
+
+      loop.2:
+        %iv.2 = phi i64 [ %iv.1, %loop.1 ], [ %iv.2.next, %loop.2 ]
+        %iv.2.next = add i64 %iv.2, 1
+        %ec.2 = icmp ult i64 %iv.2, %n
+        br i1 %ec.2, label %loop.2, label %exit
+
+      exit:
+        ret void
+      })",
+      Err, C);
+
+  ASSERT_TRUE(M && "Could not parse module?");
+  ASSERT_TRUE(!verifyModule(*M) && "Must have been well formed!");
+
+  runWithSE(*M, "f", [](Function &F, LoopInfo &LI, ScalarEvolution &SE) {
+    const Loop *L2 =
+        LI.getLoopFor(getInstructionByName(F, "iv.2")->getParent());
+    // %start is negative, so the exit value (9 + %start)<u nuw> of %iv.1, the
+    // start of %iv.2, is at least 2^63 + 9.
+    EXPECT_EQ(
+        cast<SCEVConstant>(SE.getConstantMaxBackedgeTakenCount(L2))->getAPInt(),
+        APInt::getSignedMaxValue(64) - 9);
+
+    // Once %start may be any value, the exit value is only known to be at
+    // least 9.
+    cast<PHINode>(getInstructionByName(F, "start"))
+        ->setIncomingValue(1, F.getArg(2));
+    SE.forgetAllLoops();
+    EXPECT_EQ(
+        cast<SCEVConstant>(SE.getConstantMaxBackedgeTakenCount(L2))->getAPInt(),
+        APInt(64, -10, /*isSigned=*/true));
+  });
+}
+
 TEST_F(ScalarEvolutionsTest, ForgetValueWithOverflowInst) {
   LLVMContext C;
   SMDiagnostic Err;
