@@ -3150,6 +3150,17 @@ std::unique_ptr<VPlan> LoopVectorizationPlanner::selectBestEpiloguePlan(
     return nullptr;
   }
 
+  // The epilogue is dead if the main vector loop covers all iterations.
+  ScalarEvolution &SE = *PSE.getSE();
+  const SCEV *TC = vputils::getSCEVExprForVPValue(MainPlan.getTripCount(), PSE);
+  assert(!isa<SCEVCouldNotCompute>(TC) && "Trip count SCEV must be computable");
+  if (!MainPlan.requiresScalarEpilogue() &&
+      SE.getURemExpr(TC, SE.getElementCount(TC->getType(), MainLoopVF * IC))
+          ->isZero()) {
+    LLVM_DEBUG(dbgs() << "LEV: Epilogue vector loop is dead.\n");
+    return nullptr;
+  }
+
   if (hasForcedEpilogueVF()) {
     if (estimateElementCount(EpilogueVectorizationForceVF,
                              Config.getVScaleForTuning()) >=
@@ -3214,12 +3225,9 @@ std::unique_ptr<VPlan> LoopVectorizationPlanner::selectBestEpiloguePlan(
   Type *TCType = Legal->getWidestInductionType();
   const SCEV *RemainingIterations = nullptr;
   unsigned MaxTripCount = 0;
-  const SCEV *TC = vputils::getSCEVExprForVPValue(MainPlan.getTripCount(), PSE);
-  assert(!isa<SCEVCouldNotCompute>(TC) && "Trip count SCEV must be computable");
   const SCEV *KnownMinTC;
   bool ScalableTC = match(TC, m_scev_c_Mul(m_SCEV(KnownMinTC), m_SCEVVScale()));
   bool ScalableRemIter = false;
-  ScalarEvolution &SE = *PSE.getSE();
   // Use versions of TC and VF in which both are either scalable or fixed.
   if (ScalableTC == MainLoopVF.isScalable()) {
     ScalableRemIter = ScalableTC;
@@ -3234,10 +3242,6 @@ std::unique_ptr<VPlan> LoopVectorizationPlanner::selectBestEpiloguePlan(
   } else
     RemainingIterations =
         SE.getURemExpr(TC, SE.getElementCount(TCType, EstimatedRuntimeVF * IC));
-
-  // No iterations left to process in the epilogue.
-  if (RemainingIterations->isZero())
-    return nullptr;
 
   if (MainLoopVF.isFixed()) {
     MaxTripCount = MainLoopVF.getFixedValue() * IC - 1;
