@@ -696,4 +696,67 @@ exit:
   %umin.exit = call i16 @llvm.umin.i16(i16 -27, i16 %x)
   %t = add i16 %start.ext.9, %umin.exit
   ret i16 %t
+
+; %iv.2 starts at exit value (4 + %start)<u nuw> of %iv.1, %iv.3 at %add.
+define void @inc_from_exit_value_of_nuw_addrec_and_its_expr(i32 %start, i32 %n) {
+; CHECK-LABEL: 'inc_from_exit_value_of_nuw_addrec_and_its_expr'
+; CHECK-NEXT:  Classifying expressions for: @inc_from_exit_value_of_nuw_addrec_and_its_expr
+; CHECK-NEXT:    %add = add i32 %start, 4
+; CHECK-NEXT:    --> (4 + %start) U: full-set S: full-set
+; CHECK-NEXT:    %iv.1 = phi i32 [ %start, %entry ], [ %iv.1.next, %loop.1 ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop.1> U: full-set S: full-set Exits: (4 + %start)<u nuw> LoopDispositions: { %loop.1: Computable }
+; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop.1 ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop.1> U: [0,5) S: [0,5) Exits: 4 LoopDispositions: { %loop.1: Computable }
+; CHECK-NEXT:    %iv.1.next = add nuw i32 %iv.1, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%loop.1> U: full-set S: full-set Exits: (5 + %start) LoopDispositions: { %loop.1: Computable }
+; CHECK-NEXT:    %i.next = add i32 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop.1> U: [1,6) S: [1,6) Exits: 5 LoopDispositions: { %loop.1: Computable }
+; CHECK-NEXT:    %iv.2 = phi i32 [ %iv.1, %loop.1 ], [ %iv.2.next, %loop.2 ]
+; CHECK-NEXT:    --> {{\{\{}}%start,+,1}<nuw><%loop.1>,+,1}<%loop.2> U: full-set S: full-set --> {(4 + %start)<u nuw>,+,1}<%loop.2> U: full-set S: full-set Exits: ((4 + %start) umax %n) LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %iv.2.next = add i32 %iv.2, 1
+; CHECK-NEXT:    --> {{\{\{}}(1 + %start),+,1}<nw><%loop.1>,+,1}<%loop.2> U: full-set S: full-set --> {(5 + %start),+,1}<%loop.2> U: full-set S: full-set Exits: (1 + ((4 + %start) umax %n)) LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %iv.3 = phi i32 [ %add, %loop.2 ], [ %iv.3.next, %loop.3 ]
+; CHECK-NEXT:    --> {(4 + %start),+,1}<%loop.3> U: full-set S: full-set Exits: ((4 + %start) umax %n) LoopDispositions: { %loop.3: Computable }
+; CHECK-NEXT:    %iv.3.next = add i32 %iv.3, 1
+; CHECK-NEXT:    --> {(5 + %start),+,1}<%loop.3> U: full-set S: full-set Exits: (1 + ((4 + %start) umax %n)) LoopDispositions: { %loop.3: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @inc_from_exit_value_of_nuw_addrec_and_its_expr
+; CHECK-NEXT:  Loop %loop.3: backedge-taken count is (-4 + (-1 * %start) + ((4 + %start) umax %n))
+; CHECK-NEXT:  Loop %loop.3: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %loop.3: symbolic max backedge-taken count is (-4 + (-1 * %start) + ((4 + %start) umax %n))
+; CHECK-NEXT:  Loop %loop.3: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop.2: backedge-taken count is (-4 + (-1 * %start) + ((4 + %start) umax %n))
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (-4 + (-1 * %start) + ((4 + %start) umax %n))
+; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop.1: backedge-taken count is i32 4
+; CHECK-NEXT:  Loop %loop.1: constant max backedge-taken count is i32 4
+; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is i32 4
+; CHECK-NEXT:  Loop %loop.1: Trip multiple is 5
+;
+entry:
+  %add = add i32 %start, 4
+  br label %loop.1
+
+loop.1:
+  %iv.1 = phi i32 [ %start, %entry ], [ %iv.1.next, %loop.1 ]
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop.1 ]
+  %iv.1.next = add nuw i32 %iv.1, 1
+  %i.next = add i32 %i, 1
+  %ec.1 = icmp ult i32 %i.next, 5
+  br i1 %ec.1, label %loop.1, label %loop.2
+
+loop.2:
+  %iv.2 = phi i32 [ %iv.1, %loop.1 ], [ %iv.2.next, %loop.2 ]
+  %iv.2.next = add i32 %iv.2, 1
+  %ec.2 = icmp ult i32 %iv.2, %n
+  br i1 %ec.2, label %loop.2, label %loop.3
+
+loop.3:
+  %iv.3 = phi i32 [ %add, %loop.2 ], [ %iv.3.next, %loop.3 ]
+  %iv.3.next = add i32 %iv.3, 1
+  %ec.3 = icmp ult i32 %iv.3, %n
+  br i1 %ec.3, label %loop.3, label %exit
+
+exit:
+  ret void
 }
