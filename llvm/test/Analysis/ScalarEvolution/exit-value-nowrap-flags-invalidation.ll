@@ -23,7 +23,7 @@ define void @inc_from_exit_value_of_rewritten_start(i1 %skip, i64 %end, i64 %n, 
 ; CHECK-NEXT:    --> {{\{\{}}(1 + %start),+,1}<nw><%loop.2>,+,1}<nw><%loop.3> U: full-set S: full-set --> {(10 + %start)<nsw>,+,1}<nw><%loop.3> U: full-set S: full-set Exits: (1 + ((9 + %start)<nsw> umax %n)) LoopDispositions: { %loop.3: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @inc_from_exit_value_of_rewritten_start
 ; CHECK-NEXT:  Loop %loop.3: backedge-taken count is (-9 + (-1 * %start) + ((9 + %start)<nsw> umax %n))
-; CHECK-NEXT:  Loop %loop.3: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop.3: constant max backedge-taken count is i64 -10
 ; CHECK-NEXT:  Loop %loop.3: symbolic max backedge-taken count is (-9 + (-1 * %start) + ((9 + %start)<nsw> umax %n))
 ; CHECK-NEXT:  Loop %loop.3: Trip multiple is 1
 ; CHECK-NEXT:  Loop %loop.2: backedge-taken count is i64 9

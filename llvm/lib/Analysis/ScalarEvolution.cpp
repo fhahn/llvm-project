@@ -6460,7 +6460,7 @@ static bool RangeRefPHIAllowedOperands(DominatorTree &DT, PHINode *PHI) {
 const ConstantRange &
 ScalarEvolution::getRangeRefIter(const SCEV *S,
                                  ScalarEvolution::RangeSignHint SignHint) {
-  DenseMap<const SCEV *, ConstantRange> &Cache =
+  DenseMap<SCEVUse, ConstantRange> &Cache =
       SignHint == ScalarEvolution::HINT_RANGE_UNSIGNED ? UnsignedRanges
                                                        : SignedRanges;
   SmallVector<SCEVUse> WorkList;
@@ -6541,14 +6541,20 @@ const APInt *ScalarEvolution::getConstantAPIntOrNull(const SCEV *S) {
 /// Determine the range for a particular SCEV.  If SignHint is
 /// HINT_RANGE_UNSIGNED (resp. HINT_RANGE_SIGNED) then getRange prefers ranges
 /// with a "cleaner" unsigned (resp. signed) representation.
-const ConstantRange &ScalarEvolution::getRangeRef(
-    const SCEV *S, ScalarEvolution::RangeSignHint SignHint, unsigned Depth) {
-  DenseMap<const SCEV *, ConstantRange> &Cache =
+const ConstantRange &ScalarEvolution::getRangeForUse(
+    SCEVUse S, ScalarEvolution::RangeSignHint SignHint, unsigned Depth) {
+  DenseMap<SCEVUse, ConstantRange> &Cache =
       SignHint == ScalarEvolution::HINT_RANGE_UNSIGNED ? UnsignedRanges
                                                        : SignedRanges;
   ConstantRange::PreferredRangeType RangeType =
       SignHint == ScalarEvolution::HINT_RANGE_UNSIGNED ? ConstantRange::Unsigned
                                                        : ConstantRange::Signed;
+
+  // Only uses of adds have their own entry. Rebuild the use, so that its key
+  // matches those erased by forgetMemoizedResultsImpl.
+  if (S.hasUseFlags())
+    S = SCEVUse(S.getPointer(),
+                isa<SCEVAddExpr>(S) ? S.getUseNoWrapFlags() : SCEV::FlagNone);
 
   // See if we've computed this range already.
   auto I = Cache.find(S);
@@ -6630,14 +6636,14 @@ const ConstantRange &ScalarEvolution::getRangeRef(
     }
     ConstantRange X = getRangeRef(Add->getOperand(0), SignHint, Depth + 1);
     unsigned WrapType = OBO::AnyWrap;
-    if (Add->hasNoSignedWrap())
+    if (hasFlags(S.getNoWrapFlags(), SCEV::FlagNSW))
       WrapType |= OBO::NoSignedWrap;
-    if (Add->hasNoUnsignedWrap())
+    if (hasFlags(S.getNoWrapFlags(), SCEV::FlagNUW))
       WrapType |= OBO::NoUnsignedWrap;
     for (const SCEV *Op : drop_begin(Add->operands()))
       X = X.addWithNoWrap(getRangeRef(Op, SignHint, Depth + 1), WrapType,
                           RangeType);
-    return setRange(Add, SignHint,
+    return setRange(S, SignHint,
                     ConservativeResult.intersectWith(X, RangeType));
   }
   case scMulExpr: {
@@ -13178,7 +13184,7 @@ const SCEV *ScalarEvolution::getUDivCeilSCEV(const SCEV *N, const SCEV *D) {
 }
 
 const SCEV *
-ScalarEvolution::computeMaxBECountForLT(const SCEV *Start, const SCEV *Stride,
+ScalarEvolution::computeMaxBECountForLT(SCEVUse Start, const SCEV *Stride,
                                         const SCEV *End, unsigned BitWidth,
                                         bool IsSigned, bool Invert) {
   // The logic in this function assumes we can represent a positive stride.
@@ -13226,8 +13232,9 @@ ScalarEvolution::computeMaxBECountForLT(const SCEV *Start, const SCEV *Stride,
 
   // Try to refine Delta in case End - Start (or Start - End if Invert) gives a
   // tighter bound after folding.
-  const SCEV *DeltaExpr =
-      Invert ? getMinusSCEV(Start, End) : getMinusSCEV(End, Start);
+  // The use flags of Start do not hold for the difference.
+  const SCEV *DeltaExpr = Invert ? getMinusSCEV(Start.getPointer(), End)
+                                 : getMinusSCEV(End, Start.getPointer());
   Delta = APIntOps::umin(Delta, getUnsignedRangeMax(DeltaExpr));
 
   return getUDivCeilSCEV(getConstant(Delta), getConstant(StrideForMaxBECount));
@@ -13741,9 +13748,10 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
   if (isa<SCEVConstant>(BECount)) {
     ConstantMaxBECount = BECount;
   } else {
+    // Pass the start as used by the recurrence, for the range of that use.
     ConstantMaxBECount = computeMaxBECountForLT(
-        Start, Stride, RHS, getTypeSizeInBits(LHS->getType()), IsSigned,
-        Invert);
+        Start == OrigStart ? IV->getStart() : SCEVUse(Start), Stride, RHS,
+        getTypeSizeInBits(LHS->getType()), IsSigned, Invert);
     // If we know exactly how many times the backedge will be taken if it's
     // taken at least once, then the backedge count will either be that or
     // zero. If that count exceeds the range-based bound, the backedge can
@@ -14532,6 +14540,15 @@ void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
   BlockDispositions.erase(S);
   UnsignedRanges.erase(S);
   SignedRanges.erase(S);
+  // Uses with flags have their own ranges.
+  if (S->HasUseRanges) {
+    S->HasUseRanges = false;
+    for (SCEVFlags Flags :
+         {SCEV::FlagNUW, SCEV::FlagNSW, SCEV::FlagNUW | SCEV::FlagNSW}) {
+      UnsignedRanges.erase(SCEVUse(S, Flags));
+      SignedRanges.erase(SCEVUse(S, Flags));
+    }
+  }
   HasRecMap.erase(S);
   ConstantMultipleCache.erase(S);
 
