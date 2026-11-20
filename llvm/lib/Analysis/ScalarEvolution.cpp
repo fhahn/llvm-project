@@ -13232,7 +13232,7 @@ bool ScalarEvolution::isImpliedCondOperandsViaRanges(
   return LHSRange.icmp(Pred, ConstRHS);
 }
 
-bool ScalarEvolution::canIVOverflowOnLT(const SCEV *RHS, const SCEV *Stride,
+bool ScalarEvolution::canIVOverflowOnLT(SCEVUse RHS, const SCEV *Stride,
                                         bool IsSigned, bool Invert) {
   assert(isKnownPositive(Stride) && "Positive stride expected!");
 
@@ -13240,7 +13240,7 @@ bool ScalarEvolution::canIVOverflowOnLT(const SCEV *RHS, const SCEV *Stride,
   const SCEV *One = getOne(Stride->getType());
 
   if (IsSigned) {
-    APInt MaxRHS = getRangeMax(RHS, /*IsSigned=*/true, Invert);
+    APInt MaxRHS = getRangeMaxForUse(RHS, /*IsSigned=*/true, Invert);
     APInt MaxValue = APInt::getSignedMaxValue(BitWidth);
     APInt MaxStrideMinusOne = getSignedRangeMax(getMinusSCEV(Stride, One));
 
@@ -13248,7 +13248,7 @@ bool ScalarEvolution::canIVOverflowOnLT(const SCEV *RHS, const SCEV *Stride,
     return (std::move(MaxValue) - MaxStrideMinusOne).slt(MaxRHS);
   }
 
-  APInt MaxRHS = getRangeMax(RHS, /*IsSigned=*/false, Invert);
+  APInt MaxRHS = getRangeMaxForUse(RHS, /*IsSigned=*/false, Invert);
   APInt MaxValue = APInt::getMaxValue(BitWidth);
   APInt MaxStrideMinusOne = getUnsignedRangeMax(getMinusSCEV(Stride, One));
 
@@ -13534,9 +13534,11 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, SCEVUse RHSUse,
   } else {
     // Avoid proven overflow cases: this will ensure that the backedge taken
     // count will not generate any unsigned overflow.
-    IVMayOverflow = canIVOverflowOnLT(RHS, GuardedStride, IsSigned, Invert) &&
-                    canIVOverflowOnLT(applyLoopGuards(RHS, Guards),
-                                      GuardedStride, IsSigned, Invert);
+    // The check of the unguarded RHS uses the range of RHSUse.
+    IVMayOverflow =
+        canIVOverflowOnLT(RHSUse, GuardedStride, IsSigned, Invert) &&
+        canIVOverflowOnLT(applyLoopGuards(RHS, Guards), GuardedStride, IsSigned,
+                          Invert);
     if (IVMayOverflow && !NoWrap)
       return getCouldNotCompute();
   }

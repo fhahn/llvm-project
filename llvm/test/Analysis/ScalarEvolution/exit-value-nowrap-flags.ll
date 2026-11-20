@@ -886,9 +886,9 @@ define void @dec_to_exit_value_of_nuw_addrec_and_its_expr(i32 %start, i32 %n) {
 ; CHECK-NEXT:    %i.next = add i32 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop.1> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %loop.1: Computable }
 ; CHECK-NEXT:    %iv.2 = phi i32 [ %n, %loop.1 ], [ %iv.2.next, %loop.2 ]
-; CHECK-NEXT:    --> {%n,+,-10}<%loop.2> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    --> {%n,+,-10}<%loop.2> U: full-set S: full-set Exits: ((-10 * ((9 + (-1 * ((9 + %start) umin %n)) + %n) /u 10)) + %n) LoopDispositions: { %loop.2: Computable }
 ; CHECK-NEXT:    %iv.2.next = add i32 %iv.2, -10
-; CHECK-NEXT:    --> {(-10 + %n),+,-10}<%loop.2> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    --> {(-10 + %n),+,-10}<%loop.2> U: full-set S: full-set Exits: (-10 + (-10 * ((9 + (-1 * ((9 + %start) umin %n)) + %n) /u 10)) + %n) LoopDispositions: { %loop.2: Computable }
 ; CHECK-NEXT:    %iv.3 = phi i32 [ %n, %loop.2 ], [ %iv.3.next, %loop.3 ]
 ; CHECK-NEXT:    --> {%n,+,-10}<%loop.3> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop.3: Computable }
 ; CHECK-NEXT:    %iv.3.next = add i32 %iv.3, -10
@@ -897,9 +897,10 @@ define void @dec_to_exit_value_of_nuw_addrec_and_its_expr(i32 %start, i32 %n) {
 ; CHECK-NEXT:  Loop %loop.3: Unpredictable backedge-taken count.
 ; CHECK-NEXT:  Loop %loop.3: Unpredictable constant max backedge-taken count.
 ; CHECK-NEXT:  Loop %loop.3: Unpredictable symbolic max backedge-taken count.
-; CHECK-NEXT:  Loop %loop.2: Unpredictable backedge-taken count.
-; CHECK-NEXT:  Loop %loop.2: Unpredictable constant max backedge-taken count.
-; CHECK-NEXT:  Loop %loop.2: Unpredictable symbolic max backedge-taken count.
+; CHECK-NEXT:  Loop %loop.2: backedge-taken count is ((9 + (-1 * ((9 + %start) umin %n)) + %n) /u 10)
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 429496729
+; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is ((9 + (-1 * ((9 + %start) umin %n)) + %n) /u 10)
+; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
 ; CHECK-NEXT:  Loop %loop.1: backedge-taken count is i32 9
 ; CHECK-NEXT:  Loop %loop.1: constant max backedge-taken count is i32 9
 ; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is i32 9
@@ -945,13 +946,14 @@ define void @dec_to_exit_value_of_nuw_ptr_addrec(ptr %start, ptr %n) {
 ; CHECK-NEXT:    %i.next = add i32 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop.1> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %loop.1: Computable }
 ; CHECK-NEXT:    %iv.2 = phi ptr [ %n, %loop.1 ], [ %iv.2.next, %loop.2 ]
-; CHECK-NEXT:    --> {%n,+,-10}<%loop.2> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    --> {%n,+,-10}<%loop.2> U: full-set S: full-set Exits: ((-10 * ((9 + (-1 * ((9 + (ptrtoaddr ptr %start to i64)) umin (ptrtoaddr ptr %n to i64))) + (ptrtoaddr ptr %n to i64)) /u 10)) + %n) LoopDispositions: { %loop.2: Computable }
 ; CHECK-NEXT:    %iv.2.next = getelementptr i8, ptr %iv.2, i64 -10
-; CHECK-NEXT:    --> {(-10 + %n),+,-10}<%loop.2> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    --> {(-10 + %n),+,-10}<%loop.2> U: full-set S: full-set Exits: (-10 + (-10 * ((9 + (-1 * ((9 + (ptrtoaddr ptr %start to i64)) umin (ptrtoaddr ptr %n to i64))) + (ptrtoaddr ptr %n to i64)) /u 10)) + %n) LoopDispositions: { %loop.2: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @dec_to_exit_value_of_nuw_ptr_addrec
-; CHECK-NEXT:  Loop %loop.2: Unpredictable backedge-taken count.
-; CHECK-NEXT:  Loop %loop.2: Unpredictable constant max backedge-taken count.
-; CHECK-NEXT:  Loop %loop.2: Unpredictable symbolic max backedge-taken count.
+; CHECK-NEXT:  Loop %loop.2: backedge-taken count is ((9 + (-1 * ((9 + (ptrtoaddr ptr %start to i64)) umin (ptrtoaddr ptr %n to i64))) + (ptrtoaddr ptr %n to i64)) /u 10)
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i64 1844674407370955161
+; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is ((9 + (-1 * ((9 + (ptrtoaddr ptr %start to i64)) umin (ptrtoaddr ptr %n to i64))) + (ptrtoaddr ptr %n to i64)) /u 10)
+; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
 ; CHECK-NEXT:  Loop %loop.1: backedge-taken count is i32 9
 ; CHECK-NEXT:  Loop %loop.1: constant max backedge-taken count is i32 9
 ; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is i32 9
