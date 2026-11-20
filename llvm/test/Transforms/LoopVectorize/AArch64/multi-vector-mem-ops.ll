@@ -1035,31 +1035,22 @@ define void @i32_single_iteration(ptr noalias %x) {
 ; CHECK-NEXT:  [[ITER_CHECK:.*:]]
 ; CHECK-NEXT:    [[VSCALE:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TRIP_COUNT:%.*]] = mul nuw i64 [[VSCALE]], 8
-; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TRIP_COUNT]], 4
-; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[VEC_EPILOG_SCALAR_PH:label %.*]], label %[[VECTOR_MAIN_LOOP_ITER_CHECK:.*]]
-; CHECK:       [[VECTOR_MAIN_LOOP_ITER_CHECK]]:
-; CHECK-NEXT:    br i1 true, [[VEC_EPILOG_PH:label %.*]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 4
+; CHECK-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 3
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[TRIP_COUNT]], [[TMP1]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TRIP_COUNT]], [[N_MOD_VF]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[TMP2:%.*]] = load <vscale x 16 x i32>, ptr [[X]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = call <vscale x 4 x i32> @llvm.vector.extract.nxv4i32.nxv16i32(<vscale x 16 x i32> [[TMP2]], i64 0)
-; CHECK-NEXT:    [[TMP4:%.*]] = call <vscale x 4 x i32> @llvm.vector.extract.nxv4i32.nxv16i32(<vscale x 16 x i32> [[TMP2]], i64 4)
-; CHECK-NEXT:    [[TMP5:%.*]] = call <vscale x 4 x i32> @llvm.vector.extract.nxv4i32.nxv16i32(<vscale x 16 x i32> [[TMP2]], i64 8)
-; CHECK-NEXT:    [[TMP6:%.*]] = call <vscale x 4 x i32> @llvm.vector.extract.nxv4i32.nxv16i32(<vscale x 16 x i32> [[TMP2]], i64 12)
-; CHECK-NEXT:    [[TMP7:%.*]] = add <vscale x 4 x i32> [[TMP3]], splat (i32 1)
-; CHECK-NEXT:    [[TMP8:%.*]] = add <vscale x 4 x i32> [[TMP4]], splat (i32 1)
+; CHECK-NEXT:    [[TMP2:%.*]] = load <vscale x 8 x i32>, ptr [[X]], align 4
+; CHECK-NEXT:    [[TMP5:%.*]] = call <vscale x 4 x i32> @llvm.vector.extract.nxv4i32.nxv8i32(<vscale x 8 x i32> [[TMP2]], i64 0)
+; CHECK-NEXT:    [[TMP6:%.*]] = call <vscale x 4 x i32> @llvm.vector.extract.nxv4i32.nxv8i32(<vscale x 8 x i32> [[TMP2]], i64 4)
 ; CHECK-NEXT:    [[TMP9:%.*]] = add <vscale x 4 x i32> [[TMP5]], splat (i32 1)
 ; CHECK-NEXT:    [[TMP10:%.*]] = add <vscale x 4 x i32> [[TMP6]], splat (i32 1)
-; CHECK-NEXT:    [[TMP11:%.*]] = call <vscale x 16 x i32> @llvm.vector.insert.nxv16i32.nxv4i32(<vscale x 16 x i32> poison, <vscale x 4 x i32> [[TMP7]], i64 0)
-; CHECK-NEXT:    [[TMP12:%.*]] = call <vscale x 16 x i32> @llvm.vector.insert.nxv16i32.nxv4i32(<vscale x 16 x i32> [[TMP11]], <vscale x 4 x i32> [[TMP8]], i64 4)
-; CHECK-NEXT:    [[TMP13:%.*]] = call <vscale x 16 x i32> @llvm.vector.insert.nxv16i32.nxv4i32(<vscale x 16 x i32> [[TMP12]], <vscale x 4 x i32> [[TMP9]], i64 8)
-; CHECK-NEXT:    [[TMP14:%.*]] = call <vscale x 16 x i32> @llvm.vector.insert.nxv16i32.nxv4i32(<vscale x 16 x i32> [[TMP13]], <vscale x 4 x i32> [[TMP10]], i64 12)
-; CHECK-NEXT:    store <vscale x 16 x i32> [[TMP14]], ptr [[X]], align 4
+; CHECK-NEXT:    [[TMP7:%.*]] = call <vscale x 8 x i32> @llvm.vector.insert.nxv8i32.nxv4i32(<vscale x 8 x i32> poison, <vscale x 4 x i32> [[TMP9]], i64 0)
+; CHECK-NEXT:    [[TMP8:%.*]] = call <vscale x 8 x i32> @llvm.vector.insert.nxv8i32.nxv4i32(<vscale x 8 x i32> [[TMP7]], <vscale x 4 x i32> [[TMP10]], i64 4)
+; CHECK-NEXT:    store <vscale x 8 x i32> [[TMP8]], ptr [[X]], align 4
 ; CHECK-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ;
@@ -1203,7 +1194,7 @@ define void @wide_active_lane_mask_all_true_incoming(ptr noalias %p) vscale_rang
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP1]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <vscale x 4 x i32> [[STEP_ADD_3]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP44:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP43:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ;
 ; CHECK-UF2-TF-LABEL: define void @wide_active_lane_mask_all_true_incoming(
