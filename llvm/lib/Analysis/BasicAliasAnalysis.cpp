@@ -1466,6 +1466,47 @@ BasicAAResult::aliasSelect(const SelectInst *SI, LocationSize SISize,
   return MergeAliasResults(ThisAlias, Alias);
 }
 
+/// Return true if \p Loc cannot alias any value \p PN may take. Check \p Loc
+/// against the values \p PN is based on with unknown sizes, looking through
+/// phis. To control compile time, only look through a limited number of phis
+/// with multiple sources including a phi.
+static bool phiSourcesNoAlias(const PHINode *PN, const MemoryLocation &Loc,
+                              AAQueryInfo &AAQI, AssumptionCache &AC) {
+  // The values may come from different iterations.
+  SaveAndRestore SavedMayBeCrossIteration(AAQI.MayBeCrossIteration, true);
+  unsigned Budget = 8;
+  SmallPtrSet<const PHINode *, 8> Visited({PN});
+  SmallPtrSet<const Value *, 8> Checked;
+  SmallVector<const PHINode *> Worklist({PN});
+  do {
+    const PHINode *P = Worklist.pop_back_val();
+    bool HasPhiSrc = false;
+    SmallPtrSet<const Value *, 4> Srcs;
+    for (const Value *V : P->incoming_values()) {
+      // Values based on a phi have the same underlying objects. Skip them if
+      // the phi is already being checked and check its sources otherwise.
+      // Check phis with assumptions as a whole, so the assumptions are used.
+      auto *Phi = dyn_cast<PHINode>(getUnderlyingObject(V));
+      if (Phi == P)
+        continue;
+      Srcs.insert(V);
+      HasPhiSrc |= isa<PHINode>(V);
+      if (Phi && AC.assumptionsFor(Phi).empty()) {
+        if (Visited.insert(Phi).second)
+          Worklist.push_back(Phi);
+        continue;
+      }
+      if (Checked.insert(V).second &&
+          AAQI.AAR.alias(MemoryLocation::getBeforeOrAfter(V), Loc, AAQI) !=
+              AliasResult::NoAlias)
+        return false;
+    }
+    if (Srcs.size() > 1 && HasPhiSrc && Budget-- == 0)
+      return false;
+  } while (!Worklist.empty());
+  return true;
+}
+
 /// Provide a bunch of ad-hoc rules to disambiguate a PHI instruction against
 /// another.
 AliasResult BasicAAResult::aliasPHI(const PHINode *PN, LocationSize PNSize,
@@ -1524,23 +1565,21 @@ AliasResult BasicAAResult::aliasPHI(const PHINode *PN, LocationSize PNSize,
       V1Srcs.push_back(PV1);
   }
 
-  // To control compile time, only allow a phi source if there is either single
-  // source or all sources are not phis, e.g. LCSSA phis or phi start values of
-  // pointer IVs.
-  if (V1Srcs.size() > 1 && any_of(V1Srcs, IsaPred<PHINode>))
-    return AliasResult::MayAlias;
-
   // If V1Srcs is empty then that means that the phi has no underlying non-phi
   // value. This should only be possible in blocks unreachable from the entry
   // block, but return MayAlias just in case.
   if (V1Srcs.empty())
     return AliasResult::MayAlias;
 
-  // If this PHI node is recursive, indicate that the pointer may be moved
-  // across iterations. We can only prove NoAlias if different underlying
-  // objects are involved.
-  if (isRecursive)
-    PNSize = LocationSize::beforeOrAfterPointer();
+  // If this PHI node is recursive, the pointer may be moved across iterations,
+  // so its size is lost and only the values it is based on can prove NoAlias.
+  // Check V2 against them directly, instead of recursing. Phis with multiple
+  // sources including a phi are not recursed into to control compile time, so
+  // do the same for them.
+  if (isRecursive || (V1Srcs.size() > 1 && any_of(V1Srcs, IsaPred<PHINode>)))
+    return phiSourcesNoAlias(PN, MemoryLocation(V2, V2Size), AAQI, AC)
+               ? AliasResult::NoAlias
+               : AliasResult::MayAlias;
 
   // In the recursive alias queries below, we may compare values from two
   // different loop iterations.
@@ -1552,10 +1591,6 @@ AliasResult BasicAAResult::aliasPHI(const PHINode *PN, LocationSize PNSize,
   // Early exit if the check of the first PHI source against V2 is MayAlias.
   // Other results are not possible.
   if (Alias == AliasResult::MayAlias)
-    return AliasResult::MayAlias;
-  // With recursive phis we cannot guarantee that MustAlias/PartialAlias will
-  // remain valid to all elements and needs to conservatively return MayAlias.
-  if (isRecursive && Alias != AliasResult::NoAlias)
     return AliasResult::MayAlias;
 
   // If all sources of the PHI node NoAlias or MustAlias V2, then returns
