@@ -3442,6 +3442,22 @@ LoopVectorizationPlanner::selectInterleaveCount(VPlan &Plan, ElementCount VF,
       getSmallBestKnownTC(Opts, PSE, OrigLoop,
                           /*CanUseConstantMax=*/true,
                           /*CanExcludeZeroTrips=*/CM->isEpilogueAllowed());
+  bool IsExactTC = getSmallConstantTripCount(PSE.getSE(), OrigLoop).isNonZero();
+
+  // The plan's trip count may be smaller than the original loop's, e.g. after
+  // replacing symbolic strides by constants.
+  if (!Plan.hasTailFolded()) {
+    ScalarEvolution &SE = *PSE.getSE();
+    const SCEV *TC = SE.applyLoopGuards(
+        vputils::getSCEVExprForVPValue(Plan.getTripCount(), PSE),
+        OrigLoopGuards);
+    APInt MaxTC = SE.getUnsignedRangeMax(TC);
+    if (!MaxTC.isZero() && MaxTC.getActiveBits() <= 32 &&
+        (!BestKnownTC || MaxTC.ule(BestKnownTC->getKnownMinValue()))) {
+      BestKnownTC = ElementCount::getFixed(MaxTC.getZExtValue());
+      IsExactTC = isa<SCEVConstant>(TC);
+    }
+  }
 
   // For fixed length VFs treat a scalable trip count as unknown.
   if (BestKnownTC && (BestKnownTC->isFixed() || VF.isScalable())) {
@@ -3459,7 +3475,7 @@ LoopVectorizationPlanner::selectInterleaveCount(VPlan &Plan, ElementCount VF,
     unsigned InterleaveCountLB = bit_floor(std::max(
         1u, std::min(AvailableTC / (EstimatedVF * 2), MaxInterleaveCount)));
 
-    if (getSmallConstantTripCount(PSE.getSE(), OrigLoop).isNonZero()) {
+    if (IsExactTC) {
       // If the best known trip count is exact, we select between two
       // prospective ICs, where
       //
@@ -5563,8 +5579,10 @@ LoopVectorizationPlanner::LoopVectorizationPlanner(
     PredicatedScalarEvolution &PSE, OptimizationRemarkEmitter *ORE,
     std::function<const BranchProbabilityInfo &()> GetBPI)
     : Opts(Config.getOpts()), OrigLoop(L), LI(LI), DT(DT), TLI(TLI), TTI(TTI),
-      Legal(Legal), CM(std::move(CM)), Config(Config), PSE(PSE), ORE(ORE),
-      GetBPI(GetBPI) {}
+      Legal(Legal), CM(std::move(CM)), Config(Config), PSE(PSE),
+      OrigLoopGuards(
+          ScalarEvolution::LoopGuards::collectOnDemand(L, *PSE.getSE())),
+      ORE(ORE), GetBPI(GetBPI) {}
 
 LoopVectorizationPlanner::~LoopVectorizationPlanner() = default;
 

@@ -26,6 +26,7 @@
 #include "VPlan.h"
 #include "VPlanUtils.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Support/InstructionCost.h"
 #include <optional>
@@ -915,6 +916,9 @@ class LoopVectorizationPlanner {
   VFSelectionContext &Config;
 
   PredicatedScalarEvolution &PSE;
+
+  /// The loop guards of OrigLoop, collected on first use.
+  ScalarEvolution::LoopGuards OrigLoopGuards;
 
   OptimizationRemarkEmitter *ORE;
 

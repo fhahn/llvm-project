@@ -4,11 +4,10 @@
 
 ; The trip counts of the loops below depend on %stride.
 
-; TODO: Currently VF and IC are chosen based on the original loop's trip count
-; and the vector loop never executes.
-
+; TODO: Currently VF is chosen based on the original loop's trip count and the
+; vector loop never executes.
 ; Trip count is 1 with %stride == 1, the vector loop can never execute.
-; CHECK:      remark: {{.*}} vectorized loop (vectorization width: 2, interleaved count: 4)
+; CHECK:      remark: {{.*}} vectorized loop (vectorization width: 2, interleaved count: 1)
 ; CHECK-NEXT: remark: {{.*}} Created vector loop never executes due to insufficient trip count.
 define void @tc_1(ptr noalias %dst, ptr %src, i64 %stride) {
 entry:
@@ -30,8 +29,8 @@ exit:
 }
 
 ; Trip count is 4 with %stride == 1.
-; CHECK:      remark: {{.*}} vectorized loop (vectorization width: 2, interleaved count: 4)
-; CHECK-NEXT: remark: {{.*}} Created vector loop never executes due to insufficient trip count.
+; CHECK:      remark: {{.*}} vectorized loop (vectorization width: 2, interleaved count: 2)
+; CHECK-NOT:  Created vector loop never executes
 define void @tc_4(ptr noalias %dst, ptr %src, i64 %stride) {
 entry:
   %n = shl i64 %stride, 2
@@ -54,8 +53,8 @@ exit:
 
 ; Trip count is 4 with %stride == 1 and the interleave group for the strided
 ; load of %a requires a scalar epilogue.
-; CHECK:      remark: {{.*}} vectorized loop (vectorization width: 2, interleaved count: 4)
-; CHECK-NEXT: remark: {{.*}} Created vector loop never executes due to insufficient trip count.
+; CHECK:      remark: {{.*}} vectorized loop (vectorization width: 2, interleaved count: 1)
+; CHECK-NOT:  Created vector loop never executes
 define void @tc_4_requires_scalar_epilogue(ptr noalias %dst, ptr %src, ptr %a, i64 %stride) {
 entry:
   %n = shl i64 %stride, 2
@@ -81,7 +80,7 @@ exit:
 }
 
 ; Trip count is 4 with %stride == 1 and the user forces VF 8.
-; CHECK:      remark: {{.*}} vectorized loop (vectorization width: 8, interleaved count: 4)
+; CHECK:      remark: {{.*}} vectorized loop (vectorization width: 8, interleaved count: 1)
 ; CHECK-NEXT: remark: {{.*}} Created vector loop never executes due to insufficient trip count.
 define void @tc_4_forced_vf(ptr noalias %dst, ptr %src, i64 %stride) {
 entry:
