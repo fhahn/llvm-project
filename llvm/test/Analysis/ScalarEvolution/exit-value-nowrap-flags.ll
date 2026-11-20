@@ -504,3 +504,113 @@ loop.3:
 exit:
   ret void
 }
+
+; %iv.2 counts up to exit value (9 + %start)<u nuw> of %iv.1, %iv.3 to %add.
+define void @inc_to_exit_value_of_nuw_addrec_and_its_expr(i32 %start) {
+; CHECK-LABEL: 'inc_to_exit_value_of_nuw_addrec_and_its_expr'
+; CHECK-NEXT:  Classifying expressions for: @inc_to_exit_value_of_nuw_addrec_and_its_expr
+; CHECK-NEXT:    %add = add i32 %start, 9
+; CHECK-NEXT:    --> (9 + %start) U: full-set S: full-set
+; CHECK-NEXT:    %iv.1 = phi i32 [ %start, %entry ], [ %iv.1.next, %loop.1 ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop.1> U: full-set S: full-set Exits: (9 + %start)<u nuw> LoopDispositions: { %loop.1: Computable }
+; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop.1 ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop.1> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %loop.1: Computable }
+; CHECK-NEXT:    %iv.1.next = add nuw i32 %iv.1, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%loop.1> U: full-set S: full-set Exits: (10 + %start) LoopDispositions: { %loop.1: Computable }
+; CHECK-NEXT:    %i.next = add i32 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop.1> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %loop.1: Computable }
+; CHECK-NEXT:    %iv.2 = phi i32 [ 0, %loop.1 ], [ %iv.2.next, %loop.2 ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><%loop.2> U: [0,-1) S: [0,-1) Exits: (-1 + (1 umax (9 + %start))) LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %iv.2.next = add i32 %iv.2, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><%loop.2> U: [1,0) S: [1,0) Exits: (1 umax (9 + %start)) LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %iv.3 = phi i32 [ 0, %loop.2 ], [ %iv.3.next, %loop.3 ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><%loop.3> U: [0,-1) S: [0,-1) Exits: (-1 + (1 umax (9 + %start))) LoopDispositions: { %loop.3: Computable }
+; CHECK-NEXT:    %iv.3.next = add i32 %iv.3, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><%loop.3> U: [1,0) S: [1,0) Exits: (1 umax (9 + %start)) LoopDispositions: { %loop.3: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @inc_to_exit_value_of_nuw_addrec_and_its_expr
+; CHECK-NEXT:  Loop %loop.3: backedge-taken count is (-1 + (1 umax (9 + %start)))
+; CHECK-NEXT:  Loop %loop.3: constant max backedge-taken count is i32 -2
+; CHECK-NEXT:  Loop %loop.3: symbolic max backedge-taken count is (-1 + (1 umax (9 + %start)))
+; CHECK-NEXT:  Loop %loop.3: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop.2: backedge-taken count is (-1 + (1 umax (9 + %start)))
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -2
+; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (-1 + (1 umax (9 + %start)))
+; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop.1: backedge-taken count is i32 9
+; CHECK-NEXT:  Loop %loop.1: constant max backedge-taken count is i32 9
+; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is i32 9
+; CHECK-NEXT:  Loop %loop.1: Trip multiple is 10
+;
+entry:
+  %add = add i32 %start, 9
+  br label %loop.1
+
+loop.1:
+  %iv.1 = phi i32 [ %start, %entry ], [ %iv.1.next, %loop.1 ]
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop.1 ]
+  %iv.1.next = add nuw i32 %iv.1, 1
+  %i.next = add i32 %i, 1
+  %ec.1 = icmp ult i32 %i.next, 10
+  br i1 %ec.1, label %loop.1, label %loop.2
+
+loop.2:
+  %iv.2 = phi i32 [ 0, %loop.1 ], [ %iv.2.next, %loop.2 ]
+  %iv.2.next = add i32 %iv.2, 1
+  %ec.2 = icmp ult i32 %iv.2.next, %iv.1
+  br i1 %ec.2, label %loop.2, label %loop.3
+
+loop.3:
+  %iv.3 = phi i32 [ 0, %loop.2 ], [ %iv.3.next, %loop.3 ]
+  %iv.3.next = add i32 %iv.3, 1
+  %ec.3 = icmp ult i32 %iv.3.next, %add
+  br i1 %ec.3, label %loop.3, label %exit
+
+exit:
+  ret void
+}
+
+define void @inc_to_exit_value_of_nuw_ptr_addrec(ptr %start) {
+; CHECK-LABEL: 'inc_to_exit_value_of_nuw_ptr_addrec'
+; CHECK-NEXT:  Classifying expressions for: @inc_to_exit_value_of_nuw_ptr_addrec
+; CHECK-NEXT:    %iv.1 = phi ptr [ %start, %entry ], [ %iv.1.next, %loop.1 ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop.1> U: full-set S: full-set Exits: (9 + %start)<u nuw> LoopDispositions: { %loop.1: Computable }
+; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop.1 ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop.1> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %loop.1: Computable }
+; CHECK-NEXT:    %iv.1.next = getelementptr nuw i8, ptr %iv.1, i64 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%loop.1> U: full-set S: full-set Exits: (10 + %start) LoopDispositions: { %loop.1: Computable }
+; CHECK-NEXT:    %i.next = add i32 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop.1> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %loop.1: Computable }
+; CHECK-NEXT:    %iv.2 = phi ptr [ null, %loop.1 ], [ %iv.2.next, %loop.2 ]
+; CHECK-NEXT:    --> {null,+,1}<nuw><%loop.2> U: [0,-1) S: [0,-1) Exits: (-1 + (1 umax (9 + (ptrtoaddr ptr %start to i64))) + null) LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %iv.2.next = getelementptr i8, ptr %iv.2, i64 1
+; CHECK-NEXT:    --> {(1 + null)<nuw><nsw>,+,1}<nuw><%loop.2> U: [1,0) S: [1,0) Exits: ((1 umax (9 + (ptrtoaddr ptr %start to i64))) + null) LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @inc_to_exit_value_of_nuw_ptr_addrec
+; CHECK-NEXT:  Loop %loop.2: backedge-taken count is (-1 + (1 umax (9 + (ptrtoaddr ptr %start to i64))))
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i64 -2
+; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (-1 + (1 umax (9 + (ptrtoaddr ptr %start to i64))))
+; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop.1: backedge-taken count is i32 9
+; CHECK-NEXT:  Loop %loop.1: constant max backedge-taken count is i32 9
+; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is i32 9
+; CHECK-NEXT:  Loop %loop.1: Trip multiple is 10
+;
+entry:
+  br label %loop.1
+
+loop.1:
+  %iv.1 = phi ptr [ %start, %entry ], [ %iv.1.next, %loop.1 ]
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop.1 ]
+  %iv.1.next = getelementptr nuw i8, ptr %iv.1, i64 1
+  %i.next = add i32 %i, 1
+  %ec.1 = icmp ult i32 %i.next, 10
+  br i1 %ec.1, label %loop.1, label %loop.2
+
+loop.2:
+  %iv.2 = phi ptr [ null, %loop.1 ], [ %iv.2.next, %loop.2 ]
+  %iv.2.next = getelementptr i8, ptr %iv.2, i64 1
+  %ec.2 = icmp ult ptr %iv.2.next, %iv.1
+  br i1 %ec.2, label %loop.2, label %exit
+
+exit:
+  ret void
+}
