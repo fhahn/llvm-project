@@ -5150,9 +5150,14 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
         LLVM_DEBUG(printPlans(dbgs()));
         return;
       }
+      if (VPlans.empty())
+        reportVectorizationInfo(
+            "UserVF ignored because no executable vector loop could be built",
+            "NoVectorPlan", ORE, OrigLoop);
+      else
+        reportVectorizationInfo("UserVF ignored because of invalid costs.",
+                                "InvalidCost", ORE, OrigLoop);
       VPlans.clear();
-      reportVectorizationInfo("UserVF ignored because of invalid costs.",
-                              "InvalidCost", ORE, OrigLoop);
     }
   }
 
@@ -5585,6 +5590,19 @@ LoopVectorizationPlanner::LoopVectorizationPlanner(
       ORE(ORE), GetBPI(GetBPI) {}
 
 LoopVectorizationPlanner::~LoopVectorizationPlanner() = default;
+
+bool LoopVectorizationPlanner::isVectorLoopKnownDead(VPlan &Plan,
+                                                     ElementCount VFxUF) {
+  if (Plan.hasTailFolded())
+    return false;
+  ScalarEvolution &SE = *PSE.getSE();
+  const SCEV *TC = vputils::getSCEVExprForVPValue(Plan.getTripCount(), PSE);
+  CmpInst::Predicate Pred =
+      Plan.requiresScalarEpilogue() ? ICmpInst::ICMP_ULE : ICmpInst::ICMP_ULT;
+  return SE.isKnownPredicate(
+      Pred, SE.applyLoopGuards(TC, OrigLoopGuards),
+      SE.getElementCount(TC->getType(), VFxUF, SCEV::FlagNUW));
+}
 
 void LoopVectorizationPlanner::clearCostModel() { CM.reset(); }
 
@@ -6319,6 +6337,15 @@ void LoopVectorizationPlanner::buildVPlans(VPlan &VPlan1, ElementCount MinVF,
   if (ElementCount::isKnownGT(MinVF, MaxVF))
     return;
 
+  // Remove VFs for which the vector loop is known to never execute.
+  auto AddPlan = [&](VPlanPtr P) {
+    for (ElementCount VF : to_vector(P->vectorFactors()))
+      if (VF.isVector() && isVectorLoopKnownDead(*P, VF))
+        P->removeVF(VF);
+    if (!P->vectorFactors().empty())
+      VPlans.push_back(std::move(P));
+  };
+
   auto MaxVFTimes2 = MaxVF * 2;
   for (ElementCount VF = MinVF; ElementCount::isKnownLT(VF, MaxVFTimes2);) {
     VFRange SubRange = {VF, MaxVFTimes2};
@@ -6346,7 +6373,7 @@ void LoopVectorizationPlanner::buildVPlans(VPlan &VPlan1, ElementCount MinVF,
 
     if (auto P =
             RUN_VPLAN_PASS(VPlanTransforms::narrowInterleaveGroups, *Plan, TTI))
-      VPlans.push_back(std::move(P));
+      AddPlan(std::move(P));
 
     TailFoldingStyle Style = PlanCM.getTailFoldingStyle();
     RUN_VPLAN_PASS(VPlanTransforms::materializeHeaderMask, *Plan,
@@ -6355,7 +6382,7 @@ void LoopVectorizationPlanner::buildVPlans(VPlan &VPlan1, ElementCount MinVF,
 
     RUN_VPLAN_PASS_NO_VERIFY(printOptimizedVPlan, *Plan);
     assert(verifyVPlanIsValid(*Plan) && "VPlan is invalid");
-    VPlans.push_back(std::move(Plan));
+    AddPlan(std::move(Plan));
   }
 }
 

@@ -4,11 +4,8 @@
 
 ; The trip counts of the loops below depend on %stride.
 
-; TODO: Currently VF is chosen based on the original loop's trip count and the
-; vector loop never executes.
 ; Trip count is 1 with %stride == 1, the vector loop can never execute.
-; CHECK:      remark: {{.*}} vectorized loop (vectorization width: 2, interleaved count: 1)
-; CHECK-NEXT: remark: {{.*}} Created vector loop never executes due to insufficient trip count.
+; CHECK-NOT: vectorized loop
 define void @tc_1(ptr noalias %dst, ptr %src, i64 %stride) {
 entry:
   br label %loop
@@ -80,8 +77,9 @@ exit:
 }
 
 ; Trip count is 4 with %stride == 1 and the user forces VF 8.
-; CHECK:      remark: {{.*}} vectorized loop (vectorization width: 8, interleaved count: 1)
-; CHECK-NEXT: remark: {{.*}} Created vector loop never executes due to insufficient trip count.
+; CHECK:      remark: {{.*}} UserVF ignored because no executable vector loop could be built
+; CHECK:      remark: {{.*}} vectorized loop (vectorization width: 4, interleaved count: 1)
+; CHECK-NOT:  Created vector loop never executes
 define void @tc_4_forced_vf(ptr noalias %dst, ptr %src, i64 %stride) {
 entry:
   %n = shl i64 %stride, 2

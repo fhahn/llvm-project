@@ -994,6 +994,10 @@ public:
   /// ProfitableVFs.
   std::pair<VectorizationFactor, VPlan *> computeBestVF();
 
+  /// Returns true if the minimum iteration check of \p Plan for \p VFxUF is
+  /// known to always branch to the scalar loop.
+  bool isVectorLoopKnownDead(VPlan &Plan, ElementCount VFxUF);
+
   /// \return The desired interleave count.
   /// If interleave count has been specified by metadata it will be returned.
   /// Otherwise, the interleave count is computed and returned. VF and LoopCost
