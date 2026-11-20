@@ -520,9 +520,9 @@ define void @inc_to_exit_value_of_nuw_addrec_and_its_expr(i32 %start) {
 ; CHECK-NEXT:    %i.next = add i32 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop.1> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %loop.1: Computable }
 ; CHECK-NEXT:    %iv.2 = phi i32 [ 0, %loop.1 ], [ %iv.2.next, %loop.2 ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><%loop.2> U: [0,-1) S: [0,-1) Exits: (-1 + (1 umax (9 + %start))) LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><%loop.2> U: [0,-1) S: [0,-1) Exits: (8 + %start) LoopDispositions: { %loop.2: Computable }
 ; CHECK-NEXT:    %iv.2.next = add i32 %iv.2, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><%loop.2> U: [1,0) S: [1,0) Exits: (1 umax (9 + %start)) LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nuw><%loop.2> U: [1,0) S: [1,0) Exits: (9 + %start) LoopDispositions: { %loop.2: Computable }
 ; CHECK-NEXT:    %iv.3 = phi i32 [ 0, %loop.2 ], [ %iv.3.next, %loop.3 ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><%loop.3> U: [0,-1) S: [0,-1) Exits: (-1 + (1 umax (9 + %start))) LoopDispositions: { %loop.3: Computable }
 ; CHECK-NEXT:    %iv.3.next = add i32 %iv.3, 1
@@ -532,9 +532,9 @@ define void @inc_to_exit_value_of_nuw_addrec_and_its_expr(i32 %start) {
 ; CHECK-NEXT:  Loop %loop.3: constant max backedge-taken count is i32 -2
 ; CHECK-NEXT:  Loop %loop.3: symbolic max backedge-taken count is (-1 + (1 umax (9 + %start)))
 ; CHECK-NEXT:  Loop %loop.3: Trip multiple is 1
-; CHECK-NEXT:  Loop %loop.2: backedge-taken count is (-1 + (1 umax (9 + %start)))
+; CHECK-NEXT:  Loop %loop.2: backedge-taken count is (8 + %start)
 ; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -2
-; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (-1 + (1 umax (9 + %start)))
+; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (8 + %start)
 ; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
 ; CHECK-NEXT:  Loop %loop.1: backedge-taken count is i32 9
 ; CHECK-NEXT:  Loop %loop.1: constant max backedge-taken count is i32 9
