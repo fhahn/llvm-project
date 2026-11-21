@@ -1680,9 +1680,10 @@ static VPValue *createDiffRuntimeChecks(VPlan &Plan, VPBuilder &Builder,
                                         ArrayRef<PointerDiffInfo> Checks,
                                         ScalarEvolution &SE, ElementCount VF,
                                         unsigned UF, DebugLoc DL) {
-  // Set of operand pairs of already created compares, to allow detecting and
-  // re-using redundant compares.
-  SmallDenseSet<std::pair<const SCEV *, const SCEV *>, 8> SeenCompares;
+  // Set of operand pairs of already created compares and whether equal starts
+  // are allowed, to allow detecting and re-using redundant checks.
+  SmallDenseSet<std::tuple<const SCEV *, const SCEV *, unsigned>, 8>
+      SeenCompares;
   VPValue *Cond = Plan.getFalse();
   for (const PointerDiffInfo &C : Checks) {
     // A cached compare may come from a check without the vscale bound, so add
@@ -1695,9 +1696,15 @@ static VPValue *createDiffRuntimeChecks(VPlan &Plan, VPBuilder &Builder,
     }
     auto [DiffSCEV, ThresholdMinusOneSCEV] =
         getDiffCheckOperands(C, SE, VF, UF);
-    // If the same compare has already been created earlier, there is no need to
+    // Equal starts are safe if every iteration's accesses through either
+    // pointer stay within its own step: all dependences are then within a
+    // single iteration, whose order the vector loop preserves.
+    bool AllowEqualStarts = C.IsSymmetric && C.Span <= C.AccessSize;
+    // If the same check has already been created earlier, there is no need to
     // check it again.
-    if (!SeenCompares.insert({DiffSCEV, ThresholdMinusOneSCEV}).second)
+    if (!SeenCompares
+             .insert({DiffSCEV, ThresholdMinusOneSCEV, AllowEqualStarts})
+             .second)
       continue;
 
     Type *Ty = C.SinkStart->getType();
@@ -1708,6 +1715,13 @@ static VPValue *createDiffRuntimeChecks(VPlan &Plan, VPBuilder &Builder,
         Builder.createSub(Diff, Plan.getConstantInt(Ty, 1), DL);
     VPValue *IsConflict = Builder.createICmp(
         CmpInst::ICMP_ULT, DiffMinusOne, ThresholdMinusOne, DL, "diff.check");
+    if (AllowEqualStarts) {
+      VPValue *StartDiff =
+          Expander.expand(SE.getMinusSCEV(C.SinkStart, C.SrcStart));
+      VPValue *NotEqual = Builder.createICmp(
+          CmpInst::ICMP_NE, StartDiff, Plan.getZero(Ty), DL, "diff.check.ne");
+      IsConflict = Builder.createAnd(IsConflict, NotEqual, DL);
+    }
     if (C.NeedsFreeze)
       IsConflict = Builder.createFreeze(IsConflict, DL, "diff.check.fr");
     Cond = Builder.createOr(Cond, IsConflict, DL, "conflict.rdx");

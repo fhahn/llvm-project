@@ -13,6 +13,7 @@
 #ifndef LLVM_ANALYSIS_VECTORUTILS_H
 #define LLVM_ANALYSIS_VECTORUTILS_H
 
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Sequence.h"
@@ -920,19 +921,31 @@ private:
     // Diff checks only rule out conflicts in lane order, so treat accesses
     // checked by them as dependent.
     const RuntimePointerChecking *RtChecking = LAI->getRuntimePointerChecking();
-    if (!RtChecking->Need || !RtChecking->getDiffChecks())
+    if (!RtChecking->Need)
       return;
+    auto Mixed = RtChecking->getMixedChecks();
+    if (!RtChecking->getDiffChecks() && !Mixed)
+      return;
+    // Pairs of pointers checked by range checks cannot overlap at all.
+    SmallDenseSet<std::pair<unsigned, unsigned>> RangeChecked;
+    if (Mixed)
+      for (const auto &[A, B] : Mixed->second)
+        for (unsigned I : A->Members)
+          for (unsigned J : B->Members) {
+            RangeChecked.insert({I, J});
+            RangeChecked.insert({J, I});
+          }
     for (const auto &[I, PI] : enumerate(RtChecking->Pointers))
       for (const auto &[J, PJ] : enumerate(RtChecking->Pointers))
-        if (RtChecking->needsChecking(I, J))
-          for (Instruction *Src :
-               DepChecker.getInstructionsForAccess(PI.PointerValue,
-                                                   PI.IsWritePtr))
+        if (RtChecking->needsChecking(I, J) &&
+            !RangeChecked.contains({unsigned(I), unsigned(J)}))
+          for (Instruction *Src : DepChecker.getInstructionsForAccess(
+                   PI.PointerValue, PI.IsWritePtr))
             Dependences[Src].insert_range(DepChecker.getInstructionsForAccess(
                 PJ.PointerValue, PJ.IsWritePtr));
   }
 };
 
-} // llvm namespace
+} // namespace llvm
 
 #endif
