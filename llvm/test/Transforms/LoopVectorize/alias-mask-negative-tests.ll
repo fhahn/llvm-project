@@ -151,7 +151,10 @@ define void @accesses_narrower_than_step(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[A2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP2]], 55
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[B1]], [[A2]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP3]], 0
+; CHECK-NEXT:    [[TMP45:%.*]] = and i1 [[FOUND_CONFLICT]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    br i1 [[TMP45]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_RND_UP:%.*]] = add i64 [[N]], 3
 ; CHECK-NEXT:    [[TMP4:%.*]] = and i64 [[N_RND_UP]], 3

@@ -75,7 +75,10 @@ define i8 @dead_live_out_due_to_scalar_epilogue_required(ptr %src, ptr %dst) vsc
 ; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 [[TMP5]], [[DST4]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = sub i64 [[TMP6]], 1
 ; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP7]], [[TMP2]]
-; CHECK-NEXT:    br i1 [[DIFF_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP8:%.*]] = sub i64 [[SRC3]], [[DST4]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP8]], 0
+; CHECK-NEXT:    [[TMP9:%.*]] = and i1 [[DIFF_CHECK]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    br i1 [[TMP9]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:

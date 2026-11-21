@@ -545,7 +545,7 @@ using RuntimePointerCheck =
 /// addresses of two groups of accesses with a common step of +/-AccessSize
 /// bytes, whose members access Span bytes in a single iteration. With
 /// T = (VF * IC - 1) * AccessSize + Span, the groups conflict if 0 < D < T, or
-/// if |D| < T for symmetric checks.
+/// if |D| < T for symmetric checks, except D == 0 if they allow equal starts.
 struct PointerDiffInfo {
   const SCEV *SrcStart;
   const SCEV *SinkStart;
@@ -553,8 +553,9 @@ struct PointerDiffInfo {
   unsigned Span;
   bool NeedsFreeze;
   /// Symmetric checks allow any order of the accesses within a vector
-  /// iteration, one-sided checks require the accesses through SrcStart to
-  /// precede the accesses through SinkStart they may conflict with.
+  /// iteration, except for accesses that overlap at equal starts if they allow
+  /// them. One-sided checks require the accesses through SrcStart to precede
+  /// the accesses through SinkStart they may conflict with.
   bool IsSymmetric;
 
   PointerDiffInfo(const SCEV *SrcStart, const SCEV *SinkStart,
@@ -565,6 +566,13 @@ struct PointerDiffInfo {
     assert((IsSymmetric || Span == AccessSize) &&
            "One-sided checks require accesses covering the step");
   }
+
+  /// Returns true if the check allows equal starts, which is the case if the
+  /// accesses of every iteration through either group stay within a single
+  /// step. Then the accesses of different iterations cannot overlap, and
+  /// those of the same iteration only overlap at equal starts. One-sided
+  /// checks always allow equal starts.
+  bool allowsEqualStarts() const { return Span <= AccessSize; }
 };
 
 /// Holds information about the memory runtime legality checks to verify
@@ -614,6 +622,7 @@ public:
     Pointers.clear();
     Checks.clear();
     DiffChecks.clear();
+    DiffCheckDependences.clear();
     RangeChecks.clear();
     CheckingGroups.clear();
   }
@@ -649,6 +658,16 @@ public:
   std::pair<ArrayRef<PointerDiffInfo>, ArrayRef<RuntimePointerCheck>>
   getDiffAndRangeChecks() const {
     return {DiffChecks, RangeChecks};
+  }
+
+  /// Returns the pairs of accesses that may access the same memory within a
+  /// vector iteration even if the pointer-difference checks pass, i.e. the
+  /// accesses through the groups of a check that allows equal starts which
+  /// overlap at equal starts. The first access of a pair precedes the second
+  /// in program order, and their order must be preserved.
+  ArrayRef<std::pair<Instruction *, Instruction *>>
+  getDiffCheckDependences() const {
+    return DiffCheckDependences;
   }
 
   /// Decide if we need to add a check between two groups of pointers,
@@ -737,6 +756,10 @@ private:
   /// RangeChecks, prove that there are no vectorization-preventing
   /// dependencies.
   SmallVector<PointerDiffInfo> DiffChecks;
+
+  /// Pairs of accesses that may access the same memory within a vector
+  /// iteration even if DiffChecks pass.
+  SmallVector<std::pair<Instruction *, Instruction *>> DiffCheckDependences;
 };
 
 /// Drive the analysis of memory accesses in the loop

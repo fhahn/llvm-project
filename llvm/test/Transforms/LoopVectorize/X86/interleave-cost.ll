@@ -178,7 +178,7 @@ define void @geps_feeding_interleave_groups_with_reuse2(ptr %A, ptr %B, i64 %N) 
 ; CHECK-NEXT:    [[A15:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; CHECK-NEXT:    [[TMP0:%.*]] = lshr i64 [[N]], 3
 ; CHECK-NEXT:    [[TMP1:%.*]] = add nuw nsw i64 [[TMP0]], 1
-; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 [[TMP1]], 28
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 [[TMP1]], 32
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = lshr i64 [[N]], 3
@@ -237,17 +237,20 @@ define void @geps_feeding_interleave_groups_with_reuse2(ptr %A, ptr %B, i64 %N) 
 ; CHECK-NEXT:    [[TMP41:%.*]] = or i1 [[TMP40]], [[TMP32]]
 ; CHECK-NEXT:    br i1 [[TMP41]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP45:%.*]] = add i64 [[A15]], 128
-; CHECK-NEXT:    [[TMP43:%.*]] = sub i64 [[TMP45]], [[B16]]
+; CHECK-NEXT:    [[TMP64:%.*]] = add i64 [[A15]], 128
+; CHECK-NEXT:    [[TMP43:%.*]] = sub i64 [[TMP64]], [[B16]]
 ; CHECK-NEXT:    [[TMP44:%.*]] = sub i64 [[TMP43]], 1
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP44]], 255
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP44]], 255
+; CHECK-NEXT:    [[TMP45:%.*]] = sub i64 [[A15]], [[B16]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP45]], 0
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[DIFF_CHECK]], [[DIFF_CHECK_NE]]
 ; CHECK-NEXT:    [[TMP42:%.*]] = lshr i64 [[N]], 3
 ; CHECK-NEXT:    [[TMP46:%.*]] = shl i64 [[TMP42]], 4
 ; CHECK-NEXT:    [[TMP47:%.*]] = add nuw nsw i64 [[TMP46]], 8
 ; CHECK-NEXT:    [[SCEVGEP37:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP47]]
-; CHECK-NEXT:    [[TMP64:%.*]] = shl i64 [[TMP42]], 5
-; CHECK-NEXT:    [[TMP65:%.*]] = add i64 [[TMP64]], 32
-; CHECK-NEXT:    [[SCEVGEP36:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP65]]
+; CHECK-NEXT:    [[TMP65:%.*]] = shl i64 [[TMP42]], 5
+; CHECK-NEXT:    [[TMP66:%.*]] = add i64 [[TMP65]], 32
+; CHECK-NEXT:    [[SCEVGEP36:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP66]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[SCEVGEP36]]
 ; CHECK-NEXT:    [[BOUND139:%.*]] = icmp ult ptr [[A]], [[SCEVGEP37]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT40:%.*]] = and i1 [[BOUND0]], [[BOUND139]]

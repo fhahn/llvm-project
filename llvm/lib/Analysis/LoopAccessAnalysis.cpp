@@ -526,6 +526,9 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
     const SCEV *Start;
     uint64_t Span;
     bool IsConsecutive;
+    /// The program order indices of the accesses through the members, with
+    /// the byte ranges they access relative to Start in a single iteration.
+    SmallVector<std::tuple<unsigned, int64_t, int64_t>> Accesses;
   };
   const DataLayout &DL = InnerLoop->getHeader()->getDataLayout();
   // Returns the lowest start address of the members of CG, which must all have
@@ -534,7 +537,7 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
   auto GetExtent =
       [&](const RuntimeCheckingPtrGroup &CG) -> std::optional<GroupExtent> {
     const SCEV *FirstStart = nullptr;
-    GroupExtent Extent = {nullptr, 0, CG.Members.size() == 1};
+    GroupExtent Extent = {nullptr, 0, CG.Members.size() == 1, {}};
     int64_t Low = 0, High = 0;
     for (unsigned M : CG.Members) {
       const PointerInfo &P = Pointers[M];
@@ -556,17 +559,23 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
         Extent.Start = Start;
       }
       for (bool IsWrite : {false, true}) {
-        for (Instruction *I :
-             DC.getInstructionsForAccess(P.PointerValue, IsWrite)) {
+        for (unsigned Idx : DC.getOrderForAccess(P.PointerValue, IsWrite)) {
+          Instruction *I = DC.getMemoryInstructions()[Idx];
           TypeSize Size = DL.getTypeAllocSize(getLoadStoreType(I));
           if (Size.isScalable() || !isUInt<32>(Size.getFixedValue()))
             return std::nullopt;
-          High = std::max(High, Offset + int64_t(Size.getFixedValue()));
+          int64_t End = Offset + Size.getFixedValue();
+          High = std::max(High, End);
           Extent.IsConsecutive &= Size.getFixedValue() == AbsStep;
+          Extent.Accesses.emplace_back(Idx, Offset, End);
         }
       }
     }
     Extent.Span = High - Low;
+    for (auto &[Idx, Begin, End] : Extent.Accesses) {
+      Begin -= Low;
+      End -= Low;
+    }
     return Extent;
   };
 
@@ -628,8 +637,23 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
   LLVM_DEBUG(dbgs() << "LAA: Creating diff runtime check for:\n"
                     << "SrcStart: " << *SrcStartInt << '\n'
                     << "SinkStartInt: " << *SinkStartInt << '\n');
-  DiffChecks.emplace_back(SrcStartInt, SinkStartInt, AbsStep, Span,
-                          CGI.NeedsFreeze || CGJ.NeedsFreeze, IsSymmetric);
+  const PointerDiffInfo &Check =
+      DiffChecks.emplace_back(SrcStartInt, SinkStartInt, AbsStep, Span,
+                              CGI.NeedsFreeze || CGJ.NeedsFreeze, IsSymmetric);
+  // If the check allows equal starts, accesses through Src and Sink of the
+  // same iteration access the same memory if their ranges overlap at equal
+  // starts. This includes all pairs of a one-sided check, whose accesses
+  // cover the full step.
+  if (!Check.allowsEqualStarts())
+    return true;
+  ArrayRef<Instruction *> Insts = DC.getMemoryInstructions();
+  for (auto [IdxA, BeginA, EndA] : Src->Accesses) {
+    for (auto [IdxB, BeginB, EndB] : Sink->Accesses) {
+      auto [First, Second] = std::minmax(IdxA, IdxB);
+      if (BeginA < EndB && BeginB < EndA)
+        DiffCheckDependences.emplace_back(Insts[First], Insts[Second]);
+    }
+  }
   return true;
 }
 
@@ -662,6 +686,7 @@ SmallVector<RuntimePointerCheck, 4> RuntimePointerChecking::generateChecks() {
           PtrToGroup.try_emplace(Pointers[M].PointerValue, &CG);
       if (!Inserted && It->second != &CG) {
         DiffChecks.clear();
+        DiffCheckDependences.clear();
         RangeChecks.assign(Checks);
         return Checks;
       }

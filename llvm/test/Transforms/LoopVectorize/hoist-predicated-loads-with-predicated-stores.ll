@@ -17,12 +17,15 @@ define void @test_stores_noalias_via_rt_checks_after_loads(ptr %dst, ptr %src, p
 ; CHECK-NEXT:    [[TMP18:%.*]] = sub i64 [[TMP17]], [[DST5]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = sub i64 [[TMP18]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP19]], 15
+; CHECK-NEXT:    [[TMP20:%.*]] = sub i64 [[COND4]], [[DST5]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP20]], 0
+; CHECK-NEXT:    [[TMP21:%.*]] = and i1 [[FOUND_CONFLICT]], [[DIFF_CHECK_NE]]
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 400
 ; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[SRC]], i64 796
 ; CHECK-NEXT:    [[BOUND03:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP2]]
 ; CHECK-NEXT:    [[BOUND14:%.*]] = icmp ult ptr [[SRC]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT5:%.*]] = and i1 [[BOUND03]], [[BOUND14]]
-; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT5]]
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[TMP21]], [[FOUND_CONFLICT5]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
@@ -101,6 +104,9 @@ define void @test_aliasing_store(ptr %dst, ptr %src, ptr %cond) {
 ; CHECK-NEXT:    [[TMP33:%.*]] = sub i64 [[TMP32]], [[DST10]]
 ; CHECK-NEXT:    [[TMP34:%.*]] = sub i64 [[TMP33]], 1
 ; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP34]], 15
+; CHECK-NEXT:    [[TMP35:%.*]] = sub i64 [[COND9]], [[DST10]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP35]], 0
+; CHECK-NEXT:    [[TMP36:%.*]] = and i1 [[DIFF_CHECK]], [[DIFF_CHECK_NE]]
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[SRC]], i64 796
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[DST]], i64 400
 ; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[COND]], i64 400
@@ -111,7 +117,7 @@ define void @test_aliasing_store(ptr %dst, ptr %src, ptr %cond) {
 ; CHECK-NEXT:    [[BOUND14:%.*]] = icmp ult ptr [[COND]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT5:%.*]] = and i1 [[BOUND03]], [[BOUND14]]
 ; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT5]]
-; CHECK-NEXT:    [[CONFLICT_RDX9:%.*]] = or i1 [[DIFF_CHECK]], [[CONFLICT_RDX]]
+; CHECK-NEXT:    [[CONFLICT_RDX9:%.*]] = or i1 [[TMP36]], [[CONFLICT_RDX]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX9]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
@@ -224,6 +230,9 @@ define void @test_noalias_store_via_runtime_checks(ptr %dst, ptr %dst.1, ptr %sr
 ; CHECK-NEXT:    [[TMP28:%.*]] = sub i64 [[TMP26]], [[DST14]]
 ; CHECK-NEXT:    [[TMP30:%.*]] = sub i64 [[TMP28]], 1
 ; CHECK-NEXT:    [[DIFF_CHECK18:%.*]] = icmp ult i64 [[TMP30]], 15
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 [[COND16]], [[DST14]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP6]], 0
+; CHECK-NEXT:    [[TMP4:%.*]] = and i1 [[DIFF_CHECK18]], [[DIFF_CHECK_NE]]
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST_1]], i64 1192
 ; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr i8, ptr [[DST]], i64 400
 ; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr i8, ptr [[COND]], i64 400
@@ -243,7 +252,7 @@ define void @test_noalias_store_via_runtime_checks(ptr %dst, ptr %dst.1, ptr %sr
 ; CHECK-NEXT:    [[BOUND131:%.*]] = icmp ult ptr [[SRC]], [[TMP21]]
 ; CHECK-NEXT:    [[CONFLICT_RDX18:%.*]] = and i1 [[BOUND011]], [[BOUND131]]
 ; CHECK-NEXT:    [[CONFLICT_RDX25:%.*]] = or i1 [[CONFLICT_RDX26]], [[CONFLICT_RDX18]]
-; CHECK-NEXT:    [[CONFLICT_RDX27:%.*]] = or i1 [[DIFF_CHECK18]], [[CONFLICT_RDX25]]
+; CHECK-NEXT:    [[CONFLICT_RDX27:%.*]] = or i1 [[TMP4]], [[CONFLICT_RDX25]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX27]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
@@ -338,6 +347,9 @@ define void @test_memory_op_between_loads_alias(ptr %dst, ptr %src, ptr %cond, p
 ; CHECK-NEXT:    [[TMP21:%.*]] = sub i64 [[TMP20]], [[DST10]]
 ; CHECK-NEXT:    [[TMP22:%.*]] = sub i64 [[TMP21]], 1
 ; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP22]], 15
+; CHECK-NEXT:    [[TMP23:%.*]] = sub i64 [[COND9]], [[DST10]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP23]], 0
+; CHECK-NEXT:    [[TMP24:%.*]] = and i1 [[DIFF_CHECK]], [[DIFF_CHECK_NE]]
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[SRC]], i64 796
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[DST]], i64 400
 ; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[COND]], i64 400
@@ -348,7 +360,7 @@ define void @test_memory_op_between_loads_alias(ptr %dst, ptr %src, ptr %cond, p
 ; CHECK-NEXT:    [[BOUND14:%.*]] = icmp ult ptr [[COND]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT5:%.*]] = and i1 [[BOUND03]], [[BOUND14]]
 ; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT5]]
-; CHECK-NEXT:    [[CONFLICT_RDX9:%.*]] = or i1 [[DIFF_CHECK]], [[CONFLICT_RDX]]
+; CHECK-NEXT:    [[CONFLICT_RDX9:%.*]] = or i1 [[TMP24]], [[CONFLICT_RDX]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX9]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
@@ -445,15 +457,21 @@ define void @test_memory_op_between_loads_no_alias_via_rt_checks(ptr %dst, ptr %
 ; CHECK-NEXT:    [[TMP22:%.*]] = sub i64 [[TMP21]], [[DST_115]]
 ; CHECK-NEXT:    [[TMP23:%.*]] = sub i64 [[TMP22]], 1
 ; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP23]], 15
+; CHECK-NEXT:    [[TMP29:%.*]] = sub i64 [[DST14]], [[DST_115]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP29]], 0
+; CHECK-NEXT:    [[TMP30:%.*]] = and i1 [[DIFF_CHECK]], [[DIFF_CHECK_NE]]
 ; CHECK-NEXT:    [[TMP24:%.*]] = sub i64 [[DST_115]], [[COND16]]
 ; CHECK-NEXT:    [[TMP25:%.*]] = sub i64 [[TMP24]], 1
 ; CHECK-NEXT:    [[DIFF_CHECK17:%.*]] = icmp ult i64 [[TMP25]], 7
-; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[DIFF_CHECK]], [[DIFF_CHECK17]]
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[TMP30]], [[DIFF_CHECK17]]
 ; CHECK-NEXT:    [[TMP26:%.*]] = add i64 [[COND16]], 8
 ; CHECK-NEXT:    [[TMP27:%.*]] = sub i64 [[TMP26]], [[DST14]]
 ; CHECK-NEXT:    [[TMP28:%.*]] = sub i64 [[TMP27]], 1
 ; CHECK-NEXT:    [[DIFF_CHECK18:%.*]] = icmp ult i64 [[TMP28]], 15
-; CHECK-NEXT:    [[CONFLICT_RDX19:%.*]] = or i1 [[CONFLICT_RDX]], [[DIFF_CHECK18]]
+; CHECK-NEXT:    [[TMP31:%.*]] = sub i64 [[COND16]], [[DST14]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE19:%.*]] = icmp ne i64 [[TMP31]], 0
+; CHECK-NEXT:    [[TMP32:%.*]] = and i1 [[DIFF_CHECK18]], [[DIFF_CHECK_NE19]]
+; CHECK-NEXT:    [[CONFLICT_RDX19:%.*]] = or i1 [[CONFLICT_RDX]], [[TMP32]]
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST_1]], i64 400
 ; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[SRC]], i64 796
 ; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr i8, ptr [[DST]], i64 400
@@ -562,12 +580,15 @@ define void @test_stores_not_sunk_due_to_aliasing_load(ptr %dst, ptr %alias, ptr
 ; CHECK-NEXT:    [[TMP20:%.*]] = sub i64 [[TMP19]], [[DST5]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = sub i64 [[TMP20]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP21]], 15
+; CHECK-NEXT:    [[TMP22:%.*]] = sub i64 [[COND4]], [[DST5]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP22]], 0
+; CHECK-NEXT:    [[TMP23:%.*]] = and i1 [[FOUND_CONFLICT]], [[DIFF_CHECK_NE]]
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 400
 ; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[ALIAS]], i64 796
 ; CHECK-NEXT:    [[BOUND03:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP2]]
 ; CHECK-NEXT:    [[BOUND14:%.*]] = icmp ult ptr [[ALIAS]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT5:%.*]] = and i1 [[BOUND03]], [[BOUND14]]
-; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT5]]
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[TMP23]], [[FOUND_CONFLICT5]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
@@ -653,6 +674,9 @@ define void @test_stores_not_sunk_aliasing_load_between(ptr %dst, ptr %mid, ptr 
 ; CHECK-NEXT:    [[TMP24:%.*]] = sub i64 [[TMP25]], [[DST10]]
 ; CHECK-NEXT:    [[TMP22:%.*]] = sub i64 [[TMP24]], 1
 ; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP22]], 15
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 [[MID9]], [[DST10]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP6]], 0
+; CHECK-NEXT:    [[TMP10:%.*]] = and i1 [[DIFF_CHECK]], [[DIFF_CHECK_NE]]
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 400
 ; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[COND]], i64 796
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[MID]], i64 400
@@ -663,7 +687,7 @@ define void @test_stores_not_sunk_aliasing_load_between(ptr %dst, ptr %mid, ptr 
 ; CHECK-NEXT:    [[BOUND17:%.*]] = icmp ult ptr [[COND]], [[SCEVGEP1]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT8:%.*]] = and i1 [[BOUND06]], [[BOUND17]]
 ; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT5]], [[FOUND_CONFLICT8]]
-; CHECK-NEXT:    [[CONFLICT_RDX9:%.*]] = or i1 [[DIFF_CHECK]], [[CONFLICT_RDX]]
+; CHECK-NEXT:    [[CONFLICT_RDX9:%.*]] = or i1 [[TMP10]], [[CONFLICT_RDX]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX9]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
@@ -1232,6 +1256,9 @@ define void @stores_never_sunk_past_alising_loads_or_stores(ptr %dst, ptr %src, 
 ; CHECK-NEXT:    [[TMP36:%.*]] = sub i64 [[TMP31]], [[SRC10]]
 ; CHECK-NEXT:    [[TMP37:%.*]] = sub i64 [[TMP36]], 1
 ; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP37]], 15
+; CHECK-NEXT:    [[TMP38:%.*]] = sub i64 [[DST9]], [[SRC10]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP38]], 0
+; CHECK-NEXT:    [[TMP39:%.*]] = and i1 [[DIFF_CHECK]], [[DIFF_CHECK_NE]]
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[SRC]], i64 400
 ; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[COND]], i64 796
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[DST]], i64 400
@@ -1242,7 +1269,7 @@ define void @stores_never_sunk_past_alising_loads_or_stores(ptr %dst, ptr %src, 
 ; CHECK-NEXT:    [[BOUND17:%.*]] = icmp ult ptr [[COND]], [[SCEVGEP1]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT8:%.*]] = and i1 [[BOUND06]], [[BOUND17]]
 ; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT5]], [[FOUND_CONFLICT8]]
-; CHECK-NEXT:    [[CONFLICT_RDX9:%.*]] = or i1 [[DIFF_CHECK]], [[CONFLICT_RDX]]
+; CHECK-NEXT:    [[CONFLICT_RDX9:%.*]] = or i1 [[TMP39]], [[CONFLICT_RDX]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX9]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
@@ -1378,6 +1405,9 @@ define void @loads_never_hoisted_past_alising_stores(ptr %dst, ptr %src, ptr %co
 ; CHECK-NEXT:    [[TMP33:%.*]] = sub i64 [[TMP32]], [[DST10]]
 ; CHECK-NEXT:    [[TMP34:%.*]] = sub i64 [[TMP33]], 1
 ; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP34]], 15
+; CHECK-NEXT:    [[TMP35:%.*]] = sub i64 [[COND9]], [[DST10]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP35]], 0
+; CHECK-NEXT:    [[TMP36:%.*]] = and i1 [[DIFF_CHECK]], [[DIFF_CHECK_NE]]
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[SRC]], i64 796
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[DST]], i64 400
 ; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[COND]], i64 400
@@ -1388,7 +1418,7 @@ define void @loads_never_hoisted_past_alising_stores(ptr %dst, ptr %src, ptr %co
 ; CHECK-NEXT:    [[BOUND14:%.*]] = icmp ult ptr [[COND]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT5:%.*]] = and i1 [[BOUND03]], [[BOUND14]]
 ; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT5]]
-; CHECK-NEXT:    [[CONFLICT_RDX9:%.*]] = or i1 [[DIFF_CHECK]], [[CONFLICT_RDX]]
+; CHECK-NEXT:    [[CONFLICT_RDX9:%.*]] = or i1 [[TMP36]], [[CONFLICT_RDX]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX9]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]

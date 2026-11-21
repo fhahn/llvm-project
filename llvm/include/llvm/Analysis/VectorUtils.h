@@ -916,6 +916,12 @@ private:
     for (auto Dep : *Deps)
       Dependences[Dep.getSource(DepChecker)].insert(
           Dep.getDestination(DepChecker));
+
+    // Accesses checked by pointer-difference checks may still access the same
+    // memory within a vector iteration.
+    for (auto [Src, Sink] :
+         LAI->getRuntimePointerChecking()->getDiffCheckDependences())
+      Dependences[Src].insert(Sink);
   }
 };
 

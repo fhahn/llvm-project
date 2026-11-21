@@ -21,7 +21,10 @@ define void @fn(i32 noundef %n, ptr %in, ptr %out) #0 {
 ; CHECK-NEXT:    [[TMP33:%.*]] = sub i32 [[TMP0]], [[OUT2]]
 ; CHECK-NEXT:    [[TMP34:%.*]] = sub i32 [[TMP33]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i32 [[TMP34]], 23
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP35:%.*]] = sub i32 [[IN1]], [[OUT2]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i32 [[TMP35]], 0
+; CHECK-NEXT:    [[TMP36:%.*]] = and i1 [[FOUND_CONFLICT]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    br i1 [[TMP36]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_RND_UP:%.*]] = add i32 [[N]], 3
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N_RND_UP]], 3
@@ -75,7 +78,7 @@ define void @fn(i32 noundef %n, ptr %in, ptr %out) #0 {
 ; CHECK-NEXT:    [[PTR_IND3]] = getelementptr i8, ptr [[POINTER_PHI2]], i32 12
 ; CHECK-NEXT:    [[PTR_IND6]] = getelementptr i8, ptr [[POINTER_PHI]], i32 12
 ; CHECK-NEXT:    [[TMP32:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP32]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP32]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br [[EXIT_LOOPEXIT:label %.*]]
 ; CHECK:       [[SCALAR_PH]]:

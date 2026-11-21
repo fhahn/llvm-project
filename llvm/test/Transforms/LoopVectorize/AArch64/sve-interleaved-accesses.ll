@@ -1254,7 +1254,11 @@ define void @PR34743(ptr %a, ptr %b, i64 %n) #1 {
 ; CHECK-NEXT:    [[TMP8:%.*]] = add i64 [[TMP7]], 2
 ; CHECK-NEXT:    [[TMP9:%.*]] = sub i64 [[TMP8]], [[B4]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = sub i64 [[TMP9]], 1
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP10]], [[TMP5]]
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP10]], [[TMP5]]
+; CHECK-NEXT:    [[TMP11:%.*]] = add i64 [[A3]], 2
+; CHECK-NEXT:    [[TMP12:%.*]] = sub i64 [[TMP11]], [[B4]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP12]], 0
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[DIFF_CHECK]], [[DIFF_CHECK_NE]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[TMP1]], [[TMP3]]

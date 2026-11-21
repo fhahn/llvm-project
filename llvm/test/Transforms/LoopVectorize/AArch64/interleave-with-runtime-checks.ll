@@ -15,12 +15,18 @@ define void @interleave_group_separated_by_offset(ptr %A, i64 %offset) {
 ; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 31, [[OFFSET]]
-; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP0]], 1
-; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP2]], 61
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP1]], 61
+; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 0, [[OFFSET]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP2]], 0
+; CHECK-NEXT:    [[TMP3:%.*]] = and i1 [[DIFF_CHECK]], [[DIFF_CHECK_NE]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 32, [[OFFSET]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = sub i64 [[TMP4]], 1
 ; CHECK-NEXT:    [[DIFF_CHECK2:%.*]] = icmp ult i64 [[TMP5]], 61
-; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[DIFF_CHECK]], [[DIFF_CHECK2]]
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 1, [[OFFSET]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE3:%.*]] = icmp ne i64 [[TMP6]], 0
+; CHECK-NEXT:    [[TMP7:%.*]] = and i1 [[DIFF_CHECK2]], [[DIFF_CHECK_NE3]]
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[TMP3]], [[TMP7]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VECTOR_MAIN_LOOP_ITER_CHECK:.*]]
 ; CHECK:       [[VECTOR_MAIN_LOOP_ITER_CHECK]]:
 ; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_PH:.*]], label %[[VECTOR_PH:.*]]
@@ -30,24 +36,24 @@ define void @interleave_group_separated_by_offset(ptr %A, i64 %offset) {
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[INDEX]], 1
-; CHECK-NEXT:    [[TMP11:%.*]] = add i64 [[TMP1]], 2
-; CHECK-NEXT:    [[TMP12:%.*]] = add i64 [[TMP1]], 4
-; CHECK-NEXT:    [[TMP13:%.*]] = add i64 [[TMP1]], 6
-; CHECK-NEXT:    [[TMP14:%.*]] = add i64 [[TMP1]], 8
-; CHECK-NEXT:    [[TMP15:%.*]] = add i64 [[TMP1]], 10
-; CHECK-NEXT:    [[TMP16:%.*]] = add i64 [[TMP1]], 12
-; CHECK-NEXT:    [[TMP17:%.*]] = add i64 [[TMP1]], 14
-; CHECK-NEXT:    [[TMP18:%.*]] = add i64 [[TMP1]], 16
-; CHECK-NEXT:    [[TMP19:%.*]] = add i64 [[TMP1]], 18
-; CHECK-NEXT:    [[TMP20:%.*]] = add i64 [[TMP1]], 20
-; CHECK-NEXT:    [[TMP21:%.*]] = add i64 [[TMP1]], 22
-; CHECK-NEXT:    [[TMP22:%.*]] = add i64 [[TMP1]], 24
-; CHECK-NEXT:    [[TMP23:%.*]] = add i64 [[TMP1]], 26
-; CHECK-NEXT:    [[TMP24:%.*]] = add i64 [[TMP1]], 28
-; CHECK-NEXT:    [[TMP25:%.*]] = add i64 [[TMP1]], 30
-; CHECK-NEXT:    [[NEXT_GEP:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP1]]
-; CHECK-NEXT:    [[NEXT_GEP4:%.*]] = getelementptr i8, ptr [[A_OFFSET]], i64 [[TMP1]]
+; CHECK-NEXT:    [[TMP10:%.*]] = shl i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP11:%.*]] = add i64 [[TMP10]], 2
+; CHECK-NEXT:    [[TMP12:%.*]] = add i64 [[TMP10]], 4
+; CHECK-NEXT:    [[TMP13:%.*]] = add i64 [[TMP10]], 6
+; CHECK-NEXT:    [[TMP14:%.*]] = add i64 [[TMP10]], 8
+; CHECK-NEXT:    [[TMP15:%.*]] = add i64 [[TMP10]], 10
+; CHECK-NEXT:    [[TMP16:%.*]] = add i64 [[TMP10]], 12
+; CHECK-NEXT:    [[TMP17:%.*]] = add i64 [[TMP10]], 14
+; CHECK-NEXT:    [[TMP18:%.*]] = add i64 [[TMP10]], 16
+; CHECK-NEXT:    [[TMP19:%.*]] = add i64 [[TMP10]], 18
+; CHECK-NEXT:    [[TMP20:%.*]] = add i64 [[TMP10]], 20
+; CHECK-NEXT:    [[TMP21:%.*]] = add i64 [[TMP10]], 22
+; CHECK-NEXT:    [[TMP22:%.*]] = add i64 [[TMP10]], 24
+; CHECK-NEXT:    [[TMP23:%.*]] = add i64 [[TMP10]], 26
+; CHECK-NEXT:    [[TMP24:%.*]] = add i64 [[TMP10]], 28
+; CHECK-NEXT:    [[TMP25:%.*]] = add i64 [[TMP10]], 30
+; CHECK-NEXT:    [[NEXT_GEP:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP10]]
+; CHECK-NEXT:    [[NEXT_GEP4:%.*]] = getelementptr i8, ptr [[A_OFFSET]], i64 [[TMP10]]
 ; CHECK-NEXT:    [[NEXT_GEP5:%.*]] = getelementptr i8, ptr [[A_OFFSET]], i64 [[TMP11]]
 ; CHECK-NEXT:    [[NEXT_GEP6:%.*]] = getelementptr i8, ptr [[A_OFFSET]], i64 [[TMP12]]
 ; CHECK-NEXT:    [[NEXT_GEP7:%.*]] = getelementptr i8, ptr [[A_OFFSET]], i64 [[TMP13]]
@@ -100,8 +106,8 @@ define void @interleave_group_separated_by_offset(ptr %A, i64 %offset) {
 ; CHECK-NEXT:    [[TMP42:%.*]] = extractelement <16 x i8> [[TMP26]], i64 15
 ; CHECK-NEXT:    store i8 [[TMP42]], ptr [[NEXT_GEP19]], align 1
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
-; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT]], 992
-; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK-NEXT:    [[TMP43:%.*]] = icmp eq i64 [[INDEX_NEXT]], 992
+; CHECK-NEXT:    br i1 [[TMP43]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br i1 false, [[EXIT:label %.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
 ; CHECK:       [[VEC_EPILOG_ITER_CHECK]]:
@@ -112,8 +118,8 @@ define void @interleave_group_separated_by_offset(ptr %A, i64 %offset) {
 ; CHECK-NEXT:    [[TMP45:%.*]] = getelementptr i8, ptr [[A_OFFSET]], i64 2000
 ; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX12:%.*]] = phi i64 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT14:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP46:%.*]] = shl i64 [[INDEX12]], 1
+; CHECK-NEXT:    [[INDEX21:%.*]] = phi i64 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT34:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP46:%.*]] = shl i64 [[INDEX21]], 1
 ; CHECK-NEXT:    [[TMP47:%.*]] = add i64 [[TMP46]], 2
 ; CHECK-NEXT:    [[TMP48:%.*]] = add i64 [[TMP46]], 4
 ; CHECK-NEXT:    [[TMP49:%.*]] = add i64 [[TMP46]], 6
@@ -150,8 +156,8 @@ define void @interleave_group_separated_by_offset(ptr %A, i64 %offset) {
 ; CHECK-NEXT:    store i8 [[TMP61]], ptr [[NEXT_GEP29]], align 1
 ; CHECK-NEXT:    [[TMP62:%.*]] = extractelement <8 x i8> [[TMP54]], i64 7
 ; CHECK-NEXT:    store i8 [[TMP62]], ptr [[NEXT_GEP30]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT14]] = add nuw i64 [[INDEX12]], 8
-; CHECK-NEXT:    [[TMP63:%.*]] = icmp eq i64 [[INDEX_NEXT14]], 1000
+; CHECK-NEXT:    [[INDEX_NEXT34]] = add nuw i64 [[INDEX21]], 8
+; CHECK-NEXT:    [[TMP63:%.*]] = icmp eq i64 [[INDEX_NEXT34]], 1000
 ; CHECK-NEXT:    br i1 [[TMP63]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br i1 true, [[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]]

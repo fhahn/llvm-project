@@ -232,6 +232,9 @@ define void @test_masked_interleave_group(i32 %N, ptr %mask, ptr %src, ptr %dst)
 ; CHECK-NEXT:    [[TMP41:%.*]] = sub i64 [[TMP40]], [[DST4]]
 ; CHECK-NEXT:    [[TMP42:%.*]] = sub i64 [[TMP41]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP42]], [[TMP38]]
+; CHECK-NEXT:    [[TMP43:%.*]] = sub i64 [[SRC5]], [[DST4]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP43]], 0
+; CHECK-NEXT:    [[TMP44:%.*]] = and i1 [[FOUND_CONFLICT]], [[DIFF_CHECK_NE]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = zext i32 [[N]] to i64
 ; CHECK-NEXT:    [[TMP5:%.*]] = shl nuw nsw i64 [[TMP4]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = add nuw nsw i64 [[TMP5]], 16
@@ -241,7 +244,7 @@ define void @test_masked_interleave_group(i32 %N, ptr %mask, ptr %src, ptr %dst)
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[TMP9]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[MASK]], [[TMP7]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT8:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT8]]
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[TMP44]], [[FOUND_CONFLICT8]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VECTOR_MAIN_LOOP_ITER_CHECK:.*]]
 ; CHECK:       [[VECTOR_MAIN_LOOP_ITER_CHECK]]:
 ; CHECK-NEXT:    [[TMP11:%.*]] = shl nuw i64 [[TMP2]], 4

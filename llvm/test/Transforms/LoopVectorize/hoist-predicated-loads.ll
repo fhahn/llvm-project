@@ -38,7 +38,7 @@ define void @test(ptr %dst, ptr %src, ptr %cond) {
 ; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP37]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP38:%.*]] = icmp eq i32 [[INDEX_NEXT]], 100
-; CHECK-NEXT:    br i1 [[TMP38]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP38]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br [[EXIT:label %.*]]
 ; CHECK:       [[SCALAR_PH]]:
@@ -149,7 +149,7 @@ define void @different_addresses(ptr %dst, ptr %src1, ptr %src2, ptr %cond) {
 ; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP34]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP35:%.*]] = icmp eq i32 [[INDEX_NEXT]], 100
-; CHECK-NEXT:    br i1 [[TMP35]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP35]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br [[EXIT:label %.*]]
 ; CHECK:       [[SCALAR_PH]]:
@@ -264,7 +264,7 @@ define void @non_complementary_masks(ptr %dst, ptr %src, ptr %cond1, ptr %cond2)
 ; CHECK-NEXT:    store <2 x i32> [[PREDPHI18]], ptr [[TMP41]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP42:%.*]] = icmp eq i32 [[INDEX_NEXT]], 100
-; CHECK-NEXT:    br i1 [[TMP42]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP24:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP42]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br [[EXIT:label %.*]]
 ; CHECK:       [[SCALAR_PH]]:
@@ -325,7 +325,10 @@ define void @different_access_sizes(ptr %dst, ptr %src, ptr %cond) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], [[DST1]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[TMP3]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT5:%.*]] = icmp ult i64 [[TMP4]], 15
-; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT5]]
+; CHECK-NEXT:    [[TMP8:%.*]] = sub i64 [[SRC3]], [[DST1]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP8]], 0
+; CHECK-NEXT:    [[TMP9:%.*]] = and i1 [[FOUND_CONFLICT5]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[TMP9]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
@@ -377,7 +380,7 @@ define void @different_access_sizes(ptr %dst, ptr %src, ptr %cond) {
 ; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP31]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP32:%.*]] = icmp eq i32 [[INDEX_NEXT]], 100
-; CHECK-NEXT:    br i1 [[TMP32]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP34:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP32]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br [[EXIT:label %.*]]
 ; CHECK:       [[SCALAR_PH]]:
@@ -453,7 +456,7 @@ define void @different_alignments_same_address(ptr %dst, ptr %src, ptr %cond) {
 ; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP35]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP36:%.*]] = icmp eq i32 [[INDEX_NEXT]], 100
-; CHECK-NEXT:    br i1 [[TMP36]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP44:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP36]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br [[EXIT:label %.*]]
 ; CHECK:       [[SCALAR_PH]]:
@@ -571,7 +574,10 @@ define void @duplicate_gep(ptr %dst, ptr %src, ptr %cond) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], [[DST1]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[TMP3]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT5:%.*]] = icmp ult i64 [[TMP4]], 15
-; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT5]]
+; CHECK-NEXT:    [[TMP9:%.*]] = sub i64 [[SRC3]], [[DST1]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP9]], 0
+; CHECK-NEXT:    [[TMP11:%.*]] = and i1 [[FOUND_CONFLICT5]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[TMP11]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
@@ -593,7 +599,7 @@ define void @duplicate_gep(ptr %dst, ptr %src, ptr %cond) {
 ; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP30]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP31:%.*]] = icmp eq i32 [[INDEX_NEXT]], 100
-; CHECK-NEXT:    br i1 [[TMP31]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP54:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP31]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br [[EXIT:label %.*]]
 ; CHECK:       [[SCALAR_PH]]:
@@ -658,21 +664,21 @@ define void @non_unit_stride_i64(ptr %dst, ptr %src, ptr %cond) {
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP7:%.*]] = add i32 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i32, ptr [[COND]], i32 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP8]], align 4, !alias.scope [[META56:![0-9]+]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP8]], align 4, !alias.scope [[META14:![0-9]+]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp ule <2 x i32> [[WIDE_LOAD]], splat (i32 11)
 ; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i32 [[INDEX]]
 ; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i32 [[TMP7]]
-; CHECK-NEXT:    [[TMP24:%.*]] = load i32, ptr [[TMP12]], align 4, !alias.scope [[META59:![0-9]+]]
-; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr [[TMP17]], align 4, !alias.scope [[META59]]
+; CHECK-NEXT:    [[TMP24:%.*]] = load i32, ptr [[TMP12]], align 4, !alias.scope [[META17:![0-9]+]]
+; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr [[TMP17]], align 4, !alias.scope [[META17]]
 ; CHECK-NEXT:    [[TMP25:%.*]] = insertelement <2 x i32> poison, i32 [[TMP24]], i64 0
 ; CHECK-NEXT:    [[TMP31:%.*]] = insertelement <2 x i32> [[TMP25]], i32 [[TMP10]], i64 1
 ; CHECK-NEXT:    [[TMP21:%.*]] = add <2 x i32> [[TMP31]], splat (i32 10)
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP9]], <2 x i32> [[TMP31]], <2 x i32> [[TMP21]]
 ; CHECK-NEXT:    [[TMP32:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[INDEX]]
-; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP32]], align 4, !alias.scope [[META19:![0-9]+]], !noalias [[META59]]
+; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP32]], align 4, !alias.scope [[META19:![0-9]+]], !noalias [[META17]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP33:%.*]] = icmp eq i32 [[INDEX_NEXT]], 100
-; CHECK-NEXT:    br i1 [[TMP33]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP64:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP33]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP21:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br [[EXIT:label %.*]]
 ; CHECK:       [[SCALAR_PH]]:
@@ -732,7 +738,7 @@ define void @hoist_loads_in_masked_regions(ptr noalias %dst, ptr noalias %src, p
 ; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP3]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i32 [[INDEX_NEXT]], 100
-; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP66:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP23:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
@@ -851,7 +857,7 @@ define void @hoist_multiple_complementary_loads(ptr noalias %dst, ptr noalias %s
 ; CHECK-NEXT:    store <2 x i32> [[TMP42]], ptr [[TMP40]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP46:%.*]] = icmp eq i32 [[INDEX_NEXT]], 100
-; CHECK-NEXT:    br i1 [[TMP46]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP67:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP46]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP24:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
@@ -921,12 +927,12 @@ define void @hoist_predicated_load_with_chained_geps1(ptr %dst, ptr %src, i1 %co
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr [11 x i16], ptr [[SRC]], i64 [[TMP2]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr i8, ptr [[TMP20]], i64 8
-; CHECK-NEXT:    [[TMP3:%.*]] = load i16, ptr [[TMP21]], align 2, !alias.scope [[META68:![0-9]+]]
+; CHECK-NEXT:    [[TMP6:%.*]] = load i16, ptr [[TMP21]], align 2, !alias.scope [[META25:![0-9]+]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP26:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
-; CHECK-NEXT:    br i1 [[TMP26]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP71:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP26]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP28:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    store i16 [[TMP3]], ptr [[DST]], align 2, !alias.scope [[META72:![0-9]+]], !noalias [[META68]]
+; CHECK-NEXT:    store i16 [[TMP6]], ptr [[DST]], align 2, !alias.scope [[META29:![0-9]+]], !noalias [[META25]]
 ; CHECK-NEXT:    br label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
 ;
@@ -980,12 +986,12 @@ define void @hoist_predicated_load_with_chained_geps2(ptr %dst, ptr %src, i1 %co
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr [11 x i16], ptr [[SRC]], i64 [[TMP2]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr i8, ptr [[TMP4]], i64 8
-; CHECK-NEXT:    [[TMP3:%.*]] = load i16, ptr [[TMP21]], align 2, !alias.scope [[META75:![0-9]+]]
+; CHECK-NEXT:    [[TMP6:%.*]] = load i16, ptr [[TMP21]], align 2, !alias.scope [[META32:![0-9]+]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP26:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
-; CHECK-NEXT:    br i1 [[TMP26]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP78:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP26]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP35:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    store i16 [[TMP3]], ptr [[DST]], align 2, !alias.scope [[META79:![0-9]+]], !noalias [[META75]]
+; CHECK-NEXT:    store i16 [[TMP6]], ptr [[DST]], align 2, !alias.scope [[META36:![0-9]+]], !noalias [[META32]]
 ; CHECK-NEXT:    br label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
 ;
@@ -1101,7 +1107,7 @@ define void @hoist_all_three_loads_at_same_address(ptr %dst, ptr %src, ptr noali
 ; CHECK-NEXT:    store <2 x i32> [[PREDPHI16]], ptr [[TMP43]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP44:%.*]] = icmp eq i32 [[INDEX_NEXT]], 100
-; CHECK-NEXT:    br i1 [[TMP44]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP87:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP44]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP39:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br [[EXIT:label %.*]]
 ; CHECK:       [[SCALAR_PH]]:

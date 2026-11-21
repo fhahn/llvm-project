@@ -2379,9 +2379,9 @@ Value *llvm::addDiffRuntimeChecks(Instruction *Loc,
   Value *MemoryRuntimeCheck = ChkBuilder.getFalse();
 
   auto &SE = *Expander.getSE();
-  // Map to keep track of created compares, The key is the pair of operands for
-  // the compare, to allow detecting and re-using redundant compares.
-  DenseMap<std::pair<Value *, Value *>, Value *> SeenCompares;
+  // Set of operand pairs of already created compares and whether equal starts
+  // are allowed, to allow detecting and re-using redundant checks.
+  SmallDenseSet<std::tuple<Value *, Value *, unsigned>, 8> SeenCompares;
   for (const PointerDiffInfo &C : Checks) {
     Type *Ty = C.SinkStart->getType();
     // A cached compare may come from a check without the vscale bound, so add
@@ -2397,17 +2397,27 @@ Value *llvm::addDiffRuntimeChecks(Instruction *Loc,
     Value *ThresholdMinusOne = Expander.expandCodeFor(Ops.second, Ty, Loc);
     Value *Diff = Expander.expandCodeFor(Ops.first, Ty, Loc);
 
-    // Check if the same compare has already been created earlier. In that case,
-    // there is no need to check it again.
-    Value *IsConflict = SeenCompares.lookup({Diff, ThresholdMinusOne});
-    if (IsConflict)
+    // One-sided checks already allow equal starts, symmetric checks need an
+    // extra compare.
+    bool AllowEqualStarts = C.IsSymmetric && C.allowsEqualStarts();
+    // If the same check has already been created earlier, there is no need to
+    // check it again.
+    if (!SeenCompares.insert({Diff, ThresholdMinusOne, AllowEqualStarts})
+             .second)
       continue;
 
     // Use (Diff - 1) <u (Threshold - 1), equivalent to 0 < Diff <u Threshold.
-    IsConflict = ChkBuilder.CreateICmpULT(
+    Value *IsConflict = ChkBuilder.CreateICmpULT(
         ChkBuilder.CreateSub(Diff, ConstantInt::get(Ty, 1)), ThresholdMinusOne,
         "diff.check");
-    SeenCompares.insert({{Diff, ThresholdMinusOne}, IsConflict});
+    if (AllowEqualStarts) {
+      Value *StartDiff = Expander.expandCodeFor(
+          SE.getMinusSCEV(C.SinkStart, C.SrcStart), Ty, Loc);
+      IsConflict = ChkBuilder.CreateAnd(
+          IsConflict,
+          ChkBuilder.CreateICmpNE(StartDiff, ConstantInt::get(Ty, 0),
+                                  "diff.check.ne"));
+    }
     if (C.NeedsFreeze)
       IsConflict =
           ChkBuilder.CreateFreeze(IsConflict, IsConflict->getName() + ".fr");
