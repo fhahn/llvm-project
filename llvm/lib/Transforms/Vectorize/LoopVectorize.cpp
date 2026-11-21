@@ -1224,6 +1224,16 @@ public:
       if (DiffChecks) {
         MemRuntimeCheckCond = addDiffRuntimeChecks(
             MemCheckBlock->getTerminator(), *DiffChecks, MemCheckExp, VF, IC);
+      } else if (auto Mixed = RtPtrChecking.getMixedChecks()) {
+        Value *DiffCond = addDiffRuntimeChecks(
+            MemCheckBlock->getTerminator(), Mixed->first, MemCheckExp, VF, IC);
+        SmallVector<RuntimePointerCheck, 4> RangeChecks(Mixed->second);
+        Value *RangeCond =
+            addRuntimeChecks(MemCheckBlock->getTerminator(), L, RangeChecks,
+                             MemCheckExp, VectorizerParams::HoistRuntimeChecks);
+        IRBuilder<> ChkBuilder(MemCheckBlock->getTerminator());
+        MemRuntimeCheckCond =
+            ChkBuilder.CreateOr(DiffCond, RangeCond, "conflict.rdx");
       } else {
         MemRuntimeCheckCond = addRuntimeChecks(
             MemCheckBlock->getTerminator(), L, RtPtrChecking.getChecks(),
@@ -6198,14 +6208,17 @@ LoopVectorizationPlanner::tryToBuildVPlan1(LoopVectorizationCostModel &PlanCM) {
   std::optional<LoopVersioning> LVer;
   if (IsInnerLoop) {
     const LoopAccessInfo *LAI = Legal->getLAI();
-    LVer.emplace(*LAI, LAI->getRuntimePointerChecking()->getChecks(), OrigLoop,
-                 LI, DT, PSE.getSE());
-    if (!LAI->getRuntimePointerChecking()->getChecks().empty() &&
-        !LAI->getRuntimePointerChecking()->getDiffChecks()) {
-      // Only use noalias metadata when using memory checks guaranteeing no
-      // overlap across all iterations.
+    const RuntimePointerChecking &RtPtrChecking =
+        *LAI->getRuntimePointerChecking();
+    // Only use noalias metadata for memory checks guaranteeing no overlap
+    // across all iterations, i.e. range checks. With mixed checks, only the
+    // pairs checked by range checks are known not to overlap.
+    ArrayRef<RuntimePointerCheck> NoAliasChecks = RtPtrChecking.getChecks();
+    if (auto Mixed = RtPtrChecking.getMixedChecks())
+      NoAliasChecks = Mixed->second;
+    LVer.emplace(*LAI, NoAliasChecks, OrigLoop, LI, DT, PSE.getSE());
+    if (!NoAliasChecks.empty() && !RtPtrChecking.getDiffChecks())
       LVer->prepareNoAliasMetadata();
-    }
   }
 
   // Create initial base VPlan0, to serve as common starting point for all
