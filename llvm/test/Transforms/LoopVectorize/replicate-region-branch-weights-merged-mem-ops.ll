@@ -49,10 +49,10 @@ define void @hoist_loads_no_prof_on_merged_load(ptr %dst, ptr %src, ptr %cond, i
 ; CHECK-NEXT:    store <4 x i32> [[PREDPHI]], ptr [[TMP13]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP23:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP23]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF9:![0-9]+]], !llvm.loop [[LOOP10:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP23]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1:![0-9]+]], !llvm.loop [[LOOP2:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[N]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF14:![0-9]+]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6:![0-9]+]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ], [ 0, %[[VECTOR_MEMCHECK]] ]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
@@ -63,7 +63,7 @@ define void @hoist_loads_no_prof_on_merged_load(ptr %dst, ptr %src, ptr %cond, i
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp sgt i32 [[C]], 0
 ; CHECK-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i32 [[IV]]
 ; CHECK-NEXT:    [[GEP_DST:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[IV]]
-; CHECK-NEXT:    br i1 [[CMP]], label %[[THEN:.*]], label %[[ELSE:.*]], !prof [[PROF15:![0-9]+]]
+; CHECK-NEXT:    br i1 [[CMP]], label %[[THEN:.*]], label %[[ELSE:.*]], !prof [[PROF7:![0-9]+]]
 ; CHECK:       [[THEN]]:
 ; CHECK-NEXT:    [[L_THEN:%.*]] = load i32, ptr [[GEP_SRC]], align 4
 ; CHECK-NEXT:    br label %[[LATCH]]
@@ -76,7 +76,7 @@ define void @hoist_loads_no_prof_on_merged_load(ptr %dst, ptr %src, ptr %cond, i
 ; CHECK-NEXT:    store i32 [[MERGE]], ptr [[GEP_DST]], align 4
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i32 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i32 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF16:![0-9]+]], !llvm.loop [[LOOP17:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8:![0-9]+]], !llvm.loop [[LOOP9:![0-9]+]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;
@@ -112,23 +112,28 @@ exit:
   ret void
 }
 
+; %src is accessed with a different step than %dst, so range checks are used,
+; which add the scoped noalias metadata required for sinking the stores.
 define void @sink_stores_no_prof_on_merged_store(ptr %dst, ptr %src, ptr %cond, i32 %n) {
 ; CHECK-LABEL: define void @sink_stores_no_prof_on_merged_store(
 ; CHECK-SAME: ptr [[DST:%.*]], ptr [[SRC:%.*]], ptr [[COND:%.*]], i32 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[COND5:%.*]] = ptrtoaddr ptr [[COND]] to i64
+; CHECK-NEXT:    [[DST4:%.*]] = ptrtoaddr ptr [[DST]] to i64
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[N]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]], !prof [[PROF0]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP33:%.*]] = sub i64 [[DST4]], [[COND5]]
+; CHECK-NEXT:    [[TMP34:%.*]] = sub i64 [[TMP33]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP34]], 15
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64
 ; CHECK-NEXT:    [[TMP2:%.*]] = shl nuw nsw i64 [[TMP1]], 2
 ; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i64 [[TMP2]], 4
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP3]]
-; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[COND]], i64 [[TMP3]]
-; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP3]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP1]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[COND]], [[SCEVGEP]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[TMP38:%.*]] = shl nuw nsw i64 [[TMP1]], 3
+; CHECK-NEXT:    [[TMP37:%.*]] = add nuw nsw i64 [[TMP38]], 4
+; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP37]]
 ; CHECK-NEXT:    [[BOUND03:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP2]]
 ; CHECK-NEXT:    [[BOUND14:%.*]] = icmp ult ptr [[SRC]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT5:%.*]] = and i1 [[BOUND03]], [[BOUND14]]
@@ -144,20 +149,20 @@ define void @sink_stores_no_prof_on_merged_store(ptr %dst, ptr %src, ptr %cond, 
 ; CHECK-NEXT:    [[TMP5:%.*]] = add i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[INDEX]], 3
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i32, ptr [[COND]], i32 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP7]], align 4, !alias.scope [[META19:![0-9]+]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP7]], align 4, !alias.scope [[META11:![0-9]+]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp sle <4 x i32> [[WIDE_LOAD]], zeroinitializer
-; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i32 [[INDEX]]
-; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i32 [[TMP4]]
-; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i32 [[TMP5]]
-; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i32 [[TMP6]]
+; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i32 [[INDEX]]
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i32 [[TMP4]]
+; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i32 [[TMP5]]
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i32 [[TMP6]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[INDEX]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP4]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP5]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP6]]
-; CHECK-NEXT:    [[TMP17:%.*]] = load i32, ptr [[TMP9]], align 4, !alias.scope [[META22:![0-9]+]]
-; CHECK-NEXT:    [[TMP18:%.*]] = load i32, ptr [[TMP10]], align 4, !alias.scope [[META22]]
-; CHECK-NEXT:    [[TMP19:%.*]] = load i32, ptr [[TMP11]], align 4, !alias.scope [[META22]]
-; CHECK-NEXT:    [[TMP20:%.*]] = load i32, ptr [[TMP12]], align 4, !alias.scope [[META22]]
+; CHECK-NEXT:    [[TMP17:%.*]] = load i32, ptr [[TMP9]], align 4, !alias.scope [[META14:![0-9]+]]
+; CHECK-NEXT:    [[TMP18:%.*]] = load i32, ptr [[TMP10]], align 4, !alias.scope [[META14]]
+; CHECK-NEXT:    [[TMP19:%.*]] = load i32, ptr [[TMP11]], align 4, !alias.scope [[META14]]
+; CHECK-NEXT:    [[TMP20:%.*]] = load i32, ptr [[TMP12]], align 4, !alias.scope [[META14]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = insertelement <4 x i32> poison, i32 [[TMP17]], i64 0
 ; CHECK-NEXT:    [[TMP22:%.*]] = insertelement <4 x i32> [[TMP21]], i32 [[TMP18]], i64 1
 ; CHECK-NEXT:    [[TMP23:%.*]] = insertelement <4 x i32> [[TMP22]], i32 [[TMP19]], i64 2
@@ -166,19 +171,19 @@ define void @sink_stores_no_prof_on_merged_store(ptr %dst, ptr %src, ptr %cond, 
 ; CHECK-NEXT:    [[TMP26:%.*]] = add <4 x i32> [[TMP24]], splat (i32 10)
 ; CHECK-NEXT:    [[TMP27:%.*]] = select <4 x i1> [[TMP8]], <4 x i32> [[TMP25]], <4 x i32> [[TMP26]]
 ; CHECK-NEXT:    [[TMP28:%.*]] = extractelement <4 x i32> [[TMP27]], i64 0
-; CHECK-NEXT:    store i32 [[TMP28]], ptr [[TMP13]], align 4, !alias.scope [[META24:![0-9]+]], !noalias [[META26:![0-9]+]]
+; CHECK-NEXT:    store i32 [[TMP28]], ptr [[TMP13]], align 4, !alias.scope [[META16:![0-9]+]], !noalias [[META14]]
 ; CHECK-NEXT:    [[TMP29:%.*]] = extractelement <4 x i32> [[TMP27]], i64 1
-; CHECK-NEXT:    store i32 [[TMP29]], ptr [[TMP14]], align 4, !alias.scope [[META24]], !noalias [[META26]]
+; CHECK-NEXT:    store i32 [[TMP29]], ptr [[TMP14]], align 4, !alias.scope [[META16]], !noalias [[META14]]
 ; CHECK-NEXT:    [[TMP30:%.*]] = extractelement <4 x i32> [[TMP27]], i64 2
-; CHECK-NEXT:    store i32 [[TMP30]], ptr [[TMP15]], align 4, !alias.scope [[META24]], !noalias [[META26]]
+; CHECK-NEXT:    store i32 [[TMP30]], ptr [[TMP15]], align 4, !alias.scope [[META16]], !noalias [[META14]]
 ; CHECK-NEXT:    [[TMP31:%.*]] = extractelement <4 x i32> [[TMP27]], i64 3
-; CHECK-NEXT:    store i32 [[TMP31]], ptr [[TMP16]], align 4, !alias.scope [[META24]], !noalias [[META26]]
+; CHECK-NEXT:    store i32 [[TMP31]], ptr [[TMP16]], align 4, !alias.scope [[META16]], !noalias [[META14]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP32:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP32]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF9]], !llvm.loop [[LOOP27:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP32]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP18:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[N]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF14]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ], [ 0, %[[VECTOR_MEMCHECK]] ]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
@@ -187,9 +192,9 @@ define void @sink_stores_no_prof_on_merged_store(ptr %dst, ptr %src, ptr %cond, 
 ; CHECK-NEXT:    [[GEP_COND:%.*]] = getelementptr inbounds i32, ptr [[COND]], i32 [[IV]]
 ; CHECK-NEXT:    [[C:%.*]] = load i32, ptr [[GEP_COND]], align 4
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp sgt i32 [[C]], 0
-; CHECK-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i32 [[IV]]
+; CHECK-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i32 [[IV]]
 ; CHECK-NEXT:    [[GEP_DST:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[IV]]
-; CHECK-NEXT:    br i1 [[CMP]], label %[[THEN:.*]], label %[[ELSE:.*]], !prof [[PROF15]]
+; CHECK-NEXT:    br i1 [[CMP]], label %[[THEN:.*]], label %[[ELSE:.*]], !prof [[PROF7]]
 ; CHECK:       [[THEN]]:
 ; CHECK-NEXT:    [[L_THEN:%.*]] = load i32, ptr [[GEP_SRC]], align 4
 ; CHECK-NEXT:    [[ADD:%.*]] = add i32 [[L_THEN]], 10
@@ -203,7 +208,7 @@ define void @sink_stores_no_prof_on_merged_store(ptr %dst, ptr %src, ptr %cond, 
 ; CHECK:       [[LATCH]]:
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i32 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i32 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF16]], !llvm.loop [[LOOP28:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP19:![0-9]+]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;
@@ -215,7 +220,7 @@ loop:
   %gep.cond = getelementptr inbounds i32, ptr %cond, i32 %iv
   %c = load i32, ptr %gep.cond, align 4
   %cmp = icmp sgt i32 %c, 0
-  %gep.src = getelementptr inbounds i32, ptr %src, i32 %iv
+  %gep.src = getelementptr inbounds i64, ptr %src, i32 %iv
   %gep.dst = getelementptr inbounds i32, ptr %dst, i32 %iv
   br i1 %cmp, label %then, label %else, !prof !0
 
@@ -244,24 +249,23 @@ exit:
 !1 = !{!"branch_weights", i32 1, i32 999}
 ;.
 ; CHECK: [[PROF0]] = !{!"branch_weights", i32 1, i32 127}
-; CHECK: [[PROF9]] = !{!"branch_weights", i32 1, i32 249}
-; CHECK: [[LOOP10]] = distinct !{[[LOOP10]], [[META11:![0-9]+]], [[META12:![0-9]+]], [[META13:![0-9]+]]}
-; CHECK: [[META11]] = !{!"llvm.loop.isvectorized", i32 1}
-; CHECK: [[META12]] = !{!"llvm.loop.unroll.runtime.disable"}
-; CHECK: [[META13]] = !{!"llvm.loop.estimated_trip_count", i32 250}
-; CHECK: [[PROF14]] = !{!"branch_weights", i32 1, i32 3}
-; CHECK: [[PROF15]] = !{!"branch_weights", i32 1, i32 1}
-; CHECK: [[PROF16]] = !{!"branch_weights", i32 1, i32 0}
-; CHECK: [[LOOP17]] = distinct !{[[LOOP17]], [[META11]], [[META18:![0-9]+]]}
-; CHECK: [[META18]] = !{!"llvm.loop.estimated_trip_count", i32 0}
-; CHECK: [[META19]] = !{[[META20:![0-9]+]]}
-; CHECK: [[META20]] = distinct !{[[META20]], [[META21:![0-9]+]]}
-; CHECK: [[META21]] = distinct !{[[META21]], i1 false, !"LVerDomain"}
-; CHECK: [[META22]] = !{[[META23:![0-9]+]]}
-; CHECK: [[META23]] = distinct !{[[META23]], [[META21]]}
-; CHECK: [[META24]] = !{[[META25:![0-9]+]]}
-; CHECK: [[META25]] = distinct !{[[META25]], [[META21]]}
-; CHECK: [[META26]] = !{[[META20]], [[META23]]}
-; CHECK: [[LOOP27]] = distinct !{[[LOOP27]], [[META11]], [[META12]], [[META13]]}
-; CHECK: [[LOOP28]] = distinct !{[[LOOP28]], [[META11]], [[META18]]}
+; CHECK: [[PROF1]] = !{!"branch_weights", i32 1, i32 249}
+; CHECK: [[LOOP2]] = distinct !{[[LOOP2]], [[META3:![0-9]+]], [[META4:![0-9]+]], [[META5:![0-9]+]]}
+; CHECK: [[META3]] = !{!"llvm.loop.isvectorized", i32 1}
+; CHECK: [[META4]] = !{!"llvm.loop.unroll.runtime.disable"}
+; CHECK: [[META5]] = !{!"llvm.loop.estimated_trip_count", i32 250}
+; CHECK: [[PROF6]] = !{!"branch_weights", i32 1, i32 3}
+; CHECK: [[PROF7]] = !{!"branch_weights", i32 1, i32 1}
+; CHECK: [[PROF8]] = !{!"branch_weights", i32 1, i32 0}
+; CHECK: [[LOOP9]] = distinct !{[[LOOP9]], [[META3]], [[META10:![0-9]+]]}
+; CHECK: [[META10]] = !{!"llvm.loop.estimated_trip_count", i32 0}
+; CHECK: [[META11]] = !{[[META12:![0-9]+]]}
+; CHECK: [[META12]] = distinct !{[[META12]], [[META13:![0-9]+]]}
+; CHECK: [[META13]] = distinct !{[[META13]], i1 false, !"LVerDomain"}
+; CHECK: [[META14]] = !{[[META15:![0-9]+]]}
+; CHECK: [[META15]] = distinct !{[[META15]], [[META13]]}
+; CHECK: [[META16]] = !{[[META17:![0-9]+]]}
+; CHECK: [[META17]] = distinct !{[[META17]], [[META13]]}
+; CHECK: [[LOOP18]] = distinct !{[[LOOP18]], [[META3]], [[META4]], [[META5]]}
+; CHECK: [[LOOP19]] = distinct !{[[LOOP19]], [[META3]], [[META10]]}
 ;.

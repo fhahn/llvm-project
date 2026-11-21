@@ -7,14 +7,16 @@ target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16
 ; FIXME
 ; Test case for PR47751. Make sure the runtime check includes a required
 ; addition of the size of the element type (a pointer) for the end bound.
+; %base.2 is accessed with a different step than %base, so range checks are
+; used instead of diff checks.
 
-define void @test(i64 %arg, i32 %arg1, ptr %base) {
+define void @test(i64 %arg, i32 %arg1, ptr %base, ptr %base.2) {
 ; CHECK:      LAA: Adding RT check for range:
+; CHECK-NEXT:  Start: ((16 * (1 smin %arg)) + %base.2)
+; CHECK-SAME:  End: (8 + (16 * %arg) + %base.2)
+; CHECK-NEXT: LAA: Adding RT check for range:
 ; CHECK-NEXT:  Start: ((8 * (zext i32 (-1 + %arg1)<nsw> to i64))<nuw><nsw> + (8 * (1 smin %arg)) + (-8 * %arg) + %base)
 ; CHECK-SAME:  End: (8 + (8 * (zext i32 (-1 + %arg1)<nsw> to i64))<nuw><nsw> + %base)
-; CHECK-NEXT: LAA: Adding RT check for range:
-; CHECK-NEXT:  Start: ((8 * (1 smin %arg)) + %base)
-; CHECK-SAME:  End: (8 + (8 * %arg) + %base)
 
 ; CHECK: vector.body
 
@@ -28,7 +30,7 @@ loop:
   %iv.2.ext = zext i32 %iv.2.next to i64
   %idx.1 = getelementptr inbounds ptr, ptr %base, i64 %iv.2.ext
   %v.1 = load ptr, ptr %idx.1, align 8
-  %idx.2 = getelementptr inbounds ptr, ptr %base, i64 %iv.1
+  %idx.2 = getelementptr inbounds [2 x ptr], ptr %base.2, i64 %iv.1
   %v.2 = load ptr, ptr %idx.2, align 8
   store ptr %v.2, ptr %idx.1, align 8
   store ptr %v.1, ptr %idx.2, align 8

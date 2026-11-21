@@ -26,7 +26,10 @@ define void @load_pair_store_pair(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[B2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP2]], 63
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[A1]], [[B2]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP3]], 0
+; CHECK-NEXT:    [[TMP4:%.*]] = and i1 [[FOUND_CONFLICT]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    br i1 [[TMP4]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ;
 entry:
@@ -77,7 +80,10 @@ define void @negative_stride(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], [[B2]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[TMP3]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP4]], 63
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP5:%.*]] = sub i64 [[A1]], [[B2]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP5]], 0
+; CHECK-NEXT:    [[TMP6:%.*]] = and i1 [[FOUND_CONFLICT]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    br i1 [[TMP6]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ;
 entry:
@@ -118,14 +124,17 @@ define void @in_place_update(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; CHECK-NEXT:    [[B1:%.*]] = ptrtoaddr ptr [[B]] to i64
-; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 [[N]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[B1]], 32
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[A2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP2]], 63
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[B1]], [[A2]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP3]], 0
+; CHECK-NEXT:    [[TMP4:%.*]] = and i1 [[FOUND_CONFLICT]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    br i1 [[TMP4]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ;
 entry:
@@ -219,19 +228,29 @@ define void @symbolic_offsets(ptr %a, ptr %b, i64 %k, i64 %n) {
 ; NOMERGE-NEXT:    [[TMP6:%.*]] = sub i64 [[TMP2]], [[B2]]
 ; NOMERGE-NEXT:    [[TMP4:%.*]] = sub i64 [[TMP6]], 1
 ; NOMERGE-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP4]], 55
+; NOMERGE-NEXT:    [[TMP17:%.*]] = sub i64 [[TMP5]], [[B2]]
+; NOMERGE-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP17]], 0
+; NOMERGE-NEXT:    [[TMP21:%.*]] = and i1 [[FOUND_CONFLICT]], [[DIFF_CHECK_NE]]
 ; NOMERGE-NEXT:    [[TMP8:%.*]] = shl i64 [[K]], 2
 ; NOMERGE-NEXT:    [[TMP10:%.*]] = add i64 [[TMP0]], [[TMP8]]
 ; NOMERGE-NEXT:    [[TMP7:%.*]] = add i64 [[TMP10]], 28
 ; NOMERGE-NEXT:    [[TMP14:%.*]] = sub i64 [[TMP7]], [[B2]]
 ; NOMERGE-NEXT:    [[TMP9:%.*]] = sub i64 [[TMP14]], 1
 ; NOMERGE-NEXT:    [[FOUND_CONFLICT16:%.*]] = icmp ult i64 [[TMP9]], 55
-; NOMERGE-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT16]]
+; NOMERGE-NEXT:    [[TMP12:%.*]] = sub i64 [[TMP10]], [[B2]]
+; NOMERGE-NEXT:    [[DIFF_CHECK_NE9:%.*]] = icmp ne i64 [[TMP12]], 0
+; NOMERGE-NEXT:    [[TMP22:%.*]] = and i1 [[FOUND_CONFLICT16]], [[DIFF_CHECK_NE9]]
+; NOMERGE-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[TMP21]], [[TMP22]]
 ; NOMERGE-NEXT:    [[TMP16:%.*]] = add i64 [[TMP0]], 28
 ; NOMERGE-NEXT:    [[TMP11:%.*]] = sub i64 [[TMP16]], [[B2]]
 ; NOMERGE-NEXT:    [[TMP15:%.*]] = sub i64 [[TMP11]], [[TMP8]]
 ; NOMERGE-NEXT:    [[TMP13:%.*]] = sub i64 [[TMP15]], 1
 ; NOMERGE-NEXT:    [[FOUND_CONFLICT19:%.*]] = icmp ult i64 [[TMP13]], 55
-; NOMERGE-NEXT:    [[CONFLICT_RDX20:%.*]] = or i1 [[CONFLICT_RDX]], [[FOUND_CONFLICT19]]
+; NOMERGE-NEXT:    [[TMP18:%.*]] = sub i64 [[TMP0]], [[B2]]
+; NOMERGE-NEXT:    [[TMP19:%.*]] = sub i64 [[TMP18]], [[TMP8]]
+; NOMERGE-NEXT:    [[DIFF_CHECK_NE11:%.*]] = icmp ne i64 [[TMP19]], 0
+; NOMERGE-NEXT:    [[TMP20:%.*]] = and i1 [[FOUND_CONFLICT19]], [[DIFF_CHECK_NE11]]
+; NOMERGE-NEXT:    [[CONFLICT_RDX20:%.*]] = or i1 [[CONFLICT_RDX]], [[TMP20]]
 ; NOMERGE-NEXT:    br i1 [[CONFLICT_RDX20]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; NOMERGE:       [[VECTOR_PH]]:
 ;
@@ -303,15 +322,15 @@ define void @outer_loop_prefers_hoisted_range_checks(ptr %dst, ptr %src, i64 %m,
 ; CHECK-SAME: ptr [[DST:%.*]], ptr [[SRC:%.*]], i64 [[M:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[N_1:%.*]] = add nuw nsw i64 [[N]], 1
-; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[M]], -1
 ; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[N]], 3
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP1]], 8
-; CHECK-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP0]], [[TMP2]]
-; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[TMP3]], [[TMP1]]
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP4]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = mul i64 [[N]], [[M]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = shl i64 [[TMP5]], 3
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP6]]
+; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[M]], -1
+; CHECK-NEXT:    [[TMP9:%.*]] = mul i64 [[TMP4]], [[TMP2]]
+; CHECK-NEXT:    [[TMP10:%.*]] = add i64 [[TMP9]], [[TMP1]]
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP10]]
 ; CHECK-NEXT:    br label %[[OUTER_LOOP:.*]]
 ; CHECK:       [[OUTER_LOOP]]:
 ; CHECK-NEXT:    [[I:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[I_NEXT:%.*]], [[INNER_EXIT:%.*]] ]
@@ -382,6 +401,7 @@ define void @outer_loop_narrow_load(ptr %dst, ptr %src, i64 %m, i64 %n) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[DST2:%.*]] = ptrtoaddr ptr [[DST]] to i64
 ; CHECK-NEXT:    [[SRC1:%.*]] = ptrtoaddr ptr [[SRC]] to i64
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[SRC1]], [[DST2]]
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[SRC1]], 32
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[DST2]]
 ; CHECK-NEXT:    br label %[[OUTER_LOOP:.*]]
@@ -393,7 +413,9 @@ define void @outer_loop_narrow_load(ptr %dst, ptr %src, i64 %m, i64 %n) {
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], 1
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp ult i64 [[TMP2]], 63
-; CHECK-NEXT:    br i1 [[TMP4]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP3]], 0
+; CHECK-NEXT:    [[TMP5:%.*]] = and i1 [[TMP4]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    br i1 [[TMP5]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ;
 entry:

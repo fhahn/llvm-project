@@ -124,7 +124,11 @@ define void @steps_match_but_different_access_sizes_1(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[B2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP2]], 31
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[A1]], 2
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[TMP3]], [[B2]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP4]], 0
+; CHECK-NEXT:    [[TMP5:%.*]] = and i1 [[FOUND_CONFLICT]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    br i1 [[TMP5]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
 ;
 entry:
   br label %loop
@@ -160,7 +164,11 @@ define void @steps_match_but_different_access_sizes_2(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[A2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP2]], 31
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[B1]], -2
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[TMP3]], [[A2]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP4]], 0
+; CHECK-NEXT:    [[TMP5:%.*]] = and i1 [[FOUND_CONFLICT]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    br i1 [[TMP5]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
 ;
 entry:
   br label %loop
@@ -197,16 +205,25 @@ define void @steps_match_two_loadstores_different_access_sizes(ptr %src.1, ptr %
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], [[DST_12]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP3]], 63
+; CHECK-NEXT:    [[TMP16:%.*]] = sub i64 [[DST_21]], [[DST_12]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP16]], 0
+; CHECK-NEXT:    [[TMP17:%.*]] = and i1 [[FOUND_CONFLICT]], [[DIFF_CHECK_NE]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[SRC_13]], 32
 ; CHECK-NEXT:    [[TMP5:%.*]] = sub i64 [[TMP4]], [[DST_12]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 [[TMP5]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT21:%.*]] = icmp ult i64 [[TMP6]], 63
-; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT21]]
+; CHECK-NEXT:    [[TMP18:%.*]] = sub i64 [[SRC_13]], [[DST_12]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE17:%.*]] = icmp ne i64 [[TMP18]], 0
+; CHECK-NEXT:    [[TMP19:%.*]] = and i1 [[FOUND_CONFLICT21]], [[DIFF_CHECK_NE17]]
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[TMP17]], [[TMP19]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = add i64 [[SRC_25]], 32
 ; CHECK-NEXT:    [[TMP8:%.*]] = sub i64 [[TMP7]], [[DST_12]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = sub i64 [[TMP8]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT24:%.*]] = icmp ult i64 [[TMP9]], 63
-; CHECK-NEXT:    [[CONFLICT_RDX25:%.*]] = or i1 [[CONFLICT_RDX]], [[FOUND_CONFLICT24]]
+; CHECK-NEXT:    [[TMP14:%.*]] = sub i64 [[SRC_25]], [[DST_12]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE19:%.*]] = icmp ne i64 [[TMP14]], 0
+; CHECK-NEXT:    [[TMP15:%.*]] = and i1 [[FOUND_CONFLICT24]], [[DIFF_CHECK_NE19]]
+; CHECK-NEXT:    [[CONFLICT_RDX25:%.*]] = or i1 [[CONFLICT_RDX]], [[TMP15]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = sub i64 [[DST_21]], [[SRC_13]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = sub i64 [[TMP10]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT28:%.*]] = icmp ult i64 [[TMP11]], 31
@@ -244,14 +261,18 @@ define void @steps_match_but_different_access_sizes_padded_type(ptr %a, ptr %b, 
 ; CHECK-LABEL: define void @steps_match_but_different_access_sizes_padded_type(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[A4:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; CHECK-NEXT:    [[B3:%.*]] = ptrtoaddr ptr [[B]] to i64
+; CHECK-NEXT:    [[A3:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[B3]], [[A4]]
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[A3]], 32
+; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[TMP2]], [[B3]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], 1
-; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP1]], 31
+; CHECK-NEXT:    [[DIFF_CHECK1:%.*]] = icmp ult i64 [[TMP1]], 63
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[A3]], [[B3]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP3]], 0
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = and i1 [[DIFF_CHECK1]], [[DIFF_CHECK_NE]]
 ; CHECK-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
 ;
 entry:
@@ -276,10 +297,12 @@ define void @nested_loop_steps_match_but_different_access_sizes(ptr %a, ptr %b, 
 ; CHECK-LABEL: define void @nested_loop_steps_match_but_different_access_sizes(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; CHECK-NEXT:    [[B1:%.*]] = ptrtoaddr ptr [[B]] to i64
-; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[B1]], -2
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[A2]]
+; CHECK-NEXT:    [[A3:%.*]] = ptrtoaddr ptr [[A]] to i64
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[A3]], 2
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP0]], [[B1]]
+; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[A3]], 18
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP4]], [[B1]]
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
 ; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i64 [ [[OUTER_IV_NEXT:%.*]], [[OUTER_LATCH:%.*]] ], [ 0, %[[ENTRY]] ]
@@ -287,7 +310,9 @@ define void @nested_loop_steps_match_but_different_access_sizes(ptr %a, ptr %b, 
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], 1
-; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP2]], 15
+; CHECK-NEXT:    [[DIFF_CHECK1:%.*]] = icmp ult i64 [[TMP2]], 31
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP3]], 0
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = and i1 [[DIFF_CHECK1]], [[DIFF_CHECK_NE]]
 ; CHECK-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
 ;
 entry:
@@ -422,8 +447,9 @@ exit:
   ret void
 }
 
-; The bounds of the inner loop's accesses are 4 and 8 times the outer induction
-; variable, which is already available.
+; The bounds of the inner loop's accesses are 4, 8 and 16 times the outer
+; induction variable, which is already available. %b is accessed with twice the
+; step of %a, so range checks are used.
 define void @nested_loop_bounds_are_scaled_outer_iv(ptr %a, ptr %b, i32 %n, i32 %is, i32 %js) {
 ; CHECK-LABEL: define void @nested_loop_bounds_are_scaled_outer_iv(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i32 [[N:%.*]], i32 [[IS:%.*]], i32 [[JS:%.*]]) {
@@ -449,15 +475,17 @@ define void @nested_loop_bounds_are_scaled_outer_iv(ptr %a, ptr %b, i32 %n, i32 
 ; CHECK-NEXT:    br i1 [[TMP2]], [[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP1:%.*]] = shl nuw nsw i64 [[INDVAR]], 2
-; CHECK-NEXT:    [[TMP3:%.*]] = add nuw i64 4, [[TMP1]]
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP3]]
+; CHECK-NEXT:    [[TMP11:%.*]] = add nuw i64 4, [[TMP1]]
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP11]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = shl nuw nsw i64 [[INDVAR]], 3
-; CHECK-NEXT:    [[TMP5:%.*]] = add i64 8, [[TMP4]]
-; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP5]]
-; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP3]]
-; CHECK-NEXT:    [[SCEVGEP4:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP5]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP]], [[SCEVGEP4]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP3]], [[SCEVGEP2]]
+; CHECK-NEXT:    [[TMP5:%.*]] = add nuw i64 8, [[TMP4]]
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP5]]
+; CHECK-NEXT:    [[TMP8:%.*]] = shl nuw nsw i64 [[INDVAR]], 4
+; CHECK-NEXT:    [[TMP9:%.*]] = add i64 12, [[TMP8]]
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP9]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP3]], [[TMP10]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[TMP7]], [[TMP6]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
 ;
@@ -483,13 +511,13 @@ inner.body:
   %idx.1 = add nsw i64 %inner.off.js, %outer.off.is
   %gep.a.1 = getelementptr inbounds [4 x i8], ptr %a, i64 %idx.1
   %l.a.1 = load float, ptr %gep.a.1, align 4
-  %gep.b.1 = getelementptr inbounds [4 x i8], ptr %b, i64 %idx.1
+  %gep.b.1 = getelementptr inbounds [8 x i8], ptr %b, i64 %idx.1
   %l.b.1 = load float, ptr %gep.b.1, align 4
   %inner.off.is = mul nsw i64 %inner.iv, %is.ext
   %idx.2 = add nsw i64 %inner.off.is, %outer.off.js
   %gep.a.2 = getelementptr inbounds [4 x i8], ptr %a, i64 %idx.2
   %l.a.2 = load float, ptr %gep.a.2, align 4
-  %gep.b.2 = getelementptr inbounds [4 x i8], ptr %b, i64 %idx.2
+  %gep.b.2 = getelementptr inbounds [8 x i8], ptr %b, i64 %idx.2
   %l.b.2 = load float, ptr %gep.b.2, align 4
   store float %l.a.1, ptr %gep.a.2, align 4
   store float %l.b.1, ptr %gep.b.2, align 4
@@ -535,14 +563,17 @@ define void @nested_loop_only_one_bound_is_scaled_outer_iv(ptr %a, ptr %b, i32 %
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP1:%.*]] = mul nuw nsw i64 [[INDVAR]], 12
 ; CHECK-NEXT:    [[TMP2:%.*]] = add nuw i64 12, [[TMP1]]
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP2]]
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP2]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = mul nuw nsw i64 [[INDVAR]], 24
 ; CHECK-NEXT:    [[TMP5:%.*]] = add i64 16, [[TMP4]]
-; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP5]]
-; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP2]]
-; CHECK-NEXT:    [[SCEVGEP4:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP5]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP]], [[SCEVGEP4]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP3]], [[SCEVGEP2]]
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = add nuw i64 24, [[TMP4]]
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP7]]
+; CHECK-NEXT:    [[TMP9:%.*]] = mul nuw nsw i64 [[INDVAR]], 48
+; CHECK-NEXT:    [[TMP10:%.*]] = add i64 28, [[TMP9]]
+; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP10]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP12]], [[TMP11]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[TMP8]], [[TMP6]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
 ;
@@ -568,13 +599,13 @@ inner.body:
   %idx.1 = add nsw i64 %inner.off.js, %outer.off.is
   %gep.a.1 = getelementptr inbounds [12 x i8], ptr %a, i64 %idx.1
   %l.a.1 = load float, ptr %gep.a.1, align 4
-  %gep.b.1 = getelementptr inbounds [12 x i8], ptr %b, i64 %idx.1
+  %gep.b.1 = getelementptr inbounds [24 x i8], ptr %b, i64 %idx.1
   %l.b.1 = load float, ptr %gep.b.1, align 4
   %inner.off.is = mul nsw i64 %inner.iv, %is.ext
   %idx.2 = add nsw i64 %inner.off.is, %outer.off.js
   %gep.a.2 = getelementptr inbounds [12 x i8], ptr %a, i64 %idx.2
   %l.a.2 = load float, ptr %gep.a.2, align 4
-  %gep.b.2 = getelementptr inbounds [12 x i8], ptr %b, i64 %idx.2
+  %gep.b.2 = getelementptr inbounds [24 x i8], ptr %b, i64 %idx.2
   %l.b.2 = load float, ptr %gep.b.2, align 4
   store float %l.a.1, ptr %gep.a.2, align 4
   store float %l.b.1, ptr %gep.b.2, align 4
@@ -1065,10 +1096,14 @@ define void @reverse_iteration_diff_check_different_access_sizes(ptr %a, ptr %b,
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[A3]], 2
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[A3]], 18
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[B4]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], 1
-; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP2]], 15
+; CHECK-NEXT:    [[DIFF_CHECK1:%.*]] = icmp ult i64 [[TMP2]], 31
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[A3]], 2
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[TMP3]], [[B4]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP4]], 0
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = and i1 [[DIFF_CHECK1]], [[DIFF_CHECK_NE]]
 ; CHECK-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
 ;
 entry:
@@ -1097,14 +1132,14 @@ define void @read_modify_write_and_read_only(ptr %dst, ptr %src) {
 ; CHECK-LABEL: define void @read_modify_write_and_read_only(
 ; CHECK-SAME: ptr [[DST:%.*]], ptr [[SRC:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[SRC4:%.*]] = ptrtoaddr ptr [[SRC]] to i64
+; CHECK-NEXT:    [[DST3:%.*]] = ptrtoaddr ptr [[DST]] to i64
 ; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr nuw i8, ptr [[DST]], i64 512
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[DST]], i64 1536
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[SRC]], i64 1024
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP0]], [[TMP2]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC]], [[TMP1]]
-; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[DST3]], 512
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[SRC4]]
+; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP2]], 15
 ; CHECK-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH:label %.*]], [[VECTOR_PH:label %.*]]
 ;
 entry:
@@ -1133,14 +1168,14 @@ define void @read_modify_write_and_write_only(ptr %dst, ptr %other) {
 ; CHECK-LABEL: define void @read_modify_write_and_write_only(
 ; CHECK-SAME: ptr [[DST:%.*]], ptr [[OTHER:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[DST4:%.*]] = ptrtoaddr ptr [[DST]] to i64
+; CHECK-NEXT:    [[OTHER3:%.*]] = ptrtoaddr ptr [[OTHER]] to i64
 ; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr nuw i8, ptr [[DST]], i64 512
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[DST]], i64 1536
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[OTHER]], i64 1024
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP0]], [[TMP2]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[OTHER]], [[TMP1]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[OTHER3]], -512
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[DST4]]
+; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP2]], 15
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH:label %.*]], [[VECTOR_PH:label %.*]]
 ;
 entry:
@@ -1195,219 +1230,6 @@ loop:
 exit:
   ret void
 }
-<<<<<<< HEAD
-||||||| parent of fb78eeec099f ([LAA] Use symmetric diff checks for accesses narrower or wider than the step.)
-
-define void @pointer_stored_before_and_after_load(ptr %a, ptr %b, i64 %n) {
-; CHECK-LABEL: define void @pointer_stored_before_and_after_load(
-; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
-; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
-; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP0]]
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP0]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[TMP2]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[TMP1]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
-;
-entry:
-  br label %loop
-
-loop:
-  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
-  %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
-  store i32 0, ptr %gep.a, align 4
-  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
-  %l.b = load i32, ptr %gep.b, align 4
-  store i32 %l.b, ptr %gep.a, align 4
-  %iv.next = add nuw nsw i64 %iv, 1
-  %ec = icmp eq i64 %iv.next, %n
-  br i1 %ec, label %exit, label %loop
-
-exit:
-  ret void
-}
-
-; The second load of %b is narrower than the step.
-define void @pointer_loaded_with_different_access_sizes(ptr %a, ptr %b, i64 %n) {
-; CHECK-LABEL: define void @pointer_loaded_with_different_access_sizes(
-; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
-; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
-; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP0]]
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP0]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[TMP2]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[TMP1]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
-;
-entry:
-  br label %loop
-
-loop:
-  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
-  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
-  %l.b = load i32, ptr %gep.b, align 4
-  %l.b.1 = load i16, ptr %gep.b, align 2
-  %ext = sext i16 %l.b.1 to i32
-  %add = add nsw i32 %l.b, %ext
-  %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
-  store i32 %add, ptr %gep.a, align 4
-  %iv.next = add nuw nsw i64 %iv, 1
-  %ec = icmp eq i64 %iv.next, %n
-  br i1 %ec, label %exit, label %loop
-
-exit:
-  ret void
-}
-
-define void @read_and_written_pointer_reverse(ptr %a, ptr %b, i64 %n) {
-; CHECK-LABEL: define void @read_and_written_pointer_reverse(
-; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[A4:%.*]] = ptrtoaddr ptr [[A]] to i64
-; CHECK-NEXT:    [[B3:%.*]] = ptrtoaddr ptr [[B]] to i64
-; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
-; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
-; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[B3]], [[A4]]
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], 1
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP1]], 15
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
-;
-entry:
-  br label %loop
-
-loop:
-  %iv = phi i64 [ %n, %entry ], [ %iv.next, %loop ]
-  %iv.next = add nsw i64 %iv, -1
-  %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv.next
-  %l.a = load i32, ptr %gep.a, align 4
-  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv.next
-  %l.b = load i32, ptr %gep.b, align 4
-  %add = add nsw i32 %l.a, %l.b
-  store i32 %add, ptr %gep.a, align 4
-  %ec = icmp eq i64 %iv.next, 0
-  br i1 %ec, label %exit, label %loop
-
-exit:
-  ret void
-}
-
-; All accesses of %b precede the accesses of %a.
-define void @read_and_written_pointers_same_direction(ptr %a, ptr %b, i64 %n) {
-; CHECK-LABEL: define void @read_and_written_pointers_same_direction(
-; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[B4:%.*]] = ptrtoaddr ptr [[B]] to i64
-; CHECK-NEXT:    [[A3:%.*]] = ptrtoaddr ptr [[A]] to i64
-; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
-; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
-; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[A3]], [[B4]]
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], 1
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP1]], 15
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
-;
-entry:
-  br label %loop
-
-loop:
-  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
-  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
-  %l.b = load i32, ptr %gep.b, align 4
-  %inc = add nsw i32 %l.b, 1
-  store i32 %inc, ptr %gep.b, align 4
-  %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
-  %l.a = load i32, ptr %gep.a, align 4
-  %add = add nsw i32 %l.a, %inc
-  store i32 %add, ptr %gep.a, align 4
-  %iv.next = add nuw nsw i64 %iv, 1
-  %ec = icmp eq i64 %iv.next, %n
-  br i1 %ec, label %exit, label %loop
-
-exit:
-  ret void
-}
-
-; %b is loaded before %a is stored and %a is loaded before %b is stored, so
-; there are dependences in both directions.
-define void @read_and_written_pointers_both_directions(ptr %a, ptr %b, i64 %n) {
-; CHECK-LABEL: define void @read_and_written_pointers_both_directions(
-; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
-; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
-; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP0]]
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP0]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[TMP2]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[TMP1]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
-;
-entry:
-  br label %loop
-
-loop:
-  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
-  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
-  %l.b = load i32, ptr %gep.b, align 4
-  %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
-  %l.a = load i32, ptr %gep.a, align 4
-  store i32 %l.a, ptr %gep.b, align 4
-  store i32 %l.b, ptr %gep.a, align 4
-  %iv.next = add nuw nsw i64 %iv, 1
-  %ec = icmp eq i64 %iv.next, %n
-  br i1 %ec, label %exit, label %loop
-
-exit:
-  ret void
-}
-
-; %a is loaded as i32, which is narrower than the step, but stored as i64.
-define void @read_and_written_pointer_different_access_sizes(ptr %a, ptr %b, i64 %n) {
-; CHECK-LABEL: define void @read_and_written_pointer_different_access_sizes(
-; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
-; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
-; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 3
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP0]]
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP0]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[TMP2]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[TMP1]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
-;
-entry:
-  br label %loop
-
-loop:
-  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
-  %gep.a = getelementptr inbounds i64, ptr %a, i64 %iv
-  %l.a = load i32, ptr %gep.a, align 4
-  %ext = sext i32 %l.a to i64
-  %gep.b = getelementptr inbounds i64, ptr %b, i64 %iv
-  %l.b = load i64, ptr %gep.b, align 8
-  %add = add nsw i64 %ext, %l.b
-  store i64 %add, ptr %gep.a, align 8
-  %iv.next = add nuw nsw i64 %iv, 1
-  %ec = icmp eq i64 %iv.next, %n
-  br i1 %ec, label %exit, label %loop
-
-exit:
-  ret void
-}
-=======
 
 define void @pointer_stored_before_and_after_load(ptr %a, ptr %b, i64 %n) {
 ; CHECK-LABEL: define void @pointer_stored_before_and_after_load(
@@ -1456,7 +1278,10 @@ define void @pointer_loaded_with_different_access_sizes(ptr %a, ptr %b, i64 %n) 
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[A2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP2]], 31
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[B1]], [[A2]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP3]], 0
+; CHECK-NEXT:    [[TMP4:%.*]] = and i1 [[FOUND_CONFLICT]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    br i1 [[TMP4]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
 ;
 entry:
   br label %loop
@@ -1597,7 +1422,10 @@ define void @read_and_written_pointer_different_access_sizes(ptr %a, ptr %b, i64
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[A2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP2]], 63
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[B1]], [[A2]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP3]], 0
+; CHECK-NEXT:    [[TMP4:%.*]] = and i1 [[FOUND_CONFLICT]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    br i1 [[TMP4]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
 ;
 entry:
   br label %loop
@@ -1618,4 +1446,3 @@ loop:
 exit:
   ret void
 }
->>>>>>> fb78eeec099f ([LAA] Use symmetric diff checks for accesses narrower or wider than the step.)

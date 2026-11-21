@@ -12,11 +12,13 @@ target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128"
 ;
 ;   for (i = 0; i < n; i++) {
 ;     C[i] = A[i] + 1;
-;     C[i] += B[i];
+;     C[i] += B[2 * i];
 ;   }
 ;
-; Check that the corresponding noalias metadata is added to the vector loop
-; but not to the scalar loop.
+; {A} x {C} is checked by a diff check, which does not rule out overlap across
+; iterations, while {B} x {C} is checked by a range check. Check that the
+; corresponding noalias metadata is added for {B} x {C} to the vector loop but
+; not to the scalar loop.
 ;
 ; Since in the versioned vector loop C and B can no longer alias, the first
 ; store to C[i] can be DSE'd.
@@ -39,19 +41,19 @@ for.body:
   %add = add nuw i32 %loadA, 2
 
   %arrayidxC = getelementptr inbounds i32, ptr %c, i64 %ind
-; Noalias with scope 1 and 6
+; Noalias with scope 6
 ; LV: store {{.*}} !alias.scope !3, !noalias !5
 ; DSE-NOT: store
   store i32 %add, ptr %arrayidxC, align 4
 
-  %arrayidxB = getelementptr inbounds i32, ptr %b, i64 %ind
+  %arrayidxB = getelementptr inbounds i64, ptr %b, i64 %ind
 ; Scope 6
-; LV: = load {{.*}} !alias.scope !7
+; LV: = load {{.*}} !alias.scope !5
   %loadB = load i32, ptr %arrayidxB, align 4
 
   %add2 = add nuw i32 %add, %loadB
 
-; Noalias with scope 1 and 6
+; Noalias with scope 6
 ; LV: store {{.*}} !alias.scope !3, !noalias !5
 ; DSE: store
   store i32 %add2, ptr %arrayidxC, align 4
@@ -73,6 +75,5 @@ for.end:
 ; LV: !2 = distinct !{!2, i1 false, !"LVerDomain"}
 ; LV: !3 = !{!4}
 ; LV: !4 = distinct !{!4, !2}
-; LV: !5 = !{!1, !6}
+; LV: !5 = !{!6}
 ; LV: !6 = distinct !{!6, !2}
-; LV: !7 = !{!6}

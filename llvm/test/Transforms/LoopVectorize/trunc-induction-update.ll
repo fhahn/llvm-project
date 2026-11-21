@@ -611,6 +611,8 @@ define void @trunc_of_iv_plus_const_scalar_use(ptr %dst, ptr %dst2, ptr %src, i6
 ; CHECK-LABEL: define void @trunc_of_iv_plus_const_scalar_use(
 ; CHECK-SAME: ptr [[DST:%.*]], ptr [[DST2:%.*]], ptr [[SRC:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[SRC11:%.*]] = ptrtoaddr ptr [[SRC]] to i64
+; CHECK-NEXT:    [[DST210:%.*]] = ptrtoaddr ptr [[DST2]] to i64
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
@@ -622,6 +624,10 @@ define void @trunc_of_iv_plus_const_scalar_use(ptr %dst, ptr %dst2, ptr %src, i6
 ; CHECK-NEXT:    [[TMP5:%.*]] = or i1 [[TMP3]], [[TMP4]]
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP20:%.*]] = add i64 [[DST210]], -5
+; CHECK-NEXT:    [[TMP21:%.*]] = sub i64 [[TMP20]], [[SRC11]]
+; CHECK-NEXT:    [[TMP22:%.*]] = sub i64 [[TMP21]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP22]], 3
 ; CHECK-NEXT:    [[TMP6:%.*]] = shl i64 [[N]], 2
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP6]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[DST2]], i64 [[N]]
@@ -635,10 +641,7 @@ define void @trunc_of_iv_plus_const_scalar_use(ptr %dst, ptr %dst2, ptr %src, i6
 ; CHECK-NEXT:    [[BOUND112:%.*]] = icmp ult ptr [[TMP9]], [[TMP7]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT13:%.*]] = and i1 [[BOUND011]], [[BOUND112]]
 ; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT13]]
-; CHECK-NEXT:    [[BOUND014:%.*]] = icmp ult ptr [[DST2]], [[TMP11]]
-; CHECK-NEXT:    [[BOUND115:%.*]] = icmp ult ptr [[TMP9]], [[TMP8]]
-; CHECK-NEXT:    [[FOUND_CONFLICT16:%.*]] = and i1 [[BOUND014]], [[BOUND115]]
-; CHECK-NEXT:    [[CONFLICT_RDX17:%.*]] = or i1 [[CONFLICT_RDX]], [[FOUND_CONFLICT16]]
+; CHECK-NEXT:    [[CONFLICT_RDX17:%.*]] = or i1 [[DIFF_CHECK]], [[CONFLICT_RDX]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX17]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[TMP12:%.*]] = and i64 [[N]], 3
@@ -655,7 +658,7 @@ define void @trunc_of_iv_plus_const_scalar_use(ptr %dst, ptr %dst2, ptr %src, i6
 ; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds i8, ptr [[SRC]], i64 [[TMP16]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i8>, ptr [[TMP17]], align 1, !alias.scope [[META33:![0-9]+]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i8, ptr [[DST2]], i64 [[INDEX]]
-; CHECK-NEXT:    store <4 x i8> [[WIDE_LOAD]], ptr [[TMP18]], align 1, !alias.scope [[META34:![0-9]+]], !noalias [[META33]]
+; CHECK-NEXT:    store <4 x i8> [[WIDE_LOAD]], ptr [[TMP18]], align 1, !alias.scope [[META34:![0-9]+]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
 ; CHECK-NEXT:    [[TMP19:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]

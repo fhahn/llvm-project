@@ -58,7 +58,7 @@ for.body:
 ; both be widened, and are originally adjacent to each other, make sure the
 ; load/deinterleave sequence ends up appearing between them.
 ;
-; void PR34711(short[2] *a, int *b, int *c, int n) {
+; void PR34711(short[2] *restrict a, int *b, int *c, int n) {
 ;   for(int i = 0; i < n; i++) {
 ;     c[i] = 7;
 ;     b[i] = (a[i][0] * a[i][1]);
@@ -66,7 +66,7 @@ for.body:
 ; }
 ;
 ; Check that the sext sank after the load in the vector loop.
-define void @PR34711(ptr %a, ptr %b, ptr %c, i64 %n) #0 {
+define void @PR34711(ptr noalias %a, ptr %b, ptr %c, i64 %n) #0 {
 ; CHECK-VF4UF1-LABEL: @PR34711
 ; CHECK-VF4UF1: vector.body
 ; CHECK-VF4UF1: %[[VEC_RECUR:.*]] = phi <vscale x 4 x i16> [ %vector.recur.init, %vector.ph ], [ %[[LOAD_LANE:.*]], %vector.body ]

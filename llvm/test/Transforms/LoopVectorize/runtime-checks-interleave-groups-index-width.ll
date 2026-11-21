@@ -20,21 +20,24 @@ define void @max_vscale_2_to_25(ptr %a, ptr %b, i32 %n) vscale_range(1, 33554432
 ; CHECK-LABEL: define void @max_vscale_2_to_25(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i32 [[N:%.*]]) #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[B2:%.*]] = ptrtoaddr ptr [[B]] to i32
+; CHECK-NEXT:    [[B4:%.*]] = ptrtoaddr ptr [[B]] to i32
 ; CHECK-NEXT:    [[A1:%.*]] = ptrtoaddr ptr [[A]] to i32
 ; CHECK-NEXT:    [[TMP0:%.*]] = call i32 @llvm.vscale.i32()
 ; CHECK-NEXT:    [[TMP1:%.*]] = shl nuw i32 [[TMP0]], 3
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[N]], [[TMP1]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP3:%.*]] = shl i32 [[TMP0]], 7
-; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], -1
+; CHECK-NEXT:    [[TMP2:%.*]] = shl i32 [[TMP0]], 7
+; CHECK-NEXT:    [[TMP3:%.*]] = add i32 [[TMP2]], -1
 ; CHECK-NEXT:    [[TMP5:%.*]] = shl nuw i32 [[TMP0]], 6
 ; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[A1]], [[TMP5]]
-; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[TMP6]], [[B2]]
-; CHECK-NEXT:    [[TMP8:%.*]] = sub i32 [[TMP7]], 1
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i32 [[TMP8]], [[TMP4]]
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP10:%.*]] = sub i32 [[TMP6]], [[B4]]
+; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[TMP10]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i32 [[TMP7]], [[TMP3]]
+; CHECK-NEXT:    [[TMP8:%.*]] = sub i32 [[A1]], [[B4]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i32 [[TMP8]], 0
+; CHECK-NEXT:    [[TMP9:%.*]] = and i1 [[DIFF_CHECK]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    br i1 [[TMP9]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ;
 entry:
@@ -66,7 +69,7 @@ define void @max_vscale_2_to_26(ptr %a, ptr %b, i32 %n) vscale_range(1, 67108864
 ; CHECK-LABEL: define void @max_vscale_2_to_26(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i32 [[N:%.*]]) #[[ATTR1:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[B2:%.*]] = ptrtoaddr ptr [[B]] to i32
+; CHECK-NEXT:    [[B4:%.*]] = ptrtoaddr ptr [[B]] to i32
 ; CHECK-NEXT:    [[A1:%.*]] = ptrtoaddr ptr [[A]] to i32
 ; CHECK-NEXT:    [[TMP0:%.*]] = call i32 @llvm.vscale.i32()
 ; CHECK-NEXT:    [[TMP1:%.*]] = shl nuw i32 [[TMP0]], 3
@@ -74,15 +77,18 @@ define void @max_vscale_2_to_26(ptr %a, ptr %b, i32 %n) vscale_range(1, 67108864
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[DIFF_CHECK_WRAP:%.*]] = icmp ugt i32 [[TMP0]], 33554432
-; CHECK-NEXT:    [[TMP3:%.*]] = shl i32 [[TMP0]], 7
-; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], -1
+; CHECK-NEXT:    [[TMP2:%.*]] = shl i32 [[TMP0]], 7
+; CHECK-NEXT:    [[TMP3:%.*]] = add i32 [[TMP2]], -1
 ; CHECK-NEXT:    [[TMP5:%.*]] = shl i32 [[TMP0]], 6
 ; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[A1]], [[TMP5]]
-; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[TMP6]], [[B2]]
-; CHECK-NEXT:    [[TMP8:%.*]] = sub i32 [[TMP7]], 1
-; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i32 [[TMP8]], [[TMP4]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = or i1 [[DIFF_CHECK_WRAP]], [[DIFF_CHECK]]
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP10:%.*]] = sub i32 [[TMP6]], [[B4]]
+; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[TMP10]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i32 [[TMP7]], [[TMP3]]
+; CHECK-NEXT:    [[TMP8:%.*]] = sub i32 [[A1]], [[B4]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i32 [[TMP8]], 0
+; CHECK-NEXT:    [[TMP9:%.*]] = and i1 [[DIFF_CHECK]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[DIFF_CHECK_WRAP]], [[TMP9]]
+; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ;
 entry:
@@ -157,23 +163,26 @@ define void @no_vscale_range_64_bit_pointers(ptr addrspace(1) %a, ptr addrspace(
 ; CHECK-LABEL: define void @no_vscale_range_64_bit_pointers(
 ; CHECK-SAME: ptr addrspace(1) [[A:%.*]], ptr addrspace(1) [[B:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[B2:%.*]] = ptrtoaddr ptr addrspace(1) [[B]] to i64
-; CHECK-NEXT:    [[A1:%.*]] = ptrtoaddr ptr addrspace(1) [[A]] to i64
+; CHECK-NEXT:    [[B4:%.*]] = ptrtoaddr ptr addrspace(1) [[B]] to i64
+; CHECK-NEXT:    [[A3:%.*]] = ptrtoaddr ptr addrspace(1) [[A]] to i64
 ; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 3
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], [[TMP1]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[DIFF_CHECK_WRAP:%.*]] = icmp ugt i64 [[TMP0]], 144115188075855872
-; CHECK-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP0]], 7
-; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[TMP3]], -1
-; CHECK-NEXT:    [[TMP5:%.*]] = shl i64 [[TMP0]], 6
-; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[A1]], [[TMP5]]
-; CHECK-NEXT:    [[TMP7:%.*]] = sub i64 [[TMP6]], [[B2]]
-; CHECK-NEXT:    [[TMP8:%.*]] = sub i64 [[TMP7]], 1
-; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP8]], [[TMP4]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = or i1 [[DIFF_CHECK_WRAP]], [[DIFF_CHECK]]
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP2:%.*]] = shl i64 [[TMP0]], 7
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[TMP2]], -1
+; CHECK-NEXT:    [[TMP4:%.*]] = shl i64 [[TMP0]], 6
+; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[A3]], [[TMP4]]
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 [[TMP5]], [[B4]]
+; CHECK-NEXT:    [[TMP7:%.*]] = sub i64 [[TMP6]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP7]], [[TMP3]]
+; CHECK-NEXT:    [[TMP8:%.*]] = sub i64 [[A3]], [[B4]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP8]], 0
+; CHECK-NEXT:    [[TMP9:%.*]] = and i1 [[DIFF_CHECK]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[DIFF_CHECK_WRAP]], [[TMP9]]
+; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ;
 entry:
@@ -220,7 +229,10 @@ define void @fixed_vf_step_306783378(ptr %a, ptr %b, i32 %n) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub i32 [[TMP0]], [[B2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i32 [[TMP1]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i32 [[TMP2]], -1
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i32 [[A1]], [[B2]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i32 [[TMP3]], 0
+; CHECK-NEXT:    [[TMP4:%.*]] = and i1 [[FOUND_CONFLICT]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    br i1 [[TMP4]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ;
 entry:
@@ -295,7 +307,10 @@ define void @step_2_to_31_64_bit_pointers(ptr addrspace(1) %a, ptr addrspace(1) 
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[B2]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], 1
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP2]], 30064771073
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[A1]], [[B2]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP3]], 0
+; CHECK-NEXT:    [[TMP4:%.*]] = and i1 [[FOUND_CONFLICT]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    br i1 [[TMP4]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ;
 entry:

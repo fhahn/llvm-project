@@ -28,7 +28,10 @@ define void @narrow_load_no_vscale_range(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    [[TMP7:%.*]] = sub i64 [[TMP6]], [[B2]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = sub i64 [[TMP7]], 1
 ; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP8]], [[TMP4]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = or i1 [[DIFF_CHECK_WRAP]], [[DIFF_CHECK]]
+; CHECK-NEXT:    [[TMP10:%.*]] = sub i64 [[A1]], [[B2]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP10]], 0
+; CHECK-NEXT:    [[TMP9:%.*]] = and i1 [[DIFF_CHECK]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = or i1 [[DIFF_CHECK_WRAP]], [[TMP9]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ;
@@ -61,12 +64,13 @@ define void @narrow_load_no_vscale_range_outer_loop(ptr %a, ptr %b, i64 %m, i64 
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[B2:%.*]] = ptrtoaddr ptr [[B]] to i64
 ; CHECK-NEXT:    [[A1:%.*]] = ptrtoaddr ptr [[A]] to i64
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[A1]], [[B2]]
 ; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[TMP0]], 5
-; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP1]], -1
 ; CHECK-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP0]], 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[A1]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = sub i64 [[TMP4]], [[B2]]
+; CHECK-NEXT:    [[TMP9:%.*]] = shl i64 [[TMP0]], 5
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP9]], -1
 ; CHECK-NEXT:    br label %[[OUTER_LOOP:.*]]
 ; CHECK:       [[OUTER_LOOP]]:
 ; CHECK-NEXT:    [[I:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[I_NEXT:%.*]], [[INNER_EXIT:%.*]] ]
@@ -79,7 +83,9 @@ define void @narrow_load_no_vscale_range_outer_loop(ptr %a, ptr %b, i64 %m, i64 
 ; CHECK-NEXT:    [[DIFF_CHECK_WRAP:%.*]] = icmp ugt i64 [[TMP0]], 576460752303423488
 ; CHECK-NEXT:    [[TMP8:%.*]] = sub i64 [[TMP5]], 1
 ; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP8]], [[TMP2]]
-; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[DIFF_CHECK_WRAP]], [[DIFF_CHECK]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i64 [[TMP1]], 0
+; CHECK-NEXT:    [[TMP10:%.*]] = and i1 [[DIFF_CHECK]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[DIFF_CHECK_WRAP]], [[TMP10]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ;
@@ -133,7 +139,10 @@ define void @narrow_load_32_bit_pointers_max_vscale_2_to_27(ptr addrspace(270) %
 ; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[TMP6]], [[B2]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = sub i32 [[TMP7]], 1
 ; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i32 [[TMP8]], [[TMP4]]
-; CHECK-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP9:%.*]] = sub i32 [[A1]], [[B2]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i32 [[TMP9]], 0
+; CHECK-NEXT:    [[TMP10:%.*]] = and i1 [[DIFF_CHECK]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    br i1 [[TMP10]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ;
 entry:
@@ -174,7 +183,10 @@ define void @narrow_load_32_bit_pointers_max_vscale_2_to_28(ptr addrspace(270) %
 ; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[TMP6]], [[B2]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = sub i32 [[TMP7]], 1
 ; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i32 [[TMP8]], [[TMP4]]
-; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[DIFF_CHECK_WRAP]], [[DIFF_CHECK]]
+; CHECK-NEXT:    [[TMP11:%.*]] = sub i32 [[A1]], [[B2]]
+; CHECK-NEXT:    [[DIFF_CHECK_NE:%.*]] = icmp ne i32 [[TMP11]], 0
+; CHECK-NEXT:    [[TMP10:%.*]] = and i1 [[DIFF_CHECK]], [[DIFF_CHECK_NE]]
+; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[DIFF_CHECK_WRAP]], [[TMP10]]
 ; CHECK-NEXT:    br i1 [[TMP9]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ;
