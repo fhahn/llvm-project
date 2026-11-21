@@ -1717,13 +1717,14 @@ void VPlanTransforms::attachMemoryChecks(
   auto *MemCheckVPBB = Plan.createVPBasicBlock("vector.memcheck");
   VPBuilder Builder(MemCheckVPBB);
   VPSCEVExpander Expander(Builder, SE, DL, TheLoop->getParentLoop());
-  auto DiffChecks = RtPtrChecking.getDiffChecks();
-  VPValue *Cond =
-      DiffChecks
-          ? createDiffRuntimeChecks(Plan, Builder, Expander, *DiffChecks, SE,
-                                    VF, UF, DL)
-          : createRuntimeChecks(Plan, Builder, Expander,
-                                RtPtrChecking.getChecks(), TheLoop, SE, DL);
+  auto [DiffChecks, RangeChecks] = RtPtrChecking.getDiffAndRangeChecks();
+  VPValue *Cond = createDiffRuntimeChecks(Plan, Builder, Expander, DiffChecks,
+                                          SE, VF, UF, DL);
+  if (!RangeChecks.empty()) {
+    VPValue *RangeCond = createRuntimeChecks(Plan, Builder, Expander,
+                                             RangeChecks, TheLoop, SE, DL);
+    Cond = Builder.createOr(Cond, RangeCond, DL, "conflict.rdx");
+  }
   attachVPCheckBlock(Plan, Cond, MemCheckVPBB, AddBranchWeights);
 }
 

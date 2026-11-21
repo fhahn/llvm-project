@@ -642,8 +642,28 @@ SmallVector<RuntimePointerCheck, 4> RuntimePointerChecking::generateChecks() {
       const RuntimeCheckingPtrGroup &CGJ = CheckingGroups[J];
 
       if (needsChecking(CGI, CGJ)) {
-        CanUseDiffCheck = CanUseDiffCheck && tryToCreateDiffCheck(CGI, CGJ);
+        if (!tryToCreateDiffCheck(CGI, CGJ))
+          RangeChecks.emplace_back(&CGI, &CGJ);
         Checks.emplace_back(&CGI, &CGJ);
+      }
+    }
+  }
+
+  // LoopVersioning maps each pointer value to a single group when adding
+  // noalias metadata for RangeChecks. If a pointer value is in multiple
+  // groups, e.g. a forked pointer, its groups may be checked against the same
+  // group by both kinds of checks, so use range checks for all pairs.
+  if (DiffChecks.empty() || RangeChecks.empty())
+    return Checks;
+  DenseMap<Value *, const RuntimeCheckingPtrGroup *> PtrToGroup;
+  for (const RuntimeCheckingPtrGroup &CG : CheckingGroups) {
+    for (unsigned M : CG.Members) {
+      auto [It, Inserted] =
+          PtrToGroup.try_emplace(Pointers[M].PointerValue, &CG);
+      if (!Inserted && It->second != &CG) {
+        DiffChecks.clear();
+        RangeChecks.assign(Checks);
+        return Checks;
       }
     }
   }

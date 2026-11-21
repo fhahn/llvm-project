@@ -216,6 +216,8 @@ define void @test_masked_interleave_group(i32 %N, ptr %mask, ptr %src, ptr %dst)
 ; CHECK-LABEL: define void @test_masked_interleave_group(
 ; CHECK-SAME: i32 [[N:%.*]], ptr [[MASK:%.*]], ptr [[SRC:%.*]], ptr [[DST:%.*]]) #[[ATTR0]] {
 ; CHECK-NEXT:  [[ITER_CHECK:.*]]:
+; CHECK-NEXT:    [[SRC5:%.*]] = ptrtoaddr ptr [[SRC]] to i64
+; CHECK-NEXT:    [[DST4:%.*]] = ptrtoaddr ptr [[DST]] to i64
 ; CHECK-NEXT:    [[TMP0:%.*]] = zext i32 [[N]] to i64
 ; CHECK-NEXT:    [[TMP1:%.*]] = add nuw nsw i64 [[TMP0]], 1
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
@@ -223,19 +225,22 @@ define void @test_masked_interleave_group(i32 %N, ptr %mask, ptr %src, ptr %dst)
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP1]], [[TMP3]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP10:%.*]] = shl nuw nsw i64 [[TMP2]], 9
+; CHECK-NEXT:    [[TMP38:%.*]] = add nsw i64 [[TMP10]], -1
+; CHECK-NEXT:    [[TMP39:%.*]] = shl nuw nsw i64 [[TMP2]], 8
+; CHECK-NEXT:    [[TMP40:%.*]] = add i64 [[SRC5]], [[TMP39]]
+; CHECK-NEXT:    [[TMP41:%.*]] = sub i64 [[TMP40]], [[DST4]]
+; CHECK-NEXT:    [[TMP42:%.*]] = sub i64 [[TMP41]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP42]], [[TMP38]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = zext i32 [[N]] to i64
 ; CHECK-NEXT:    [[TMP5:%.*]] = shl nuw nsw i64 [[TMP4]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = add nuw nsw i64 [[TMP5]], 16
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP6]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = add nuw nsw i64 [[TMP4]], 1
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr i8, ptr [[MASK]], i64 [[TMP8]]
-; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP6]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[TMP9]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[MASK]], [[TMP7]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    [[BOUND06:%.*]] = icmp ult ptr [[DST]], [[TMP10]]
-; CHECK-NEXT:    [[BOUND17:%.*]] = icmp ult ptr [[SRC]], [[TMP7]]
-; CHECK-NEXT:    [[FOUND_CONFLICT8:%.*]] = and i1 [[BOUND06]], [[BOUND17]]
+; CHECK-NEXT:    [[FOUND_CONFLICT8:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT8]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VECTOR_MAIN_LOOP_ITER_CHECK:.*]]
 ; CHECK:       [[VECTOR_MAIN_LOOP_ITER_CHECK]]:
@@ -268,16 +273,16 @@ define void @test_masked_interleave_group(i32 %N, ptr %mask, ptr %src, ptr %dst)
 ; CHECK-NEXT:    [[TMP22:%.*]] = extractvalue { <vscale x 16 x float>, <vscale x 16 x float>, <vscale x 16 x float>, <vscale x 16 x float> } [[STRIDED_VEC]], 3
 ; CHECK-NEXT:    [[INTERLEAVED_VEC:%.*]] = call <vscale x 64 x float> @llvm.vector.interleave4.nxv64f32(<vscale x 16 x float> [[TMP19]], <vscale x 16 x float> [[TMP20]], <vscale x 16 x float> [[TMP21]], <vscale x 16 x float> [[TMP22]])
 ; CHECK-NEXT:    [[INTERLEAVED_MASK12:%.*]] = call <vscale x 64 x i1> @llvm.vector.interleave4.nxv64i1(<vscale x 16 x i1> [[TMP18]], <vscale x 16 x i1> [[TMP18]], <vscale x 16 x i1> [[TMP18]], <vscale x 16 x i1> [[TMP18]])
-; CHECK-NEXT:    call void @llvm.masked.store.nxv64f32.p0(<vscale x 64 x float> [[INTERLEAVED_VEC]], ptr align 4 [[NEXT_GEP]], <vscale x 64 x i1> [[INTERLEAVED_MASK12]]), !alias.scope [[META13:![0-9]+]], !noalias [[META15:![0-9]+]]
+; CHECK-NEXT:    call void @llvm.masked.store.nxv64f32.p0(<vscale x 64 x float> [[INTERLEAVED_VEC]], ptr align 4 [[NEXT_GEP]], <vscale x 64 x i1> [[INTERLEAVED_MASK12]]), !alias.scope [[META13:![0-9]+]], !noalias [[META8]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP11]]
 ; CHECK-NEXT:    [[TMP23:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP23]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP23]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP15:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP1]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
 ; CHECK:       [[VEC_EPILOG_ITER_CHECK]]:
 ; CHECK-NEXT:    [[MIN_EPILOG_ITERS_CHECK:%.*]] = icmp ult i64 [[N_MOD_VF]], [[TMP3]]
-; CHECK-NEXT:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF17:![0-9]+]]
+; CHECK-NEXT:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF16:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_PH]]:
 ; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    [[TMP24:%.*]] = call i64 @llvm.vscale.i64()
@@ -307,24 +312,24 @@ define void @test_masked_interleave_group(i32 %N, ptr %mask, ptr %src, ptr %dst)
 ; CHECK-NEXT:    [[TMP36:%.*]] = extractvalue { <vscale x 8 x float>, <vscale x 8 x float>, <vscale x 8 x float>, <vscale x 8 x float> } [[STRIDED_VEC22]], 3
 ; CHECK-NEXT:    [[INTERLEAVED_VEC23:%.*]] = call <vscale x 32 x float> @llvm.vector.interleave4.nxv32f32(<vscale x 8 x float> [[TMP33]], <vscale x 8 x float> [[TMP34]], <vscale x 8 x float> [[TMP35]], <vscale x 8 x float> [[TMP36]])
 ; CHECK-NEXT:    [[INTERLEAVED_MASK24:%.*]] = call <vscale x 32 x i1> @llvm.vector.interleave4.nxv32i1(<vscale x 8 x i1> [[TMP32]], <vscale x 8 x i1> [[TMP32]], <vscale x 8 x i1> [[TMP32]], <vscale x 8 x i1> [[TMP32]])
-; CHECK-NEXT:    call void @llvm.masked.store.nxv32f32.p0(<vscale x 32 x float> [[INTERLEAVED_VEC23]], ptr align 4 [[NEXT_GEP16]], <vscale x 32 x i1> [[INTERLEAVED_MASK24]]), !alias.scope [[META13]], !noalias [[META15]]
+; CHECK-NEXT:    call void @llvm.masked.store.nxv32f32.p0(<vscale x 32 x float> [[INTERLEAVED_VEC23]], ptr align 4 [[NEXT_GEP16]], <vscale x 32 x i1> [[INTERLEAVED_MASK24]]), !alias.scope [[META13]], !noalias [[META8]]
 ; CHECK-NEXT:    [[INDEX_NEXT25]] = add nuw i64 [[INDEX15]], [[TMP25]]
 ; CHECK-NEXT:    [[TMP37:%.*]] = icmp eq i64 [[INDEX_NEXT25]], [[N_VEC14]]
-; CHECK-NEXT:    br i1 [[TMP37]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP18:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP37]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP17:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N26:%.*]] = icmp eq i64 [[TMP1]], [[N_VEC14]]
 ; CHECK-NEXT:    br i1 [[CMP_N26]], label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]]
 ; CHECK:       [[VEC_EPILOG_SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[TMP26]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP12]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MEMCHECK]] ], [ 0, %[[ITER_CHECK]] ]
-; CHECK-NEXT:    [[BC_RESUME_VAL27:%.*]] = phi ptr [ [[TMP28]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP14]], %[[VEC_EPILOG_ITER_CHECK]] ], [ [[DST]], %[[VECTOR_MEMCHECK]] ], [ [[DST]], %[[ITER_CHECK]] ]
-; CHECK-NEXT:    [[BC_RESUME_VAL28:%.*]] = phi ptr [ [[TMP29]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP15]], %[[VEC_EPILOG_ITER_CHECK]] ], [ [[SRC]], %[[VECTOR_MEMCHECK]] ], [ [[SRC]], %[[ITER_CHECK]] ]
-; CHECK-NEXT:    [[BC_RESUME_VAL29:%.*]] = phi ptr [ [[TMP30]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP16]], %[[VEC_EPILOG_ITER_CHECK]] ], [ [[MASK]], %[[VECTOR_MEMCHECK]] ], [ [[MASK]], %[[ITER_CHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL24:%.*]] = phi ptr [ [[TMP28]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP14]], %[[VEC_EPILOG_ITER_CHECK]] ], [ [[DST]], %[[VECTOR_MEMCHECK]] ], [ [[DST]], %[[ITER_CHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL25:%.*]] = phi ptr [ [[TMP29]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP15]], %[[VEC_EPILOG_ITER_CHECK]] ], [ [[SRC]], %[[VECTOR_MEMCHECK]] ], [ [[SRC]], %[[ITER_CHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL26:%.*]] = phi ptr [ [[TMP30]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP16]], %[[VEC_EPILOG_ITER_CHECK]] ], [ [[MASK]], %[[VECTOR_MEMCHECK]] ], [ [[MASK]], %[[ITER_CHECK]] ]
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[BC_RESUME_VAL]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[DST_IV:%.*]] = phi ptr [ [[BC_RESUME_VAL27]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[DST_IV_NEXT:%.*]], %[[LOOP_LATCH]] ]
-; CHECK-NEXT:    [[SRC_IV:%.*]] = phi ptr [ [[BC_RESUME_VAL28]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[SRC_IV_NEXT:%.*]], %[[LOOP_LATCH]] ]
-; CHECK-NEXT:    [[MASK_IV:%.*]] = phi ptr [ [[BC_RESUME_VAL29]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[MASK_IV_NEXT:%.*]], %[[LOOP_LATCH]] ]
+; CHECK-NEXT:    [[DST_IV:%.*]] = phi ptr [ [[BC_RESUME_VAL24]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[DST_IV_NEXT:%.*]], %[[LOOP_LATCH]] ]
+; CHECK-NEXT:    [[SRC_IV:%.*]] = phi ptr [ [[BC_RESUME_VAL25]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[SRC_IV_NEXT:%.*]], %[[LOOP_LATCH]] ]
+; CHECK-NEXT:    [[MASK_IV:%.*]] = phi ptr [ [[BC_RESUME_VAL26]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[MASK_IV_NEXT:%.*]], %[[LOOP_LATCH]] ]
 ; CHECK-NEXT:    [[MASK_IV_NEXT]] = getelementptr i8, ptr [[MASK_IV]], i64 1
 ; CHECK-NEXT:    [[MASK_VAL:%.*]] = load i8, ptr [[MASK_IV]], align 1
 ; CHECK-NEXT:    [[SHOULD_COPY:%.*]] = icmp eq i8 [[MASK_VAL]], 0
@@ -350,7 +355,7 @@ define void @test_masked_interleave_group(i32 %N, ptr %mask, ptr %src, ptr %dst)
 ; CHECK-NEXT:    [[SRC_IV_NEXT]] = getelementptr i8, ptr [[SRC_IV]], i64 16
 ; CHECK-NEXT:    [[DST_IV_NEXT]] = getelementptr i8, ptr [[DST_IV]], i64 16
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i32 [[IV]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP19:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP18:![0-9]+]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;
@@ -420,7 +425,7 @@ define void @shared_wide_load_not_narrowed(ptr noalias %src, ptr noalias %scales
 ; CHECK-NEXT:    store <2 x double> [[TMP3]], ptr [[TMP4]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP20:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP19:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br [[EXIT:label %.*]]
 ; CHECK:       [[SCALAR_PH]]:
@@ -474,7 +479,7 @@ define void @shared_wide_load_with_cast_not_narrowed(ptr noalias %src, ptr noali
 ; CHECK-NEXT:    store <2 x double> [[TMP4]], ptr [[TMP5]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP22:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP21:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br [[EXIT:label %.*]]
 ; CHECK:       [[SCALAR_PH]]:
@@ -593,7 +598,7 @@ define void @forward_load_reverse_store_interleave_group(ptr noalias %src, ptr n
 ; CHECK-NEXT:    store <vscale x 4 x i64> [[INTERLEAVED_VEC]], ptr [[TMP11]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP1]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP24:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP23:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 100, [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[SCALAR_PH:.*]]

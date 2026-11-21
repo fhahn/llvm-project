@@ -174,6 +174,8 @@ define void @geps_feeding_interleave_groups_with_reuse2(ptr %A, ptr %B, i64 %N) 
 ; CHECK-LABEL: define void @geps_feeding_interleave_groups_with_reuse2(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) #[[ATTR1:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[B16:%.*]] = ptrtoaddr ptr [[B]] to i64
+; CHECK-NEXT:    [[A15:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; CHECK-NEXT:    [[TMP0:%.*]] = lshr i64 [[N]], 3
 ; CHECK-NEXT:    [[TMP1:%.*]] = add nuw nsw i64 [[TMP0]], 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 [[TMP1]], 28
@@ -235,18 +237,18 @@ define void @geps_feeding_interleave_groups_with_reuse2(ptr %A, ptr %B, i64 %N) 
 ; CHECK-NEXT:    [[TMP41:%.*]] = or i1 [[TMP40]], [[TMP32]]
 ; CHECK-NEXT:    br i1 [[TMP41]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP45:%.*]] = add i64 [[A15]], 128
+; CHECK-NEXT:    [[TMP43:%.*]] = sub i64 [[TMP45]], [[B16]]
+; CHECK-NEXT:    [[TMP44:%.*]] = sub i64 [[TMP43]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP44]], 255
 ; CHECK-NEXT:    [[TMP42:%.*]] = lshr i64 [[N]], 3
-; CHECK-NEXT:    [[TMP43:%.*]] = shl i64 [[TMP42]], 5
-; CHECK-NEXT:    [[TMP44:%.*]] = add nuw nsw i64 [[TMP43]], 4
-; CHECK-NEXT:    [[SCEVGEP35:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP44]]
-; CHECK-NEXT:    [[TMP45:%.*]] = add i64 [[TMP43]], 32
-; CHECK-NEXT:    [[SCEVGEP36:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP45]]
 ; CHECK-NEXT:    [[TMP46:%.*]] = shl i64 [[TMP42]], 4
 ; CHECK-NEXT:    [[TMP47:%.*]] = add nuw nsw i64 [[TMP46]], 8
 ; CHECK-NEXT:    [[SCEVGEP37:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP47]]
+; CHECK-NEXT:    [[TMP64:%.*]] = shl i64 [[TMP42]], 5
+; CHECK-NEXT:    [[TMP65:%.*]] = add i64 [[TMP64]], 32
+; CHECK-NEXT:    [[SCEVGEP36:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP65]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[SCEVGEP36]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[SCEVGEP35]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    [[BOUND139:%.*]] = icmp ult ptr [[A]], [[SCEVGEP37]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT40:%.*]] = and i1 [[BOUND0]], [[BOUND139]]
 ; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT40]]
@@ -280,7 +282,7 @@ define void @geps_feeding_interleave_groups_with_reuse2(ptr %A, ptr %B, i64 %N) 
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4i32.v4p0(<4 x i32> zeroinitializer, <4 x ptr> align 4 [[WIDE_GEP22]], <4 x i1> splat (i1 true)), !alias.scope [[META6]]
 ; CHECK-NEXT:    [[TMP57:%.*]] = or disjoint <4 x i64> [[VEC_IND]], splat (i64 4)
 ; CHECK-NEXT:    [[WIDE_GEP23:%.*]] = getelementptr [4 x i8], ptr [[B]], <4 x i64> [[VEC_IND]]
-; CHECK-NEXT:    [[WIDE_MASKED_GATHER:%.*]] = call <4 x i32> @llvm.masked.gather.v4i32.v4p0(<4 x ptr> align 4 [[WIDE_GEP23]], <4 x i1> splat (i1 true), <4 x i32> poison), !alias.scope [[META8:![0-9]+]], !noalias [[META6]]
+; CHECK-NEXT:    [[WIDE_MASKED_GATHER:%.*]] = call <4 x i32> @llvm.masked.gather.v4i32.v4p0(<4 x ptr> align 4 [[WIDE_GEP23]], <4 x i1> splat (i1 true), <4 x i32> poison), !alias.scope [[META8:![0-9]+]]
 ; CHECK-NEXT:    [[WIDE_GEP24:%.*]] = getelementptr [4 x i8], ptr [[A]], <4 x i64> [[TMP57]]
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4i32.v4p0(<4 x i32> [[WIDE_MASKED_GATHER]], <4 x ptr> align 4 [[WIDE_GEP24]], <4 x i1> splat (i1 true)), !alias.scope [[META6]]
 ; CHECK-NEXT:    [[TMP58:%.*]] = or disjoint <4 x i64> [[VEC_IND]], splat (i64 5)

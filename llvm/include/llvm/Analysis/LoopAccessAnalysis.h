@@ -611,10 +611,10 @@ public:
   /// Reset the state of the pointer runtime information.
   void reset() {
     Need = false;
-    CanUseDiffCheck = true;
     Pointers.clear();
     Checks.clear();
     DiffChecks.clear();
+    RangeChecks.clear();
     CheckingGroups.clear();
   }
 
@@ -639,13 +639,16 @@ public:
     return Checks;
   }
 
-  /// Returns the pointer-difference checks that can be used instead of the
-  /// checks of getChecks() to prove that there are no vectorization-preventing
-  /// dependences at runtime, or std::nullopt if they cannot be used.
-  std::optional<ArrayRef<PointerDiffInfo>> getDiffChecks() const {
-    if (!CanUseDiffCheck)
-      return std::nullopt;
-    return {DiffChecks};
+  /// Returns the pointer-difference checks for the pairs of groups that use
+  /// them, and the checks of getChecks() for the remaining pairs.
+  /// Together, they can be used instead of getChecks() to prove that there are
+  /// no vectorization-preventing dependences at runtime. Each check proves its
+  /// pair of groups independent on its own, so the conditions of both lists can
+  /// be combined. Unlike the checks of getChecks(), pointer-difference checks
+  /// do not rule out overlap across loop iterations.
+  std::pair<ArrayRef<PointerDiffInfo>, ArrayRef<RuntimePointerCheck>>
+  getDiffAndRangeChecks() const {
+    return {DiffChecks, RangeChecks};
   }
 
   /// Decide if we need to add a check between two groups of pointers,
@@ -707,9 +710,9 @@ private:
   /// Generate the checks and return them.
   SmallVector<RuntimePointerCheck, 4> generateChecks();
 
-  /// Try to create add a new (pointer-difference, access size) pair to
-  /// DiffCheck for checking groups \p CGI and \p CGJ. If pointer-difference
-  /// checks cannot be used for the groups, set CanUseDiffCheck to false.
+  /// Try to add a new (pointer-difference, access size) pair to DiffChecks for
+  /// checking groups \p CGI and \p CGJ. Returns false if pointer-difference
+  /// checks cannot be used for the groups.
   bool tryToCreateDiffCheck(const RuntimeCheckingPtrGroup &CGI,
                             const RuntimeCheckingPtrGroup &CGJ);
 
@@ -727,11 +730,12 @@ private:
   /// otherwise may-aliasing pointers in the loop.
   SmallVector<RuntimePointerCheck, 4> Checks;
 
-  /// Flag indicating if pointer-difference checks can be used
-  bool CanUseDiffCheck = true;
+  /// Checks of the pairs of groups that do not use a pointer-difference check.
+  SmallVector<RuntimePointerCheck> RangeChecks;
 
-  /// A list of (pointer-difference, access size) pairs that can be used to
-  /// prove that there are no vectorization-preventing dependencies.
+  /// A list of (pointer-difference, access size) pairs that, together with
+  /// RangeChecks, prove that there are no vectorization-preventing
+  /// dependencies.
   SmallVector<PointerDiffInfo> DiffChecks;
 };
 

@@ -8,6 +8,8 @@ define void @dep_between_interleaved_store_and_load_with_runtime_checks(ptr %a, 
 ; CHECK-NEXT:    [[B_OFF:%.*]] = getelementptr i8, ptr [[B]], i64 [[OFF]]
 ; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP18:%.*]] = sub i64 [[OFF]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP18]], 15
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr i8, ptr [[A]], i64 800
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[B]], i64 400
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[OFF]], 400
@@ -19,10 +21,7 @@ define void @dep_between_interleaved_store_and_load_with_runtime_checks(ptr %a, 
 ; CHECK-NEXT:    [[BOUND111:%.*]] = icmp ult ptr [[B_OFF]], [[TMP0]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT12:%.*]] = and i1 [[BOUND010]], [[BOUND111]]
 ; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT12]]
-; CHECK-NEXT:    [[BOUND013:%.*]] = icmp ult ptr [[B]], [[TMP3]]
-; CHECK-NEXT:    [[BOUND114:%.*]] = icmp ult ptr [[B_OFF]], [[TMP1]]
-; CHECK-NEXT:    [[FOUND_CONFLICT15:%.*]] = and i1 [[BOUND013]], [[BOUND114]]
-; CHECK-NEXT:    [[CONFLICT_RDX16:%.*]] = or i1 [[CONFLICT_RDX]], [[FOUND_CONFLICT15]]
+; CHECK-NEXT:    [[CONFLICT_RDX16:%.*]] = or i1 [[DIFF_CHECK]], [[CONFLICT_RDX]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX16]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
@@ -50,9 +49,9 @@ define void @dep_between_interleaved_store_and_load_with_runtime_checks(ptr %a, 
 ; CHECK-NEXT:    store i32 3, ptr [[TMP13]], align 4, !alias.scope [[META0]], !noalias [[META3]]
 ; CHECK-NEXT:    store i32 3, ptr [[TMP14]], align 4, !alias.scope [[META0]], !noalias [[META3]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[INDEX]]
-; CHECK-NEXT:    store <4 x i32> [[STRIDED_VEC]], ptr [[TMP5]], align 4, !alias.scope [[META6:![0-9]+]], !noalias [[META7:![0-9]+]]
+; CHECK-NEXT:    store <4 x i32> [[STRIDED_VEC]], ptr [[TMP5]], align 4, !alias.scope [[META6:![0-9]+]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[B_OFF]], i64 [[INDEX]]
-; CHECK-NEXT:    store <4 x i32> zeroinitializer, ptr [[TMP6]], align 4, !alias.scope [[META7]]
+; CHECK-NEXT:    store <4 x i32> zeroinitializer, ptr [[TMP6]], align 4, !alias.scope [[META7:![0-9]+]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], 96
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
@@ -187,7 +186,7 @@ define void @interleave_group_with_forward_dep_after_retry(ptr noalias %A, ptr n
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
 ; CHECK-NEXT:    [[TMP23:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP23]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP22:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP23]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:

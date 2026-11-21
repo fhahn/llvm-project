@@ -764,12 +764,13 @@ public:
     if (!Checks)
       return;
 
-    auto DiffChecks = Checks->getDiffChecks();
-    if (!DiffChecks || DiffChecks->empty())
+    // The alias mask requires pointer-difference checks for all pairs.
+    auto [DiffChecks, RangeChecks] = Checks->getDiffAndRangeChecks();
+    if (DiffChecks.empty() || !RangeChecks.empty())
       return;
     // The alias mask cannot express symmetric checks, which allow dependences
     // in both directions.
-    if (any_of(*DiffChecks,
+    if (any_of(DiffChecks,
                [](const PointerDiffInfo &C) { return C.IsSymmetric; }))
       return;
 
@@ -1220,18 +1221,20 @@ public:
       MemCheckBlock = SplitBlock(Pred, Pred->getTerminator(), DT, LI, nullptr,
                                  "vector.memcheck");
 
-      auto DiffChecks = RtPtrChecking.getDiffChecks();
-      if (DiffChecks) {
-        MemRuntimeCheckCond = addDiffRuntimeChecks(
-            MemCheckBlock->getTerminator(), *DiffChecks, MemCheckExp, VF, IC);
-      } else {
-        MemRuntimeCheckCond = addRuntimeChecks(
-            MemCheckBlock->getTerminator(), L, RtPtrChecking.getChecks(),
-            MemCheckExp, VectorizerParams::HoistRuntimeChecks);
+      auto [DiffChecks, RangeChecks] = RtPtrChecking.getDiffAndRangeChecks();
+      MemRuntimeCheckCond = addDiffRuntimeChecks(
+          MemCheckBlock->getTerminator(), DiffChecks, MemCheckExp, VF, IC);
+      if (!RangeChecks.empty()) {
+        Value *RangeCond =
+            addRuntimeChecks(MemCheckBlock->getTerminator(), L,
+                             SmallVector<RuntimePointerCheck>(RangeChecks),
+                             MemCheckExp, VectorizerParams::HoistRuntimeChecks);
+        IRBuilder ChkBuilder(
+            MemCheckBlock->getTerminator()->getIterator(),
+            InstSimplifyFolder(MemCheckBlock->getDataLayout()));
+        MemRuntimeCheckCond =
+            ChkBuilder.CreateOr(MemRuntimeCheckCond, RangeCond, "conflict.rdx");
       }
-      assert(MemRuntimeCheckCond &&
-             "no RT checks generated although RtPtrChecking "
-             "claimed checks are required");
     }
 
     SCEVExp.eraseDeadInstructions(SCEVCheckCond);
@@ -5606,9 +5609,10 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
 
   if (vputils::findIncomingAliasMask(BestVPlan)) {
     assert(BestVPlan.hasTailFolded() && "Expected tail folding to be enabled");
-    RUN_VPLAN_PASS(VPlanTransforms::materializeAliasMaskCheckBlock, BestVPlan,
-                   *Legal->getRuntimePointerChecking()->getDiffChecks(),
-                   *PSE.getSE(), HasBranchWeights);
+    RUN_VPLAN_PASS(
+        VPlanTransforms::materializeAliasMaskCheckBlock, BestVPlan,
+        Legal->getRuntimePointerChecking()->getDiffAndRangeChecks().first,
+        *PSE.getSE(), HasBranchWeights);
     ++LoopsPartialAliasVectorized;
   }
 
@@ -6198,14 +6202,13 @@ LoopVectorizationPlanner::tryToBuildVPlan1(LoopVectorizationCostModel &PlanCM) {
   std::optional<LoopVersioning> LVer;
   if (IsInnerLoop) {
     const LoopAccessInfo *LAI = Legal->getLAI();
-    LVer.emplace(*LAI, LAI->getRuntimePointerChecking()->getChecks(), OrigLoop,
-                 LI, DT, PSE.getSE());
-    if (!LAI->getRuntimePointerChecking()->getChecks().empty() &&
-        !LAI->getRuntimePointerChecking()->getDiffChecks()) {
-      // Only use noalias metadata when using memory checks guaranteeing no
-      // overlap across all iterations.
+    // Only use noalias metadata for the pairs checked by range checks, which
+    // guarantee no overlap across all iterations.
+    ArrayRef<RuntimePointerCheck> RangeChecks =
+        LAI->getRuntimePointerChecking()->getDiffAndRangeChecks().second;
+    LVer.emplace(*LAI, RangeChecks, OrigLoop, LI, DT, PSE.getSE());
+    if (!RangeChecks.empty())
       LVer->prepareNoAliasMetadata();
-    }
   }
 
   // Create initial base VPlan0, to serve as common starting point for all

@@ -55,14 +55,18 @@ define void @foo(ptr %p, ptr %p.strided, i64 %n, i64 %stride) vscale_range(2, 10
 ; NO-UNIT-STRIDE-MV-NEXT:    [[TMP12:%.*]] = or i1 [[TMP11]], [[MUL_OVERFLOW]]
 ; NO-UNIT-STRIDE-MV-NEXT:    br i1 [[TMP12]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; NO-UNIT-STRIDE-MV:       [[VECTOR_MEMCHECK]]:
+; NO-UNIT-STRIDE-MV-NEXT:    [[TMP19:%.*]] = call i64 @llvm.vscale.i64()
+; NO-UNIT-STRIDE-MV-NEXT:    [[TMP24:%.*]] = shl nuw nsw i64 [[TMP19]], 4
+; NO-UNIT-STRIDE-MV-NEXT:    [[TMP27:%.*]] = add nsw i64 [[TMP24]], -1
 ; NO-UNIT-STRIDE-MV-NEXT:    [[TMP13:%.*]] = mul i64 [[ADD]], [[ADD]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[TMP14:%.*]] = shl i64 [[TMP13]], 3
+; NO-UNIT-STRIDE-MV-NEXT:    [[TMP16:%.*]] = add i64 [[TMP14]], 128
+; NO-UNIT-STRIDE-MV-NEXT:    [[TMP17:%.*]] = sub i64 [[TMP16]], 1
+; NO-UNIT-STRIDE-MV-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP17]], [[TMP27]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[TMP15:%.*]] = add i64 [[TMP14]], 136
 ; NO-UNIT-STRIDE-MV-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP15]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[TMP18:%.*]] = add i64 [[TMP14]], 640
 ; NO-UNIT-STRIDE-MV-NEXT:    [[SCEVGEP4:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP18]]
-; NO-UNIT-STRIDE-MV-NEXT:    [[SCEVGEP5:%.*]] = getelementptr i8, ptr [[P]], i64 8
-; NO-UNIT-STRIDE-MV-NEXT:    [[SCEVGEP6:%.*]] = getelementptr i8, ptr [[P]], i64 512
 ; NO-UNIT-STRIDE-MV-NEXT:    [[TMP20:%.*]] = mul i64 [[STRIDE]], 504
 ; NO-UNIT-STRIDE-MV-NEXT:    [[SCEVGEP7:%.*]] = getelementptr i8, ptr [[P_STRIDED]], i64 [[TMP20]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[TMP21:%.*]] = shl i64 [[STRIDE]], 3
@@ -72,9 +76,6 @@ define void @foo(ptr %p, ptr %p.strided, i64 %n, i64 %stride) vscale_range(2, 10
 ; NO-UNIT-STRIDE-MV-NEXT:    [[TMP23:%.*]] = icmp ugt ptr [[SCEVGEP7]], [[SCEVGEP8]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[UMAX:%.*]] = select i1 [[TMP23]], ptr [[SCEVGEP7]], ptr [[SCEVGEP8]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[SCEVGEP9:%.*]] = getelementptr i8, ptr [[UMAX]], i64 8
-; NO-UNIT-STRIDE-MV-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP2]], [[SCEVGEP6]]
-; NO-UNIT-STRIDE-MV-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP5]], [[SCEVGEP4]]
-; NO-UNIT-STRIDE-MV-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[BOUND010:%.*]] = icmp ult ptr [[SCEVGEP2]], [[SCEVGEP9]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[BOUND111:%.*]] = icmp ult ptr [[UMIN]], [[SCEVGEP4]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[FOUND_CONFLICT12:%.*]] = and i1 [[BOUND010]], [[BOUND111]]
@@ -102,12 +103,12 @@ define void @foo(ptr %p, ptr %p.strided, i64 %n, i64 %stride) vscale_range(2, 10
 ; NO-UNIT-STRIDE-MV-NEXT:    [[WIDE_LOAD19:%.*]] = call <vscale x 2 x i64> @llvm.vp.load.nxv2i64.p0(ptr align 8 [[TMP30]], <vscale x 2 x i1> splat (i1 true), i32 [[TMP25]]), !alias.scope [[META0:![0-9]+]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[WIDE_MASKED_GATHER22:%.*]] = call <vscale x 2 x i64> @llvm.vp.gather.nxv2i64.nxv2p0(<vscale x 2 x ptr> align 8 [[WIDE_GEP]], <vscale x 2 x i1> splat (i1 true), i32 [[TMP25]]), !alias.scope [[META3:![0-9]+]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[TMP49:%.*]] = add <vscale x 2 x i64> [[WIDE_LOAD19]], [[WIDE_MASKED_GATHER22]]
-; NO-UNIT-STRIDE-MV-NEXT:    call void @llvm.vp.store.nxv2i64.p0(<vscale x 2 x i64> [[TMP49]], ptr align 8 [[TMP31]], <vscale x 2 x i1> splat (i1 true), i32 [[TMP25]]), !alias.scope [[META5:![0-9]+]], !noalias [[META7:![0-9]+]]
+; NO-UNIT-STRIDE-MV-NEXT:    call void @llvm.vp.store.nxv2i64.p0(<vscale x 2 x i64> [[TMP49]], ptr align 8 [[TMP31]], <vscale x 2 x i1> splat (i1 true), i32 [[TMP25]]), !alias.scope [[META5:![0-9]+]], !noalias [[META3]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[INDEX_EVL_NEXT]] = add nuw i64 [[TMP26]], [[INDEX]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[AVL_NEXT]] = sub nuw i64 [[AVL]], [[TMP26]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[VEC_IND_NEXT]] = add nsw <vscale x 2 x i64> [[STEP_ADD_3]], [[BROADCAST_SPLAT]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[TMP32:%.*]] = icmp eq i64 [[AVL_NEXT]], 0
-; NO-UNIT-STRIDE-MV-NEXT:    br i1 [[TMP32]], label %[[MIDDLE_BLOCK:.*]], label %[[HEADER]], !llvm.loop [[LOOP8:![0-9]+]]
+; NO-UNIT-STRIDE-MV-NEXT:    br i1 [[TMP32]], label %[[MIDDLE_BLOCK:.*]], label %[[HEADER]], !llvm.loop [[LOOP7:![0-9]+]]
 ; NO-UNIT-STRIDE-MV:       [[MIDDLE_BLOCK]]:
 ; NO-UNIT-STRIDE-MV-NEXT:    br label %[[EXIT:.*]]
 ; NO-UNIT-STRIDE-MV:       [[SCALAR_PH]]:
@@ -124,7 +125,7 @@ define void @foo(ptr %p, ptr %p.strided, i64 %n, i64 %stride) vscale_range(2, 10
 ; NO-UNIT-STRIDE-MV-NEXT:    [[LD:%.*]] = add i64 [[LD1]], [[LD2]]
 ; NO-UNIT-STRIDE-MV-NEXT:    store i64 [[LD]], ptr [[GEP_ST]], align 8
 ; NO-UNIT-STRIDE-MV-NEXT:    [[EXITCOND:%.*]] = icmp slt i64 [[IV_NEXT]], 64
-; NO-UNIT-STRIDE-MV-NEXT:    br i1 [[EXITCOND]], label %[[HEADER1]], label %[[EXIT]], !llvm.loop [[LOOP11:![0-9]+]]
+; NO-UNIT-STRIDE-MV-NEXT:    br i1 [[EXITCOND]], label %[[HEADER1]], label %[[EXIT]], !llvm.loop [[LOOP10:![0-9]+]]
 ; NO-UNIT-STRIDE-MV:       [[EXIT]]:
 ; NO-UNIT-STRIDE-MV-NEXT:    ret void
 ;
