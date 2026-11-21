@@ -642,7 +642,10 @@ SmallVector<RuntimePointerCheck, 4> RuntimePointerChecking::generateChecks() {
       const RuntimeCheckingPtrGroup &CGJ = CheckingGroups[J];
 
       if (needsChecking(CGI, CGJ)) {
-        CanUseDiffCheck = CanUseDiffCheck && tryToCreateDiffCheck(CGI, CGJ);
+        if (!tryToCreateDiffCheck(CGI, CGJ)) {
+          CanUseDiffCheck = false;
+          NonDiffChecks.emplace_back(&CGI, &CGJ);
+        }
         Checks.emplace_back(&CGI, &CGJ);
       }
     }

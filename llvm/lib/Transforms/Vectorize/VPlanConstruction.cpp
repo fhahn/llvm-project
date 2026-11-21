@@ -1725,13 +1725,22 @@ void VPlanTransforms::attachMemoryChecks(
   auto *MemCheckVPBB = Plan.createVPBasicBlock("vector.memcheck");
   VPBuilder Builder(MemCheckVPBB);
   VPSCEVExpander Expander(Builder, SE, DL, TheLoop->getParentLoop());
-  auto DiffChecks = RtPtrChecking.getDiffChecks();
-  VPValue *Cond =
-      DiffChecks
-          ? createDiffRuntimeChecks(Plan, Builder, Expander, *DiffChecks, SE,
-                                    VF, UF, DL)
-          : createRuntimeChecks(Plan, Builder, Expander,
-                                RtPtrChecking.getChecks(), TheLoop, SE, DL);
+  VPValue *Cond;
+  if (auto DiffChecks = RtPtrChecking.getDiffChecks()) {
+    Cond = createDiffRuntimeChecks(Plan, Builder, Expander, *DiffChecks, SE, VF,
+                                   UF, DL);
+  } else if (auto Mixed = RtPtrChecking.getMixedChecks()) {
+    // Use pointer-difference checks for the pairs that support them and range
+    // checks for the remaining pairs.
+    VPValue *DiffCond = createDiffRuntimeChecks(Plan, Builder, Expander,
+                                                Mixed->first, SE, VF, UF, DL);
+    VPValue *RangeCond = createRuntimeChecks(Plan, Builder, Expander,
+                                             Mixed->second, TheLoop, SE, DL);
+    Cond = Builder.createOr(DiffCond, RangeCond, DL, "conflict.rdx");
+  } else {
+    Cond = createRuntimeChecks(Plan, Builder, Expander,
+                               RtPtrChecking.getChecks(), TheLoop, SE, DL);
+  }
   attachVPCheckBlock(Plan, Cond, MemCheckVPBB, AddBranchWeights);
 }
 

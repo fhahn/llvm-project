@@ -615,6 +615,7 @@ public:
     Pointers.clear();
     Checks.clear();
     DiffChecks.clear();
+    NonDiffChecks.clear();
     CheckingGroups.clear();
   }
 
@@ -646,6 +647,19 @@ public:
     if (!CanUseDiffCheck)
       return std::nullopt;
     return {DiffChecks};
+  }
+
+  /// If pointer-difference checks cannot be used for all pairs of groups but
+  /// can for some, returns the pointer-difference checks for those pairs
+  /// together with the checks of getChecks() for the remaining pairs. Each
+  /// check proves its pair of groups independent on its own, so the two lists
+  /// can be combined.
+  std::optional<
+      std::pair<ArrayRef<PointerDiffInfo>, ArrayRef<RuntimePointerCheck>>>
+  getMixedChecks() const {
+    if (CanUseDiffCheck || DiffChecks.empty())
+      return std::nullopt;
+    return {{DiffChecks, NonDiffChecks}};
   }
 
   /// Decide if we need to add a check between two groups of pointers,
@@ -729,6 +743,10 @@ private:
 
   /// Flag indicating if pointer-difference checks can be used
   bool CanUseDiffCheck = true;
+
+  /// Checks of the pairs of groups for which no pointer-difference check could
+  /// be created.
+  SmallVector<RuntimePointerCheck, 4> NonDiffChecks;
 
   /// A list of (pointer-difference, access size) pairs that can be used to
   /// prove that there are no vectorization-preventing dependencies.
