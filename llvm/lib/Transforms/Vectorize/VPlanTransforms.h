@@ -102,8 +102,8 @@ struct VPlanTransforms {
   /// The created loop is wrapped in an initial skeleton to facilitate
   /// vectorization, consisting of a vector pre-header, an exit block for the
   /// main vector loop (middle.block) and a new block as preheader of the scalar
-  /// loop (scalar.ph). See below for an illustration. It also creates a
-  /// VPValue expression for the original trip count.
+  /// loop (scalar.ph). See below for an illustration. It also sets the trip
+  /// count of the original loop.
   ///
   ///    [ ] <-- Plan's entry VPIRBasicBlock, wrapping the original loop's
   ///    / \       old preheader. Will contain iteration number check and SCEV
@@ -256,7 +256,8 @@ struct VPlanTransforms {
   /// try to update the vector loop to exit early if any input is NaN and resume
   /// executing in the scalar loop to handle the NaNs there. Return false if
   /// this attempt was unsuccessful.
-  static bool handleMaxMinNumReductions(VPlan &Plan);
+  static bool handleMaxMinNumReductions(VPlan &Plan,
+                                        PredicatedScalarEvolution &PSE);
 
   /// Check if \p Plan contains any FindLast reductions. If it does, try to
   /// update the vector loop to save the appropriate state using selects

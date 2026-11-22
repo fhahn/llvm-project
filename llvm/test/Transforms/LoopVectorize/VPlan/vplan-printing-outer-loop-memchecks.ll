@@ -10,7 +10,6 @@ define void @may_alias_load(ptr %A, ptr %B, i64 %N, i64 %M) {
 ; OPTIMIZED-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; OPTIMIZED-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; OPTIMIZED-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; OPTIMIZED-NEXT:  Live-in ir<%N> = original trip-count
 ; OPTIMIZED-EMPTY:
 ; OPTIMIZED-NEXT:  ir-bb<entry>:
 ; OPTIMIZED-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -19,7 +18,6 @@ define void @may_alias_load(ptr %A, ptr %B, i64 %N, i64 %M) {
 ;
 ; FINAL-LABEL: VPlan for loop in 'may_alias_load'
 ; FINAL:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; FINAL-NEXT:  Live-in ir<%N> = original trip-count
 ; FINAL-EMPTY:
 ; FINAL-NEXT:  ir-bb<entry>:
 ; FINAL-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%N>, ir<4>

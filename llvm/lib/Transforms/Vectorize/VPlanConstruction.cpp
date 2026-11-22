@@ -576,7 +576,7 @@ static void addInitialSkeleton(VPlan &Plan, Type *InductionTy,
                                       {Plan.getFalse()});
   }
 
-  // Create SCEV and VPValue for the trip count.
+  // Create SCEV for the trip count.
   // We use the symbolic max backedge-taken-count, which works also when
   // vectorizing loops with uncountable early exits.
   const SCEV *BackedgeTakenCountSCEV = PSE.getSymbolicMaxBackedgeTakenCount();
@@ -585,7 +585,7 @@ static void addInitialSkeleton(VPlan &Plan, Type *InductionTy,
   ScalarEvolution &SE = *PSE.getSE();
   const SCEV *TripCount = SE.getTripCountFromExitCount(BackedgeTakenCountSCEV,
                                                        InductionTy, TheLoop);
-  Plan.setTripCount(vputils::getOrCreateVPValueForSCEVExpr(Plan, TripCount));
+  Plan.setTripCount(TripCount);
 
   VPBasicBlock *ScalarPH = Plan.createVPBasicBlock("scalar.ph");
   VPBlockUtils::connectBlocks(ScalarPH, Plan.getScalarHeader());
@@ -1358,9 +1358,10 @@ void VPlanTransforms::addMiddleCheck(VPlan &Plan) {
   auto *LatchVPBB = cast<VPBasicBlock>(MiddleVPBB->getSinglePredecessor());
   DebugLoc LatchDL = LatchVPBB->getTerminator()->getDebugLoc();
   VPBuilder Builder(MiddleVPBB);
-  VPValue *Cmp =
-      Builder.createICmp(CmpInst::ICMP_EQ, Plan.getTripCount(),
-                         &Plan.getVectorTripCount(), LatchDL, "cmp.n");
+  VPValue *TC =
+      vputils::getOrCreateVPValueForSCEVExpr(Plan, Plan.getTripCount());
+  VPValue *Cmp = Builder.createICmp(
+      CmpInst::ICMP_EQ, TC, &Plan.getVectorTripCount(), LatchDL, "cmp.n");
   Builder.createNaryOp(VPInstruction::BranchOnCond, {Cmp}, LatchDL);
 }
 
@@ -1477,9 +1478,9 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
 
   // VectorTripCount now equals TripCount so simplify the MiddleVPBB branch.
   assert(match(Plan.getMiddleBlock()->getTerminator(),
-               m_BranchOnCond(m_SpecificICmp(
-                   CmpInst::ICMP_EQ, m_Specific(Plan.getTripCount()),
-                   m_Specific(&Plan.getVectorTripCount())))) &&
+               m_BranchOnCond(
+                   m_SpecificICmp(CmpInst::ICMP_EQ, m_VPValue(),
+                                  m_Specific(&Plan.getVectorTripCount())))) &&
          "Unexpected MiddleVPBB branch");
   Plan.getMiddleBlock()->getTerminator()->setOperand(0, Plan.getTrue());
 }
@@ -1738,8 +1739,7 @@ void VPlanTransforms::addMinimumIterationCheck(
   CmpInst::Predicate CmpPred =
       RequiresScalarEpilogue ? ICmpInst::ICMP_ULE : ICmpInst::ICMP_ULT;
   // If tail is to be folded, vector loop takes care of all iterations.
-  VPValue *TripCountVPV = Plan.getTripCount();
-  const SCEV *TripCount = vputils::getSCEVExprForVPValue(TripCountVPV, PSE);
+  const SCEV *TripCount = Plan.getTripCount();
   Type *TripCountTy = TripCount->getType();
   ScalarEvolution &SE = *PSE.getSE();
   auto GetMinTripCount = [&]() -> const SCEV * {
@@ -1774,6 +1774,8 @@ void VPlanTransforms::addMinimumIterationCheck(
                                     TripCount, Step)) {
       // Generate the minimum iteration check only if we cannot prove the
       // check is known to be true, or known to be false.
+      VPValue *TripCountVPV =
+          vputils::getOrCreateVPValueForSCEVExpr(Plan, Plan.getTripCount());
       VPValue *MinTripCountVPV =
           VPSCEVExpander(Builder, *PSE.getSE(), DL).expand(Step);
       TripCountCheck = Builder.createICmp(
@@ -1821,9 +1823,10 @@ void VPlanTransforms::addMinimumVectorEpilogueIterationCheck(
   }
 
   VPBuilder Builder(cast<VPBasicBlock>(Plan.getEntry()));
-  VPValue *TC = Plan.getTripCount();
+  const SCEV *TCScev = Plan.getTripCount();
   VPValue *VFxUF = Builder.createExpandSCEV(
-      SE.getElementCount(TC->getScalarType(), EpilogueVF, SCEV::FlagNUW));
+      SE.getElementCount(TCScev->getType(), EpilogueVF, SCEV::FlagNUW));
+  VPValue *TC = vputils::getOrCreateVPValueForSCEVExpr(Plan, TCScev);
   Builder.setInsertPoint(EpilogueCheck);
   VPValue *Count = Builder.createSub(TC, MainVectorTripCount,
                                      DebugLoc::getUnknown(), "n.vec.remaining");
@@ -1864,7 +1867,8 @@ static VPInstruction *findFindIVSelect(VPValue *BackedgeVal) {
       }));
 }
 
-bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
+bool VPlanTransforms::handleMaxMinNumReductions(
+    VPlan &Plan, PredicatedScalarEvolution &PSE) {
   auto GetMinOrMaxCompareValue =
       [](VPReductionPHIRecipe *RedPhiR) -> VPValue * {
     auto *MinOrMaxR =
@@ -2001,8 +2005,9 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
   // Update resume phis for inductions in the scalar preheader. If AnyNaNLane is
   // true, the resume from the start of the last vector iteration via the
   // canonical IV, otherwise from the original value.
-  auto IsTC = [&Plan](VPValue *V) {
-    return V == &Plan.getVectorTripCount() || V == Plan.getTripCount();
+  auto IsTC = [&Plan, &PSE](VPValue *V) {
+    return V == &Plan.getVectorTripCount() ||
+           vputils::getSCEVExprForVPValue(V, PSE) == Plan.getTripCount();
   };
   for (VPPhi &ResumeR :
        map_range(Plan.getScalarPreheader()->phis(), CastTo<VPPhi>)) {

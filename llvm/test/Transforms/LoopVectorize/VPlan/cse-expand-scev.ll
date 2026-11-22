@@ -6,31 +6,33 @@
 define void @cse_trip_count_expression(ptr %a, ptr %p) {
 ; CHECK-LABEL: VPlan for loop in 'cse_trip_count_expression'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %n = load i64, ptr %p, align 4
-; CHECK-NEXT:    EMIT vp<[[VP2]]> = EXPAND SCEV %n
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<2>
+; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = EXPAND SCEV %n
+; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = EXPAND SCEV %n
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEV %n
+; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = EXPAND SCEV %n
+; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP1]]>, ir<2>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.main.loop.iter.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.main.loop.iter.check:
-; CHECK-NEXT:    EMIT vp<%min.iters.check>.1 = icmp ult vp<[[VP2]]>, ir<4>
+; CHECK-NEXT:    EMIT vp<%min.iters.check>.1 = icmp ult vp<[[VP1]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>.1
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:    EMIT vp<%n.mod.vf> = urem vp<[[VP2]]>, ir<4>
-; CHECK-NEXT:    EMIT vp<%n.vec> = sub vp<[[VP2]]>, vp<%n.mod.vf>
-; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = mul vp<%n.vec>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT vp<%n.mod.vf> = urem vp<[[VP1]]>, ir<4>
+; CHECK-NEXT:    EMIT vp<%n.vec> = sub vp<[[VP1]]>, vp<%n.mod.vf>
+; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = mul vp<%n.vec>, vp<[[VP1]]>
 ; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = add ir<0>, vp<[[VP5]]>
 ; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = step-vector i64
 ; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = broadcast ir<0>
-; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = broadcast vp<[[VP2]]>
+; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = broadcast vp<[[VP1]]>
 ; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = mul vp<[[VP7]]>, vp<[[VP9]]>
 ; CHECK-NEXT:    EMIT vp<%induction> = add vp<[[VP8]]>, vp<[[VP10]]>
-; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = mul vp<[[VP2]]>, ir<4>
+; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = mul vp<[[VP1]]>, ir<4>
 ; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = broadcast vp<[[VP11]]>
 ; CHECK-NEXT:  Successor(s): vector.body
 ; CHECK-EMPTY:
@@ -68,17 +70,19 @@ exit:
 define void @hoisted_stride_check_and_trip_count_expand_same_scev(ptr %dst, ptr %src, ptr %n.ptr, i64 %m) {
 ; CHECK-LABEL: VPlan for loop in 'hoisted_stride_check_and_trip_count_expand_same_scev'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  vp<[[VP1:%[0-9]+]]> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<outer.header>:
 ; CHECK-NEXT:    IR   %outer.iv = phi i64 [ 0, %entry ], [ %outer.iv.next, %outer.latch ]
 ; CHECK-NEXT:    IR   %row = mul i64 %outer.iv, %n
-; CHECK-NEXT:    EMIT vp<[[VP1]]> = EXPAND SCEV %n (in IR)
+; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = EXPAND SCEV %n
+; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = EXPAND SCEV %n
+; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = EXPAND SCEV %n (in IR)
 ; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = EXPAND SCEV (4 * %n) (in IR)
 ; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEV ((%m * %n) + %src) (in IR)
 ; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = EXPAND SCEV ((4 * %m * %n) + %dst) (in IR)
+; CHECK-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = EXPAND SCEV %n
 ; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = EXPAND SCEV %n
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP1]]>, ir<2>
+; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP12]]>, ir<2>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.memcheck
 ; CHECK-EMPTY:
@@ -88,7 +92,7 @@ define void @hoisted_stride_check_and_trip_count_expand_same_scev(ptr %dst, ptr 
 ; CHECK-NEXT:    EMIT vp<%found.conflict> = and vp<%bound0>, vp<%bound1>
 ; CHECK-NEXT:    EMIT vp<%stride.check> = icmp slt vp<[[VP2]]>, ir<0>
 ; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = or vp<%found.conflict>, vp<%stride.check>
-; CHECK-NEXT:    EMIT vp<%stride.check>.1 = icmp slt vp<[[VP1]]>, ir<0>
+; CHECK-NEXT:    EMIT vp<%stride.check>.1 = icmp slt vp<[[VP12]]>, ir<0>
 ; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = or vp<[[VP7]]>, vp<%stride.check>.1
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP8]]>
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.main.loop.iter.check

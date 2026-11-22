@@ -61,7 +61,6 @@ exit:
 define void @ptr_minmax_bounds(ptr %a, ptr %b, i64 %n, i64 %s, i64 %t) {
 ; CHECK-LABEL: VPlan for loop in 'ptr_minmax_bounds'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %step = mul i64 %s, %t
@@ -173,7 +172,6 @@ exit:
 define void @bound_is_addrec_of_sibling_loop(ptr %a, ptr %b, i64 %n, i64 %d, i1 %cond) {
 ; CHECK-LABEL: VPlan for loop in 'bound_is_addrec_of_sibling_loop'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<ph.2>:
 ; CHECK-NEXT:    IR   %iv.1.lcssa = phi i64 [ %iv.1, %loop.1 ]
@@ -265,7 +263,6 @@ exit:
 define void @bound_is_addrec_of_sibling_loop_non_unit_step(ptr %a, ptr %b, i64 %n, i64 %m) {
 ; CHECK-LABEL: VPlan for loop in 'bound_is_addrec_of_sibling_loop_non_unit_step'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<ph.2>:
 ; CHECK-NEXT:    IR   %iv.1.lcssa = phi i64 [ %iv.1, %loop.1 ]
@@ -331,7 +328,6 @@ exit:
 define void @bound_is_ptr_iv_of_sibling_loop(ptr %a, ptr %b, i64 %n, i64 %m) {
 ; CHECK-LABEL: VPlan for loop in 'bound_is_ptr_iv_of_sibling_loop'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<ph.2>:
 ; CHECK-NEXT:    IR   %ptr.iv.lcssa = phi ptr [ %ptr.iv, %loop.1 ]
@@ -397,7 +393,6 @@ define void @diff_check_dedup(ptr %dst, i64 %off, i64 %n) {
 ;
 ; CHECK-LABEL: VPlan for loop in 'diff_check_dedup'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %off.mul.2 = shl i64 %off, 1
@@ -452,7 +447,6 @@ define void @diff_check_needs_freeze(ptr %src.1, ptr %src.2, ptr %dst, i1 %c, i6
 ;
 ; CHECK-LABEL: VPlan for loop in 'diff_check_needs_freeze'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %src.27 = ptrtoaddr ptr %src.2 to i64

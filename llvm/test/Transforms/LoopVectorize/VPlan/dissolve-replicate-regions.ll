@@ -9,7 +9,6 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; SCALAR-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; SCALAR-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; SCALAR-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; SCALAR-NEXT:  Live-in ir<1024> = original trip-count
 ; SCALAR-EMPTY:
 ; SCALAR-NEXT:  ir-bb<entry>:
 ; SCALAR-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEV (ptrtoaddr ptr %ptr to i64)
@@ -89,7 +88,6 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; VECTOR-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; VECTOR-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; VECTOR-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; VECTOR-NEXT:  Live-in ir<1024> = original trip-count
 ; VECTOR-EMPTY:
 ; VECTOR-NEXT:  ir-bb<entry>:
 ; VECTOR-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEV (ptrtoaddr ptr %ptr to i64)

@@ -88,7 +88,6 @@ exit:
 define void @scev_expand_vscale_mul(ptr %dst, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'scev_expand_vscale_mul'
 ; CHECK:  VPlan 'Final VPlan for VF={vscale x 4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<loop.preheader>:
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = call i64 @llvm.vscale()

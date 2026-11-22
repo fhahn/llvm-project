@@ -547,7 +547,7 @@ void VPlanTransforms::unrollByUF(VPlan &Plan, unsigned UF) {
       }
     }
 
-    Type *TCTy = Plan.getTripCount()->getScalarType();
+    Type *TCTy = Plan.getTripCount()->getType();
     Plan.getUF().replaceAllUsesWith(Plan.getConstantInt(TCTy, UF));
   });
   if (UF == 1) {

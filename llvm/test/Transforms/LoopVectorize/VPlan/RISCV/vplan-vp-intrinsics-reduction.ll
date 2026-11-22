@@ -29,7 +29,6 @@ define i32 @reduction(ptr %a, i64 %n, i32 %start) {
 ; IF-EVL-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; IF-EVL-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; IF-EVL-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; IF-EVL-NEXT:  Live-in ir<%n> = original trip-count
 ; IF-EVL-EMPTY:
 ; IF-EVL-NEXT:  ir-bb<entry>:
 ; IF-EVL-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -69,7 +68,6 @@ define i32 @reduction(ptr %a, i64 %n, i32 %start) {
 ; IF-EVL-OUTLOOP:  VPlan 'Initial VPlan for VF={vscale x 4},UF={1}' {
 ; IF-EVL-OUTLOOP-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF * UF
 ; IF-EVL-OUTLOOP-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
-; IF-EVL-OUTLOOP-NEXT:  Live-in ir<%n> = original trip-count
 ; IF-EVL-OUTLOOP-EMPTY:
 ; IF-EVL-OUTLOOP-NEXT:  ir-bb<entry>:
 ; IF-EVL-OUTLOOP-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -115,7 +113,6 @@ define i32 @reduction(ptr %a, i64 %n, i32 %start) {
 ; IF-EVL-INLOOP:  VPlan 'Initial VPlan for VF={vscale x 4},UF={1}' {
 ; IF-EVL-INLOOP-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF * UF
 ; IF-EVL-INLOOP-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
-; IF-EVL-INLOOP-NEXT:  Live-in ir<%n> = original trip-count
 ; IF-EVL-INLOOP-EMPTY:
 ; IF-EVL-INLOOP-NEXT:  ir-bb<entry>:
 ; IF-EVL-INLOOP-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -162,7 +159,6 @@ define i32 @reduction(ptr %a, i64 %n, i32 %start) {
 ; NO-VP-OUTLOOP-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; NO-VP-OUTLOOP-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; NO-VP-OUTLOOP-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; NO-VP-OUTLOOP-NEXT:  Live-in ir<%n> = original trip-count
 ; NO-VP-OUTLOOP-EMPTY:
 ; NO-VP-OUTLOOP-NEXT:  ir-bb<entry>:
 ; NO-VP-OUTLOOP-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -204,7 +200,6 @@ define i32 @reduction(ptr %a, i64 %n, i32 %start) {
 ; NO-VP-INLOOP-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; NO-VP-INLOOP-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; NO-VP-INLOOP-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; NO-VP-INLOOP-NEXT:  Live-in ir<%n> = original trip-count
 ; NO-VP-INLOOP-EMPTY:
 ; NO-VP-INLOOP-NEXT:  ir-bb<entry>:
 ; NO-VP-INLOOP-NEXT:  Successor(s): scalar.ph, vector.ph

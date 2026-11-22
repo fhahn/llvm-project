@@ -57,7 +57,6 @@ bb3:
 define void @redundant_or_1(ptr %dst, i1 %c.0, i1 %c.1) {
 ; CHECK-LABEL: VPlan for loop in 'redundant_or_1'
 ; CHECK:  VPlan ' for UF>=1' {
-; CHECK-NEXT:  Live-in ir<3> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -117,7 +116,6 @@ exit:
 define void @redundant_or_2(ptr %dst, i1 %c.0, i1 %c.1) {
 ; CHECK-LABEL: VPlan for loop in 'redundant_or_2'
 ; CHECK:  VPlan ' for UF>=1' {
-; CHECK-NEXT:  Live-in ir<3> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -177,7 +175,6 @@ exit:
 define void @redundant_and_1(ptr %dst, i1 %c.0, i1 %c.1) {
 ; CHECK-LABEL: VPlan for loop in 'redundant_and_1'
 ; CHECK:  VPlan ' for UF>=1' {
-; CHECK-NEXT:  Live-in ir<3> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -239,7 +236,6 @@ exit:
 define void @redundant_and_2(ptr %dst, i1 %c.0, i1 %c.1) {
 ; CHECK-LABEL: VPlan for loop in 'redundant_and_2'
 ; CHECK:  VPlan ' for UF>=1' {
-; CHECK-NEXT:  Live-in ir<3> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -298,7 +294,6 @@ exit:
 define void @fold_replicating_umax_equal_live_ins(ptr noalias %dst, ptr %cond, i32 %x) {
 ; CHECK-LABEL: VPlan for loop in 'fold_replicating_umax_equal_live_ins'
 ; CHECK:  VPlan ' for UF>=1' {
-; CHECK-NEXT:  Live-in ir<1024> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph

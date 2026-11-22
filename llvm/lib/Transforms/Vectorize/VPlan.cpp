@@ -1119,13 +1119,6 @@ void VPlan::printLiveIns(raw_ostream &O) const {
   }
 
   O << "\n";
-  if (TripCount && !TripCount->user_empty()) {
-    if (isa<VPIRValue>(TripCount))
-      O << "Live-in ";
-    TripCount->printAsOperand(O, SlotTracker);
-    O << " = original trip-count";
-    O << "\n";
-  }
 }
 
 LLVM_DUMP_METHOD
@@ -1240,11 +1233,6 @@ VPlan *VPlan::duplicate() {
   for (VPIRValue *OldLiveIn : getLiveIns())
     Old2NewVPValues[OldLiveIn] = NewPlan->getOrAddLiveIn(OldLiveIn);
 
-  if (auto *TripCountIRV = dyn_cast_or_null<VPIRValue>(TripCount))
-    Old2NewVPValues[TripCountIRV] = NewPlan->getOrAddLiveIn(TripCountIRV);
-  // else NewTripCount will be created and inserted into Old2NewVPValues when
-  // TripCount is cloned. In any case NewPlan->TripCount is updated below.
-
   assert(none_of(Old2NewVPValues.keys(), IsaPred<VPSymbolicValue>) &&
          "All VPSymbolicValues must be handled below");
 
@@ -1276,11 +1264,7 @@ VPlan *VPlan::duplicate() {
   NewPlan->UFs = UFs;
   // TODO: Adjust names.
   NewPlan->Name = Name;
-  if (TripCount) {
-    assert(Old2NewVPValues.contains(TripCount) &&
-           "TripCount must have been added to Old2NewVPValues");
-    NewPlan->TripCount = Old2NewVPValues[TripCount];
-  }
+  NewPlan->TripCount = TripCount;
 
   // Transfer all cloned blocks (the second half of all current blocks) from
   // current to new VPlan.

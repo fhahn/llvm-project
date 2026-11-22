@@ -11,7 +11,6 @@
 define void @if_then(ptr noalias %a, ptr noalias %idx) {
 ; VPLAN0-LABEL: VPlan for loop in 'if_then'
 ; VPLAN0:  VPlan ' for UF>=1' {
-; VPLAN0-NEXT:  Live-in ir<1024> = original trip-count
 ; VPLAN0-EMPTY:
 ; VPLAN0-NEXT:  ir-bb<entry>:
 ; VPLAN0-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -46,7 +45,6 @@ define void @if_then(ptr noalias %a, ptr noalias %idx) {
 ; MASKED-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; MASKED-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; MASKED-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; MASKED-NEXT:  Live-in ir<1024> = original trip-count
 ; MASKED-EMPTY:
 ; MASKED-NEXT:  ir-bb<entry>:
 ; MASKED-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -111,7 +109,6 @@ exit:
 define void @if_else(ptr noalias %a, ptr noalias %b, ptr noalias %idx) {
 ; VPLAN0-LABEL: VPlan for loop in 'if_else'
 ; VPLAN0:  VPlan ' for UF>=1' {
-; VPLAN0-NEXT:  Live-in ir<1024> = original trip-count
 ; VPLAN0-EMPTY:
 ; VPLAN0-NEXT:  ir-bb<entry>:
 ; VPLAN0-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -150,7 +147,6 @@ define void @if_else(ptr noalias %a, ptr noalias %b, ptr noalias %idx) {
 ; MASKED-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; MASKED-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; MASKED-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; MASKED-NEXT:  Live-in ir<1024> = original trip-count
 ; MASKED-EMPTY:
 ; MASKED-NEXT:  ir-bb<entry>:
 ; MASKED-NEXT:  Successor(s): scalar.ph, vector.ph

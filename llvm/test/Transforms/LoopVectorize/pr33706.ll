@@ -20,11 +20,11 @@ define void @PR33706(ptr nocapture readonly %arg, ptr nocapture %arg1, i32 %arg2
 ; CHECK-NEXT:    br label %[[VAR_BB27:.*]]
 ; CHECK:       [[VAR_BB9]]:
 ; CHECK-NEXT:    [[VAR_TMP10:%.*]] = udiv i32 65536, [[ARG2]]
-; CHECK-NEXT:    [[TMP0:%.*]] = trunc i32 [[ARG2]] to i16
-; CHECK-NEXT:    [[TMP1:%.*]] = sext i16 [[TMP0]] to i32
 ; CHECK-NEXT:    [[TMP2:%.*]] = add nsw i32 [[VAR_TMP10]], -1
 ; CHECK-NEXT:    [[TMP3:%.*]] = zext i32 [[TMP2]] to i64
 ; CHECK-NEXT:    [[TMP4:%.*]] = add nuw nsw i64 [[TMP3]], 1
+; CHECK-NEXT:    [[TMP0:%.*]] = trunc i32 [[ARG2]] to i16
+; CHECK-NEXT:    [[TMP1:%.*]] = sext i16 [[TMP0]] to i32
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP4]], 2
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:

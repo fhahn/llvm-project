@@ -7,7 +7,6 @@
 define i64 @resume_values(ptr noalias %A, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'resume_values'
 ; CHECK:  VPlan 'Final VPlan for VF={8},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%n>, ir<4>
@@ -65,7 +64,6 @@ define i64 @resume_values(ptr noalias %A, i64 %n) {
 ;
 ; CHECK-LABEL: VPlan for loop in 'resume_values'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %min.iters.check = icmp ult i64 %n, 4
@@ -155,7 +153,6 @@ exit:
 define i64 @bypass_blocks(ptr %A, ptr %B, i32 %n) {
 ; CHECK-LABEL: VPlan for loop in 'bypass_blocks'
 ; CHECK:  VPlan 'Final VPlan for VF={8},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %B4 = ptrtoaddr ptr %B to i64
@@ -234,7 +231,6 @@ define i64 @bypass_blocks(ptr %A, ptr %B, i32 %n) {
 ;
 ; CHECK-LABEL: VPlan for loop in 'bypass_blocks'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %B4 = ptrtoaddr ptr %B to i64
@@ -404,7 +400,6 @@ define void @all_iterations_in_main_loop_with_memcheck(ptr %dst, ptr %src) {
 ; CHECK-LABEL: VPlan for loop in 'all_iterations_in_main_loop_with_memcheck'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
 ; CHECK-NEXT:  Live-in ir<16> = vector-trip-count
-; CHECK-NEXT:  Live-in ir<16> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %dst4 = ptrtoaddr ptr %dst to i64
@@ -553,7 +548,6 @@ define void @all_iterations_in_main_loop_with_scevcheck(ptr %p, i32 %off) {
 ; CHECK-LABEL: VPlan for loop in 'all_iterations_in_main_loop_with_scevcheck'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
 ; CHECK-NEXT:  Live-in ir<16> = vector-trip-count
-; CHECK-NEXT:  Live-in ir<16> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): ir-bb<vec.epilog.scalar.ph>, ir-bb<vector.scevcheck>
@@ -642,7 +636,6 @@ exit:
 define void @dead_main_vector_loop(ptr %dst, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'dead_main_vector_loop'
 ; CHECK:  VPlan 'Final VPlan for VF={8},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%clamped> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %clamped = call i64 @llvm.umin.i64(i64 %n, i64 4)
@@ -687,7 +680,6 @@ define void @dead_main_vector_loop(ptr %dst, i64 %n) {
 ;
 ; CHECK-LABEL: VPlan for loop in 'dead_main_vector_loop'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%clamped> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %clamped = call i64 @llvm.umin.i64(i64 %n, i64 4)
@@ -764,7 +756,6 @@ exit:
 define i32 @nested_loop(ptr noalias %p, ptr noalias %end, ptr noalias %dst, i64 %m) {
 ; CHECK-LABEL: VPlan for loop in 'nested_loop'
 ; CHECK:  VPlan 'Final VPlan for VF={8},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%3> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<outer.header>:
 ; CHECK-NEXT:    IR   %j = phi i64 [ 0, %entry ], [ %j.next, %outer.latch ]
@@ -821,7 +812,6 @@ define i32 @nested_loop(ptr noalias %p, ptr noalias %end, ptr noalias %dst, i64 
 ;
 ; CHECK-LABEL: VPlan for loop in 'nested_loop'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%3> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<outer.header>:
 ; CHECK-NEXT:    IR   %j = phi i64 [ 0, %entry ], [ %j.next, %outer.latch ]

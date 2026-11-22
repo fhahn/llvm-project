@@ -139,10 +139,7 @@ protected:
   VPlan &getPlan() {
     Plans.push_back(
         std::make_unique<VPlan>(ScalarHeader, IntegerType::get(C, 64)));
-    VPlan &Plan = *Plans.back();
-    VPValue *DefaultTC = Plan.getConstantInt(32, 1024);
-    Plan.setTripCount(DefaultTC);
-    return Plan;
+    return *Plans.back();
   }
 };
 

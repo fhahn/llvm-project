@@ -7,7 +7,6 @@
 define i64 @reduction_resume_interleaved(ptr noalias %A, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'reduction_resume_interleaved'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={2}' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%n>, ir<2>

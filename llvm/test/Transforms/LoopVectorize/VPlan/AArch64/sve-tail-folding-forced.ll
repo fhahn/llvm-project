@@ -11,10 +11,8 @@ target triple = "aarch64-unknown-linux-gnu"
 ; VPLANS:      VPlan 'Initial VPlan for VF={vscale x 1,vscale x 2,vscale x 4},UF>=1' {
 ; VPLANS-NEXT: Live-in vp<[[VF:%.+]]> = VF
 ; VPLANS-NEXT: Live-in vp<[[VFxUF:%.+]]> = VF * UF
-; VPLANS:      vp<[[TC:%[0-9]+]]> = original trip-count
-; VPLANS-EMPTY:
-; VPLANS-NEXT: ir-bb<entry>:
-; VPLANS-NEXT:  EMIT vp<[[TC]]> = EXPAND SCEV (1 umax %n)
+; VPLANS:      ir-bb<entry>:
+; VPLANS-NEXT:  EMIT vp<[[TC:%[0-9]+]]> = EXPAND SCEV (1 umax %n)
 ; VPLANS-NEXT: Successor(s): scalar.ph, vector.ph
 ; VPLANS-EMPTY:
 ; VPLANS-NEXT: vector.ph:

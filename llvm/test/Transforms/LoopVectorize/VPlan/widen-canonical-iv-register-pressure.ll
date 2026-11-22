@@ -11,7 +11,6 @@
 define i32 @two_reductions(i64 %N, ptr %a, ptr %b) {
 ; UF1-LABEL: VPlan for loop in 'two_reductions'
 ; UF1:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; UF1-NEXT:  Live-in ir<%N> = original trip-count
 ; UF1-EMPTY:
 ; UF1-NEXT:  ir-bb<entry>:
 ; UF1-NEXT:  Successor(s): vector.ph
@@ -49,7 +48,6 @@ define i32 @two_reductions(i64 %N, ptr %a, ptr %b) {
 ;
 ; UF4-LABEL: VPlan for loop in 'two_reductions'
 ; UF4:  VPlan 'Final VPlan for VF={4},UF={4}' {
-; UF4-NEXT:  Live-in ir<%N> = original trip-count
 ; UF4-EMPTY:
 ; UF4-NEXT:  ir-bb<entry>:
 ; UF4-NEXT:  Successor(s): vector.ph

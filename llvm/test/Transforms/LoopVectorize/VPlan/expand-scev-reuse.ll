@@ -6,8 +6,8 @@ define void @reuse_ptrtoaddr_across_expansions(ptr align 8 %dst, ptr align 8 %sr
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF={1}' {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = EXPAND SCEV (ptrtoaddr ptr %dst to i64)
 ; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEV (ptrtoaddr ptr %src to i64)
+; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = EXPAND SCEV (ptrtoaddr ptr %dst to i64)
 ; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = sub vp<[[VP2]]>, vp<[[VP3]]>
 ; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = udiv vp<[[VP4]]>, ir<8>
 ; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = add nuw nsw vp<[[VP5]]>, ir<1>

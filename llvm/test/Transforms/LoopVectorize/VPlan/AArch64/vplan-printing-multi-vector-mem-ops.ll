@@ -14,10 +14,10 @@ define void @i64_load_store(ptr noalias %x, i64 %n) {
 ; BEFORE-SCALE-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; BEFORE-SCALE-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; BEFORE-SCALE-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; BEFORE-SCALE-NEXT:  vp<[[VP3:%[0-9]+]]> = original trip-count
 ; BEFORE-SCALE-EMPTY:
 ; BEFORE-SCALE-NEXT:  ir-bb<entry>:
-; BEFORE-SCALE-NEXT:    EMIT vp<[[VP3]]> = EXPAND SCEV (1 umax %n)
+; BEFORE-SCALE-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEV (1 umax %n)
+; BEFORE-SCALE-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = EXPAND SCEV (1 umax %n)
 ; BEFORE-SCALE-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = call i64 @llvm.vscale()
 ; BEFORE-SCALE-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = mul nuw vp<[[VP4]]>, ir<8>
 ; BEFORE-SCALE-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP3]]>, vp<[[VP5]]>
@@ -50,10 +50,10 @@ define void @i64_load_store(ptr noalias %x, i64 %n) {
 ; AFTER-SCALE-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; AFTER-SCALE-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; AFTER-SCALE-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; AFTER-SCALE-NEXT:  vp<[[VP3:%[0-9]+]]> = original trip-count
 ; AFTER-SCALE-EMPTY:
 ; AFTER-SCALE-NEXT:  ir-bb<entry>:
-; AFTER-SCALE-NEXT:    EMIT vp<[[VP3]]> = EXPAND SCEV (1 umax %n)
+; AFTER-SCALE-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEV (1 umax %n)
+; AFTER-SCALE-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = EXPAND SCEV (1 umax %n)
 ; AFTER-SCALE-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = call i64 @llvm.vscale()
 ; AFTER-SCALE-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = mul nuw vp<[[VP4]]>, ir<8>
 ; AFTER-SCALE-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP3]]>, vp<[[VP5]]>
@@ -88,10 +88,10 @@ define void @i64_load_store(ptr noalias %x, i64 %n) {
 ; AFTER-UNROLL-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; AFTER-UNROLL-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; AFTER-UNROLL-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; AFTER-UNROLL-NEXT:  vp<[[VP3:%[0-9]+]]> = original trip-count
 ; AFTER-UNROLL-EMPTY:
 ; AFTER-UNROLL-NEXT:  ir-bb<entry>:
-; AFTER-UNROLL-NEXT:    EMIT vp<[[VP3]]> = EXPAND SCEV (1 umax %n)
+; AFTER-UNROLL-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEV (1 umax %n)
+; AFTER-UNROLL-NEXT:    EMIT vp<[[VP14:%[0-9]+]]> = EXPAND SCEV (1 umax %n)
 ; AFTER-UNROLL-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = call i64 @llvm.vscale()
 ; AFTER-UNROLL-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = mul nuw vp<[[VP4]]>, ir<8>
 ; AFTER-UNROLL-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP3]]>, vp<[[VP5]]>
@@ -127,10 +127,9 @@ define void @i64_load_store(ptr noalias %x, i64 %n) {
 ; CHECK-TF:  VPlan 'Initial VPlan for VF={vscale x 4},UF={2}' {
 ; CHECK-TF-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; CHECK-TF-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; CHECK-TF-NEXT:  vp<[[VP3:%[0-9]+]]> = original trip-count
 ; CHECK-TF-EMPTY:
 ; CHECK-TF-NEXT:  ir-bb<entry>:
-; CHECK-TF-NEXT:    EMIT vp<[[VP3]]> = EXPAND SCEV (1 umax %n)
+; CHECK-TF-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = EXPAND SCEV (1 umax %n)
 ; CHECK-TF-NEXT:    EMIT branch-on-cond ir<false>
 ; CHECK-TF-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-TF-EMPTY:

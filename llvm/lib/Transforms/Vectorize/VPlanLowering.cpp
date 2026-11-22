@@ -148,7 +148,8 @@ addVPLaneMaskPhiAndUpdateExitBranch(VPlan &Plan) {
   DebugLoc DL = CanonicalIVIncrement->getDebugLoc();
   auto *VecPreheader = Plan.getVectorPreheader();
   VPBuilder Builder(VecPreheader);
-  VPValue *TC = Plan.getTripCount();
+  VPValue *TC =
+      vputils::getOrCreateVPValueForSCEVExpr(Plan, Plan.getTripCount());
 
   // Create the wide active lane mask instruction in the VPlan preheader.
   VPValue *ALMMultiplier =
@@ -233,16 +234,17 @@ void VPlanTransforms::materializeHeaderMask(
   auto *WideCanonicalIV = Builder.insert(new VPWidenCanonicalIVRecipe(
       LoopRegion->getCanonicalIV(),
       VPIRFlags::WrapFlagsTy(/*HasNUW=*/true, /*HasNSW=*/false)));
+  VPValue *TC =
+      vputils::getOrCreateVPValueForSCEVExpr(Plan, Plan.getTripCount());
   VPValue *Mask;
   if (UseActiveLaneMask) {
     Mask = Builder.createNaryOp(VPInstruction::ActiveLaneMask,
-                                {WideCanonicalIV, Plan.getTripCount()}, nullptr,
+                                {WideCanonicalIV, TC}, nullptr,
                                 "active.lane.mask");
   } else {
     // Compare against the backedge-taken count, TC - 1, computed in the vector
     // preheader.
     VPBasicBlock *VectorPH = Plan.getVectorPreheader();
-    VPValue *TC = Plan.getTripCount();
     VPValue *BTC =
         VPBuilder(VectorPH->getFirstNonPhi())
             .createSub(TC, Plan.getConstantInt(TC->getScalarType(), 1),
@@ -789,17 +791,14 @@ void VPlanTransforms::materializeConstantVectorTripCount(
   assert(Plan.hasVF(BestVF) && "BestVF is not available in Plan");
   assert(Plan.hasUF(BestUF) && "BestUF is not available in Plan");
 
-  VPValue *TC = Plan.getTripCount();
-  if (TC->user_empty())
-    return;
-
   // Skip cases for which the trip count may be non-trivial to materialize.
   // I.e., when a scalar tail is absent - due to tail folding, or when a scalar
   // tail is required.
+  auto *TCScev = dyn_cast<SCEVConstant>(Plan.getTripCount());
   if (Plan.hasTailFolded() || !Plan.hasScalarTail() ||
       Plan.getMiddleBlock()->getSingleSuccessor() ==
           Plan.getScalarPreheader() ||
-      !isa<VPIRValue>(TC))
+      !TCScev)
     return;
 
   // Materialize vector trip counts for constants early if it can simply
@@ -807,9 +806,6 @@ void VPlanTransforms::materializeConstantVectorTripCount(
   // TODO: Compute vector trip counts for loops requiring a scalar epilogue and
   // tail-folded loops.
   ScalarEvolution &SE = *PSE.getSE();
-  auto *TCScev = SE.getSCEV(TC->getLiveInIRValue());
-  if (!isa<SCEVConstant>(TCScev))
-    return;
   const SCEV *VFxUF = SE.getElementCount(TCScev->getType(), BestVF * BestUF);
   const SCEV *VecTCScev = SE.getMulExpr(SE.getUDivExpr(TCScev, VFxUF), VFxUF);
   if (auto *ConstVecTC = dyn_cast<SCEVConstant>(VecTCScev))
@@ -869,8 +865,9 @@ void VPlanTransforms::materializeVectorTripCount(
   if (VectorTC.user_empty() || VectorTC.getUnderlyingValue())
     return;
 
-  VPValue *TC = Plan.getTripCount();
-  Type *TCTy = TC->getScalarType();
+  const SCEV *TCScev = Plan.getTripCount();
+  Type *TCTy = TCScev->getType();
+  VPValue *TC = vputils::getOrCreateVPValueForSCEVExpr(Plan, TCScev);
   VPBasicBlock::iterator InsertPt = VectorPHVPBB->getFirstNonPhi();
   if (auto *StepR = Step->getDefiningRecipe()) {
     assert(VPDominatorTree(Plan).dominates(StepR->getParent(), VectorPHVPBB) &&
@@ -941,7 +938,7 @@ void VPlanTransforms::materializeFactors(VPlan &Plan, VPBasicBlock *VectorPH,
   }
 
   VPBuilder Builder(VectorPH->getFirstNonPhi());
-  Type *TCTy = Plan.getTripCount()->getScalarType();
+  Type *TCTy = Plan.getTripCount()->getType();
   VPValue &VF = Plan.getVF();
   VPValue &VFxUF = Plan.getVFxUF();
   // If there are no users of the runtime VF, compute VFxUF by constant folding
@@ -1027,14 +1024,15 @@ void VPlanTransforms::materializeAliasMaskCheckBlock(
       materializeAliasMask(Plan, ClampedVFCheck, DiffChecks, SE);
   VPBuilder Builder(ClampedVFCheck);
   DebugLoc DL = DebugLoc::getCompilerGenerated();
-  Type *TCTy = Plan.getTripCount()->getScalarType();
+  Type *TCTy = Plan.getTripCount()->getType();
 
   // Check the "ClampedVF" from the alias mask is larger than one.
   VPValue *IsScalar =
       Builder.createICmp(CmpInst::ICMP_ULE, ClampedVF,
                          Plan.getConstantInt(TCTy, 1), DL, "vf.is.scalar");
 
-  VPValue *TripCount = Plan.getTripCount();
+  VPValue *TripCount =
+      vputils::getOrCreateVPValueForSCEVExpr(Plan, Plan.getTripCount());
   VPValue *MaxUIntTripCount =
       Plan.getConstantInt(cast<IntegerType>(TCTy)->getMask());
   VPValue *DistanceToMax = Builder.createSub(MaxUIntTripCount, TripCount);
@@ -1084,10 +1082,6 @@ void VPlanTransforms::expandSCEVsToVPInstructions(VPlan &Plan,
     if (Expanded == &ExpSCEV)
       continue;
     ExpSCEV.replaceAllUsesWith(Expanded);
-    // TripCount should not be used after expansion to VPInstructions. Reset to
-    // poison to avoid dangling references.
-    if (Plan.getTripCount() == &ExpSCEV)
-      Plan.resetTripCount(Plan.getPoison(ExpSCEV.getScalarType()));
     ExpSCEV.eraseFromParent();
   }
 }
@@ -1111,8 +1105,6 @@ VPlanTransforms::expandSCEVs(VPlan &Plan, ScalarEvolution &SE) {
     ExpandedSCEVs[Expr] = Res;
     VPValue *Exp = Plan.getOrAddLiveIn(Res);
     ExpSCEV.replaceAllUsesWith(Exp);
-    if (Plan.getTripCount() == &ExpSCEV)
-      Plan.resetTripCount(Exp);
     ExpSCEV.eraseFromParent();
   }
   assert(none_of(*Entry, IsaPred<VPExpandSCEVRecipe>) &&

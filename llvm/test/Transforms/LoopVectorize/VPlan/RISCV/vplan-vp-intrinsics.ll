@@ -14,7 +14,6 @@ define void @foo(ptr noalias %a, ptr noalias %b, ptr noalias %c, i64 %N) {
 ; IF-EVL:  VPlan 'Initial VPlan for VF={vscale x 1,vscale x 2,vscale x 4},UF={1}' {
 ; IF-EVL-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF * UF
 ; IF-EVL-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
-; IF-EVL-NEXT:  Live-in ir<%N> = original trip-count
 ; IF-EVL-EMPTY:
 ; IF-EVL-NEXT:  ir-bb<entry>:
 ; IF-EVL-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -55,7 +54,6 @@ define void @foo(ptr noalias %a, ptr noalias %b, ptr noalias %c, i64 %N) {
 ; NO-VP-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; NO-VP-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; NO-VP-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; NO-VP-NEXT:  Live-in ir<%N> = original trip-count
 ; NO-VP-EMPTY:
 ; NO-VP-NEXT:  ir-bb<entry>:
 ; NO-VP-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -112,7 +110,6 @@ define void @safe_dep(ptr %p) {
 ; IF-EVL-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; IF-EVL-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; IF-EVL-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; IF-EVL-NEXT:  Live-in ir<512> = original trip-count
 ; IF-EVL-EMPTY:
 ; IF-EVL-NEXT:  ir-bb<entry>:
 ; IF-EVL-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -143,7 +140,6 @@ define void @safe_dep(ptr %p) {
 ; NO-VP-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; NO-VP-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; NO-VP-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; NO-VP-NEXT:  Live-in ir<512> = original trip-count
 ; NO-VP-EMPTY:
 ; NO-VP-NEXT:  ir-bb<entry>:
 ; NO-VP-NEXT:  Successor(s): scalar.ph, vector.ph

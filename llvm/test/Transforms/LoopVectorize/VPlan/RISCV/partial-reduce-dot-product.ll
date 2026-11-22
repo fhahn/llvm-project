@@ -6,7 +6,6 @@ define i32 @vdota4(ptr %a, ptr %b) vscale_range(2, 1024) {
 ; CHECK:  VPlan 'Initial VPlan for VF={vscale x 4},UF={1}' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
-; CHECK-NEXT:  Live-in ir<1024> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph

@@ -12,7 +12,6 @@ define void @test_tc_less_than_16(ptr %A, i64 %N) {
 ; OPTIMIZE-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; OPTIMIZE-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; OPTIMIZE-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; OPTIMIZE-NEXT:  Live-in ir<16> = original trip-count
 ; OPTIMIZE-EMPTY:
 ; OPTIMIZE-NEXT:  ir-bb<entry>:
 ; OPTIMIZE-NEXT:  Successor(s): scalar.ph, vector.ph

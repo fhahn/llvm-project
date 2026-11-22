@@ -1136,7 +1136,9 @@ void VPlanTransforms::optimizeInductionLiveOutUsers(
   VPBuilder VectorPHBuilder(VectorPH->getFirstNonPhi());
   DenseMap<VPValue *, VPValue *> EndValues;
   VPValue *ResumeTC =
-      Plan.hasTailFolded() ? Plan.getTripCount() : &Plan.getVectorTripCount();
+      Plan.hasTailFolded()
+          ? vputils::getOrCreateVPValueForSCEVExpr(Plan, Plan.getTripCount())
+          : &Plan.getVectorTripCount();
   for (VPWidenInductionRecipe &WideIV : make_isa_range<VPWidenInductionRecipe>(
            VectorRegion->getEntryBasicBlock()->phis())) {
     if (VPValue *EndValue = tryToComputeEndValueForInduction(
@@ -2049,7 +2051,7 @@ static bool optimizeVectorInductionWidthForTCAndVFUF(VPlan &Plan,
     return false;
 
   const APInt *TC;
-  if (!BestVF.isFixed() || !match(Plan.getTripCount(), m_APInt(TC)))
+  if (!BestVF.isFixed() || !match(Plan.getTripCount(), m_scev_APInt(TC)))
     return false;
 
   // Calculate the minimum power-of-2 bit width that can fit the known TC, VF
@@ -2085,12 +2087,13 @@ static bool optimizeVectorInductionWidthForTCAndVFUF(VPlan &Plan,
     // comparison with the backedge-taken-count, TC - 1.
     VPUser *SingleUser = WideIV->getSingleUser();
     VPValue *BTC;
+    const APInt *BTCPlusOne;
     if (!SingleUser ||
-        !match(
-            SingleUser,
-            m_ICmp(m_Specific(WideIV),
-                   m_Broadcast(m_VPValue(
-                       BTC, m_Sub(m_Specific(Plan.getTripCount()), m_One()))))))
+        !match(SingleUser,
+               m_ICmp(m_Specific(WideIV),
+                      m_Broadcast(m_VPValue(
+                          BTC, m_Sub(m_APInt(BTCPlusOne), m_One()))))) ||
+        *BTCPlusOne != *TC)
       continue;
 
     // Update IV operands and comparison bound to use new narrower type.
@@ -2141,7 +2144,7 @@ static bool isConditionTrueViaVFAndUF(VPValue *Cond, VPlan &Plan,
   const SCEV *VectorTripCount =
       vputils::getSCEVExprForVPValue(&Plan.getVectorTripCount(), PSE);
   if (isa<SCEVCouldNotCompute>(VectorTripCount))
-    VectorTripCount = vputils::getSCEVExprForVPValue(Plan.getTripCount(), PSE);
+    VectorTripCount = Plan.getTripCount();
   assert(!isa<SCEVCouldNotCompute>(VectorTripCount) &&
          "Trip count SCEV must be computable");
   ScalarEvolution &SE = *PSE.getSE();
@@ -2233,8 +2236,7 @@ static bool simplifyBranchConditionForVFAndUF(VPlan &Plan, ElementCount BestVF,
     const SCEV *VectorTripCount =
         vputils::getSCEVExprForVPValue(&Plan.getVectorTripCount(), PSE);
     if (isa<SCEVCouldNotCompute>(VectorTripCount))
-      VectorTripCount =
-          vputils::getSCEVExprForVPValue(Plan.getTripCount(), PSE);
+      VectorTripCount = Plan.getTripCount();
     assert(!isa<SCEVCouldNotCompute>(VectorTripCount) &&
            "Trip count SCEV must be computable");
     ScalarEvolution &SE = *PSE.getSE();
@@ -2464,9 +2466,6 @@ void VPlanTransforms::cse(VPlan &Plan, const VPDominatorTree &VPDT) {
       if (auto *Call = dyn_cast<VPWidenCallRecipe>(V))
         Call->intersectAttrs(*cast<VPWidenCallRecipe>(Def), Plan.getContext());
       Def->replaceAllUsesWith(V);
-      // Reset Plan's TC when TC expressions are CSE'd.
-      if (Def == Plan.getTripCount())
-        Plan.resetTripCount(V);
     }
     LoadCSEMap.clear();
   }
@@ -2861,18 +2860,21 @@ void VPlanTransforms::replaceSymbolicStrides(
   }
 
   ScalarEvolution &SE = *PSE.getSE();
+  // Rewrite S using the versioned strides, unless the result may cause UB.
+  auto RewriteIfSafe = [&](const SCEV *S) {
+    const SCEV *NewS = SCEVParameterRewriter::rewrite(S, SE, RewriteMap);
+    return SE.isGuaranteedNotToCauseUB(NewS) ? NewS : S;
+  };
   for (VPExpandSCEVRecipe &ExpSCEV :
        make_isa_range<VPExpandSCEVRecipe>(*Plan.getEntry())) {
     const SCEV *ScevExpr = ExpSCEV.getSCEV();
-    const SCEV *NewSCEV =
-        SCEVParameterRewriter::rewrite(ScevExpr, SE, RewriteMap);
-    if (NewSCEV == ScevExpr || !SE.isGuaranteedNotToCauseUB(NewSCEV))
+    const SCEV *NewSCEV = RewriteIfSafe(ScevExpr);
+    if (NewSCEV == ScevExpr)
       continue;
     VPValue *NewExp = vputils::getOrCreateVPValueForSCEVExpr(Plan, NewSCEV);
     ExpSCEV.replaceAllUsesWith(NewExp);
-    if (Plan.getTripCount() == &ExpSCEV)
-      Plan.resetTripCount(NewExp);
   }
+  Plan.setTripCount(RewriteIfSafe(Plan.getTripCount()));
 }
 
 void VPlanTransforms::dropPoisonGeneratingRecipes(VPlan &Plan) {
@@ -3226,7 +3228,6 @@ getRecipesForUncountableExit(SmallVectorImpl<VPInstruction *> &Recipes,
   // VPlan ' for UF>=1' {
   // Live-in vp<%0> = VF * UF
   // Live-in vp<%1> = vector-trip-count
-  // Live-in ir<20> = original trip-count
   //
   // ir-bb<entry>:
   // Successor(s): scalar.ph, vector.ph
@@ -3503,7 +3504,7 @@ static bool handleUncountableExitsWithSideEffects(
   // as it may be one past the largest IV value.
   VPBuilder MiddleBuilder(MiddleVPBB->getTerminator());
   Type *IVScalarTy = IV->getScalarType();
-  Type *TCTy = Plan.getTripCount()->getScalarType();
+  Type *TCTy = Plan.getTripCount()->getType();
   VPValue *Zero = Plan.getZero(IVScalarTy);
   VPValue *FirstActive = MiddleBuilder.createScalarZExtOrTrunc(
       MiddleBuilder.createFirstActiveLane(Cond), TCTy, DebugLoc());
@@ -3512,8 +3513,9 @@ static bool handleUncountableExitsWithSideEffects(
   VPValue *ExitIV = MiddleBuilder.createAdd(
       MiddleBuilder.createScalarZExtOrTrunc(ScalarIV, TCTy, DebugLoc()),
       FirstActive);
-  VPValue *FullTC =
-      MiddleBuilder.createICmp(CmpInst::ICMP_EQ, ExitIV, Plan.getTripCount());
+  VPValue *TC =
+      vputils::getOrCreateVPValueForSCEVExpr(Plan, Plan.getTripCount());
+  VPValue *FullTC = MiddleBuilder.createICmp(CmpInst::ICMP_EQ, ExitIV, TC);
   MiddleVPBB->getTerminator()->setOperand(0, FullTC);
 
   // Update resume phi in scalar.ph.

@@ -6,7 +6,6 @@
 define void @unfoldable(ptr %src, ptr noalias %dst) {
 ; CHECK-LABEL: VPlan for loop in 'unfoldable'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={2}' {
-; CHECK-NEXT:  Live-in ir<7> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): vector.ph

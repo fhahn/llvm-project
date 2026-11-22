@@ -282,10 +282,6 @@ static std::optional<ElementCount> getSmallBestKnownTC(
   return std::nullopt;
 }
 
-namespace {
-using SCEV2ValueTy = DenseMap<const SCEV *, Value *>;
-} // namespace
-
 namespace llvm {
 
 AnalysisKey ShouldRunExtraVectorPasses::Key;
@@ -3214,8 +3210,7 @@ std::unique_ptr<VPlan> LoopVectorizationPlanner::selectBestEpiloguePlan(
   Type *TCType = Legal->getWidestInductionType();
   const SCEV *RemainingIterations = nullptr;
   unsigned MaxTripCount = 0;
-  const SCEV *TC = vputils::getSCEVExprForVPValue(MainPlan.getTripCount(), PSE);
-  assert(!isa<SCEVCouldNotCompute>(TC) && "Trip count SCEV must be computable");
+  const SCEV *TC = MainPlan.getTripCount();
   const SCEV *KnownMinTC;
   bool ScalableTC = match(TC, m_scev_c_Mul(m_SCEV(KnownMinTC), m_SCEVVScale()));
   bool ScalableRemIter = false;
@@ -5294,9 +5289,8 @@ bool VPCostContext::isMaskRequired(Instruction *I) const {
 }
 
 bool VPCostContext::executesAtMostOnce(const VPlan &Plan, ElementCount VF) {
-  auto *TC = dyn_cast_if_present<ConstantInt>(
-      Plan.getTripCount()->getUnderlyingValue());
-  return TC && TC->getValue().ule(VF.getKnownMinValue());
+  auto *TC = dyn_cast<SCEVConstant>(Plan.getTripCount());
+  return TC && TC->getAPInt().ule(VF.getKnownMinValue());
 }
 
 InstructionCost
@@ -5569,7 +5563,8 @@ void LoopVectorizationPlanner::clearCostModel() { CM.reset(); }
 DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
     ElementCount BestVF, unsigned BestUF, VPlan &BestVPlan,
     bool HasRuntimeChecks, EpilogueVectorizationKind EpilogueVecKind,
-    MutableArrayRef<VPBasicBlock *> TrackedBlocks) {
+    MutableArrayRef<VPBasicBlock *> TrackedBlocks,
+    const DenseMap<const SCEV *, Value *> &MainLoopExpandedSCEVs) {
   assert(BestVPlan.hasVF(BestVF) &&
          "Trying to execute plan with unsupported VF");
   assert(BestVPlan.hasUF(BestUF) &&
@@ -5652,9 +5647,22 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // Limit expansions to VPInstruction to when not vectorizing the epilogue.
   // Currently this code path still relies on code re-using SCEVs expanded
   // directly to IR instructions.
-  if (EpilogueVecKind == EpilogueVectorizationKind::None)
+  if (EpilogueVecKind == EpilogueVectorizationKind::None) {
     RUN_VPLAN_PASS(VPlanTransforms::expandSCEVsToVPInstructions, BestVPlan,
                    *PSE.getSE());
+  } else if (EpilogueVecKind == EpilogueVectorizationKind::Epilogue) {
+    // Re-use the SCEVs expanded for the main loop instead of expanding them
+    // again.
+    // TODO: Remove once the epilogue plan uses the main plan's VPValues
+    // directly.
+    for (VPExpandSCEVRecipe &ExpandR : make_early_inc_range(
+             make_isa_range<VPExpandSCEVRecipe>(*BestVPlan.getEntry()))) {
+      if (Value *V = MainLoopExpandedSCEVs.lookup(ExpandR.getSCEV())) {
+        ExpandR.replaceAllUsesWith(BestVPlan.getOrAddLiveIn(V));
+        ExpandR.eraseFromParent();
+      }
+    }
+  }
   RUN_VPLAN_PASS(VPlanTransforms::cse, BestVPlan, VPDominatorTree(BestVPlan));
   RUN_VPLAN_PASS(VPlanTransforms::combineRecipes, BestVPlan);
   // Removing branches and incoming values may expose additional simplification
@@ -5677,8 +5685,8 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
     return DenseMap<const SCEV *, Value *>();
   }
 
-  // 0. Generate SCEV-dependent code in the entry, including TripCount, before
-  // making any changes to the CFG.
+  // 0. Generate SCEV-dependent code in the entry, including the trip count,
+  // before making any changes to the CFG.
   DenseMap<const SCEV *, Value *> ExpandedSCEVs =
       RUN_VPLAN_PASS(VPlanTransforms::expandSCEVs, BestVPlan, *PSE.getSE());
 
@@ -6529,7 +6537,7 @@ LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan, VFRange &Range,
     return nullptr;
   // Apply mandatory transformation to handle FP maxnum/minnum reduction with
   // NaNs if possible, bail out otherwise.
-  if (!RUN_VPLAN_PASS(VPlanTransforms::handleMaxMinNumReductions, *Plan))
+  if (!RUN_VPLAN_PASS(VPlanTransforms::handleMaxMinNumReductions, *Plan, PSE))
     return nullptr;
 
   // Create whole-vector selects for find-last recurrences.
@@ -7193,12 +7201,11 @@ static MainPlanResumeMarkers preparePlanForMainVectorLoop(VPlan &MainPlan) {
   return {VectorTCMarker, std::move(ResumeValues)};
 }
 
-/// Prepare \p Plan for vectorizing the epilogue loop. That is, re-use expanded
-/// SCEVs from \p ExpandedSCEVs and set resume values for header recipes.
+/// Prepare \p Plan for vectorizing the epilogue loop. That is, set resume
+/// values for header recipes.
 static void preparePlanForEpilogueVectorLoop(
-    VPlan &MainPlan, VPlan &Plan, const SCEV2ValueTy &ExpandedSCEVs,
-    ElementCount MainLoopVF, unsigned MainLoopUF, ElementCount EpilogueVF,
-    VFSelectionContext &Config, ScalarEvolution &SE,
+    VPlan &MainPlan, VPlan &Plan, ElementCount MainLoopVF, unsigned MainLoopUF,
+    ElementCount EpilogueVF, VFSelectionContext &Config, ScalarEvolution &SE,
     const MainPlanResumeMarkers &Markers, VPBasicBlock *MainCheck) {
   // Build a map from the scalar-header PHI to the ResumeForEpilogue markers
   // from the main plan.
@@ -7409,7 +7416,9 @@ static void preparePlanForEpilogueVectorLoop(
       // already processed.
       VPBuilder EntryBuilder(Plan.getVectorPreheader());
       auto *EntryALM = EntryBuilder.createNaryOp(
-          VPInstruction::ActiveLaneMask, {VPV, Plan.getTripCount()},
+          VPInstruction::ActiveLaneMask,
+          {VPV,
+           vputils::getOrCreateVPValueForSCEVExpr(Plan, Plan.getTripCount())},
           R.getDebugLoc(), "active.lane.mask.entry");
       cast<VPHeaderPHIRecipe>(&R)->setStartValue(EntryALM);
       continue;
@@ -7440,22 +7449,6 @@ static void preparePlanForEpilogueVectorLoop(
     }
     assert(ResumeVPV && "Must have a resume value");
     cast<VPHeaderPHIRecipe>(&R)->setStartValue(ResumeVPV);
-  }
-
-  // Re-use the SCEVs expanded for the main loop instead of expanding them
-  // again, which also lets simplifyLiveInsWithSCEV fold their users.
-  // Others are expanded with the epilogue plan.
-  // TODO: Remove once the epilogue plan uses the main plan's VPValues directly.
-  for (VPExpandSCEVRecipe &ExpandR : make_early_inc_range(
-           make_isa_range<VPExpandSCEVRecipe>(*Plan.getEntry()))) {
-    Value *V = ExpandedSCEVs.lookup(ExpandR.getSCEV());
-    if (!V)
-      continue;
-    VPValue *ExpandedVal = Plan.getOrAddLiveIn(V);
-    ExpandR.replaceAllUsesWith(ExpandedVal);
-    if (Plan.getTripCount() == &ExpandR)
-      Plan.resetTripCount(ExpandedVal);
-    ExpandR.eraseFromParent();
   }
 
   auto VScale = Config.getVScaleForTuning();
@@ -7980,9 +7973,9 @@ bool LoopVectorizePass::processLoop(Loop *L) {
 
     // Second pass vectorizes the epilogue and adjusts the control flow
     // edges from the first pass.
-    preparePlanForEpilogueVectorLoop(BestMainPlan, BestEpiPlan, ExpandedSCEVs,
-                                     VF.Width, IC, EpilogueVF, Config,
-                                     *PSE.getSE(), Markers, MainCheck);
+    preparePlanForEpilogueVectorLoop(BestMainPlan, BestEpiPlan, VF.Width, IC,
+                                     EpilogueVF, Config, *PSE.getSE(), Markers,
+                                     MainCheck);
     RUN_VPLAN_PASS(VPlanTransforms::simplifyLiveInsWithSCEV, BestEpiPlan, PSE);
     LLVM_DEBUG({
       dbgs() << "Create Skeleton for epilogue vectorized loop (second pass)\n"
@@ -7990,7 +7983,8 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     });
     LVP.executePlan(
         EpilogueVF, /*BestUF=*/1, BestEpiPlan, Checks.hasChecks(),
-        LoopVectorizationPlanner::EpilogueVectorizationKind::Epilogue);
+        LoopVectorizationPlanner::EpilogueVectorizationKind::Epilogue,
+        /*TrackedBlocks=*/{}, ExpandedSCEVs);
     DEBUG_WITH_TYPE(VerboseDebug, {
       dbgs() << "final fn:\n" << *L->getHeader()->getParent() << "\n";
     });

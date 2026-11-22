@@ -22,7 +22,6 @@ define void @predicated_block(ptr noalias %a, ptr noalias %idx) {
 ; PREDICATE-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; PREDICATE-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; PREDICATE-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; PREDICATE-NEXT:  Live-in ir<1024> = original trip-count
 ; PREDICATE-EMPTY:
 ; PREDICATE-NEXT:  ir-bb<entry>:
 ; PREDICATE-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -64,7 +63,6 @@ define void @predicated_block(ptr noalias %a, ptr noalias %idx) {
 ; CONSTRUCT-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; CONSTRUCT-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CONSTRUCT-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; CONSTRUCT-NEXT:  Live-in ir<1024> = original trip-count
 ; CONSTRUCT-EMPTY:
 ; CONSTRUCT-NEXT:  ir-bb<entry>:
 ; CONSTRUCT-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -107,7 +105,6 @@ define void @predicated_block(ptr noalias %a, ptr noalias %idx) {
 ; REGION-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; REGION-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; REGION-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; REGION-NEXT:  Live-in ir<1024> = original trip-count
 ; REGION-EMPTY:
 ; REGION-NEXT:  ir-bb<entry>:
 ; REGION-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -236,7 +233,6 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ; PREDICATE-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; PREDICATE-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; PREDICATE-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; PREDICATE-NEXT:  Live-in ir<%n> = original trip-count
 ; PREDICATE-EMPTY:
 ; PREDICATE-NEXT:  ir-bb<entry>:
 ; PREDICATE-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -272,7 +268,6 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ; CONSTRUCT-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; CONSTRUCT-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CONSTRUCT-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; CONSTRUCT-NEXT:  Live-in ir<%n> = original trip-count
 ; CONSTRUCT-EMPTY:
 ; CONSTRUCT-NEXT:  ir-bb<entry>:
 ; CONSTRUCT-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -311,7 +306,6 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ; REGION-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; REGION-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; REGION-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; REGION-NEXT:  Live-in ir<%n> = original trip-count
 ; REGION-EMPTY:
 ; REGION-NEXT:  ir-bb<entry>:
 ; REGION-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -347,7 +341,6 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ; DISSOLVE:  VPlan 'Initial VPlan for VF={2},UF={1}' {
 ; DISSOLVE-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF * UF
 ; DISSOLVE-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
-; DISSOLVE-NEXT:  Live-in ir<%n> = original trip-count
 ; DISSOLVE-EMPTY:
 ; DISSOLVE-NEXT:  ir-bb<entry>:
 ; DISSOLVE-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%n>, ir<2>

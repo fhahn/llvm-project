@@ -6,7 +6,6 @@
 define void @scalar_intrinsic_print(i64 %x, ptr %p) {
 ; CHECK-LABEL: VPlan for loop in 'scalar_intrinsic_print'
 ; CHECK:  VPlan 'Final VPlan for VF={vscale x 4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<128> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = call i64 @llvm.vscale(){{$}}

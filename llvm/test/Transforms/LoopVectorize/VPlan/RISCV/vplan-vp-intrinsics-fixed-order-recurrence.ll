@@ -10,7 +10,6 @@ define void @first_order_recurrence(ptr noalias %A, ptr noalias %B, i64 %TC) {
 ; IF-EVL-NEXT: Live-in vp<[[VF:%[0-9]+]]> = VF
 ; IF-EVL-NEXT: Live-in vp<[[VFUF:%[0-9]+]]> = VF * UF
 ; IF-EVL-NEXT: Live-in vp<[[VTC:%[0-9]+]]> = vector-trip-count
-; IF-EVL-NEXT: Live-in ir<%TC> = original trip-count
 ; IF-EVL-EMPTY:
 ; IF-EVL: ir-bb<entry>:
 ; IF-EVL-NEXT: Successor(s): scalar.ph, vector.ph

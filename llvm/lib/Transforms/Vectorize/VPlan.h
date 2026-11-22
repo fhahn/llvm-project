@@ -4990,9 +4990,8 @@ class VPlan {
   /// Holds the name of the VPlan, for printing.
   std::string Name;
 
-  /// Represents the trip count of the original loop, for folding
-  /// the tail.
-  VPValue *TripCount = nullptr;
+  /// The trip count of the original loop.
+  const SCEV *TripCount = nullptr;
 
   /// Represents the vector trip count.
   VPSymbolicValue VectorTripCount;
@@ -5124,24 +5123,16 @@ public:
   /// Returns true if \p VPBB is an exit block.
   bool isExitBlock(VPBlockBase *VPBB);
 
-  /// The trip count of the original loop.
-  VPValue *getTripCount() const {
+  /// The trip count of the original loop. Use
+  /// vputils::getOrCreateVPValueForSCEVExpr to obtain a VPValue for it.
+  const SCEV *getTripCount() const {
     assert(TripCount && "trip count needs to be set before accessing it");
     return TripCount;
   }
 
-  /// Set the trip count assuming it is currently null; if it is not - use
-  /// resetTripCount().
-  void setTripCount(VPValue *NewTripCount) {
-    assert(!TripCount && NewTripCount && "TripCount should not be set yet.");
-    TripCount = NewTripCount;
-  }
-
-  /// Resets the trip count for the VPlan. The caller must make sure all uses of
-  /// the original trip count have been replaced.
-  void resetTripCount(VPValue *NewTripCount) {
-    assert(TripCount && NewTripCount && TripCount->user_empty() &&
-           "TripCount must be set when resetting");
+  /// Set the trip count of the original loop to \p NewTripCount.
+  void setTripCount(const SCEV *NewTripCount) {
+    assert(NewTripCount && "trip count must not be null");
     TripCount = NewTripCount;
   }
 

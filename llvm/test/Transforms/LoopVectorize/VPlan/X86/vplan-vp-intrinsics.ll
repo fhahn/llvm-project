@@ -15,7 +15,6 @@ define void @foo(ptr noalias %a, ptr noalias %b, ptr noalias %c, i64 %N) {
 ; IF-EVL-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; IF-EVL-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; IF-EVL-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; IF-EVL-NEXT:  Live-in ir<%N> = original trip-count
 ; IF-EVL-EMPTY:
 ; IF-EVL-NEXT:  ir-bb<entry>:
 ; IF-EVL-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -53,7 +52,6 @@ define void @foo(ptr noalias %a, ptr noalias %b, ptr noalias %c, i64 %N) {
 ; NO-VP-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; NO-VP-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; NO-VP-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; NO-VP-NEXT:  Live-in ir<%N> = original trip-count
 ; NO-VP-EMPTY:
 ; NO-VP-NEXT:  ir-bb<entry>:
 ; NO-VP-NEXT:  Successor(s): scalar.ph, vector.ph

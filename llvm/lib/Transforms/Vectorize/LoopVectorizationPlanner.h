@@ -1009,6 +1009,10 @@ public:
   /// When vectorizing the main loop, \p TrackedBlocks are updated to the
   /// VPIRBasicBlocks wrapping the blocks generated for them.
   ///
+  /// When vectorizing the epilogue loop, \p MainLoopExpandedSCEVs are the SCEVs
+  /// expanded for the main loop, which are re-used instead of expanding them
+  /// again.
+  ///
   /// Returns a mapping of SCEVs to their expanded IR values.
   /// Note that this is a temporary workaround needed due to the current
   /// epilogue handling.
@@ -1017,12 +1021,12 @@ public:
     MainLoop, ///< Vectorizing the main loop of epilogue vectorization.
     Epilogue  ///< Vectorizing the epilogue loop.
   };
-  DenseMap<const SCEV *, Value *>
-  executePlan(ElementCount VF, unsigned UF, VPlan &BestPlan,
-              bool HasRuntimeChecks,
-              EpilogueVectorizationKind EpilogueVecKind =
-                  EpilogueVectorizationKind::None,
-              MutableArrayRef<VPBasicBlock *> TrackedBlocks = {});
+  DenseMap<const SCEV *, Value *> executePlan(
+      ElementCount VF, unsigned UF, VPlan &BestPlan, bool HasRuntimeChecks,
+      EpilogueVectorizationKind EpilogueVecKind =
+          EpilogueVectorizationKind::None,
+      MutableArrayRef<VPBasicBlock *> TrackedBlocks = {},
+      const DenseMap<const SCEV *, Value *> &MainLoopExpandedSCEVs = {});
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   void printPlans(raw_ostream &O);

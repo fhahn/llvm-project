@@ -14,7 +14,6 @@ target triple = "aarch64-unknown-linux-gnu"
 ; CHECK-NEXT: Live-in [[VF:.*]] = VF
 ; CHECK-NEXT: Live-in [[VFxUF:.*]] = VF * UF
 ; CHECK-NEXT: Live-in [[VTC:.*]] = vector-trip-count
-; CHECK-NEXT: Live-in [[OTC:.*]] = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT: ir-bb<entry>:
 ; CHECK-NEXT: Successor(s): scalar.ph, vector.ph
@@ -63,7 +62,6 @@ target triple = "aarch64-unknown-linux-gnu"
 ; CHECK-NEXT: Live-in [[VF:.*]] = VF
 ; CHECK-NEXT: Live-in [[VFxUF:.*]] = VF * UF
 ; CHECK-NEXT: Live-in [[VTC:.*]] = vector-trip-count
-; CHECK-NEXT: Live-in [[OTC:.*]] = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT: ir-bb<entry>:
 ; CHECK-NEXT: Successor(s): scalar.ph, vector.ph
@@ -89,7 +87,7 @@ target triple = "aarch64-unknown-linux-gnu"
 ; CHECK-NEXT: Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT: middle.block:
-; CHECK-NEXT:   EMIT [[TC_CHECK:.*]] = icmp eq [[OTC]], [[VTC]]
+; CHECK-NEXT:   EMIT [[TC_CHECK:.*]] = icmp eq [[OTC:.*]], [[VTC]]
 ; CHECK-NEXT:   EMIT branch-on-cond [[TC_CHECK]]
 ; CHECK-NEXT: Successor(s): ir-bb<for.exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -158,7 +156,6 @@ for.exit:
 ; CHECK-NEXT: Live-in [[VF3:.*]] = VF
 ; CHECK-NEXT: Live-in [[VFxUF3:.*]] = VF * UF
 ; CHECK-NEXT: Live-in [[VTC3:.*]] = vector-trip-count
-; CHECK-NEXT: Live-in [[OTC3:.*]] = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT: ir-bb<entry>:
 ; CHECK-NEXT: Successor(s): scalar.ph, vector.ph
@@ -184,7 +181,7 @@ for.exit:
 ; CHECK-NEXT: Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT: middle.block:
-; CHECK-NEXT:   EMIT [[TC_CHECK3:.*]] = icmp eq [[OTC3]], [[VTC3]]
+; CHECK-NEXT:   EMIT [[TC_CHECK3:.*]] = icmp eq [[OTC3:.*]], [[VTC3]]
 ; CHECK-NEXT:   EMIT branch-on-cond [[TC_CHECK3]]
 ; CHECK-NEXT: Successor(s): ir-bb<for.exit>, scalar.ph
 ; CHECK-EMPTY:

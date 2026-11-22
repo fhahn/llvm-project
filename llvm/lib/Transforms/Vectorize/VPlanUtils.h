@@ -44,9 +44,9 @@ bool onlyScalarValuesOrLanesUsed(const VPValue *Def);
 
 /// Get or create a VPValue that corresponds to the expansion of \p Expr. If \p
 /// Expr is a SCEVConstant or SCEVUnknown, return a VPValue wrapping the live-in
-/// value. Otherwise return a VPExpandSCEVRecipe to expand \p Expr. If \p Plan's
-/// pre-header already contains a recipe expanding \p Expr, return it. If not,
-/// create a new one. \p ExpandInIR is forwarded to the VPExpandSCEVRecipe.
+/// value. Otherwise create a new VPExpandSCEVRecipe in \p Plan's entry to
+/// expand \p Expr; it is not uniqued, duplicates are removed by CSE.
+/// \p ExpandInIR is forwarded to the VPExpandSCEVRecipe.
 VPValue *getOrCreateVPValueForSCEVExpr(VPlan &Plan, const SCEV *Expr,
                                        bool ExpandInIR = false);
 

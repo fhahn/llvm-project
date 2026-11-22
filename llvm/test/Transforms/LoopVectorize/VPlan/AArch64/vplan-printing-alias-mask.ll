@@ -7,7 +7,6 @@ target triple = "aarch64-unknown-linux-gnu"
 define void @alias_mask(ptr noalias %a, ptr %b, ptr %c, i64 %n) {
 ; FINAL-LABEL: VPlan for loop in 'alias_mask'
 ; FINAL:  VPlan 'Final VPlan for VF={vscale x 1,vscale x 2,vscale x 4,vscale x 8,vscale x 16},UF={1}' {
-; FINAL-NEXT:  Live-in ir<%n> = original trip-count
 ; FINAL-EMPTY:
 ; FINAL-NEXT:  ir-bb<entry>:
 ; FINAL-NEXT:    IR   %c2 = ptrtoaddr ptr %c to i64
