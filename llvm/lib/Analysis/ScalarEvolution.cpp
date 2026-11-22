@@ -6460,7 +6460,7 @@ static bool RangeRefPHIAllowedOperands(DominatorTree &DT, PHINode *PHI) {
 const ConstantRange &
 ScalarEvolution::getRangeRefIter(const SCEV *S,
                                  ScalarEvolution::RangeSignHint SignHint) {
-  DenseMap<const SCEV *, ConstantRange> &Cache =
+  DenseMap<SCEVUse, ConstantRange> &Cache =
       SignHint == ScalarEvolution::HINT_RANGE_UNSIGNED ? UnsignedRanges
                                                        : SignedRanges;
   SmallVector<SCEVUse> WorkList;
@@ -6544,9 +6544,11 @@ const APInt *ScalarEvolution::getConstantAPIntOrNull(const SCEV *S) {
 const ConstantRange &ScalarEvolution::getRangeForUse(
     SCEVUse S, ScalarEvolution::RangeSignHint SignHint, unsigned Depth) {
   // Only adds use the use flags of S itself; drop them for other expressions.
-  if (!isa<SCEVAddExpr>(S))
-    S = S.getPointer();
-  DenseMap<const SCEV *, ConstantRange> &Cache =
+  // Rebuild the use, so its key matches those erased by
+  // forgetMemoizedResultsImpl, even if the add gained flags since.
+  S = SCEVUse(S.getPointer(),
+              isa<SCEVAddExpr>(S) ? S.getUseNoWrapFlags() : SCEV::FlagNone);
+  DenseMap<SCEVUse, ConstantRange> &Cache =
       SignHint == ScalarEvolution::HINT_RANGE_UNSIGNED ? UnsignedRanges
                                                        : SignedRanges;
   ConstantRange::PreferredRangeType RangeType =
@@ -6554,7 +6556,7 @@ const ConstantRange &ScalarEvolution::getRangeForUse(
                                                        : ConstantRange::Signed;
 
   // See if we've computed this range already.
-  auto I = S.isCanonical() ? Cache.find(S) : Cache.end();
+  auto I = Cache.find(S);
   if (I != Cache.end())
     return I->second;
 
@@ -14548,6 +14550,15 @@ void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
   BlockDispositions.erase(S);
   UnsignedRanges.erase(S);
   SignedRanges.erase(S);
+  // Uses of S with flags have their own ranges.
+  if (S->HasUseRanges) {
+    S->HasUseRanges = false;
+    for (SCEVFlags Flags :
+         {SCEV::FlagNUW, SCEV::FlagNSW, SCEV::FlagNUW | SCEV::FlagNSW}) {
+      UnsignedRanges.erase(SCEVUse(S, Flags));
+      SignedRanges.erase(SCEVUse(S, Flags));
+    }
+  }
   HasRecMap.erase(S);
   ConstantMultipleCache.erase(S);
 

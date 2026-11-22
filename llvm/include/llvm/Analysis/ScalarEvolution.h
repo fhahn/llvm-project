@@ -276,6 +276,7 @@ struct CastInfo<SCEVUseT<ToSCEVPtrT>, const SCEVUse,
 ///
 class SCEV : public FoldingSetNode {
   friend struct FoldingSetTrait<SCEV>;
+  friend class ScalarEvolution;
 
   /// A reference to an Interned FoldingSetNodeID for this node.  The
   /// ScalarEvolution's BumpPtrAllocator holds the data.
@@ -283,6 +284,9 @@ class SCEV : public FoldingSetNode {
 
   // The SCEV baseclass this node corresponds to
   const SCEVTypes SCEVType;
+
+  /// Whether ScalarEvolution memoized ranges for uses of this node with flags.
+  mutable bool HasUseRanges = false;
 
 protected:
   // Estimated complexity of this node's expression tree size.
@@ -2005,25 +2009,21 @@ private:
   DenseMap<const SCEV *, SmallPtrSet<const SCEV *, 8> > SCEVUsers;
 
   /// Memoized results from getRange
-  DenseMap<const SCEV *, ConstantRange> UnsignedRanges;
+  DenseMap<SCEVUse, ConstantRange> UnsignedRanges;
 
   /// Memoized results from getRange
-  DenseMap<const SCEV *, ConstantRange> SignedRanges;
-
-  /// The last range computed for a non-canonical use, which is not memoized.
-  std::optional<ConstantRange> UseRange;
+  DenseMap<SCEVUse, ConstantRange> SignedRanges;
 
   /// Used to parameterize getRange
   enum RangeSignHint { HINT_RANGE_UNSIGNED, HINT_RANGE_SIGNED };
 
-  /// Set the memoized range for the given SCEV. Ranges of non-canonical uses
-  /// are not memoized.
+  /// Set the memoized range for the given SCEV.
   const ConstantRange &setRange(SCEVUse S, RangeSignHint Hint,
                                 ConstantRange CR) {
-    if (!S.isCanonical())
-      return UseRange.emplace(std::move(CR));
-    DenseMap<const SCEV *, ConstantRange> &Cache =
+    DenseMap<SCEVUse, ConstantRange> &Cache =
         Hint == HINT_RANGE_UNSIGNED ? UnsignedRanges : SignedRanges;
+    if (S.hasUseFlags())
+      S->HasUseRanges = true;
 
     auto Pair = Cache.insert_or_assign(S, std::move(CR));
     return Pair.first->second;
@@ -2040,9 +2040,8 @@ private:
 
   /// Determine the range for the use \p S, using the use flags of \p S and its
   /// operands, which only hold where \p S is used.
-  /// NOTE: This returns a reference to an entry in a cache or, for
-  /// non-canonical uses, to UseRange, which is overwritten by the next such
-  /// query. It must be copied if its needed for longer.
+  /// NOTE: This returns a reference to an entry in a cache. It must be
+  /// copied if its needed for longer.
   LLVM_ABI const ConstantRange &getRangeForUse(SCEVUse S, RangeSignHint Hint,
                                                unsigned Depth = 0);
 
