@@ -141,3 +141,111 @@ define i8 @urem_var_divisor_signed(i8 %a, i8 range(i8 -19, 10) %d) {
   %t0 = urem i8 %a, %d
   ret i8 %t0
 }
+
+define i64 @urem_const_by_vscale_mul() vscale_range(1, 16) {
+; CHECK-LABEL: 'urem_const_by_vscale_mul'
+; CHECK-NEXT:  Classifying expressions for: @urem_const_by_vscale_mul
+; CHECK-NEXT:    %vs = call i64 @llvm.vscale.i64()
+; CHECK-NEXT:    --> vscale U: [1,17) S: [1,17)
+; CHECK-NEXT:    %step = shl nuw nsw i64 %vs, 5
+; CHECK-NEXT:    --> (32 * vscale)<nuw><nsw> U: [32,513) S: [32,513)
+; CHECK-NEXT:    %r = urem i64 1024, %step
+; CHECK-NEXT:    --> (1024 + (-32 * vscale * (1024 /u (32 * vscale)<nuw><nsw>)))<nsw> U: [0,-31) S: [-15360,961)
+; CHECK-NEXT:  Determining loop execution counts for: @urem_const_by_vscale_mul
+;
+  %vs = call i64 @llvm.vscale.i64()
+  %step = shl nuw nsw i64 %vs, 5
+  %r = urem i64 1024, %step
+  ret i64 %r
+}
+
+define i64 @urem_shl_by_vscale_mul(i64 %n) vscale_range(1, 16) {
+; CHECK-LABEL: 'urem_shl_by_vscale_mul'
+; CHECK-NEXT:  Classifying expressions for: @urem_shl_by_vscale_mul
+; CHECK-NEXT:    %vs = call i64 @llvm.vscale.i64()
+; CHECK-NEXT:    --> vscale U: [1,17) S: [1,17)
+; CHECK-NEXT:    %step = shl nuw nsw i64 %vs, 5
+; CHECK-NEXT:    --> (32 * vscale)<nuw><nsw> U: [32,513) S: [32,513)
+; CHECK-NEXT:    %x = shl i64 %n, 10
+; CHECK-NEXT:    --> (1024 * %n) U: [0,-1023) S: [-9223372036854775808,9223372036854774785)
+; CHECK-NEXT:    %r = urem i64 %x, %step
+; CHECK-NEXT:    --> ((1024 * %n) + (-32 * vscale * ((1024 * %n) /u (32 * vscale)<nuw><nsw>))) U: [0,-31) S: [-9223372036854775808,9223372036854775777)
+; CHECK-NEXT:  Determining loop execution counts for: @urem_shl_by_vscale_mul
+;
+  %vs = call i64 @llvm.vscale.i64()
+  %step = shl nuw nsw i64 %vs, 5
+  %x = shl i64 %n, 10
+  %r = urem i64 %x, %step
+  ret i64 %r
+}
+
+define i64 @urem_shl_by_vscale(i64 %n) vscale_range(1, 16) {
+; CHECK-LABEL: 'urem_shl_by_vscale'
+; CHECK-NEXT:  Classifying expressions for: @urem_shl_by_vscale
+; CHECK-NEXT:    %vs = call i64 @llvm.vscale.i64()
+; CHECK-NEXT:    --> vscale U: [1,17) S: [1,17)
+; CHECK-NEXT:    %x = shl i64 %n, 4
+; CHECK-NEXT:    --> (16 * %n) U: [0,-15) S: [-9223372036854775808,9223372036854775793)
+; CHECK-NEXT:    %r = urem i64 %x, %vs
+; CHECK-NEXT:    --> ((16 * %n) + (-1 * vscale * ((16 * %n) /u vscale))) U: full-set S: full-set
+; CHECK-NEXT:  Determining loop execution counts for: @urem_shl_by_vscale
+;
+  %vs = call i64 @llvm.vscale.i64()
+  %x = shl i64 %n, 4
+  %r = urem i64 %x, %vs
+  ret i64 %r
+}
+
+define i64 @urem_const_by_vscale_mul_not_multiple_of_max() vscale_range(1, 16) {
+; CHECK-LABEL: 'urem_const_by_vscale_mul_not_multiple_of_max'
+; CHECK-NEXT:  Classifying expressions for: @urem_const_by_vscale_mul_not_multiple_of_max
+; CHECK-NEXT:    %vs = call i64 @llvm.vscale.i64()
+; CHECK-NEXT:    --> vscale U: [1,17) S: [1,17)
+; CHECK-NEXT:    %step = shl nuw nsw i64 %vs, 5
+; CHECK-NEXT:    --> (32 * vscale)<nuw><nsw> U: [32,513) S: [32,513)
+; CHECK-NEXT:    %r = urem i64 256, %step
+; CHECK-NEXT:    --> (256 + (-32 * vscale * (256 /u (32 * vscale)<nuw><nsw>)))<nsw> U: [0,-31) S: [-3840,257)
+; CHECK-NEXT:  Determining loop execution counts for: @urem_const_by_vscale_mul_not_multiple_of_max
+;
+  %vs = call i64 @llvm.vscale.i64()
+  %step = shl nuw nsw i64 %vs, 5
+  %r = urem i64 256, %step
+  ret i64 %r
+}
+
+define i64 @urem_const_by_vscale_mul_no_vscale_range() {
+; CHECK-LABEL: 'urem_const_by_vscale_mul_no_vscale_range'
+; CHECK-NEXT:  Classifying expressions for: @urem_const_by_vscale_mul_no_vscale_range
+; CHECK-NEXT:    %vs = call i64 @llvm.vscale.i64()
+; CHECK-NEXT:    --> vscale U: [1,0) S: [1,0)
+; CHECK-NEXT:    %step = shl nuw nsw i64 %vs, 5
+; CHECK-NEXT:    --> (32 * vscale)<nuw><nsw> U: [0,-31) S: [-9223372036854775808,9223372036854775777)
+; CHECK-NEXT:    %r = urem i64 1024, %step
+; CHECK-NEXT:    --> (1024 + (-32 * vscale * (1024 /u (32 * vscale)<nuw><nsw>))) U: [0,-31) S: [-9223372036854775808,9223372036854775777)
+; CHECK-NEXT:  Determining loop execution counts for: @urem_const_by_vscale_mul_no_vscale_range
+;
+  %vs = call i64 @llvm.vscale.i64()
+  %step = shl nuw nsw i64 %vs, 5
+  %r = urem i64 1024, %step
+  ret i64 %r
+}
+
+define i8 @urem_shl_by_vscale_mul_max_overflows(i8 %n) vscale_range(1, 16) {
+; CHECK-LABEL: 'urem_shl_by_vscale_mul_max_overflows'
+; CHECK-NEXT:  Classifying expressions for: @urem_shl_by_vscale_mul_max_overflows
+; CHECK-NEXT:    %vs = call i8 @llvm.vscale.i8()
+; CHECK-NEXT:    --> vscale U: [1,17) S: [1,17)
+; CHECK-NEXT:    %step = shl nuw nsw i8 %vs, 4
+; CHECK-NEXT:    --> (16 * vscale)<nuw><nsw> U: [0,-15) S: [-128,113)
+; CHECK-NEXT:    %x = shl i8 %n, 7
+; CHECK-NEXT:    --> (-128 * %n) U: [0,-127) S: [-128,1)
+; CHECK-NEXT:    %r = urem i8 %x, %step
+; CHECK-NEXT:    --> ((-128 * %n) + (-16 * vscale * ((-128 * %n) /u (16 * vscale)<nuw><nsw>))) U: [0,-15) S: [-128,113)
+; CHECK-NEXT:  Determining loop execution counts for: @urem_shl_by_vscale_mul_max_overflows
+;
+  %vs = call i8 @llvm.vscale.i8()
+  %step = shl nuw nsw i8 %vs, 4
+  %x = shl i8 %n, 7
+  %r = urem i8 %x, %step
+  ret i8 %r
+}
