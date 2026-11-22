@@ -337,7 +337,7 @@ defm : BoolField<"vplan-print-in-dot-format", "false",
   "Use dot format instead of plain text when dumping VPlans">;
 
 // VPlanConstruction.cpp
-defm : BoolField<"enable-early-exit-vectorization-with-speculative-loads", "false",
+defm : BoolField<"enable-early-exit-vectorization-with-speculative-loads", "true",
   "Enable vectorization of read-only early exit loops with uncountable exits and loads not known to be dereferenceable, using @llvm.speculative.load">;
 
 // VPlanTransforms.cpp
