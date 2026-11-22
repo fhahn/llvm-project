@@ -469,7 +469,7 @@ define void @inc_from_exit_value_of_nuw_addrec_and_its_expr(i32 %start, i32 %n) 
 ; CHECK-NEXT:  Loop %loop.3: symbolic max backedge-taken count is (-4 + (-1 * %start) + ((4 + %start) umax %n))
 ; CHECK-NEXT:  Loop %loop.3: Trip multiple is 1
 ; CHECK-NEXT:  Loop %loop.2: backedge-taken count is (-4 + (-1 * %start) + ((4 + %start) umax %n))
-; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -5
 ; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (-4 + (-1 * %start) + ((4 + %start) umax %n))
 ; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
 ; CHECK-NEXT:  Loop %loop.1: backedge-taken count is i32 4
@@ -527,7 +527,7 @@ define void @inc_from_udiv_of_exit_value_of_nuw_addrec(i32 %start, i32 %n) {
 ; CHECK-NEXT:    --> {(1 + ({%start,+,1}<nuw><%loop.1> /u 2))<nuw>,+,1}<%loop.2> U: full-set S: full-set --> {(1 + ((4 + %start)<u nuw> /u 2))<nuw>,+,1}<%loop.2> U: full-set S: full-set Exits: (1 + (((4 + %start) /u 2) umax %n)) LoopDispositions: { %loop.2: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @inc_from_udiv_of_exit_value_of_nuw_addrec
 ; CHECK-NEXT:  Loop %loop.2: backedge-taken count is ((-1 * ((4 + %start)<u nuw> /u 2))<nsw> + (((4 + %start)<u nuw> /u 2) umax %n))
-; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -3
 ; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is ((-1 * ((4 + %start)<u nuw> /u 2))<nsw> + (((4 + %start)<u nuw> /u 2) umax %n))
 ; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
 ; CHECK-NEXT:  Loop %loop.1: backedge-taken count is i32 4
@@ -763,7 +763,7 @@ define void @inc_from_exit_value_of_nuw_addrec_multi_exit(i32 %start, i32 %n, i1
 ; CHECK-NEXT:  Loop %loop.2: <multiple exits> Unpredictable backedge-taken count.
 ; CHECK-NEXT:    exit count for loop.2: ***COULDNOTCOMPUTE***
 ; CHECK-NEXT:    exit count for latch.2: (-4 + (-1 * %start) + ((4 + %start) umax %n))
-; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -5
 ; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (-4 + (-1 * %start) + ((4 + %start) umax %n))
 ; CHECK-NEXT:    symbolic max exit count for loop.2: ***COULDNOTCOMPUTE***
 ; CHECK-NEXT:    symbolic max exit count for latch.2: (-4 + (-1 * %start) + ((4 + %start) umax %n))
@@ -822,7 +822,7 @@ define void @inc_from_exit_value_of_shared_nuw_addrec(i32 %start, i32 %n, ptr %p
 ; CHECK-NEXT:    --> {{\{\{}}(1 + %start),+,1}<nw><%loop.1>,+,1}<%loop.2> U: full-set S: full-set --> {(5 + %start),+,1}<%loop.2> U: full-set S: full-set Exits: (1 + ((4 + %start) umax %n)) LoopDispositions: { %loop.2: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @inc_from_exit_value_of_shared_nuw_addrec
 ; CHECK-NEXT:  Loop %loop.2: backedge-taken count is (-4 + (-1 * %start) + ((4 + %start) umax %n))
-; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -5
 ; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (-4 + (-1 * %start) + ((4 + %start) umax %n))
 ; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
 ; CHECK-NEXT:  Loop %loop.1: backedge-taken count is i32 4
