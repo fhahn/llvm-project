@@ -15,7 +15,6 @@
 #include "llvm/Analysis/BasicAliasAnalysis.h"
 #include "AnalysisOptions.h"
 #include "llvm/ADT/APInt.h"
-#include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -851,22 +850,11 @@ static constexpr unsigned MaxUnderlyingObjectsVisited = 8;
 ModRefInfo BasicAAResult::getModRefInfoMask(const MemoryLocation &Loc,
                                             AAQueryInfo &AAQI,
                                             bool IgnoreLocals) {
-  assert(Visited.empty() && "Visited must be cleared after use!");
-  llvm::scope_exit _([&] { Visited.clear(); });
-
-  unsigned MaxLookup = 8;
-  SmallVector<const Value *, 16> Worklist;
-  Worklist.push_back(Loc.Ptr);
   ModRefInfo Result = ModRefInfo::NoModRef;
-
-  do {
-    const Value *V = getUnderlyingObject(Worklist.pop_back_val());
-    if (!Visited.insert(V).second)
-      continue;
-
+  auto ExcludesMod = [&](const Value *V) {
     // Ignore allocas if we were instructed to do so.
     if (IgnoreLocals && isa<AllocaInst>(V))
-      continue;
+      return true;
 
     // If the location points to memory that is known to be invariant for
     // the life of the underlying SSA value, then we can exclude Mod from
@@ -877,45 +865,23 @@ ModRefInfo BasicAAResult::getModRefInfoMask(const MemoryLocation &Loc,
     if (const Argument *Arg = dyn_cast<Argument>(V)) {
       if (Arg->hasNoAliasAttr() && Arg->onlyReadsMemory()) {
         Result |= ModRefInfo::Ref;
-        continue;
+        return true;
       }
     }
 
     // A global constant can't be mutated.
-    if (const GlobalVariable *GV = dyn_cast<GlobalVariable>(V)) {
-      // Note: this doesn't require GV to be "ODR" because it isn't legal for a
-      // global to be marked constant in some modules and non-constant in
-      // others.  GV may even be a declaration, not a definition.
-      if (!GV->isConstant())
-        return ModRefInfo::ModRef;
-      continue;
-    }
-
-    // If both select values point to local memory, then so does the select.
-    if (const SelectInst *SI = dyn_cast<SelectInst>(V)) {
-      Worklist.push_back(SI->getTrueValue());
-      Worklist.push_back(SI->getFalseValue());
-      continue;
-    }
-
-    // If all values incoming to a phi node point to local memory, then so does
-    // the phi.
-    if (const PHINode *PN = dyn_cast<PHINode>(V)) {
-      // Don't bother inspecting phi nodes with many operands.
-      if (PN->getNumIncomingValues() > MaxLookup)
-        return ModRefInfo::ModRef;
-      append_range(Worklist, PN->incoming_values());
-      continue;
-    }
+    // Note: this doesn't require GV to be "ODR" because it isn't legal for a
+    // global to be marked constant in some modules and non-constant in
+    // others.  GV may even be a declaration, not a definition.
+    if (const GlobalVariable *GV = dyn_cast<GlobalVariable>(V))
+      return GV->isConstant();
 
     // Otherwise be conservative.
+    return false;
+  };
+  if (!getUnderlyingObjects(Loc.Ptr, ExcludesMod, /*LI=*/nullptr,
+                            MaxLookupSearchDepth, MaxUnderlyingObjectsVisited))
     return ModRefInfo::ModRef;
-  } while (!Worklist.empty() && --MaxLookup);
-
-  // If we hit the maximum number of instructions to examine, be conservative.
-  if (!Worklist.empty())
-    return ModRefInfo::ModRef;
-
   return Result;
 }
 

@@ -96,7 +96,7 @@ define void @just_writeonly(ptr writeonly %p) {
 
 ; %p has 8 incoming values, which are all @c.
 ; CHECK-LABEL: Function: phi_same_constant_incoming
-; CHECK: Both ModRef: Ptr: i32* %p <->  call void @dummy()
+; CHECK: NoModRef: Ptr: i32* %p <->  call void @dummy()
 define void @phi_same_constant_incoming(i32 %x) {
 entry:
   switch i32 %x, label %join [

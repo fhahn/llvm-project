@@ -112,9 +112,6 @@ private:
   struct DecomposedGEP;
   struct VariableGEPOffsetInfo;
 
-  /// Tracks instructions visited by pointsToConstantMemory.
-  SmallPtrSet<const Value *, 16> Visited;
-
   static DecomposedGEP
   DecomposeGEPExpression(const Value *V, const DataLayout &DL,
                          AssumptionCache *AC, DominatorTree *DT);
