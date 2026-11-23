@@ -1466,6 +1466,20 @@ BasicAAResult::aliasSelect(const SelectInst *SI, LocationSize SISize,
   return MergeAliasResults(ThisAlias, Alias);
 }
 
+/// The maximum number of phis with multiple sources including a phi to look
+/// through when checking the sources of a phi.
+static constexpr unsigned MaxPhisWithPhiSrcsLookedThrough = 8;
+
+/// Return true if there is a separate_storage assumption involving \p V.
+static bool hasSeparateStorageAssumption(const Value *V, AssumptionCache &AC) {
+  return any_of(AC.assumptionsFor(V), [](const AssumptionCache::ResultElem &E) {
+    if (!E || E.Index == AssumptionCache::ExprResultIdx)
+      return false;
+    OperandBundleUse OBU = cast<AssumeInst>(E)->getOperandBundleAt(E.Index);
+    return getBundleAttrFromOBU(OBU) == BundleAttr::SeparateStorage;
+  });
+}
+
 /// Provide a bunch of ad-hoc rules to disambiguate a PHI instruction against
 /// another.
 AliasResult BasicAAResult::aliasPHI(const PHINode *PN, LocationSize PNSize,
@@ -1496,81 +1510,73 @@ AliasResult BasicAAResult::aliasPHI(const PHINode *PN, LocationSize PNSize,
       return *Alias;
     }
 
-  SmallVector<Value *, 4> V1Srcs;
-  // If a phi operand recurses back to the phi, we can still determine NoAlias
-  // if we don't alias the underlying objects of the other phi operands, as we
-  // know that the recursive phi needs to be based on them in some way.
-  bool isRecursive = false;
-  auto CheckForRecPhi = [&](Value *PV) {
-    if (!Opts.basic_aa_recphi)
-      return false;
-    if (getUnderlyingObject(PV) == PN) {
-      isRecursive = true;
-      return true;
-    }
-    return false;
-  };
-
-  SmallPtrSet<Value *, 4> UniqueSrc;
-  for (Value *PV1 : PN->incoming_values()) {
-    // Skip the phi itself being the incoming value.
-    if (PV1 == PN)
-      continue;
-
-    if (CheckForRecPhi(PV1))
-      continue;
-
-    if (UniqueSrc.insert(PV1).second)
-      V1Srcs.push_back(PV1);
-  }
-
-  // To control compile time, only allow a phi source if there is either single
-  // source or all sources are not phis, e.g. LCSSA phis or phi start values of
-  // pointer IVs.
-  if (V1Srcs.size() > 1 && any_of(V1Srcs, IsaPred<PHINode>))
-    return AliasResult::MayAlias;
-
-  // If V1Srcs is empty then that means that the phi has no underlying non-phi
-  // value. This should only be possible in blocks unreachable from the entry
-  // block, but return MayAlias just in case.
-  if (V1Srcs.empty())
-    return AliasResult::MayAlias;
-
-  // If this PHI node is recursive, indicate that the pointer may be moved
-  // across iterations. We can only prove NoAlias if different underlying
-  // objects are involved.
-  if (isRecursive)
-    PNSize = LocationSize::beforeOrAfterPointer();
-
-  // In the recursive alias queries below, we may compare values from two
-  // different loop iterations.
+  // Check V2 against the sources of PN, looking through phis. A phi takes the
+  // exact value of one of its sources, so they are checked with PNSize. The
+  // value of a recursive phi may be offset from its other sources across
+  // iterations, so its size is lost, and only NoAlias holds for all of them.
+  // Phis V2 is based on and phis with separate_storage assumptions are checked
+  // as a whole, so offsets from them and the assumptions can be used. The
+  // sources may come from different iterations.
   SaveAndRestore SavedMayBeCrossIteration(AAQI.MayBeCrossIteration, true);
+  const Value *UnderlyingV2 = getUnderlyingObject(V2);
+  unsigned NumPhisWithPhiSrcs = 0;
+  // Phis to look through and whether their size is lost.
+  using PhiAndSizeLost = PointerIntPair<const PHINode *, 1, bool>;
+  SmallVector<PhiAndSizeLost> Worklist({PhiAndSizeLost(PN, false)});
+  SmallDenseSet<PhiAndSizeLost, 8> Visited;
+  std::optional<AliasResult> Alias;
+  while (!Worklist.empty()) {
+    PhiAndSizeLost Item = Worklist.pop_back_val();
+    if (!Visited.insert(Item).second)
+      continue;
+    const PHINode *P = Item.getPointer();
+    bool SizeLost = Item.getInt();
+    // Collect the unique sources of P. Values based on P itself make it
+    // recursive.
+    SmallSetVector<const Value *, 4> UniqueSrcs;
+    bool HasPhiSrc = false;
+    for (const Value *V : P->incoming_values()) {
+      if (V == P)
+        continue;
+      if (getUnderlyingObject(V) == P) {
+        if (!Opts.basic_aa_recphi)
+          return AliasResult::MayAlias;
+        SizeLost = true;
+        continue;
+      }
+      if (UniqueSrcs.insert(V))
+        HasPhiSrc |= isa<PHINode>(V);
+    }
 
-  AliasResult Alias = AAQI.AAR.alias(MemoryLocation(V1Srcs[0], PNSize),
-                                     MemoryLocation(V2, V2Size), AAQI);
+    // To control compile time, limit the number of phis with multiple sources
+    // including a phi looked through.
+    if (UniqueSrcs.size() > 1 && HasPhiSrc &&
+        ++NumPhisWithPhiSrcs > MaxPhisWithPhiSrcsLookedThrough)
+      return AliasResult::MayAlias;
 
-  // Early exit if the check of the first PHI source against V2 is MayAlias.
-  // Other results are not possible.
-  if (Alias == AliasResult::MayAlias)
-    return AliasResult::MayAlias;
-  // With recursive phis we cannot guarantee that MustAlias/PartialAlias will
-  // remain valid to all elements and needs to conservatively return MayAlias.
-  if (isRecursive && Alias != AliasResult::NoAlias)
-    return AliasResult::MayAlias;
-
-  // If all sources of the PHI node NoAlias or MustAlias V2, then returns
-  // NoAlias / MustAlias. Otherwise, returns MayAlias.
-  for (unsigned i = 1, e = V1Srcs.size(); i != e; ++i) {
-    Value *V = V1Srcs[i];
-
-    AliasResult ThisAlias = AAQI.AAR.alias(
-        MemoryLocation(V, PNSize), MemoryLocation(V2, V2Size), AAQI);
-    Alias = MergeAliasResults(ThisAlias, Alias);
-    if (Alias == AliasResult::MayAlias)
-      break;
+    for (const Value *V : UniqueSrcs) {
+      auto *Phi = dyn_cast<PHINode>(V);
+      if (Phi && Phi != UnderlyingV2 &&
+          !(Opts.basic_aa_separate_storage &&
+            hasSeparateStorageAssumption(Phi, AC))) {
+        Worklist.push_back(PhiAndSizeLost(Phi, SizeLost));
+        continue;
+      }
+      AliasResult ThisAlias = AAQI.AAR.alias(
+          MemoryLocation(V, SizeLost ? LocationSize::beforeOrAfterPointer()
+                                     : PNSize),
+          MemoryLocation(V2, V2Size), AAQI);
+      if (SizeLost && ThisAlias != AliasResult::NoAlias)
+        return AliasResult::MayAlias;
+      Alias = Alias ? MergeAliasResults(*Alias, ThisAlias) : ThisAlias;
+      if (*Alias == AliasResult::MayAlias)
+        return AliasResult::MayAlias;
+    }
   }
 
-  return Alias;
+  // If there are no sources other than phis, the phi can only be in blocks
+  // unreachable from the entry block.
+  return Alias.value_or(AliasResult::MayAlias);
 }
 
 // Return true for an Argument or extractvalue(Argument). These are all known

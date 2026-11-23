@@ -80,11 +80,10 @@ declare void @inc(ptr)
 
 ; When we have a chain of phis in nested loops we should recognise if there's
 ; actually only one underlying value.
-; FIXME: All of these could be NoAlias.
 ; CHECK-LABEL: loop_phi_chain
-; CHECK: MayAlias: i32* %val1, i32* @Y
-; CHECK: MayAlias: i32* %val2, i32* @Y
-; CHECK: MayAlias: i32* %val3, i32* @Y
+; CHECK: NoAlias: i32* %val1, i32* @Y
+; CHECK: NoAlias: i32* %val2, i32* @Y
+; CHECK: NoAlias: i32* %val3, i32* @Y
 define void @loop_phi_chain(i32 %a, i32 %b, i32 %c) {
 entry:
   br label %loop1
@@ -290,7 +289,7 @@ outer:                                            ; preds = %loopexit, %entry
 ; %ptr.inner is based on argument %start, which may alias argument %q.
 ; CHECK-LABEL: nested_loop_arg
 ; CHECK: MayAlias: i8* %ptr.inner, i8* %q
-; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+; CHECK: NoAlias: i8* %buf, i8* %ptr.inner
 define void @nested_loop_arg(ptr %start, ptr %q, i1 %c) {
 entry:
   %buf = alloca [16 x i8]
@@ -318,7 +317,7 @@ exit:
 
 ; %ptr.inner is based on a load and %buf is never captured.
 ; CHECK-LABEL: nested_loop_load_not_captured
-; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+; CHECK: NoAlias: i8* %buf, i8* %ptr.inner
 define void @nested_loop_load_not_captured(ptr %p, i1 %c) {
 entry:
   %buf = alloca [16 x i8]
@@ -347,7 +346,7 @@ exit:
 ; Both pointers are phis carried through nested loops, in different blocks, and
 ; based on distinct allocas.
 ; CHECK-LABEL: nested_loop_phis_both_sides
-; CHECK: MayAlias: i8* %pa.inner, i8* %pb.inner
+; CHECK: NoAlias: i8* %pa.inner, i8* %pb.inner
 define void @nested_loop_phis_both_sides(i1 %c) {
 entry:
   %a = alloca [16 x i8]
@@ -412,7 +411,7 @@ exit:
 
 ; %start is a phi with many incoming values, which are all %a.
 ; CHECK-LABEL: nested_loop_phi_same_incoming
-; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+; CHECK: NoAlias: i8* %buf, i8* %ptr.inner
 define void @nested_loop_phi_same_incoming(ptr %a, i32 %x, i1 %c) {
 entry:
   %buf = alloca [16 x i8]
@@ -474,7 +473,7 @@ exit:
 
 ; %start is a chain of selects of arguments.
 ; CHECK-LABEL: nested_loop_select_chain_of_args
-; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+; CHECK: NoAlias: i8* %buf, i8* %ptr.inner
 define void @nested_loop_select_chain_of_args(ptr %a, ptr %b, ptr %d, ptr %e, i1 %c) {
 entry:
   %buf = alloca [16 x i8]
@@ -752,7 +751,7 @@ exit:
 ; %p9 is based on arguments through 8 phis with multiple sources including a
 ; phi.
 ; CHECK-LABEL: phi_sources_at_limit
-; CHECK: MayAlias: i8* %buf, i8* %p9
+; CHECK: NoAlias: i8* %buf, i8* %p9
 define void @phi_sources_at_limit(ptr %a0, ptr %a1, ptr %a2, ptr %a3, ptr %a4, ptr %a5, ptr %a6, ptr %a7, ptr %a8, ptr %a9, i1 %c) {
 entry:
   %buf = alloca [16 x i8]
@@ -972,7 +971,7 @@ exit:
 ; %p is not recursive and takes the value of %q or %a, and %q the value of %a,
 ; so the accesses through %p are at offset 0 of %a.
 ; CHECK-LABEL: phi_sources_keep_size
-; CHECK: MayAlias: i32* %g, i32* %p
+; CHECK: NoAlias: i32* %g, i32* %p
 define void @phi_sources_keep_size(ptr %a, i1 %c, i1 %d) {
 entry:
   br i1 %c, label %l, label %r

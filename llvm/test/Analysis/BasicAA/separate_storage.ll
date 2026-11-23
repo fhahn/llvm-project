@@ -299,8 +299,7 @@ define i8 @phi_source_with_assumption(ptr %a, ptr %b, ptr %x, ptr %y, i1 %c, i1 
 ; CHECK-NEXT:    [[P:%.*]] = phi ptr [ [[Q]], [[J1]] ], [ [[Y]], [[J2]] ]
 ; CHECK-NEXT:    store i8 1, ptr [[X]], align 1
 ; CHECK-NEXT:    store i8 2, ptr [[P]], align 1
-; CHECK-NEXT:    [[V:%.*]] = load i8, ptr [[X]], align 1
-; CHECK-NEXT:    ret i8 [[V]]
+; CHECK-NEXT:    ret i8 1
 ;
 entry:
   call void @llvm.assume(i1 true) [ "separate_storage"(ptr %y, ptr %x) ]
