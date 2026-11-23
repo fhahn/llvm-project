@@ -1390,12 +1390,7 @@ void InterleavedAccessInfo::collectConstStrideAccesses(
       if (!Ptr)
         continue;
       Type *ElementTy = getLoadStoreType(&I);
-
-      // Currently, codegen doesn't support cases where the type size doesn't
-      // match the alloc size. Skip them for now.
       uint64_t Size = DL.getTypeAllocSize(ElementTy);
-      if (Size * 8 != DL.getTypeSizeInBits(ElementTy))
-        continue;
 
       // We don't check wrapping here because we don't know yet if Ptr will be
       // part of a full group or a group with gaps. Checking wrapping for all
@@ -1404,9 +1399,16 @@ void InterleavedAccessInfo::collectConstStrideAccesses(
       // wrap around the address space we would do a memory access at nullptr
       // even without the transformation. The wrapping checks are therefore
       // deferred until after we've formed the interleaved groups.
-      int64_t Stride = getPtrStride(PSE, ElementTy, Ptr, TheLoop, *DT, Strides,
-                                    /*ShouldCheckWrap=*/false, Predicates)
-                           .value_or(0);
+      //
+      // Currently, codegen doesn't support cases where the type size doesn't
+      // match the alloc size. Use an unknown stride for such accesses, so they
+      // cannot be part of a group, but their dependences with group members
+      // are still checked.
+      int64_t Stride = 0;
+      if (!hasIrregularType(ElementTy, DL))
+        Stride = getPtrStride(PSE, ElementTy, Ptr, TheLoop, *DT, Strides,
+                              /*ShouldCheckWrap=*/false, Predicates)
+                     .value_or(0);
       // The interleave analysis takes strides as int (isStrided,
       // createInterleaveGroup, InterleaveGroup); treat strides that do not
       // fit as unknown.
