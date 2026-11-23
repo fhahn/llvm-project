@@ -54,8 +54,7 @@ define void @not_captured(i1 %c) {
 ; CHECK-NEXT:    [[P:%.*]] = phi ptr [ [[A]], %[[ENTRY]] ], [ [[M:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    store i8 1, ptr [[P]], align 1
 ; CHECK-NEXT:    call void @g()
-; CHECK-NEXT:    [[V:%.*]] = load i8, ptr [[P]], align 1
-; CHECK-NEXT:    store i8 [[V]], ptr @sink, align 1
+; CHECK-NEXT:    store i8 1, ptr @sink, align 1
 ; CHECK-NEXT:    [[M]] = call ptr @alloc()
 ; CHECK-NEXT:    br i1 [[C]], label %[[LOOP]], label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:

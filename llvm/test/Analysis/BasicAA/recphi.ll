@@ -155,8 +155,8 @@ if.end: ; preds = %f.exit
 ; CHECK: MayAlias:	i16* %_tmp11, i16* %_tmp7
 ; CHECK: NoModRef:  Ptr: [3 x i16]* %int_arr.10	<->  %_tmp16 = call i16 @call(i32 %_tmp13)
 ; CHECK: NoModRef:  Ptr: i16* %_tmp1	<->  %_tmp16 = call i16 @call(i32 %_tmp13)
-; CHECK: Both ModRef:  Ptr: i16* %ls1.9.0	<->  %_tmp16 = call i16 @call(i32 %_tmp13)
-; CHECK: Both ModRef:  Ptr: i16* %_tmp7	<->  %_tmp16 = call i16 @call(i32 %_tmp13)
+; CHECK: NoModRef:  Ptr: i16* %ls1.9.0	<->  %_tmp16 = call i16 @call(i32 %_tmp13)
+; CHECK: NoModRef:  Ptr: i16* %_tmp7	<->  %_tmp16 = call i16 @call(i32 %_tmp13)
 ; CHECK: NoModRef:  Ptr: i16* %_tmp11	<->  %_tmp16 = call i16 @call(i32 %_tmp13)
 define i16 @negative(i16 %argc.5.par) {
   %int_arr.10 = alloca [3 x i16], align 1

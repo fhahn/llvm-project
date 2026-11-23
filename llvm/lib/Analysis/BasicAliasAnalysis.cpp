@@ -844,6 +844,10 @@ BasicAAResult::DecomposeGEPExpression(const Value *V, const DataLayout &DL,
   return Decomposed;
 }
 
+/// The maximum number of values to visit when looking through phis and selects
+/// for the objects a memory location may be based on.
+static constexpr unsigned MaxUnderlyingObjectsVisited = 8;
+
 ModRefInfo BasicAAResult::getModRefInfoMask(const MemoryLocation &Loc,
                                             AAQueryInfo &AAQI,
                                             bool IgnoreLocals) {
@@ -1006,24 +1010,42 @@ ModRefInfo BasicAAResult::getModRefInfo(const CallBase *Call,
   assert(notDifferentParent(Call, Loc.Ptr) &&
          "AliasAnalysis query involving multiple functions!");
 
-  const Value *Object = getUnderlyingObject(Loc.Ptr);
+  // The objects Loc may be based on. If there are too many, use the object
+  // Loc's pointer is based on, even if it is a phi or select.
+  SmallVector<const Value *> Objects;
+  if (!getUnderlyingObjects(
+          Loc.Ptr,
+          [&Objects](const Value *O) {
+            Objects.push_back(O);
+            return true;
+          },
+          /*LI=*/nullptr, MaxLookupSearchDepth, MaxUnderlyingObjectsVisited))
+    Objects.assign({getUnderlyingObject(Loc.Ptr)});
 
   // Calls marked 'tail' cannot read or write allocas from the current frame
   // because the current frame might be destroyed by the time they run. However,
   // a tail call may use an alloca with byval. Calling with byval copies the
   // contents of the alloca into argument registers or stack slots, so there is
   // no lifetime issue.
-  if (isa<AllocaInst>(Object))
+  if (all_of(Objects, IsaPred<AllocaInst>))
     if (const CallInst *CI = dyn_cast<CallInst>(Call))
       if (CI->isTailCall() &&
           !CI->getAttributes().hasAttrSomewhere(Attribute::ByVal))
         return ModRefInfo::NoModRef;
 
   // Stack restore is able to modify unescaped dynamic allocas. Assume it may
-  // modify them even though the alloca is not escaped.
-  if (auto *AI = dyn_cast<AllocaInst>(Object))
-    if (!AI->isStaticAlloca() && isIntrinsicCall(Call, Intrinsic::stackrestore))
+  // modify them even though the alloca is not escaped. Be conservative if Loc
+  // may also be based on other objects.
+  if (isIntrinsicCall(Call, Intrinsic::stackrestore)) {
+    auto IsDynamicAlloca = [](const Value *O) {
+      auto *AI = dyn_cast<AllocaInst>(O);
+      return AI && !AI->isStaticAlloca();
+    };
+    if (all_of(Objects, IsDynamicAlloca))
       return ModRefInfo::Mod;
+    if (any_of(Objects, IsDynamicAlloca))
+      return ModRefInfo::ModRef;
+  }
 
   // We can completely ignore inaccessible memory here, because MemoryLocations
   // can only reference accessible memory.
@@ -1058,14 +1080,29 @@ ModRefInfo BasicAAResult::getModRefInfo(const CallBase *Call,
   // objects, to model any accesses that may occur prior to the second return.
   // As an exception, ignore allocas, as setjmp is not required to preserve
   // non-volatile stores for them.
-  if (isModOrRefSet(OtherMR) && !isa<Constant>(Object) && Call != Object &&
-      (isa<AllocaInst>(Object) || !Call->hasFnAttr(Attribute::ReturnsTwice))) {
-    CaptureComponents CC = AAQI.CA->getCapturesBefore(
-        Object, Call, /*OrAt=*/false, /*ReturnCaptures=*/false);
-    if (capturesNothing(CC))
-      OtherMR = ModRefInfo::NoModRef;
-    else if (capturesReadProvenanceOnly(CC))
-      OtherMR = ModRefInfo::Ref;
+  //
+  // If Loc may be based on multiple objects, the call may access the union of
+  // what it may access for each of them.
+  if (isModOrRefSet(OtherMR)) {
+    auto GetObjectMR = [&](const Value *O) {
+      if (isa<Constant>(O) || Call == O ||
+          (!isa<AllocaInst>(O) && Call->hasFnAttr(Attribute::ReturnsTwice)))
+        return OtherMR;
+      CaptureComponents CC = AAQI.CA->getCapturesBefore(
+          O, Call, /*OrAt=*/false, /*ReturnCaptures=*/false);
+      if (capturesNothing(CC))
+        return ModRefInfo::NoModRef;
+      if (capturesReadProvenanceOnly(CC))
+        return ModRefInfo::Ref;
+      return OtherMR;
+    };
+    ModRefInfo ObjectsMR = ModRefInfo::NoModRef;
+    for (const Value *O : Objects) {
+      ObjectsMR |= GetObjectMR(O);
+      if (ObjectsMR == OtherMR)
+        break;
+    }
+    OtherMR = ObjectsMR;
   }
 
   // Refine the modref info for argument memory. We only bother to do this
@@ -1892,22 +1929,26 @@ AliasResult BasicAAResult::aliasErrno(const MemoryLocation &Loc,
       Loc.Size.getValue().getKnownMinValue() * 8 > TLI.getIntSize())
     return AliasResult::NoAlias;
 
-  const Value *Object = getUnderlyingObject(Loc.Ptr);
-  if (isIdentifiedFunctionLocal(Object))
-    return AliasResult::NoAlias;
+  auto CannotBeErrno = [&](const Value *Object) {
+    if (isIdentifiedFunctionLocal(Object))
+      return true;
 
-  if (auto *GV = dyn_cast<GlobalVariable>(Object)) {
-    // Errno cannot alias internal/private globals.
-    if (GV->hasLocalLinkage())
-      return AliasResult::NoAlias;
+    if (auto *GV = dyn_cast<GlobalVariable>(Object)) {
+      // Errno cannot alias internal/private globals.
+      if (GV->hasLocalLinkage())
+        return true;
 
-    // Neither can errno alias globals where environments define it as a
-    // function call.
-    if (TLI.isErrnoFunctionCall())
-      return AliasResult::NoAlias;
-  }
-
-  return AliasResult::MayAlias;
+      // Neither can errno alias globals where environments define it as a
+      // function call.
+      if (TLI.isErrnoFunctionCall())
+        return true;
+    }
+    return false;
+  };
+  return getUnderlyingObjects(Loc.Ptr, CannotBeErrno, /*LI=*/nullptr,
+                              MaxLookupSearchDepth, MaxUnderlyingObjectsVisited)
+             ? AliasResult::NoAlias
+             : AliasResult::MayAlias;
 }
 
 /// Check whether two Values can be considered equivalent.

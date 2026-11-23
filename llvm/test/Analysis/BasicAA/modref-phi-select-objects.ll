@@ -15,7 +15,7 @@ declare void @llvm.stackrestore.p0(ptr)
 @ext = external global i8
 
 ; CHECK-LABEL: Function: phi_iv_alloca
-; CHECK: Both ModRef: Ptr: i8* %p <-> call void @g()
+; CHECK: NoModRef: Ptr: i8* %p <-> call void @g()
 define void @phi_iv_alloca(i1 %c) {
 entry:
   %a = alloca [16 x i8]
@@ -33,7 +33,7 @@ exit:
 }
 
 ; CHECK-LABEL: Function: select_allocas
-; CHECK: Both ModRef: Ptr: i8* %p <-> call void @g()
+; CHECK: NoModRef: Ptr: i8* %p <-> call void @g()
 define void @select_allocas(i1 %c) {
   %a = alloca i8
   %b = alloca i8
@@ -58,7 +58,7 @@ define void @select_alloca_escaped_alloca(i1 %c) {
 
 ; Only the read provenance of %b escapes before the call.
 ; CHECK-LABEL: Function: select_alloca_read_provenance_alloca
-; CHECK: Both ModRef: Ptr: i8* %p <-> call void @g()
+; CHECK: Just Ref: Ptr: i8* %p <-> call void @g()
 define void @select_alloca_read_provenance_alloca(i1 %c) {
   %a = alloca i8
   %b = alloca i8
@@ -88,7 +88,7 @@ join:
 
 ; Tail calls cannot access allocas, even if they escaped.
 ; CHECK-LABEL: Function: tail_call_select_escaped_allocas
-; CHECK: Both ModRef: Ptr: i8* %p <-> tail call void @g()
+; CHECK: NoModRef: Ptr: i8* %p <-> tail call void @g()
 define void @tail_call_select_escaped_allocas(i1 %c) {
   %a = alloca i8
   %b = alloca i8
@@ -127,7 +127,7 @@ define void @stackrestore_select_static_and_dynamic_alloca(i64 %n, i1 %c) {
 
 ; stackrestore may modify both dynamic allocas, even though they do not escape.
 ; CHECK-LABEL: Function: stackrestore_select_dynamic_allocas
-; CHECK: Both ModRef: Ptr: i8* %p <-> call void @llvm.stackrestore.p0(ptr %ss)
+; CHECK: Just Mod: Ptr: i8* %p <-> call void @llvm.stackrestore.p0(ptr %ss)
 define void @stackrestore_select_dynamic_allocas(i64 %n, i1 %c) {
   %ss = call ptr @llvm.stacksave.p0()
   %d1 = alloca i8, i64 %n
@@ -162,7 +162,7 @@ define void @select_alloca_call_result(i1 %c) {
 }
 
 ; CHECK-LABEL: Function: errno_select_allocas
-; CHECK: Just Mod: Ptr: i8* %p <-> call void @errno_writer()
+; CHECK: NoModRef: Ptr: i8* %p <-> call void @errno_writer()
 define void @errno_select_allocas(i1 %c) {
   %a = alloca i8
   %b = alloca i8
