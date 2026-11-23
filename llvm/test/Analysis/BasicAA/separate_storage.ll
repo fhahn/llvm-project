@@ -276,3 +276,57 @@ loop:
 exit:
   ret i8 %sum.next
 }
+
+; The assumption is on %q, so %q is checked as a whole instead of its sources.
+define i8 @phi_source_with_assumption(ptr %a, ptr %b, ptr %x, ptr %y, i1 %c, i1 %d) {
+; CHECK-LABEL: @phi_source_with_assumption(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    call void @llvm.assume(i1 true) [ "separate_storage"(ptr [[Y:%.*]], ptr [[X:%.*]]) ]
+; CHECK-NEXT:    br i1 [[D:%.*]], label [[L1:%.*]], label [[L2:%.*]]
+; CHECK:       l1:
+; CHECK-NEXT:    br label [[LJ:%.*]]
+; CHECK:       l2:
+; CHECK-NEXT:    br label [[LJ]]
+; CHECK:       lj:
+; CHECK-NEXT:    [[Q:%.*]] = phi ptr [ [[A:%.*]], [[L1]] ], [ [[B:%.*]], [[L2]] ]
+; CHECK-NEXT:    call void @llvm.assume(i1 true) [ "separate_storage"(ptr [[Q]], ptr [[X]]) ]
+; CHECK-NEXT:    br i1 [[C:%.*]], label [[J1:%.*]], label [[J2:%.*]]
+; CHECK:       j1:
+; CHECK-NEXT:    br label [[J:%.*]]
+; CHECK:       j2:
+; CHECK-NEXT:    br label [[J]]
+; CHECK:       j:
+; CHECK-NEXT:    [[P:%.*]] = phi ptr [ [[Q]], [[J1]] ], [ [[Y]], [[J2]] ]
+; CHECK-NEXT:    store i8 1, ptr [[X]], align 1
+; CHECK-NEXT:    store i8 2, ptr [[P]], align 1
+; CHECK-NEXT:    [[V:%.*]] = load i8, ptr [[X]], align 1
+; CHECK-NEXT:    ret i8 [[V]]
+;
+entry:
+  call void @llvm.assume(i1 true) [ "separate_storage"(ptr %y, ptr %x) ]
+  br i1 %d, label %l1, label %l2
+
+l1:
+  br label %lj
+
+l2:
+  br label %lj
+
+lj:
+  %q = phi ptr [ %a, %l1 ], [ %b, %l2 ]
+  call void @llvm.assume(i1 true) [ "separate_storage"(ptr %q, ptr %x) ]
+  br i1 %c, label %j1, label %j2
+
+j1:
+  br label %j
+
+j2:
+  br label %j
+
+j:
+  %p = phi ptr [ %q, %j1 ], [ %y, %j2 ]
+  store i8 1, ptr %x
+  store i8 2, ptr %p
+  %v = load i8, ptr %x
+  ret i8 %v
+}
