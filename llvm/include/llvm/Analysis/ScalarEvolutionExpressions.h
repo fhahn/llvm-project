@@ -809,6 +809,10 @@ public:
   SCEVRewriteVisitor(ScalarEvolution &SE) : SE(SE) {}
 
   SCEVUse visit(SCEVUse S) {
+    // Constants are cheap to visit, do not memoize them.
+    if (isa<SCEVConstant>(S))
+      return ((SC *)this)
+          ->visitConstant(cast<SCEVUseT<const SCEVConstant *>>(S));
     auto It = RewriteResults.find(S);
     if (It != RewriteResults.end())
       return It->second;
