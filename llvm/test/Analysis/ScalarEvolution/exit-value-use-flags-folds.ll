@@ -1041,5 +1041,48 @@ exit:
   ret void
 }
 
+; The exit value of %iv adds 9 with use nuw to its start (1 + %start)<nuw>; %t
+; is the same add without nuw.
+define void @flatten_add_outer_use_nuw(i64 %start, i1 %c) {
+; CHECK-LABEL: 'flatten_add_outer_use_nuw'
+; CHECK-NEXT:  Classifying expressions for: @flatten_add_outer_use_nuw
+; CHECK-NEXT:    %start.1 = add nuw i64 %start, 1
+; CHECK-NEXT:    --> (1 + %start)<nuw> U: [1,0) S: [1,0)
+; CHECK-NEXT:    %d = udiv i64 1, %start.1
+; CHECK-NEXT:    --> (1 /u (1 + %start)<nuw>) U: [0,2) S: [0,2)
+; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv = phi i64 [ %start.1, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {(1 + %start)<nuw>,+,1}<nuw><%loop> U: [1,0) S: [1,0) Exits: (10 + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nuw i64 %iv, 1
+; CHECK-NEXT:    --> {(2 + %start),+,1}<nw><%loop> U: full-set S: full-set Exits: (11 + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %i.next = add i64 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %t = add i64 %start, 10
+; CHECK-NEXT:    --> (10 + %start) U: full-set S: full-set
+; CHECK-NEXT:  Determining loop execution counts for: @flatten_add_outer_use_nuw
+; CHECK-NEXT:  Loop %loop: backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop: Trip multiple is 10
+;
+entry:
+  %start.1 = add nuw i64 %start, 1
+  %d = udiv i64 1, %start.1
+  br i1 %c, label %loop, label %exit
+
+loop:
+  %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
+  %iv = phi i64 [ %start.1, %entry ], [ %iv.next, %loop ]
+  %iv.next = add nuw i64 %iv, 1
+  %i.next = add i64 %i, 1
+  %ec = icmp eq i64 %i, 9
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  %t = add i64 %start, 10
+  ret void
+}
+
 declare i64 @get()
 declare void @use(i64)

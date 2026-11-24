@@ -434,3 +434,79 @@ outer.latch:
 exit:
   ret i32 %l
 }
+
+; Start is a nuw sum that cannot be poison, so the exit value %a + 10 is nuw.
+; TODO: The expanded exit value is not nuw.
+define i64 @nuw_kept_nuw_sum_flattened(i64 %a) {
+; CHECK-LABEL: define i64 @nuw_kept_nuw_sum_flattened(
+; CHECK-SAME: i64 [[A:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[START:%.*]] = add nuw i64 [[A]], 1
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LATCH:.*]]
+; CHECK:       [[LATCH]]:
+; CHECK-NEXT:    br label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    [[D:%.*]] = udiv i64 1, [[START]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[A]], 10
+; CHECK-NEXT:    ret i64 [[TMP0]]
+;
+entry:
+  %start = add nuw i64 %a, 1
+  %d = udiv i64 1, %start
+  br label %loop
+
+loop:
+  %v = phi i64 [ %start, %entry ], [ %v.next, %latch ]
+  %i = phi i64 [ 0, %entry ], [ %i.next, %latch ]
+  %done = icmp eq i64 %i, 9
+  br i1 %done, label %exit, label %latch
+
+latch:
+  %v.next = add nuw i64 %v, 1
+  %i.next = add i64 %i, 1
+  br label %loop
+
+exit:
+  ret i64 %v
+}
+
+; Start is an inbounds GEP that cannot be poison, so the exit value is nuw.
+; TODO: The expanded exit value is not nuw.
+define ptr @ptr_nuw_kept_inbounds_start_flattened(ptr %p, i64 %n) {
+; CHECK-LABEL: define ptr @ptr_nuw_kept_inbounds_start_flattened(
+; CHECK-SAME: ptr [[P:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[START:%.*]] = getelementptr inbounds i8, ptr [[P]], i64 4
+; CHECK-NEXT:    store i8 0, ptr [[START]], align 1
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LATCH:.*]]
+; CHECK:       [[LATCH]]:
+; CHECK-NEXT:    br label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = shl nuw i64 [[N]], 2
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], 4
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP1]]
+; CHECK-NEXT:    ret ptr [[SCEVGEP]]
+;
+entry:
+  %start = getelementptr inbounds i8, ptr %p, i64 4
+  store i8 0, ptr %start
+  br label %loop
+
+loop:
+  %v = phi ptr [ %start, %entry ], [ %v.next, %latch ]
+  %i = phi i64 [ 0, %entry ], [ %i.next, %latch ]
+  %done = icmp eq i64 %i, %n
+  br i1 %done, label %exit, label %latch
+
+latch:
+  %v.next = getelementptr inbounds i8, ptr %v, i64 4
+  %i.next = add i64 %i, 1
+  br label %loop
+
+exit:
+  ret ptr %v
+}
