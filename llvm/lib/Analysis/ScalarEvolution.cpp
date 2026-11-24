@@ -470,6 +470,16 @@ void SCEVUnknown::allUsesReplacedWith(Value *New) {
   setValPtr(New);
 }
 
+SCEVUse SCEVRewriteVisitorBase::lookupResult(SCEVUse S) const {
+  return RewriteResults.lookup(S);
+}
+
+SCEVUse SCEVRewriteVisitorBase::recordResult(SCEVUse S, SCEVUse Visited) {
+  auto Result = RewriteResults.try_emplace(S, Visited);
+  assert(Result.second && "Should insert a new entry");
+  return Result.first->second;
+}
+
 //===----------------------------------------------------------------------===//
 //                               SCEV Utilities
 //===----------------------------------------------------------------------===//

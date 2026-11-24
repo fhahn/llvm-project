@@ -791,13 +791,9 @@ bool SCEVExprContains(const SCEV *Root, PredTy Pred) {
   return FC.Found;
 }
 
-/// This visitor recursively visits a SCEV expression and re-writes it.
-/// The result from each visit is cached, so it will return the same
-/// SCEV for the same input.
-template <typename SC>
-class SCEVRewriteVisitor : public SCEVUseVisitor<SC, SCEVUse> {
-protected:
-  ScalarEvolution &SE;
+/// State shared by all SCEVRewriteVisitor instantiations. The memoization is
+/// kept out of line, so it is not duplicated for each rewriter.
+class SCEVRewriteVisitorBase {
   // Memoize the result of each visit so that we only compute once for
   // the same input SCEV. This is to avoid redundant computations when
   // a SCEV is referenced by multiple SCEVs. Without memoization, this
@@ -805,17 +801,32 @@ protected:
   // case, causing the compiler to hang on certain tests.
   SmallDenseMap<SCEVUse, SCEVUse, 16> RewriteResults;
 
+protected:
+  ScalarEvolution &SE;
+
+  SCEVRewriteVisitorBase(ScalarEvolution &SE) : SE(SE) {}
+
+  /// Return the memoized result of visiting \p S, or null if there is none.
+  LLVM_ABI LLVM_ATTRIBUTE_NOINLINE SCEVUse lookupResult(SCEVUse S) const;
+
+  /// Memoize \p Visited as the result of visiting \p S and return it.
+  LLVM_ABI LLVM_ATTRIBUTE_NOINLINE SCEVUse recordResult(SCEVUse S,
+                                                        SCEVUse Visited);
+};
+
+/// This visitor recursively visits a SCEV expression and re-writes it.
+/// The result from each visit is cached, so it will return the same
+/// SCEV for the same input.
+template <typename SC>
+class SCEVRewriteVisitor : public SCEVUseVisitor<SC, SCEVUse>,
+                           public SCEVRewriteVisitorBase {
 public:
-  SCEVRewriteVisitor(ScalarEvolution &SE) : SE(SE) {}
+  SCEVRewriteVisitor(ScalarEvolution &SE) : SCEVRewriteVisitorBase(SE) {}
 
   SCEVUse visit(SCEVUse S) {
-    auto It = RewriteResults.find(S);
-    if (It != RewriteResults.end())
-      return It->second;
-    SCEVUse Visited = SCEVUseVisitor<SC, SCEVUse>::visit(S);
-    auto Result = RewriteResults.try_emplace(S, Visited);
-    assert(Result.second && "Should insert a new entry");
-    return Result.first->second;
+    if (SCEVUse Cached = lookupResult(S))
+      return Cached;
+    return recordResult(S, SCEVUseVisitor<SC, SCEVUse>::visit(S));
   }
 
   SCEVUse visitConstant(SCEVUseT<const SCEVConstant *> Constant) {
