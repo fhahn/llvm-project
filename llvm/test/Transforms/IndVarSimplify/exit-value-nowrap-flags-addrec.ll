@@ -4,7 +4,6 @@
 ; The nw of %j evaluated at scope with step 2 must not be used for %k, which
 ; has the same recurrence but wraps in the first iteration of %middle, where
 ; %c is false.
-; FIXME: %c is wrongly folded to true.
 define void @addrec_at_scope_nw_not_used_for_other_values(ptr %dst) {
 ; CHECK-LABEL: define void @addrec_at_scope_nw_not_used_for_other_values(
 ; CHECK-SAME: ptr [[DST:%.*]]) {
@@ -28,8 +27,13 @@ define void @addrec_at_scope_nw_not_used_for_other_values(ptr %dst) {
 ; CHECK-NEXT:    br i1 [[INNER_EC]], label %[[MIDDLE_LATCH]], label %[[INNER]]
 ; CHECK:       [[MIDDLE_LATCH]]:
 ; CHECK-NEXT:    [[J_LCSSA:%.*]] = phi i8 [ [[J]], %[[INNER]] ]
+; CHECK-NEXT:    [[K_LCSSA:%.*]] = phi i8 [ [[K]], %[[INNER]] ]
+; CHECK-NEXT:    [[W_LCSSA:%.*]] = phi i16 [ [[W]], %[[INNER]] ]
+; CHECK-NEXT:    [[K_EXT:%.*]] = zext i8 [[K_LCSSA]] to i16
+; CHECK-NEXT:    [[SUB:%.*]] = sub i16 [[W_LCSSA]], [[K_EXT]]
+; CHECK-NEXT:    [[C:%.*]] = icmp eq i16 [[SUB]], [[OUTER_IV]]
 ; CHECK-NEXT:    [[GEP:%.*]] = getelementptr i1, ptr [[DST]], i8 [[MIDDLE_IV]]
-; CHECK-NEXT:    store i1 true, ptr [[GEP]], align 1
+; CHECK-NEXT:    store i1 [[C]], ptr [[GEP]], align 1
 ; CHECK-NEXT:    [[MIDDLE_IV_NEXT]] = add nuw nsw i8 [[MIDDLE_IV]], 1
 ; CHECK-NEXT:    [[MIDDLE_EC:%.*]] = icmp eq i8 [[MIDDLE_IV_NEXT]], 3
 ; CHECK-NEXT:    br i1 [[MIDDLE_EC]], label %[[OUTER_LATCH]], label %[[MIDDLE]]

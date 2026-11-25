@@ -884,6 +884,8 @@ public:
       Operands.push_back(((SC *)this)->visit(Op));
       Changed |= Op != Operands.back();
     }
+    // TODO: The flags may not hold for the rebuilt recurrence if the step
+    // changed.
     return !Changed ? Expr
                     : SE.getAddRecExpr(Operands, Expr->getLoop(),
                                        Expr->getNoWrapFlags());

@@ -903,7 +903,6 @@ exit:                                             ; preds = %loop2
 
 ; The nw of %j evaluated at scope with step 2 must not be used for %k, which
 ; has the same recurrence but wraps in the first iteration of %outer.header.
-; FIXME: %k.lcssa is wrongly {0,+,2}<nuw><%inner>.
 define void @addrec_at_scope_nw_not_used_for_other_values() {
 ; CHECK-LABEL: 'addrec_at_scope_nw_not_used_for_other_values'
 ; CHECK-NEXT:  Classifying expressions for: @addrec_at_scope_nw_not_used_for_other_values
@@ -920,7 +919,7 @@ define void @addrec_at_scope_nw_not_used_for_other_values() {
 ; CHECK-NEXT:    %j.lcssa = phi i8 [ %j, %inner ]
 ; CHECK-NEXT:    --> {0,+,{1,+,1}<nuw><nsw><%outer.header>}<nuw><%inner> U: full-set S: full-set --> (({-57,+,-1}<nsw><%outer.header> /u {1,+,1}<nuw><nsw><%outer.header>) * {1,+,1}<nuw><nsw><%outer.header>)<nuw> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %outer.header: Variant, %inner: Computable }
 ; CHECK-NEXT:    %k.lcssa = phi i8 [ %k, %inner ]
-; CHECK-NEXT:    --> {0,+,2}<nuw><%inner> U: [0,-1) S: [-128,127) --> (2 * ({-57,+,-1}<nsw><%outer.header> /u {1,+,1}<nuw><nsw><%outer.header>)) U: [0,-1) S: [-128,127) Exits: <<Unknown>> LoopDispositions: { %outer.header: Uniform, %inner: Computable }
+; CHECK-NEXT:    --> {0,+,2}<%inner> U: [0,-1) S: [-128,127) --> (2 * ({-57,+,-1}<nsw><%outer.header> /u {1,+,1}<nuw><nsw><%outer.header>)) U: [0,-1) S: [-128,127) Exits: <<Unknown>> LoopDispositions: { %outer.header: Uniform, %inner: Computable }
 ; CHECK-NEXT:    %outer.iv.next = add nuw nsw i8 %outer.iv, 1
 ; CHECK-NEXT:    --> {2,+,1}<nuw><nsw><%outer.header> U: [2,4) S: [2,4) Exits: 3 LoopDispositions: { %outer.header: Computable, %inner: Invariant }
 ; CHECK-NEXT:  Determining loop execution counts for: @addrec_at_scope_nw_not_used_for_other_values
