@@ -2159,8 +2159,9 @@ TEST_F(ScalarEvolutionsTest, PrintUseFlagsOfOperands) {
     SCEVUse Max = SE.getUMaxExpr(NUWAdd, NSWAdd4);
     EXPECT_EQ(Rendered(Max), "((4 + %a)<u nsw> umax (%a + %b)<u nuw>)");
 
+    // The use flags of the divisor are dropped.
     SCEVUse UDiv = SE.getUDivExpr(NUWAdd, NSWAdd4);
-    EXPECT_EQ(Rendered(UDiv), "((%a + %b)<u nuw> /u (4 + %a)<u nsw>)");
+    EXPECT_EQ(Rendered(UDiv), "((%a + %b)<u nuw> /u (4 + %a))");
 
     SCEVUse AR = SE.getAddRecExpr(NUWAdd, NSWAdd4, L, SCEV::FlagNone);
     EXPECT_EQ(Rendered(AR), "{(%a + %b)<u nuw>,+,(4 + %a)<u nsw>}<%loop>");
@@ -2631,7 +2632,9 @@ TEST_F(ScalarEvolutionsTest, UseFlagsMayCauseUB) {
     SCEVUse Sum = SE.getAddExpr(SE.getConstant(Ty, 9), A,
                                 {SCEV::FlagNone, SCEV::FlagNUW});
     const SCEV *Divisor = SE.getUMaxExpr(SE.getOne(Ty), Sum);
-    EXPECT_FALSE(SE.isGuaranteedNotToCauseUB(SE.getUDivExpr(X, Divisor)));
+    EXPECT_FALSE(ScalarEvolution::isGuaranteedNotToBePoison(Divisor));
+    // getUDivExpr drops the use flags of the divisor.
+    EXPECT_TRUE(SE.isGuaranteedNotToCauseUB(SE.getUDivExpr(X, Divisor)));
     EXPECT_TRUE(SE.isGuaranteedNotToCauseUB(
         SE.getUDivExpr(X, Divisor->getCanonical())));
   });

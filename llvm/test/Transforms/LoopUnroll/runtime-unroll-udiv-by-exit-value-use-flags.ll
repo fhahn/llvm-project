@@ -3,22 +3,20 @@
 
 ; The exit count of %outer.latch divides by the value of %add after %inner,
 ; whose nuw only holds if %inner is executed.
-; FIXME: The divisor is expanded as add nuw in %entry, where it may be poison.
 define i8 @exit_count_udiv_by_umax_of_exit_value_add_nuw(i8 noundef %x, i8 noundef %y, i8 noundef %n, i8 noundef %m) {
 ; CHECK-LABEL: define i8 @exit_count_udiv_by_umax_of_exit_value_add_nuw(
 ; CHECK-SAME: i8 noundef [[X:%.*]], i8 noundef [[Y:%.*]], i8 noundef [[N:%.*]], i8 noundef [[M:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[UMIN:%.*]] = call i8 @llvm.umin.i8(i8 [[X]], i8 10)
-; CHECK-NEXT:    [[TMP0:%.*]] = add nuw i8 [[Y]], [[UMIN]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i8 [[Y]], [[UMIN]]
 ; CHECK-NEXT:    [[UMAX:%.*]] = call i8 @llvm.umax.i8(i8 [[TMP0]], i8 1)
 ; CHECK-NEXT:    [[TMP1:%.*]] = udiv i8 [[M]], [[UMAX]]
-; CHECK-NEXT:    [[TMP2:%.*]] = freeze i8 [[TMP1]]
-; CHECK-NEXT:    [[TMP3:%.*]] = add i8 [[TMP2]], -1
-; CHECK-NEXT:    [[XTRAITER:%.*]] = and i8 [[TMP2]], 1
+; CHECK-NEXT:    [[TMP3:%.*]] = add i8 [[TMP1]], -1
+; CHECK-NEXT:    [[XTRAITER:%.*]] = and i8 [[TMP1]], 1
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp ult i8 [[TMP3]], 1
 ; CHECK-NEXT:    br i1 [[TMP4]], label %[[OUTER_HEADER_EPIL_PREHEADER:.*]], label %[[ENTRY_NEW:.*]]
 ; CHECK:       [[ENTRY_NEW]]:
-; CHECK-NEXT:    [[UNROLL_ITER:%.*]] = sub i8 [[TMP2]], [[XTRAITER]]
+; CHECK-NEXT:    [[UNROLL_ITER:%.*]] = sub i8 [[TMP1]], [[XTRAITER]]
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
 ; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY_NEW]] ], [ [[OUTER_IV_NEXT_1:%.*]], %[[OUTER_LATCH_1:.*]] ]

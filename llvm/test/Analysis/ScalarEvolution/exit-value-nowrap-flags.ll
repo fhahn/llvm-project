@@ -518,7 +518,7 @@ define i8 @add_at_scope_flags_not_used_outside_loop(i8 noundef %x, i8 noundef %y
 ; CHECK-NEXT:    %add = add nuw i8 %umin, %y
 ; CHECK-NEXT:    --> (({1,+,1}<nuw><nsw><%inner> umin %x) + %y)<nuw> U: full-set S: full-set Exits: ((10 umin %x) + %y)<u nuw> LoopDispositions: { %inner: Computable, %outer.header: Uniform }
 ; CHECK-NEXT:    %div = udiv i8 1, %add
-; CHECK-NEXT:    --> (1 /u (({1,+,1}<nuw><nsw><%inner> umin %x) + %y)<nuw>) U: [0,2) S: [0,2) Exits: (1 /u ((10 umin %x) + %y)<u nuw>) LoopDispositions: { %inner: Computable, %outer.header: Uniform }
+; CHECK-NEXT:    --> (1 /u (({1,+,1}<nuw><nsw><%inner> umin %x) + %y)<nuw>) U: [0,2) S: [0,2) Exits: (1 /u ((10 umin %x) + %y)) LoopDispositions: { %inner: Computable, %outer.header: Uniform }
 ; CHECK-NEXT:    %inner.iv.next = add i8 %inner.iv, 1
 ; CHECK-NEXT:    --> {2,+,1}<nuw><nsw><%inner> U: [2,12) S: [2,12) Exits: 11 LoopDispositions: { %inner: Computable, %outer.header: Uniform }
 ; CHECK-NEXT:    %outer.iv.next = add i8 %outer.iv, 1
