@@ -320,3 +320,66 @@ loop:
 exit:
   ret void
 }
+
+; The trip count (1 + %x)<nuw> is at least 2 under the guard %x != 0, so the
+; minimum iteration check is not needed.
+define void @trip_count_add_nuw_at_least_2_via_guard(ptr %dst, i32 %x) {
+; CHECK-LABEL: define void @trip_count_add_nuw_at_least_2_via_guard(
+; CHECK-SAME: ptr [[DST:%.*]], i32 [[X:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[N:%.*]] = add nuw i32 [[X]], 1
+; CHECK-NEXT:    call void @use(i32 noundef [[N]])
+; CHECK-NEXT:    [[PRE:%.*]] = icmp ne i32 [[X]], 0
+; CHECK-NEXT:    br i1 [[PRE]], label %[[LOOP_PREHEADER:.*]], label %[[EXIT:.*]]
+; CHECK:       [[LOOP_PREHEADER]]:
+; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = and i32 [[N]], 1
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[TMP0]]
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = zext i32 [[INDEX]] to i64
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP1]]
+; CHECK-NEXT:    store <2 x i32> splat (i32 1), ptr [[TMP2]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
+; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT_LOOPEXIT:.*]], label %[[SCALAR_PH:.*]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[IV_NEXT:%.*]], %[[LOOP]] ], [ [[N_VEC]], %[[SCALAR_PH]] ]
+; CHECK-NEXT:    [[IV_EXT:%.*]] = zext i32 [[IV]] to i64
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[IV_EXT]]
+; CHECK-NEXT:    store i32 1, ptr [[GEP]], align 4
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw i32 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i32 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT_LOOPEXIT]], label %[[LOOP]], !llvm.loop [[LOOP11:![0-9]+]]
+; CHECK:       [[EXIT_LOOPEXIT]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %n = add nuw i32 %x, 1
+  call void @use(i32 noundef %n)
+  %pre = icmp ne i32 %x, 0
+  br i1 %pre, label %loop, label %exit
+
+loop:
+  %iv = phi i32 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.ext = zext i32 %iv to i64
+  %gep = getelementptr inbounds i32, ptr %dst, i64 %iv.ext
+  store i32 1, ptr %gep
+  %iv.next = add nuw i32 %iv, 1
+  %ec = icmp eq i32 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+declare void @use(i32)

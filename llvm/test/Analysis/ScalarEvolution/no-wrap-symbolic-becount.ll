@@ -149,3 +149,127 @@ loop:
 end:
   ret void
 }
+
+; Under the guard %a u>= 100, the start (%a + %b)<nuw> of %iv is rewritten to
+; ((100 umax %a) + %b), which is u>= 100 given the nuw. The range of the
+; rewritten start is needed to show that %iv does not go below its final value
+; 51.
+define void @rewrite_preserve_add_nuw_addrec_start_range(i32 %a, i32 %b) {
+;
+; CHECK-LABEL: 'rewrite_preserve_add_nuw_addrec_start_range'
+; CHECK-NEXT:  Classifying expressions for: @rewrite_preserve_add_nuw_addrec_start_range
+; CHECK-NEXT:    %start = add nuw i32 %a, %b
+; CHECK-NEXT:    --> (%a + %b)<nuw> U: full-set S: full-set
+; CHECK-NEXT:    %iv = phi i32 [ %start, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {(%a + %b)<nuw>,+,-1}<nsw><%loop> U: [51,0) S: full-set Exits: 51 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nsw i32 %iv, -1
+; CHECK-NEXT:    --> {(-1 + %a + %b),+,-1}<nsw><%loop> U: full-set S: full-set Exits: 50 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @rewrite_preserve_add_nuw_addrec_start_range
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-51 + %a + %b)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-51 + %a + %b)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %start = add nuw i32 %a, %b
+  call void @use(i32 noundef %start)
+  %pre = icmp uge i32 %a, 100
+  br i1 %pre, label %loop, label %exit
+
+loop:
+  %iv = phi i32 [ %start, %entry ], [ %iv.next, %loop ]
+  %iv.next = add nsw i32 %iv, -1
+  %ec = icmp eq i32 %iv.next, 50
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Under the guard %a s< 100, the start (%a + %b)<nsw> of %iv is rewritten to
+; ((99 smin %a) + %b), which is s< 99 given the nsw. The range of the rewritten
+; start is needed to show that %iv does not go above its final value 999.
+define void @rewrite_preserve_add_nsw_addrec_start_range_inc(i32 %a, i32 range(i32 -10, 0) %b) {
+; CHECK-LABEL: 'rewrite_preserve_add_nsw_addrec_start_range_inc'
+; CHECK-NEXT:  Classifying expressions for: @rewrite_preserve_add_nsw_addrec_start_range_inc
+; CHECK-NEXT:    %start = add nsw i32 %a, %b
+; CHECK-NEXT:    --> (%a + %b)<nsw> U: [-2147483648,2147483647) S: [-2147483648,2147483647)
+; CHECK-NEXT:    %iv = phi i32 [ %start, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {(%a + %b)<nsw>,+,1}<nsw><%loop> U: full-set S: [-2147483648,1000) Exits: 999 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nsw i32 %iv, 1
+; CHECK-NEXT:    --> {(1 + %a + %b),+,1}<nsw><%loop> U: full-set S: full-set Exits: 1000 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @rewrite_preserve_add_nsw_addrec_start_range_inc
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (999 + (-1 * %a) + (-1 * %b)<nsw>)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 -2147482639
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (999 + (-1 * %a) + (-1 * %b)<nsw>)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %start = add nsw i32 %a, %b
+  call void @use(i32 noundef %start)
+  %pre = icmp slt i32 %a, 100
+  br i1 %pre, label %loop, label %exit
+
+loop:
+  %iv = phi i32 [ %start, %entry ], [ %iv.next, %loop ]
+  %iv.next = add nsw i32 %iv, 1
+  %ec = icmp eq i32 %iv.next, 1000
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; %iv.2 at scope starts at the umax of %x and the exit value
+; (9 + %start)<u nuw> of %iv.1. The nuw need not hold where the recurrence at
+; scope is defined, so its range must not use it.
+define void @addrec_at_scope_start_with_use_flags_range(i32 %start, i32 %x) {
+; CHECK-LABEL: 'addrec_at_scope_start_with_use_flags_range'
+; CHECK-NEXT:  Classifying expressions for: @addrec_at_scope_start_with_use_flags_range
+; CHECK-NEXT:    %iv.1 = phi i32 [ %start, %entry ], [ %iv.1.next, %loop.1 ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop.1> U: full-set S: full-set Exits: (9 + %start)<u nuw> LoopDispositions: { %loop.1: Computable }
+; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop.1 ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop.1> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %loop.1: Computable }
+; CHECK-NEXT:    %umax = call i32 @llvm.umax.i32(i32 %iv.1, i32 %x)
+; CHECK-NEXT:    --> ({%start,+,1}<nuw><%loop.1> umax %x) U: full-set S: full-set Exits: ((9 + %start)<u nuw> umax %x) LoopDispositions: { %loop.1: Computable }
+; CHECK-NEXT:    %iv.1.next = add nuw i32 %iv.1, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%loop.1> U: full-set S: full-set Exits: (10 + %start) LoopDispositions: { %loop.1: Computable }
+; CHECK-NEXT:    %i.next = add i32 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop.1> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %loop.1: Computable }
+; CHECK-NEXT:    %iv.2 = phi i32 [ %umax, %loop.1 ], [ %iv.2.next, %loop.2 ]
+; CHECK-NEXT:    --> {({%start,+,1}<nuw><%loop.1> umax %x),+,-1}<nsw><%loop.2> U: full-set S: full-set --> {((9 + %start)<u nuw> umax %x),+,-1}<nw><%loop.2> U: full-set S: full-set Exits: 6 LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %iv.2.next = add nsw i32 %iv.2, -1
+; CHECK-NEXT:    --> {(-1 + ({%start,+,1}<nuw><%loop.1> umax %x)),+,-1}<nsw><%loop.2> U: full-set S: full-set --> {(-1 + ((9 + %start)<u nuw> umax %x)),+,-1}<nw><%loop.2> U: full-set S: full-set Exits: 5 LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @addrec_at_scope_start_with_use_flags_range
+; CHECK-NEXT:  Loop %loop.2: backedge-taken count is (-6 + ((9 + %start)<u nuw> umax %x))
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (-6 + ((9 + %start)<u nuw> umax %x))
+; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop.1: backedge-taken count is i32 9
+; CHECK-NEXT:  Loop %loop.1: constant max backedge-taken count is i32 9
+; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is i32 9
+; CHECK-NEXT:  Loop %loop.1: Trip multiple is 10
+;
+entry:
+  br label %loop.1
+
+loop.1:
+  %iv.1 = phi i32 [ %start, %entry ], [ %iv.1.next, %loop.1 ]
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop.1 ]
+  %umax = call i32 @llvm.umax.i32(i32 %iv.1, i32 %x)
+  %iv.1.next = add nuw i32 %iv.1, 1
+  %i.next = add i32 %i, 1
+  %ec.1 = icmp ult i32 %i.next, 10
+  br i1 %ec.1, label %loop.1, label %loop.2
+
+loop.2:
+  %iv.2 = phi i32 [ %umax, %loop.1 ], [ %iv.2.next, %loop.2 ]
+  %iv.2.next = add nsw i32 %iv.2, -1
+  %ec.2 = icmp eq i32 %iv.2.next, 5
+  br i1 %ec.2, label %exit, label %loop.2
+
+exit:
+  ret void
+}
+
+declare void @use(i32)

@@ -436,3 +436,88 @@ loop:
 exit:
   ret void
 }
+
+; The dependence distance is (%a + %b)<nsw>. Under the guard %a s< 1, it is
+; rewritten to ((0 smin %a) + %b), which is negative given the nsw, so the
+; dependence is forward.
+define void @negative_distance_via_loop_guard_add_nsw(ptr %p, i64 %a, i64 range(i64 -100, 0) %b, i64 %n) {
+;
+; CHECK-LABEL: 'negative_distance_via_loop_guard_add_nsw'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Forward:
+; CHECK-NEXT:            %l = load i8, ptr %gep.src, align 1 ->
+; CHECK-NEXT:            store i8 %l, ptr %gep.sink, align 1
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %off = add nsw i64 %a, %b
+  call void @use(i64 noundef %off)
+  %p.off = getelementptr inbounds i8, ptr %p, i64 %off
+  %pre = icmp slt i64 %a, 1
+  br i1 %pre, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.src = getelementptr inbounds i8, ptr %p, i64 %iv
+  %l = load i8, ptr %gep.src
+  %gep.sink = getelementptr inbounds i8, ptr %p.off, i64 %iv
+  store i8 %l, ptr %gep.sink
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The dependence distance is (%a + %b)<nsw>. Under the guard %a s> 0, it is
+; rewritten to ((1 smax %a) + %b), which is at least 101 given the nsw, so the
+; dependence is backward with a distance of at least 101 bytes.
+define void @positive_distance_via_loop_guard_add_nsw(ptr %p, i64 %a, i64 range(i64 100, 200) %b, i64 %n) {
+; CHECK-LABEL: 'positive_distance_via_loop_guard_add_nsw'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with a maximum safe vector width of 808 bits
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        BackwardVectorizable:
+; CHECK-NEXT:            %l = load i8, ptr %gep.src, align 1 ->
+; CHECK-NEXT:            store i8 %l, ptr %gep.sink, align 1
+; CHECK-EMPTY:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %off = add nsw i64 %a, %b
+  call void @use(i64 noundef %off)
+  %p.off = getelementptr inbounds i8, ptr %p, i64 %off
+  %pre = icmp sgt i64 %a, 0
+  br i1 %pre, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.src = getelementptr inbounds i8, ptr %p, i64 %iv
+  %l = load i8, ptr %gep.src
+  %gep.sink = getelementptr inbounds i8, ptr %p.off, i64 %iv
+  store i8 %l, ptr %gep.sink
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+declare void @use(i64)

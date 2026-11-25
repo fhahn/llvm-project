@@ -534,3 +534,63 @@ exit.early:
 exit.done:
   ret void
 }
+
+; Reverse loop over 4 i8s starting at offset (3 + %a)<nsw> of A. Under the
+; loop guard %a s> -1, the start offset is rewritten to (3 + (0 smax %a)),
+; which is in [3, 2^63 - 1] given the nsw: it is at least the distance to the
+; last accessed element, and at most the dereferenceable size.
+define void @reverse_start_offset_add_nsw_lower_guard(ptr dereferenceable(9223372036854775807) %A, ptr dereferenceable(4) %B, i64 %a) {
+;
+; CHECK-LABEL: 'reverse_start_offset_add_nsw_lower_guard'
+; CHECK-NEXT:    loop.header:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.B = getelementptr inbounds i8, ptr %B, i64 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.A = getelementptr inbounds i8, ptr %A.off, i64 %iv.neg
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %B High: (4 + %B)<nuw>)
+; CHECK-NEXT:            Member: {%B,+,1}<nuw><%loop.header>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: (%a + %A) High: (4 + %a + %A))
+; CHECK-NEXT:            Member: {(3 + %a + %A),+,-1}<nw><%loop.header>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %off = add nsw i64 %a, 3
+  call void @use(i64 noundef %off)
+  %pre = icmp sgt i64 %a, -1
+  br i1 %pre, label %loop.ph, label %exit
+
+loop.ph:
+  %A.off = getelementptr inbounds i8, ptr %A, i64 %off
+  br label %loop.header
+
+loop.header:
+  %iv = phi i64 [ 0, %loop.ph ], [ %iv.next, %loop.latch ]
+  %iv.neg = sub nsw i64 0, %iv
+  %gep.A = getelementptr inbounds i8, ptr %A.off, i64 %iv.neg
+  %gep.B = getelementptr inbounds i8, ptr %B, i64 %iv
+  %l = load i8, ptr %gep.A, align 1
+  store i8 0, ptr %gep.B, align 1
+  %uncntable = icmp eq i8 %l, 0
+  br i1 %uncntable, label %exit, label %loop.latch
+
+loop.latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv, 3
+  br i1 %ec, label %exit, label %loop.header
+
+exit:
+  ret void
+}
+
+declare void @use(i64)

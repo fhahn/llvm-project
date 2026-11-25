@@ -305,10 +305,146 @@ loop.latch:
 exit:
   ret void
 }
+
+declare void @use.i8(i8)
+
+; Under the guard %a s> -1, %bound = (100 + %a)<nsw> is rewritten to
+; (100 + (0 smax %a)), which is u<= 127 given the nsw. %iv.64 is 96 in the
+; second-to-last and 160 in the last iteration, so the umin is only known to
+; be %bound in the last iteration, which is peeled off.
+define void @peel_last_with_guard_bound_add_nsw(i8 %a, ptr %dst) {
+; CHECK-LABEL: define void @peel_last_with_guard_bound_add_nsw(
+; CHECK-SAME: i8 [[A:%.*]], ptr [[DST:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[BOUND:%.*]] = add nsw i8 [[A]], 100
+; CHECK-NEXT:    call void @use.i8(i8 noundef [[BOUND]])
+; CHECK-NEXT:    [[PRE:%.*]] = icmp sgt i8 [[A]], -1
+; CHECK-NEXT:    br i1 [[PRE]], label %[[LOOP_PREHEADER:.*]], label %[[EXIT:.*]]
+; CHECK:       [[LOOP_PREHEADER]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i8 [ [[IV_NEXT:%.*]], %[[LOOP]] ], [ 0, %[[LOOP_PREHEADER]] ]
+; CHECK-NEXT:    [[IV_64:%.*]] = phi i8 [ [[IV_64_NEXT:%.*]], %[[LOOP]] ], [ 32, %[[LOOP_PREHEADER]] ]
+; CHECK-NEXT:    [[MIN:%.*]] = call i8 @llvm.umin.i8(i8 [[IV_64]], i8 [[BOUND]])
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr i8, ptr [[DST]], i8 [[IV]]
+; CHECK-NEXT:    store i8 [[MIN]], ptr [[GEP]], align 1
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i8 [[IV]], 1
+; CHECK-NEXT:    [[IV_64_NEXT]] = add nuw i8 [[IV_64]], 64
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i8 [[IV_NEXT]], 2
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT_LOOPEXIT_PEEL_BEGIN:.*]], label %[[LOOP]], !llvm.loop [[LOOP5:![0-9]+]]
+; CHECK:       [[EXIT_LOOPEXIT_PEEL_BEGIN]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = phi i8 [ [[IV_NEXT]], %[[LOOP]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = phi i8 [ [[IV_64_NEXT]], %[[LOOP]] ]
+; CHECK-NEXT:    br label %[[LOOP_PEEL:.*]]
+; CHECK:       [[LOOP_PEEL]]:
+; CHECK-NEXT:    [[MIN_PEEL:%.*]] = call i8 @llvm.umin.i8(i8 [[TMP1]], i8 [[BOUND]])
+; CHECK-NEXT:    [[GEP_PEEL:%.*]] = getelementptr i8, ptr [[DST]], i8 [[TMP0]]
+; CHECK-NEXT:    store i8 [[MIN_PEEL]], ptr [[GEP_PEEL]], align 1
+; CHECK-NEXT:    [[IV_NEXT_PEEL:%.*]] = add nuw nsw i8 [[TMP0]], 1
+; CHECK-NEXT:    [[IV_64_NEXT_PEEL:%.*]] = add i8 [[TMP1]], 64
+; CHECK-NEXT:    [[EC_PEEL:%.*]] = icmp eq i8 [[IV_NEXT_PEEL]], 3
+; CHECK-NEXT:    br i1 [[EC_PEEL]], label %[[EXIT_LOOPEXIT_PEEL_NEXT:.*]], label %[[EXIT_LOOPEXIT_PEEL_NEXT]]
+; CHECK:       [[EXIT_LOOPEXIT_PEEL_NEXT]]:
+; CHECK-NEXT:    br label %[[LOOP_PEEL_NEXT:.*]]
+; CHECK:       [[LOOP_PEEL_NEXT]]:
+; CHECK-NEXT:    br label %[[EXIT_LOOPEXIT:.*]]
+; CHECK:       [[EXIT_LOOPEXIT]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %bound = add nsw i8 %a, 100
+  call void @use.i8(i8 noundef %bound)
+  %pre = icmp sgt i8 %a, -1
+  br i1 %pre, label %loop, label %exit
+
+loop:
+  %iv = phi i8 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.64 = phi i8 [ 32, %entry ], [ %iv.64.next, %loop ]
+  %min = call i8 @llvm.umin.i8(i8 %iv.64, i8 %bound)
+  %gep = getelementptr i8, ptr %dst, i8 %iv
+  store i8 %min, ptr %gep
+  %iv.next = add nuw nsw i8 %iv, 1
+  %iv.64.next = add i8 %iv.64, 64
+  %ec = icmp eq i8 %iv.next, 3
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Under the guard %a s< 1, %bound = (-100 + %a)<nsw> is rewritten to
+; (-100 + (0 smin %a)), which is in [128, 156] given the nsw. %iv.64 is 96 in
+; the second-to-last and 160 in the last iteration, so the umin is only known
+; to be %bound in the last iteration, which is peeled off.
+define void @peel_last_with_guard_bound_add_nsw_upper_guard(i8 %a, ptr %dst) {
+; CHECK-LABEL: define void @peel_last_with_guard_bound_add_nsw_upper_guard(
+; CHECK-SAME: i8 [[A:%.*]], ptr [[DST:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[BOUND:%.*]] = add nsw i8 [[A]], -100
+; CHECK-NEXT:    call void @use.i8(i8 noundef [[BOUND]])
+; CHECK-NEXT:    [[PRE:%.*]] = icmp slt i8 [[A]], 1
+; CHECK-NEXT:    br i1 [[PRE]], label %[[LOOP_PREHEADER:.*]], label %[[EXIT:.*]]
+; CHECK:       [[LOOP_PREHEADER]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i8 [ [[IV_NEXT:%.*]], %[[LOOP]] ], [ 0, %[[LOOP_PREHEADER]] ]
+; CHECK-NEXT:    [[IV_64:%.*]] = phi i8 [ [[IV_64_NEXT:%.*]], %[[LOOP]] ], [ 32, %[[LOOP_PREHEADER]] ]
+; CHECK-NEXT:    [[MIN:%.*]] = call i8 @llvm.umin.i8(i8 [[IV_64]], i8 [[BOUND]])
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr i8, ptr [[DST]], i8 [[IV]]
+; CHECK-NEXT:    store i8 [[MIN]], ptr [[GEP]], align 1
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i8 [[IV]], 1
+; CHECK-NEXT:    [[IV_64_NEXT]] = add nuw i8 [[IV_64]], 64
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i8 [[IV_NEXT]], 2
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT_LOOPEXIT_PEEL_BEGIN:.*]], label %[[LOOP]], !llvm.loop [[LOOP6:![0-9]+]]
+; CHECK:       [[EXIT_LOOPEXIT_PEEL_BEGIN]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = phi i8 [ [[IV_NEXT]], %[[LOOP]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = phi i8 [ [[IV_64_NEXT]], %[[LOOP]] ]
+; CHECK-NEXT:    br label %[[LOOP_PEEL:.*]]
+; CHECK:       [[LOOP_PEEL]]:
+; CHECK-NEXT:    [[MIN_PEEL:%.*]] = call i8 @llvm.umin.i8(i8 [[TMP1]], i8 [[BOUND]])
+; CHECK-NEXT:    [[GEP_PEEL:%.*]] = getelementptr i8, ptr [[DST]], i8 [[TMP0]]
+; CHECK-NEXT:    store i8 [[MIN_PEEL]], ptr [[GEP_PEEL]], align 1
+; CHECK-NEXT:    [[IV_NEXT_PEEL:%.*]] = add nuw nsw i8 [[TMP0]], 1
+; CHECK-NEXT:    [[IV_64_NEXT_PEEL:%.*]] = add i8 [[TMP1]], 64
+; CHECK-NEXT:    [[EC_PEEL:%.*]] = icmp eq i8 [[IV_NEXT_PEEL]], 3
+; CHECK-NEXT:    br i1 [[EC_PEEL]], label %[[EXIT_LOOPEXIT_PEEL_NEXT:.*]], label %[[EXIT_LOOPEXIT_PEEL_NEXT]]
+; CHECK:       [[EXIT_LOOPEXIT_PEEL_NEXT]]:
+; CHECK-NEXT:    br label %[[LOOP_PEEL_NEXT:.*]]
+; CHECK:       [[LOOP_PEEL_NEXT]]:
+; CHECK-NEXT:    br label %[[EXIT_LOOPEXIT:.*]]
+; CHECK:       [[EXIT_LOOPEXIT]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %bound = add nsw i8 %a, -100
+  call void @use.i8(i8 noundef %bound)
+  %pre = icmp slt i8 %a, 1
+  br i1 %pre, label %loop, label %exit
+
+loop:
+  %iv = phi i8 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.64 = phi i8 [ 32, %entry ], [ %iv.64.next, %loop ]
+  %min = call i8 @llvm.umin.i8(i8 %iv.64, i8 %bound)
+  %gep = getelementptr i8, ptr %dst, i8 %iv
+  store i8 %min, ptr %gep
+  %iv.next = add nuw nsw i8 %iv, 1
+  %iv.64.next = add i8 %iv.64, 64
+  %ec = icmp eq i8 %iv.next, 3
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
 ;.
 ; CHECK: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]]}
 ; CHECK: [[META1]] = !{!"llvm.loop.peeled.count", i32 1}
 ; CHECK: [[LOOP2]] = distinct !{[[LOOP2]], [[META1]]}
 ; CHECK: [[LOOP3]] = distinct !{[[LOOP3]], [[META1]]}
 ; CHECK: [[LOOP4]] = distinct !{[[LOOP4]], [[META1]]}
+; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META1]]}
+; CHECK: [[LOOP6]] = distinct !{[[LOOP6]], [[META1]]}
 ;.
