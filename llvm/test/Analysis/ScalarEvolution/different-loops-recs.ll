@@ -900,3 +900,61 @@ exit:                                             ; preds = %loop2
   %ret = mul i64 %iv1, %iv2.ext
   ret i64 %ret
 }
+
+; The nw of %j evaluated at scope with step 2 must not be used for %k, which
+; has the same recurrence but wraps in the first iteration of %outer.header.
+; FIXME: %k.lcssa is wrongly {0,+,2}<nuw><%inner>.
+define void @addrec_at_scope_nw_not_used_for_other_values() {
+; CHECK-LABEL: 'addrec_at_scope_nw_not_used_for_other_values'
+; CHECK-NEXT:  Classifying expressions for: @addrec_at_scope_nw_not_used_for_other_values
+; CHECK-NEXT:    %outer.iv = phi i8 [ 1, %entry ], [ %outer.iv.next, %outer.latch ]
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%outer.header> U: [1,3) S: [1,3) Exits: 2 LoopDispositions: { %outer.header: Computable, %inner: Invariant }
+; CHECK-NEXT:    %j = phi i8 [ 0, %outer.header ], [ %j.next, %inner ]
+; CHECK-NEXT:    --> {0,+,{1,+,1}<nuw><nsw><%outer.header>}<nuw><%inner> U: full-set S: full-set Exits: (({-57,+,-1}<nsw><%outer.header> /u {1,+,1}<nuw><nsw><%outer.header>) * {1,+,1}<nuw><nsw><%outer.header>)<nuw> LoopDispositions: { %inner: Computable, %outer.header: Variant }
+; CHECK-NEXT:    %k = phi i8 [ 0, %outer.header ], [ %k.next, %inner ]
+; CHECK-NEXT:    --> {0,+,2}<%inner> U: [0,-1) S: [-128,127) Exits: (2 * ({-57,+,-1}<nsw><%outer.header> /u {1,+,1}<nuw><nsw><%outer.header>)) LoopDispositions: { %inner: Computable, %outer.header: Uniform }
+; CHECK-NEXT:    %j.next = add nuw i8 %j, %outer.iv
+; CHECK-NEXT:    --> {{\{\{}}1,+,1}<nuw><nsw><%outer.header>,+,{1,+,1}<nuw><nsw><%outer.header>}<nuw><%inner> U: [1,0) S: [1,0) Exits: ((1 + ({-57,+,-1}<nsw><%outer.header> /u {1,+,1}<nuw><nsw><%outer.header>))<nuw> * {1,+,1}<nuw><nsw><%outer.header>) LoopDispositions: { %inner: Computable, %outer.header: Variant }
+; CHECK-NEXT:    %k.next = add i8 %k, 2
+; CHECK-NEXT:    --> {2,+,2}<%inner> U: [0,-1) S: [-128,127) Exits: (2 + (2 * ({-57,+,-1}<nsw><%outer.header> /u {1,+,1}<nuw><nsw><%outer.header>))) LoopDispositions: { %inner: Computable, %outer.header: Uniform }
+; CHECK-NEXT:    %j.lcssa = phi i8 [ %j, %inner ]
+; CHECK-NEXT:    --> {0,+,{1,+,1}<nuw><nsw><%outer.header>}<nuw><%inner> U: full-set S: full-set --> (({-57,+,-1}<nsw><%outer.header> /u {1,+,1}<nuw><nsw><%outer.header>) * {1,+,1}<nuw><nsw><%outer.header>)<nuw> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %outer.header: Variant, %inner: Computable }
+; CHECK-NEXT:    %k.lcssa = phi i8 [ %k, %inner ]
+; CHECK-NEXT:    --> {0,+,2}<nuw><%inner> U: [0,-1) S: [-128,127) --> (2 * ({-57,+,-1}<nsw><%outer.header> /u {1,+,1}<nuw><nsw><%outer.header>)) U: [0,-1) S: [-128,127) Exits: <<Unknown>> LoopDispositions: { %outer.header: Uniform, %inner: Computable }
+; CHECK-NEXT:    %outer.iv.next = add nuw nsw i8 %outer.iv, 1
+; CHECK-NEXT:    --> {2,+,1}<nuw><nsw><%outer.header> U: [2,4) S: [2,4) Exits: 3 LoopDispositions: { %outer.header: Computable, %inner: Invariant }
+; CHECK-NEXT:  Determining loop execution counts for: @addrec_at_scope_nw_not_used_for_other_values
+; CHECK-NEXT:  Loop %inner: backedge-taken count is ({-57,+,-1}<nsw><%outer.header> /u {1,+,1}<nuw><nsw><%outer.header>)
+; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i8 -57
+; CHECK-NEXT:  Loop %inner: symbolic max backedge-taken count is ({-57,+,-1}<nsw><%outer.header> /u {1,+,1}<nuw><nsw><%outer.header>)
+; CHECK-NEXT:  Loop %inner: Trip multiple is 1
+; CHECK-NEXT:  Loop %outer.header: backedge-taken count is i8 1
+; CHECK-NEXT:  Loop %outer.header: constant max backedge-taken count is i8 1
+; CHECK-NEXT:  Loop %outer.header: symbolic max backedge-taken count is i8 1
+; CHECK-NEXT:  Loop %outer.header: Trip multiple is 2
+;
+entry:
+  br label %outer.header
+
+outer.header:
+  %outer.iv = phi i8 [ 1, %entry ], [ %outer.iv.next, %outer.latch ]
+  br label %inner
+
+inner:
+  %j = phi i8 [ 0, %outer.header ], [ %j.next, %inner ]
+  %k = phi i8 [ 0, %outer.header ], [ %k.next, %inner ]
+  %j.next = add nuw i8 %j, %outer.iv
+  %k.next = add i8 %k, 2
+  %inner.ec = icmp eq i8 %j.next, 200
+  br i1 %inner.ec, label %outer.latch, label %inner
+
+outer.latch:
+  %j.lcssa = phi i8 [ %j, %inner ]
+  %k.lcssa = phi i8 [ %k, %inner ]
+  %outer.iv.next = add nuw nsw i8 %outer.iv, 1
+  %outer.ec = icmp eq i8 %outer.iv.next, 3
+  br i1 %outer.ec, label %exit, label %outer.header
+
+exit:
+  ret void
+}
