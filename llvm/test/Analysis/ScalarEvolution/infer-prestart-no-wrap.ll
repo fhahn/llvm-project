@@ -190,3 +190,44 @@ define void @infer.zext.1(ptr %c, i8 %start) {
  exit:
   ret void
 }
+
+; The recurrence of %pre gets nuw, as the extended start of %idx, compared as
+; an expression, is the sum of the extended %x and %step.
+define void @infer.zext.2(ptr %c, i8 %x, i8 %step) {
+; CHECK-LABEL: 'infer.zext.2'
+; CHECK-NEXT:  Classifying expressions for: @infer.zext.2
+; CHECK-NEXT:    %start = add nuw i8 %x, %step
+; CHECK-NEXT:    --> (%x + %step)<nuw> U: full-set S: full-set
+; CHECK-NEXT:    %div = udiv i8 1, %start
+; CHECK-NEXT:    --> (1 /u (%x + %step)<nuw>) U: [0,2) S: [0,2)
+; CHECK-NEXT:    %idx = phi i8 [ %start, %entry ], [ %idx.inc, %loop ]
+; CHECK-NEXT:    --> {(%x + %step)<nuw>,+,%step}<nuw><%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %idx.zext = zext i8 %idx to i16
+; CHECK-NEXT:    --> {((zext i8 %x to i16) + (zext i8 %step to i16))<nuw>,+,(zext i8 %step to i16)}<nuw><%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %pre = sub i8 %idx, %step
+; CHECK-NEXT:    --> {%x,+,%step}<nuw><%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %idx.inc = add nuw i8 %idx, %step
+; CHECK-NEXT:    --> {((2 * %step) + %x),+,%step}<nw><%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %condition = load volatile i1, ptr %c, align 1
+; CHECK-NEXT:    --> %condition U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
+; CHECK-NEXT:  Determining loop execution counts for: @infer.zext.2
+; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
+;
+ entry:
+  %start = add nuw i8 %x, %step
+  %div = udiv i8 1, %start
+  br label %loop
+
+ loop:
+  %idx = phi i8 [ %start, %entry ], [ %idx.inc, %loop ]
+  %idx.zext = zext i8 %idx to i16
+  %pre = sub i8 %idx, %step
+  %idx.inc = add nuw i8 %idx, %step
+  %condition = load volatile i1, ptr %c
+  br i1 %condition, label %exit, label %loop
+
+ exit:
+  ret void
+}

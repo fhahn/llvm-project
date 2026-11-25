@@ -1124,5 +1124,67 @@ exit:
   ret void
 }
 
+; zexts of the umax of the exit value of %t, a sum with nuw as use flag, and
+; %c or %d, as %j is 0 at the exit; the second zext of the sum is cached.
+; TODO: The sums of the extended operands have no use flags.
+define void @zext_umax_exit_value_of_nuw_add(i8 %x, i8 %a, i8 %c, i8 %d) {
+; CHECK-LABEL: 'zext_umax_exit_value_of_nuw_add'
+; CHECK-NEXT:  Classifying expressions for: @zext_umax_exit_value_of_nuw_add
+; CHECK-NEXT:    %iv = phi i8 [ 0, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %j = phi i8 [ -9, %entry ], [ %j.next, %loop ]
+; CHECK-NEXT:    --> {-9,+,1}<nsw><%loop> U: [-9,1) S: [-9,1) Exits: 0 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %umax = call i8 @llvm.umax.i8(i8 %iv, i8 %x)
+; CHECK-NEXT:    --> ({0,+,1}<nuw><nsw><%loop> umax %x) U: full-set S: full-set Exits: (9 umax %x) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %t = add nuw i8 %umax, %a
+; CHECK-NEXT:    --> (({0,+,1}<nuw><nsw><%loop> umax %x) + %a)<nuw> U: full-set S: full-set Exits: ((9 umax %x) + %a)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %div = udiv i8 1, %t
+; CHECK-NEXT:    --> (1 /u (({0,+,1}<nuw><nsw><%loop> umax %x) + %a)<nuw>) U: [0,2) S: [0,2) Exits: (1 /u ((9 umax %x) + %a)<u nuw>) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %umax.1 = call i8 @llvm.umax.i8(i8 %t, i8 %c)
+; CHECK-NEXT:    --> ((({0,+,1}<nuw><nsw><%loop> umax %x) + %a)<nuw> umax %c) U: full-set S: full-set Exits: (((9 umax %x) + %a)<u nuw> umax %c) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %add.1 = add i8 %umax.1, %j
+; CHECK-NEXT:    --> ({-9,+,1}<nsw><%loop> + ((({0,+,1}<nuw><nsw><%loop> umax %x) + %a)<nuw> umax %c)) U: full-set S: full-set Exits: (((9 umax %x) + %a)<u nuw> umax %c) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %zext.1 = zext i8 %add.1 to i16
+; CHECK-NEXT:    --> (zext i8 ({-9,+,1}<nsw><%loop> + ((({0,+,1}<nuw><nsw><%loop> umax %x) + %a)<nuw> umax %c)) to i16) U: [0,256) S: [0,256) Exits: ((zext i8 %c to i16) umax ((zext i8 %a to i16) + (9 umax (zext i8 %x to i16)))) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %umax.2 = call i8 @llvm.umax.i8(i8 %t, i8 %d)
+; CHECK-NEXT:    --> ((({0,+,1}<nuw><nsw><%loop> umax %x) + %a)<nuw> umax %d) U: full-set S: full-set Exits: (((9 umax %x) + %a)<u nuw> umax %d) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %add.2 = add i8 %umax.2, %j
+; CHECK-NEXT:    --> ({-9,+,1}<nsw><%loop> + ((({0,+,1}<nuw><nsw><%loop> umax %x) + %a)<nuw> umax %d)) U: full-set S: full-set Exits: (((9 umax %x) + %a)<u nuw> umax %d) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %zext.2 = zext i8 %add.2 to i16
+; CHECK-NEXT:    --> (zext i8 ({-9,+,1}<nsw><%loop> + ((({0,+,1}<nuw><nsw><%loop> umax %x) + %a)<nuw> umax %d)) to i16) U: [0,256) S: [0,256) Exits: ((zext i8 %d to i16) umax ((zext i8 %a to i16) + (9 umax (zext i8 %x to i16)))) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nuw i8 %iv, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %j.next = add i8 %j, 1
+; CHECK-NEXT:    --> {-8,+,1}<nsw><%loop> U: [-8,2) S: [-8,2) Exits: 1 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @zext_umax_exit_value_of_nuw_add
+; CHECK-NEXT:  Loop %loop: backedge-taken count is i8 9
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 9
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i8 9
+; CHECK-NEXT:  Loop %loop: Trip multiple is 10
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i8 [ 0, %entry ], [ %iv.next, %loop ]
+  %j = phi i8 [ -9, %entry ], [ %j.next, %loop ]
+  %umax = call i8 @llvm.umax.i8(i8 %iv, i8 %x)
+  %t = add nuw i8 %umax, %a
+  %div = udiv i8 1, %t
+  %umax.1 = call i8 @llvm.umax.i8(i8 %t, i8 %c)
+  %add.1 = add i8 %umax.1, %j
+  %zext.1 = zext i8 %add.1 to i16
+  %umax.2 = call i8 @llvm.umax.i8(i8 %t, i8 %d)
+  %add.2 = add i8 %umax.2, %j
+  %zext.2 = zext i8 %add.2 to i16
+  %iv.next = add nuw i8 %iv, 1
+  %j.next = add i8 %j, 1
+  %ec = icmp eq i8 %j, 0
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
 declare i64 @get()
 declare void @use(i64)
