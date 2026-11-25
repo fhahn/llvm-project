@@ -1261,6 +1261,14 @@ public:
     return getRangeRef(S, HINT_RANGE_SIGNED).getSignedMax();
   }
 
+  /// Determine the signed range of the use \p S. Unlike getSignedRange, it
+  /// also uses the no-wrap flags of the use and of the uses of its operands,
+  /// so the result only holds where \p S is evaluated, e.g. under the loop
+  /// guards for a use returned by applyLoopGuards.
+  ConstantRange getSignedRangeForUse(SCEVUse S) {
+    return getRangeForUse(S, HINT_RANGE_SIGNED);
+  }
+
   /// Test if the given expression is known to be negative.
   LLVM_ABI bool isKnownNegative(const SCEV *S);
 
@@ -1341,6 +1349,12 @@ public:
   /// Test if the given expression is known to satisfy the condition described
   /// by Pred, LHS, and RHS.
   LLVM_ABI bool isKnownPredicate(CmpPredicate Pred, SCEVUse LHS, SCEVUse RHS);
+
+  /// Like isKnownPredicate, but also compare the ranges of the uses \p LHS and
+  /// \p RHS, see getSignedRangeForUse. The result only holds where both uses
+  /// are evaluated.
+  LLVM_ABI bool isKnownPredicateForUses(CmpPredicate Pred, SCEVUse LHS,
+                                        SCEVUse RHS);
 
   /// Check whether the condition described by Pred, LHS, and RHS is true or
   /// false. If we know it, return the evaluation of this condition. If neither
@@ -1590,8 +1604,6 @@ public:
   class LoopGuards {
     DenseMap<const SCEV *, const SCEV *> RewriteMap;
     SmallDenseSet<std::pair<const SCEV *, const SCEV *>> NotEqual;
-    bool PreserveNUW = false;
-    bool PreserveNSW = false;
     /// The loop to collect guards for on first use by applyLoopGuards, if not
     /// collected yet.
     const Loop *PendingLoop = nullptr;
@@ -1624,8 +1636,8 @@ public:
         unsigned Depth);
 
     /// Like rewrite(Expr), but look up rewrites with \p Lookup if set.
-    const SCEV *rewrite(const SCEV *Expr,
-                        function_ref<const SCEV *(const SCEV *)> Lookup) const;
+    SCEVUse rewrite(const SCEV *Expr,
+                    function_ref<const SCEV *(const SCEV *)> Lookup) const;
 
   public:
     /// Return loop guards for loop \p L, which are collected on first use.
@@ -1635,13 +1647,16 @@ public:
       return Guards;
     }
 
-    /// Try to apply the collected loop guards to \p Expr.
-    LLVM_ABI const SCEV *rewrite(const SCEV *Expr) const;
+    /// Try to apply the collected loop guards to \p Expr. See applyLoopGuards
+    /// for the no-wrap flags of the result.
+    LLVM_ABI SCEVUse rewrite(const SCEV *Expr) const;
   };
 
-  /// Try to apply information from loop guards for \p L to \p Expr.
-  LLVM_ABI const SCEV *applyLoopGuards(const SCEV *Expr, const Loop *L);
-  LLVM_ABI const SCEV *applyLoopGuards(const SCEV *Expr, LoopGuards &Guards);
+  /// Try to apply information from loop guards for \p L to \p Expr. The
+  /// no-wrap flags of rewritten adds only hold under the guards, and are
+  /// returned as use flags of the result and of its operands.
+  LLVM_ABI SCEVUse applyLoopGuards(const SCEV *Expr, const Loop *L);
+  LLVM_ABI SCEVUse applyLoopGuards(const SCEV *Expr, LoopGuards &Guards);
 
   /// Return true if the loop has no abnormal exits. That is, if the loop
   /// is not infinite, it must exit through an explicit edge in the CFG.
@@ -2453,8 +2468,10 @@ private:
 
   /// Test if the given expression is known to satisfy the condition described
   /// by Pred and the known constant ranges of LHS and RHS.
+  /// If \p IsUse, use the ranges of the uses \p LHS and \p RHS, which only
+  /// hold where they are used.
   bool isKnownPredicateViaConstantRanges(CmpPredicate Pred, SCEVUse LHS,
-                                         SCEVUse RHS);
+                                         SCEVUse RHS, bool IsUse = false);
 
   /// Try to prove the condition described by "LHS Pred RHS" by ruling out
   /// integer overflow.
@@ -2613,6 +2630,24 @@ private:
                     : getRangeForUse(S, HINT_RANGE_UNSIGNED).getUnsignedMax();
   }
 
+  /// Like isKnownNegative, but for the range of the use \p S, see
+  /// getRangeForUse.
+  bool isKnownNegativeForUse(SCEVUse S) {
+    return getRangeMaxForUse(S, /*IsSigned=*/true).isNegative();
+  }
+
+  /// Like isKnownNonNegative, but for the range of the use \p S, see
+  /// getRangeForUse.
+  bool isKnownNonNegativeForUse(SCEVUse S) {
+    return getRangeMinForUse(S, /*IsSigned=*/true).isNonNegative();
+  }
+
+  /// Like isKnownPositive, but for the range of the use \p S, see
+  /// getRangeForUse.
+  bool isKnownPositiveForUse(SCEVUse S) {
+    return getRangeMinForUse(S, /*IsSigned=*/true).isStrictlyPositive();
+  }
+
   /// Compute the maximum backedge count based on the range of values
   /// permitted by Start, End, and Stride. This is for loops of the form
   /// {Start, +, Stride} LT End, or, if \p Invert is set, for the equivalent
@@ -2631,7 +2666,7 @@ private:
   /// against the invariant \p RHS with a less-than. If \p Invert is true, both
   /// the IV and \p RHS are inverted
   /// Uses the range of the use \p RHS, which only holds where \p RHS is used.
-  bool canIVOverflowOnLT(SCEVUse RHS, const SCEV *Stride, bool IsSigned,
+  bool canIVOverflowOnLT(SCEVUse RHS, SCEVUse Stride, bool IsSigned,
                          bool Invert = false);
 
   /// Get add expr already created or create a new one.

@@ -461,7 +461,7 @@ private:
   void mergeInStatus(VectorizationSafetyStatus S);
 
   struct DepDistanceStrideAndSizeInfo {
-    const SCEV *Dist;
+    SCEVUse Dist;
 
     /// Strides here are scaled; i.e. in bytes, taking the size of the
     /// underlying type into account.

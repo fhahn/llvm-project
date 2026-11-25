@@ -1693,6 +1693,65 @@ TEST_F(ScalarEvolutionsTest, ApplyLoopGuards) {
   });
 }
 
+TEST_F(ScalarEvolutionsTest, ApplyLoopGuardsUseFlags) {
+  LLVMContext C;
+  SMDiagnostic Err;
+  std::unique_ptr<Module> M = parseAssemblyString(
+      R"(define void @f(i32 %a, i32 %b, i32 %n) {
+      entry:
+        %guard = icmp ne i32 %a, %b
+        br i1 %guard, label %loop, label %exit
+
+      loop:
+        %iv = phi i32 [ 0, %entry ], [ %iv.next, %loop ]
+        %iv.next = add i32 %iv, 1
+        %ec = icmp eq i32 %iv.next, %n
+        br i1 %ec, label %exit, label %loop
+
+      exit:
+        ret void
+      })",
+      Err, C);
+
+  ASSERT_TRUE(M && "Could not parse module?");
+  ASSERT_TRUE(!verifyModule(*M) && "Must have been well formed!");
+
+  runWithSE(*M, "f", [](Function &F, LoopInfo &LI, ScalarEvolution &SE) {
+    const SCEV *A = SE.getSCEV(F.getArg(0));
+    const SCEV *B = SE.getSCEV(F.getArg(1));
+    const SCEV *N = SE.getSCEV(F.getArg(2));
+    const Loop *L = *LI.begin();
+
+    // The guard does not rewrite the operands of
+    // (%n + (%a * %b)<u nuw>)<nuw>, whose nuw may depend on the use flags of
+    // the product, so it is not rebuilt from the expressions of its operands.
+    SCEVUse Prod = SE.getMulExpr(A, B, {SCEV::FlagNone, SCEV::FlagNUW});
+    ASSERT_TRUE(Prod.hasUseFlags());
+    const SCEV *Sum = SE.getAddExpr(N, Prod, SCEV::FlagNUW);
+    EXPECT_EQ(SE.applyLoopGuards(Sum, L), Sum);
+
+    // Likewise for operands that are adds or recurrences with use flags.
+    SCEVUse Add = SE.getAddExpr(A, N, {SCEV::FlagNone, SCEV::FlagNUW});
+    ASSERT_TRUE(Add.hasUseFlags());
+    const SCEV *MaxOfAdd = SE.getUMaxExpr(B, Add);
+    EXPECT_EQ(SE.applyLoopGuards(MaxOfAdd, L), MaxOfAdd);
+    SCEVUse AddRec = SE.getAddRecExpr(A, SE.getOne(A->getType()), L,
+                                      {SCEV::FlagNone, SCEV::FlagNUW});
+    ASSERT_TRUE(AddRec.hasUseFlags());
+    const SCEV *MaxOfAddRec = SE.getUMaxExpr(B, AddRec);
+    EXPECT_EQ(SE.applyLoopGuards(MaxOfAddRec, L), MaxOfAddRec);
+
+    // The nuw of (-1 + %a + (-1 * %b))<nuw> only holds for
+    // (-1 + (1 umax (%a - %b))) under the guard, which makes %a - %b at least
+    // 1, so it is returned as use flag and not put on the expression.
+    SmallVector<SCEVUse> Ops = {SE.getMinusOne(A->getType()), A,
+                                SE.getNegativeSCEV(B)};
+    SCEVUse Guarded = SE.applyLoopGuards(SE.getAddExpr(Ops, SCEV::FlagNUW), L);
+    ASSERT_TRUE(Guarded.hasUseFlags());
+    EXPECT_EQ(cast<SCEVAddExpr>(Guarded)->getNoWrapFlags(), SCEV::FlagNone);
+  });
+}
+
 TEST_F(ScalarEvolutionsTest, ForgetAllLoopsForgetsRangesOfUses) {
   LLVMContext C;
   SMDiagnostic Err;

@@ -238,7 +238,7 @@ static bool evaluatePtrAddRecAtMaxBTCWillNotWrap(
   // If Start u< StartPtr, StartOffset wraps to a value above DerefBytes, so
   // the final MaxOffset u<= DerefBytes check rejects it.
   const SCEV *Start = AR->getStart();
-  const SCEV *StartOffset =
+  SCEVUse StartOffset =
       SE.getNoopOrZeroExtend(SE.getMinusSCEV(Start, StartPtr), WiderTy);
 
   MaxBTC = SE.applyLoopGuards(MaxBTC, LoopGuards);
@@ -264,7 +264,7 @@ static bool evaluatePtrAddRecAtMaxBTCWillNotWrap(
   // Compute MaxOffset per direction: for a non-negative step, the exclusive
   // upper offset of the accessed range; for a negative step, the offset of the
   // start of the highest access.
-  const SCEV *MaxOffset;
+  SCEVUse MaxOffset;
   if (IsKnownNonNegative) {
     // Total length in bytes of the accessed range (from the first accessed
     // byte through the end of the last access).
@@ -286,7 +286,8 @@ static bool evaluatePtrAddRecAtMaxBTCWillNotWrap(
     MaxOffset = StartOffset;
   }
   // MaxOffset must not exceed the deref-region end.
-  return SE.isKnownPredicate(CmpInst::ICMP_ULE, MaxOffset, DerefBytesSCEV);
+  return SE.isKnownPredicateForUses(CmpInst::ICMP_ULE, MaxOffset,
+                                    DerefBytesSCEV);
 }
 
 /// Return true if \p S is known to be monotonically non-decreasing
@@ -3195,9 +3196,11 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
     Dist = SE.applyLoopGuards(Dist, LoopGuards);
   }
 
-  // Negative distances are not plausible dependencies.
-  if (SE.isKnownNonPositive(Dist)) {
-    if (SE.isKnownNonNegative(Dist)) {
+  // Negative distances are not plausible dependencies. Dist only has to be in
+  // the range of its use under the loop guards.
+  ConstantRange DistRange = SE.getSignedRangeForUse(Dist);
+  if (DistRange.getSignedMax().isNonPositive()) {
+    if (DistRange.getSignedMin().isNonNegative()) {
       // Equal-sized accesses to the same location are forward.
       if (HasSameSize)
         return Dependence::Forward;
@@ -3247,7 +3250,7 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
   }
 
   std::optional<int64_t> MinDistanceOpt =
-      SE.getSignedRangeMin(Dist).trySExtValue();
+      DistRange.getSignedMin().trySExtValue();
   if (!MinDistanceOpt) {
     LLVM_DEBUG(dbgs() << "LAA: Minimum distance does not fit in 64 bits.\n");
     return Dependence::Unknown;

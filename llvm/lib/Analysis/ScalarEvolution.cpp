@@ -7139,8 +7139,13 @@ ConstantRange ScalarEvolution::getRangeForAffineNoSelfWrappingAR(
   // outside and inside the range [Min(Start, End), Max(Start, End)]. Using that
   // knowledge, let's try to prove that we are dealing with Case 1. It is so if
   // Start <= End and step is positive, or Start >= End and step is negative.
-  const SCEV *Start = applyLoopGuards(AddRec->getStart(), AddRec->getLoop());
-  ConstantRange StartRange = getRangeRef(Start, SignHint);
+  SCEVUse Start = applyLoopGuards(AddRec->getStart(), AddRec->getLoop());
+  // The range of AddRec only has to hold under the guards of its loop, like
+  // the use flags of the rewritten start, unless the start has use flags
+  // already, which need not hold there.
+  bool StartIsUse = AddRec->getStart().isCanonical();
+  ConstantRange StartRange = StartIsUse ? getRangeForUse(Start, SignHint)
+                                        : getRangeRef(Start, SignHint);
   ConstantRange EndRange = getRangeRef(End, SignHint);
   ConstantRange RangeBetween = StartRange.unionWith(EndRange);
   // If they already cover full iteration space, we will know nothing useful
@@ -7154,10 +7159,10 @@ ConstantRange ScalarEvolution::getRangeForAffineNoSelfWrappingAR(
     return ConstantRange::getFull(BitWidth);
 
   if (isKnownPositive(Step) &&
-      isKnownPredicateViaConstantRanges(LEPred, Start, End))
+      isKnownPredicateViaConstantRanges(LEPred, Start, End, StartIsUse))
     return RangeBetween;
   if (isKnownNegative(Step) &&
-           isKnownPredicateViaConstantRanges(GEPred, Start, End))
+      isKnownPredicateViaConstantRanges(GEPred, Start, End, StartIsUse))
     return RangeBetween;
   return ConstantRange::getFull(BitWidth);
 }
@@ -10804,15 +10809,16 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(const SCEV *V,
 
   LoopGuards Guards = LoopGuards::collectOnDemand(L, *this);
   // Specialize step for this loop so we get context sensitive facts below.
-  const SCEV *StepWLG = applyLoopGuards(Step, Guards);
+  SCEVUse StepWLG = applyLoopGuards(Step, Guards);
 
   // For positive steps (counting up until unsigned overflow):
   //   N = -Start/Step (as unsigned)
   // For negative steps (counting down to zero):
   //   N = Start/-Step
   // First compute the unsigned distance from zero in the direction of Step.
-  bool CountDown = isKnownNegative(StepWLG);
-  if (!CountDown && !isKnownNonNegative(StepWLG))
+  // StepWLG only has to be in the range of its use if L is entered.
+  bool CountDown = isKnownNegativeForUse(StepWLG);
+  if (!CountDown && !isKnownNonNegativeForUse(StepWLG))
     return getCouldNotCompute();
 
   const SCEV *Distance = CountDown ? Start : getNegativeSCEV(Start);
@@ -10821,7 +10827,8 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(const SCEV *V,
   //   N = Distance (as unsigned)
 
   if (match(Step, m_CombineOr(m_scev_One(), m_scev_AllOnes()))) {
-    APInt MaxBECount = getUnsignedRangeMax(applyLoopGuards(Distance, Guards));
+    APInt MaxBECount = getRangeMaxForUse(applyLoopGuards(Distance, Guards),
+                                         /*IsSigned=*/false);
     MaxBECount = APIntOps::umin(MaxBECount, getUnsignedRangeMax(Distance));
 
     // When a loop like "for (int i = 0; i != n; ++i) { /* body */ }" is rotated,
@@ -10840,7 +10847,8 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(const SCEV *V,
       // Distance + 1; the range of Distance itself may be a wrapped set even
       // when the guards bound Distance + 1 tightly.
       APInt Max = APIntOps::umin(
-          getUnsignedRangeMax(applyLoopGuards(DistancePlusOne, Guards)),
+          getRangeMaxForUse(applyLoopGuards(DistancePlusOne, Guards),
+                            /*IsSigned=*/false),
           getUnsignedRangeMax(DistancePlusOne));
       MaxBECount = APIntOps::umin(MaxBECount, Max - 1);
     }
@@ -10860,7 +10868,8 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(const SCEV *V,
     // infinite. In C++, most loops are finite by assumption, in which case the
     // step being zero implies UB must execute if the loop is entered.
     if (!(loopIsFiniteByAssumption(L) && isKnownNonZero(Start)) &&
-        !isKnownNonZero(StepWLG))
+        !isKnownNonZero(StepWLG) &&
+        getRangeMinForUse(StepWLG, /*IsSigned=*/false).isZero())
       return getCouldNotCompute();
 
     const SCEV *Exact =
@@ -11431,6 +11440,12 @@ bool ScalarEvolution::isKnownPredicate(CmpPredicate Pred, SCEVUse LHS,
          isKnownViaNonRecursiveReasoning(Pred, LHS, RHS);
 }
 
+bool ScalarEvolution::isKnownPredicateForUses(CmpPredicate Pred, SCEVUse LHS,
+                                              SCEVUse RHS) {
+  return isKnownPredicate(Pred, LHS, RHS) ||
+         isKnownPredicateViaConstantRanges(Pred, LHS, RHS, /*IsUse=*/true);
+}
+
 std::optional<bool> ScalarEvolution::evaluatePredicate(CmpPredicate Pred,
                                                        const SCEV *LHS,
                                                        const SCEV *RHS) {
@@ -11715,13 +11730,17 @@ ScalarEvolution::getLoopInvariantExitCondDuringFirstIterationsImpl(
 
 bool ScalarEvolution::isKnownPredicateViaConstantRanges(CmpPredicate Pred,
                                                         SCEVUse LHS,
-                                                        SCEVUse RHS) {
+                                                        SCEVUse RHS,
+                                                        bool IsUse) {
   if (HasSameValue(LHS, RHS))
     return ICmpInst::isTrueWhenEqual(Pred);
 
   auto CheckRange = [&](bool IsSigned) {
-    auto RangeLHS = IsSigned ? getSignedRange(LHS) : getUnsignedRange(LHS);
-    auto RangeRHS = IsSigned ? getSignedRange(RHS) : getUnsignedRange(RHS);
+    RangeSignHint Hint = IsSigned ? HINT_RANGE_SIGNED : HINT_RANGE_UNSIGNED;
+    ConstantRange RangeLHS =
+        IsUse ? getRangeForUse(LHS, Hint) : getRangeRef(LHS, Hint);
+    ConstantRange RangeRHS =
+        IsUse ? getRangeForUse(RHS, Hint) : getRangeRef(RHS, Hint);
     return RangeLHS.icmp(Pred, RangeRHS);
   };
 
@@ -13244,9 +13263,9 @@ bool ScalarEvolution::isImpliedCondOperandsViaRanges(
   return LHSRange.icmp(Pred, ConstRHS);
 }
 
-bool ScalarEvolution::canIVOverflowOnLT(SCEVUse RHS, const SCEV *Stride,
+bool ScalarEvolution::canIVOverflowOnLT(SCEVUse RHS, SCEVUse Stride,
                                         bool IsSigned, bool Invert) {
-  assert(isKnownPositive(Stride) && "Positive stride expected!");
+  assert(isKnownPositiveForUse(Stride) && "Positive stride expected!");
 
   unsigned BitWidth = getTypeSizeInBits(RHS->getType());
   const SCEV *One = getOne(Stride->getType());
@@ -13438,7 +13457,7 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, SCEVUse RHSUse,
   const SCEV *Stride = IV->getStepRecurrence(*this);
   if (Invert)
     Stride = getNegativeSCEV(Stride);
-  const SCEV *GuardedStride = Stride;
+  SCEVUse GuardedStride = Stride;
 
   // Whether the IV may reach the maximum (or minimum if inverted) value
   // before the exit is taken.
@@ -13447,8 +13466,8 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, SCEVUse RHSUse,
   bool PositiveStride = isKnownPositive(Stride);
   // A dominating guard may prove the stride positive.
   if (!PositiveStride) {
-    const SCEV *LoopGuardedStride = applyLoopGuards(Stride, Guards);
-    if (isKnownPositive(LoopGuardedStride)) {
+    SCEVUse LoopGuardedStride = applyLoopGuards(Stride, Guards);
+    if (isKnownPositiveForUse(LoopGuardedStride)) {
       GuardedStride = LoopGuardedStride;
       PositiveStride = true;
       // Encode the context-sensitive stride > 0 fact into the expression
@@ -13786,14 +13805,14 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, SCEVUse RHSUse,
         if (ICmpInst::compare(RHSMin, StartMax, CondGE))
           return true;
 
-        const SCEV *GuardedRHS = applyLoopGuards(OrigRHS, Guards);
-        const SCEV *GuardedStart = applyLoopGuards(OrigStart, Guards);
+        SCEVUse GuardedRHS = applyLoopGuards(OrigRHS, Guards);
+        SCEVUse GuardedStart = applyLoopGuards(OrigStart, Guards);
         if (Invert)
           std::swap(GuardedRHS, GuardedStart);
 
         auto [GELHS, GERHS] = SwapIfInverted(OrigRHS, OrigStart);
         if (isLoopEntryGuardedByCond(L, CondGE, GELHS, GERHS) ||
-            isKnownPredicate(CondGE, GuardedRHS, GuardedStart))
+            isKnownPredicateForUses(CondGE, GuardedRHS, GuardedStart))
           return true;
 
         if ((GuardedRHS != GELHS || GuardedStart != GERHS) &&
@@ -16211,19 +16230,6 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
     ExprsToRewrite.push_back(K);
   }
 
-  // Let the rewriter preserve NUW/NSW flags if the unsigned/signed ranges of
-  // the replacement expressions are contained in the ranges of the replaced
-  // expressions.
-  Guards.PreserveNUW = true;
-  Guards.PreserveNSW = true;
-  for (const SCEV *Expr : ExprsToRewrite) {
-    const SCEV *RewriteTo = Guards.RewriteMap[Expr];
-    Guards.PreserveNUW &=
-        SE.getUnsignedRange(Expr).contains(SE.getUnsignedRange(RewriteTo));
-    Guards.PreserveNSW &=
-        SE.getSignedRange(Expr).contains(SE.getSignedRange(RewriteTo));
-  }
-
   // Now that all rewrite information is collect, rewrite the collected
   // expressions with the information in the map. This applies information to
   // sub-expressions. A collected expression is rewritten when it is first
@@ -16251,25 +16257,42 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   }
 }
 
-const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
+SCEVUse ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
   return rewrite(Expr, nullptr);
 }
 
-const SCEV *ScalarEvolution::LoopGuards::rewrite(
+SCEVUse ScalarEvolution::LoopGuards::rewrite(
     const SCEV *Expr, function_ref<const SCEV *(const SCEV *)> Lookup) const {
   /// A rewriter to replace SCEV expressions in Map with the corresponding entry
   /// in the map. It skips AddRecExpr because we cannot guarantee that the
   /// replacement is loop invariant in the loop of the AddRec.
+  ///
+  /// Replacements are only equal to the replaced expressions under the guards.
+  /// The no-wrap flags of an add or mul hold for the expression rebuilt from
+  /// its rewritten operands, but only under the guards, while the rebuilt
+  /// expression is also the SCEV of values that are not guarded. They are
+  /// returned as use flags.
   class SCEVLoopGuardRewriter
       : public SCEVRewriteVisitor<SCEVLoopGuardRewriter> {
     const DenseMap<const SCEV *, const SCEV *> &Map;
     const SmallDenseSet<std::pair<const SCEV *, const SCEV *>> &NotEqual;
     function_ref<const SCEV *(const SCEV *)> Lookup;
 
-    SCEVFlags FlagMask = SCEV::FlagNone;
-
     const SCEV *lookup(const SCEV *Key) {
       return Lookup ? Lookup(Key) : Map.lookup(Key);
+    }
+
+    /// Return the no-wrap flags of \p Expr to pass as use flags when
+    /// rebuilding it from operands that are equal to its operands under the
+    /// guards. Other than folding constant operands, getAddExpr only returns
+    /// use flags for an expression with exactly the operands passed. The nsw
+    /// of more than 2 operands may only hold for one order of the operands,
+    /// e.g. for the offsets of a GEP with nusw, and that order is not kept.
+    static SCEVFlagsPair getFlagsUnderGuards(const SCEVAddExpr *Expr) {
+      SCEVFlags Mask = SCEV::FlagNUW;
+      if (Expr->getNumOperands() == 2)
+        Mask |= SCEV::FlagNSW;
+      return {SCEV::FlagNone, Expr->getNoWrapFlags(Mask)};
     }
 
   public:
@@ -16277,14 +16300,9 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(
                           const ScalarEvolution::LoopGuards &Guards,
                           function_ref<const SCEV *(const SCEV *)> Lookup)
         : SCEVRewriteVisitor(SE), Map(Guards.RewriteMap),
-          NotEqual(Guards.NotEqual), Lookup(Lookup) {
-      if (Guards.PreserveNUW)
-        FlagMask = ScalarEvolution::setFlags(FlagMask, SCEV::FlagNUW);
-      if (Guards.PreserveNSW)
-        FlagMask = ScalarEvolution::setFlags(FlagMask, SCEV::FlagNSW);
-    }
+          NotEqual(Guards.NotEqual), Lookup(Lookup) {}
 
-    const SCEV *visit(const SCEV *Expr) {
+    SCEVUse visit(SCEVUse Expr) {
       if (isa<SCEVUnknown, SCEVPtrToAddrExpr, SCEVZeroExtendExpr,
               SCEVSignExtendExpr, SCEVUMinExpr, SCEVSMinExpr, SCEVAddExpr,
               SCEVMulExpr>(Expr))
@@ -16293,9 +16311,11 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(
       return SCEVRewriteVisitor::visit(Expr);
     }
 
-    const SCEV *visitAddRecExpr(const SCEVAddRecExpr *Expr) { return Expr; }
+    SCEVUse visitAddRecExpr(SCEVUseT<const SCEVAddRecExpr *> Expr) {
+      return Expr;
+    }
 
-    const SCEV *visitZeroExtendExpr(const SCEVZeroExtendExpr *Expr) {
+    SCEVUse visitZeroExtendExpr(SCEVUseT<const SCEVZeroExtendExpr *> Expr) {
       // If there is no replacement for the exact ZExt expr, check if there's
       // one for a smaller ZExt we can use instead.
       Type *Ty = Expr->getType();
@@ -16313,7 +16333,7 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(
       return SCEVRewriteVisitor::visitZeroExtendExpr(Expr);
     }
 
-    const SCEV *visitAddExpr(const SCEVAddExpr *Expr) {
+    SCEVUse visitAddExpr(SCEVUseT<const SCEVAddExpr *> Expr) {
       // Helper to check if S is a subtraction (A - B) where A != B, and if so,
       // return UMax(S, 1).
       auto RewriteSubtraction = [&](const SCEV *S) -> const SCEV * {
@@ -16342,10 +16362,11 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(
         if (Expr->getNumOperands() == 3) {
           const SCEV *Add =
               SE.getAddExpr(Expr->getOperand(1), Expr->getOperand(2));
+          // Rewritten is equal to A + B under the guards, so the nuw of Expr
+          // holds for adding it to the constant.
           if (const SCEV *Rewritten = RewriteSubtraction(Add))
-            return SE.getAddExpr(
-                Expr->getOperand(0), Rewritten,
-                ScalarEvolution::maskFlags(Expr->getNoWrapFlags(), FlagMask));
+            return SE.getAddExpr(Expr->getOperand(0), Rewritten,
+                                 getFlagsUnderGuards(Expr));
           if (const SCEV *S = lookup(Add))
             return SE.getAddExpr(Expr->getOperand(0), S);
         }
@@ -16374,27 +16395,10 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(
         Operands.push_back(visit(Op));
         Changed |= Op != Operands.back();
       }
-      // We are only replacing operands with equivalent values, so transfer the
-      // flags from the original expression.
+      // We are only replacing operands with values that are equal under the
+      // guards, so transfer the flags from the original expression to the use.
       return !Changed ? Expr
-                      : SE.getAddExpr(Operands,
-                                      ScalarEvolution::maskFlags(
-                                          Expr->getNoWrapFlags(), FlagMask));
-    }
-
-    const SCEV *visitMulExpr(const SCEVMulExpr *Expr) {
-      SmallVector<SCEVUse, 2> Operands;
-      bool Changed = false;
-      for (SCEVUse Op : Expr->operands()) {
-        Operands.push_back(visit(Op));
-        Changed |= Op != Operands.back();
-      }
-      // We are only replacing operands with equivalent values, so transfer the
-      // flags from the original expression.
-      return !Changed ? Expr
-                      : SE.getMulExpr(Operands,
-                                      ScalarEvolution::maskFlags(
-                                          Expr->getNoWrapFlags(), FlagMask));
+                      : SE.getAddExpr(Operands, getFlagsUnderGuards(Expr));
     }
   };
 
@@ -16405,13 +16409,12 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(
   return Rewriter.visit(Expr);
 }
 
-const SCEV *ScalarEvolution::applyLoopGuards(const SCEV *Expr, const Loop *L) {
+SCEVUse ScalarEvolution::applyLoopGuards(const SCEV *Expr, const Loop *L) {
   LoopGuards Guards = LoopGuards::collectOnDemand(L, *this);
   return applyLoopGuards(Expr, Guards);
 }
 
-const SCEV *ScalarEvolution::applyLoopGuards(const SCEV *Expr,
-                                             LoopGuards &Guards) {
+SCEVUse ScalarEvolution::applyLoopGuards(const SCEV *Expr, LoopGuards &Guards) {
   // Loop guards never rewrite constants and AddRecs, so there is no need to
   // collect pending guards for them.
   if (isa<SCEVConstant, SCEVAddRecExpr>(Expr))

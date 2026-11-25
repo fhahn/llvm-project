@@ -242,7 +242,7 @@ define void @addrec_at_scope_start_with_use_flags_range(i32 %start, i32 %x) {
 ; CHECK-NEXT:    --> {(-1 + ({%start,+,1}<nuw><%loop.1> umax %x)),+,-1}<nsw><%loop.2> U: full-set S: full-set --> {(-1 + ((9 + %start)<u nuw> umax %x)),+,-1}<nw><%loop.2> U: full-set S: full-set Exits: 5 LoopDispositions: { %loop.2: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @addrec_at_scope_start_with_use_flags_range
 ; CHECK-NEXT:  Loop %loop.2: backedge-taken count is (-6 + ((9 + %start)<u nuw> umax %x))
-; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -7
 ; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (-6 + ((9 + %start)<u nuw> umax %x))
 ; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
 ; CHECK-NEXT:  Loop %loop.1: backedge-taken count is i32 9

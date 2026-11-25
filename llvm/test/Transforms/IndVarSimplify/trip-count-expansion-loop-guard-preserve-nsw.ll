@@ -45,7 +45,6 @@ exit:
 ; The guard %a == -1 rewrites the exit count (%a + %p)<nuw> of %inner to
 ; (-1 + %p), which is also the SCEV of %r. The nuw only holds under the guard
 ; and must not be added to %r, which wraps for %p != 0.
-; FIXME: nuw is added to %r.
 define i32 @rewrite_flags_only_hold_under_guard_strengthen(i32 %a, i32 %start) {
 ; CHECK-LABEL: define i32 @rewrite_flags_only_hold_under_guard_strengthen(
 ; CHECK-SAME: i32 [[A:%.*]], i32 [[START:%.*]]) {
@@ -55,7 +54,7 @@ define i32 @rewrite_flags_only_hold_under_guard_strengthen(i32 %a, i32 %start) {
 ; CHECK-NEXT:    [[P:%.*]] = phi i32 [ [[START]], [[ENTRY:%.*]] ], [ [[P_NEXT:%.*]], [[OUTER_LATCH:%.*]] ]
 ; CHECK-NEXT:    [[ADD:%.*]] = add nuw i32 [[A]], [[P]]
 ; CHECK-NEXT:    call void @use(i32 noundef [[ADD]])
-; CHECK-NEXT:    [[R:%.*]] = add nuw i32 [[P]], -1
+; CHECK-NEXT:    [[R:%.*]] = add i32 [[P]], -1
 ; CHECK-NEXT:    [[PRE:%.*]] = icmp eq i32 [[A]], -1
 ; CHECK-NEXT:    br i1 [[PRE]], label [[INNER_PREHEADER:%.*]], label [[OUTER_LATCH]]
 ; CHECK:       inner.preheader:
@@ -106,7 +105,6 @@ exit:
 ; Same as @rewrite_flags_only_hold_under_guard_strengthen, but %add is not
 ; poison on any path, as it decides an exit of %outer. For %a = 0 and
 ; %start = 1, %r is 0 and must be returned.
-; FIXME: nuw is added to %r.
 define i8 @rewrite_flags_only_hold_under_guard_strengthen_returned(i8 %a, i8 %start, ptr %q) {
 ; CHECK-LABEL: define i8 @rewrite_flags_only_hold_under_guard_strengthen_returned(
 ; CHECK-SAME: i8 [[A:%.*]], i8 [[START:%.*]], ptr [[Q:%.*]]) {
@@ -115,7 +113,7 @@ define i8 @rewrite_flags_only_hold_under_guard_strengthen_returned(i8 %a, i8 %st
 ; CHECK:       outer.header:
 ; CHECK-NEXT:    [[P:%.*]] = phi i8 [ [[START]], [[ENTRY:%.*]] ], [ [[P_NEXT:%.*]], [[OUTER_LATCH:%.*]] ]
 ; CHECK-NEXT:    [[ADD:%.*]] = add nuw i8 [[A]], [[P]]
-; CHECK-NEXT:    [[R:%.*]] = add nuw i8 [[P]], -1
+; CHECK-NEXT:    [[R:%.*]] = add i8 [[P]], -1
 ; CHECK-NEXT:    [[C:%.*]] = icmp eq i8 [[ADD]], 7
 ; CHECK-NEXT:    br i1 [[C]], label [[EXIT:%.*]], label [[GUARD:%.*]]
 ; CHECK:       guard:

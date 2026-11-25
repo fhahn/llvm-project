@@ -82,12 +82,11 @@ exit:
 ; which does not wrap under the guard and bounds the constant max
 ; backedge-taken count. The replacement 300 of the other guard is not in the
 ; range of (zext i8 %b to i32).
-; TODO: The constant max backedge-taken count could be 2147483646 as well.
 define void @rewrite_preserve_add_nsw_constant_max_other_guard(i32 %a, i8 %b) {
 ; CHECK-LABEL: 'rewrite_preserve_add_nsw_constant_max_other_guard'
 ; CHECK-NEXT:  Determining loop execution counts for: @rewrite_preserve_add_nsw_constant_max_other_guard
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is %a
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 2147483647
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 2147483646
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is %a
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -256,7 +255,6 @@ exit:
 ; The guard %a == 16 rewrites the exit count (%a + %y)<nuw> of %loop.2 to
 ; (16 + %y), the SCEV of the unguarded %n. The nuw only holds under the guard,
 ; so it must not end up on (16 + %y) in the trip count of %loop.1.
-; FIXME: (16 + %y) is nuw in the backedge-taken count of %loop.1.
 define void @rewrite_flags_only_hold_under_guard(i32 %a, i32 %y) {
 ; CHECK-LABEL: 'rewrite_flags_only_hold_under_guard'
 ; CHECK-NEXT:  Determining loop execution counts for: @rewrite_flags_only_hold_under_guard
@@ -264,9 +262,9 @@ define void @rewrite_flags_only_hold_under_guard(i32 %a, i32 %y) {
 ; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -1
 ; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (%a + %y)<nuw>
 ; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
-; CHECK-NEXT:  Loop %loop.1: backedge-taken count is (-1 + (1 umax (16 + %y)<nuw>))
+; CHECK-NEXT:  Loop %loop.1: backedge-taken count is (-1 + (1 umax (16 + %y)))
 ; CHECK-NEXT:  Loop %loop.1: constant max backedge-taken count is i32 -2
-; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is (-1 + (1 umax (16 + %y)<nuw>))
+; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is (-1 + (1 umax (16 + %y)))
 ; CHECK-NEXT:  Loop %loop.1: Trip multiple is 1
 ;
 entry:
@@ -296,7 +294,6 @@ exit:
 }
 
 ; Same as @rewrite_flags_only_hold_under_guard, but with a mul.
-; FIXME: (16 * %y) is nuw in the backedge-taken count of %loop.1.
 define void @rewrite_flags_only_hold_under_guard_mul(i32 %a, i32 %y) {
 ; CHECK-LABEL: 'rewrite_flags_only_hold_under_guard_mul'
 ; CHECK-NEXT:  Determining loop execution counts for: @rewrite_flags_only_hold_under_guard_mul
@@ -304,9 +301,9 @@ define void @rewrite_flags_only_hold_under_guard_mul(i32 %a, i32 %y) {
 ; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -16
 ; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is (%a * %y)<nuw>
 ; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
-; CHECK-NEXT:  Loop %loop.1: backedge-taken count is (-1 + (1 umax (16 * %y)<nuw>))
+; CHECK-NEXT:  Loop %loop.1: backedge-taken count is (-1 + (1 umax (16 * %y)))
 ; CHECK-NEXT:  Loop %loop.1: constant max backedge-taken count is i32 -17
-; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is (-1 + (1 umax (16 * %y)<nuw>))
+; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is (-1 + (1 umax (16 * %y)))
 ; CHECK-NEXT:  Loop %loop.1: Trip multiple is 1
 ;
 entry:
@@ -339,12 +336,11 @@ exit:
 ; adding the operands in that order. The guard %z == -2^62 - 16 rewrites it to
 ; (2^63 - 16 + 2 * %y) by folding -2^62 and -2^62 - 16, which wraps, so the nsw
 ; does not hold for the rewritten add, which is u>= 2^63 for %y >= 8.
-; FIXME: The constant max backedge-taken count 2^63 - 1 is too small.
 define void @rewrite_nary_add_nsw_folds_constants(ptr %p, i8 %y.in, i64 %z) {
 ; CHECK-LABEL: 'rewrite_nary_add_nsw_folds_constants'
 ; CHECK-NEXT:  Determining loop execution counts for: @rewrite_nary_add_nsw_folds_constants
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-4611686018427387904 + (2 * (zext i8 %y.in to i64))<nuw><nsw> + %z)<nsw>
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9223372036854775807
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -9223372036854775314
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-4611686018427387904 + (2 * (zext i8 %y.in to i64))<nuw><nsw> + %z)<nsw>
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;

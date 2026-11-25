@@ -1739,7 +1739,7 @@ void VPlanTransforms::addMinimumIterationCheck(
       RequiresScalarEpilogue ? ICmpInst::ICMP_ULE : ICmpInst::ICMP_ULT;
   // If tail is to be folded, vector loop takes care of all iterations.
   VPValue *TripCountVPV = Plan.getTripCount();
-  const SCEV *TripCount = vputils::getSCEVExprForVPValue(TripCountVPV, PSE);
+  SCEVUse TripCount = vputils::getSCEVExprForVPValue(TripCountVPV, PSE);
   Type *TripCountTy = TripCount->getType();
   ScalarEvolution &SE = *PSE.getSE();
   auto GetMinTripCount = [&]() -> const SCEV * {
@@ -1770,8 +1770,8 @@ void VPlanTransforms::addMinimumIterationCheck(
       // TODO: Ensure step is at most the trip count when determining max VF and
       // UF, w/o tail folding.
       TripCountCheck = Plan.getTrue();
-    } else if (!SE.isKnownPredicate(CmpInst::getInversePredicate(CmpPred),
-                                    TripCount, Step)) {
+    } else if (!SE.isKnownPredicateForUses(
+                   CmpInst::getInversePredicate(CmpPred), TripCount, Step)) {
       // Generate the minimum iteration check only if we cannot prove the
       // check is known to be true, or known to be false.
       VPValue *MinTripCountVPV =
