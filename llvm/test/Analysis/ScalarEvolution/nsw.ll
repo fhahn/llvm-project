@@ -202,7 +202,7 @@ define void @PR12376(ptr nocapture %arg, ptr nocapture %arg1)  {
 ; CHECK-NEXT:    %tmp = phi ptr [ %arg, %bb ], [ %tmp4, %bb2 ]
 ; CHECK-NEXT:    --> {%arg,+,4}<nuw><%bb2> U: full-set S: full-set Exits: ((4 * ((-1 + (-1 * (ptrtoaddr ptr %arg to i64)) + ((4 + (ptrtoaddr ptr %arg to i64))<nuw> umax (ptrtoaddr ptr %arg1 to i64))) /u 4))<nuw> + %arg)<u nuw> LoopDispositions: { %bb2: Computable }
 ; CHECK-NEXT:    %tmp4 = getelementptr inbounds i32, ptr %tmp, i64 1
-; CHECK-NEXT:    --> {(4 + %arg)<nuw>,+,4}<nuw><%bb2> U: [4,0) S: [4,0) Exits: (4 + (4 * ((-1 + (-1 * (ptrtoaddr ptr %arg to i64)) + ((4 + (ptrtoaddr ptr %arg to i64))<nuw> umax (ptrtoaddr ptr %arg1 to i64))) /u 4))<nuw> + %arg) LoopDispositions: { %bb2: Computable }
+; CHECK-NEXT:    --> {(4 + %arg)<nuw>,+,4}<nuw><%bb2> U: [4,0) S: [4,0) Exits: (4 + (4 * ((-1 + (-1 * (ptrtoaddr ptr %arg to i64)) + ((4 + (ptrtoaddr ptr %arg to i64))<nuw> umax (ptrtoaddr ptr %arg1 to i64))) /u 4))<nuw> + %arg)<u nuw> LoopDispositions: { %bb2: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @PR12376
 ; CHECK-NEXT:  Loop %bb2: backedge-taken count is ((-1 + (-1 * (ptrtoaddr ptr %arg to i64)) + ((4 + (ptrtoaddr ptr %arg to i64))<nuw> umax (ptrtoaddr ptr %arg1 to i64))) /u 4)
 ; CHECK-NEXT:  Loop %bb2: constant max backedge-taken count is i64 4611686018427387902

@@ -2612,12 +2612,16 @@ SCEVUse ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
     // common NUW flag for expression after inlining. Other flags cannot be
     // preserved, because they may depend on the original order of operations.
     SCEVFlags CommonFlags = maskFlags(ExprFlags, SCEV::FlagNUW);
+    // NUW for the use of this add and of each inlined add, which are its
+    // operands, also holds for the use of the flattened add.
+    SCEVFlags CommonUseFlags = maskFlags(ExprFlags | UseFlags, SCEV::FlagNUW);
     while (const SCEVAddExpr *Add = dyn_cast<SCEVAddExpr>(Ops[Idx])) {
       if (Ops.size() > Opts.scev_addops_inline_threshold ||
           Add->getNumOperands() > Opts.scev_addops_inline_threshold)
         break;
       // If we have an add, expand the add operands onto the end of the operands
       // list.
+      CommonUseFlags = maskFlags(CommonUseFlags, Ops[Idx].getNoWrapFlags());
       Ops.erase(Ops.begin()+Idx);
       append_range(Ops, Add->operands());
       DeletedAdd = true;
@@ -2628,7 +2632,7 @@ SCEVUse ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
     // and they are not necessarily sorted.  Recurse to resort and resimplify
     // any operands we just acquired.
     if (DeletedAdd)
-      return getAddExpr(Ops, CommonFlags, Depth + 1);
+      return getAddExpr(Ops, {CommonFlags, CommonUseFlags}, Depth + 1);
   }
 
   // Skip over the add expression until we get to a multiply.

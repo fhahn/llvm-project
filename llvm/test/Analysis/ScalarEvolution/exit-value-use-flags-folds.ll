@@ -1053,7 +1053,7 @@ define void @flatten_add_outer_use_nuw(i64 %start, i1 %c) {
 ; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv = phi i64 [ %start.1, %entry ], [ %iv.next, %loop ]
-; CHECK-NEXT:    --> {(1 + %start)<nuw>,+,1}<nuw><%loop> U: [1,0) S: [1,0) Exits: (10 + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(1 + %start)<nuw>,+,1}<nuw><%loop> U: [1,0) S: [1,0) Exits: (10 + %start)<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nuw i64 %iv, 1
 ; CHECK-NEXT:    --> {(2 + %start),+,1}<nw><%loop> U: full-set S: full-set Exits: (11 + %start) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add i64 %i, 1
