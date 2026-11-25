@@ -1130,8 +1130,8 @@ static const SCEV *getUnsignedOverflowLimitForStep(const SCEV *Step,
 namespace {
 
 struct ExtendOpTraitsBase {
-  typedef const SCEV *(ScalarEvolution::*GetExtendExprTy)(SCEVUse, Type *,
-                                                          unsigned);
+  typedef SCEVUse (ScalarEvolution::*GetExtendExprTy)(SCEVUse, Type *,
+                                                      unsigned);
 };
 
 // Used to make code generic over signed and unsigned overflow.
@@ -1242,7 +1242,10 @@ static const SCEV *getPreStartForExtend(const SCEVAddRecExpr *AR,
   const SCEV *OperandExtendedStart =
       SE->getAddExpr((SE->*GetExtendExpr)(PreStart, WideTy, Depth),
                      (SE->*GetExtendExpr)(Step, WideTy, Depth));
-  if ((SE->*GetExtendExpr)(Start, WideTy, Depth) == OperandExtendedStart) {
+  // Compare expressions; the extended start may carry use flags.
+  const SCEV *ExtendedStart =
+      (SE->*GetExtendExpr)(Start, WideTy, Depth).getPointer();
+  if (ExtendedStart == OperandExtendedStart) {
     if (PreAR && any(AR->getNoWrapFlags(WrapType))) {
       // If we know `AR` == {`PreStart`+`Step`,+,`Step`} is `WrapType` (FlagNSW
       // or FlagNUW) and that `PreStart` + `Step` is `WrapType` too, then
@@ -1386,8 +1389,8 @@ static APInt extractConstantWithoutWrapping(ScalarEvolution &SE,
 }
 
 static void insertFoldCacheEntry(
-    const ScalarEvolution::FoldID &ID, const SCEV *S,
-    DenseMap<ScalarEvolution::FoldID, const SCEV *> &FoldCache,
+    const ScalarEvolution::FoldID &ID, SCEVUse S,
+    DenseMap<ScalarEvolution::FoldID, SCEVUse> &FoldCache,
     DenseMap<const SCEV *, SmallVector<ScalarEvolution::FoldID, 2>>
         &FoldCacheUser) {
   auto I = FoldCache.insert({ID, S});
@@ -1414,8 +1417,8 @@ static SCEVFlags getFlagsIfCanonical(const SCEV *S, SCEVFlags Flags) {
   return SCEVUse(S).isCanonical() ? Flags : SCEV::FlagNone;
 }
 
-const SCEV *ScalarEvolution::getZeroExtendExpr(SCEVUse Op, Type *Ty,
-                                               unsigned Depth) {
+SCEVUse ScalarEvolution::getZeroExtendExpr(SCEVUse Op, Type *Ty,
+                                           unsigned Depth) {
   assert(getTypeSizeInBits(Op->getType()) < getTypeSizeInBits(Ty) &&
          "This is not an extending conversion!");
   assert(isSCEVable(Ty) &&
@@ -1424,17 +1427,17 @@ const SCEV *ScalarEvolution::getZeroExtendExpr(SCEVUse Op, Type *Ty,
   Ty = getEffectiveSCEVType(Ty);
 
   FoldID ID(scZeroExtend, Op, Ty);
-  if (const SCEV *S = FoldCache.lookup(ID))
+  if (SCEVUse S = FoldCache.lookup(ID))
     return S;
 
-  const SCEV *S = getZeroExtendExprImpl(Op, Ty, Depth);
+  SCEVUse S = getZeroExtendExprImpl(Op, Ty, Depth);
   if (!isa<SCEVZeroExtendExpr>(S))
     insertFoldCacheEntry(ID, S, FoldCache, FoldCacheUser);
   return S;
 }
 
-const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
-                                                   unsigned Depth) {
+SCEVUse ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
+                                               unsigned Depth) {
   assert(getTypeSizeInBits(Op->getType()) < getTypeSizeInBits(Ty) &&
          "This is not an extending conversion!");
   assert(isSCEVable(Ty) && "This is not a conversion to a SCEVable type!");
@@ -1656,8 +1659,8 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
                        getZeroExtendExpr(Div->getRHS(), Ty, Depth + 1));
 
   if (auto *SA = dyn_cast<SCEVAddExpr>(Op)) {
-    // zext((A + B + ...)<nuw>) --> (zext(A) + zext(B) + ...), also for a use
-    // nuw. The wide sum only keeps nuw as expression flag via
+    // zext((A + B + ...)<nuw>) --> (zext(A) + zext(B) + ...)<u nuw><u nsw>,
+    // also for a use nuw. The wide sum only keeps nuw as expression flag via
     // getFlagsIfCanonical.
     if (any(Op.getNoWrapFlags(SCEV::FlagNUW))) {
       // If the addition does not unsign overflow then we can, by definition,
@@ -1665,9 +1668,12 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
       SmallVector<SCEVUse, 4> Ops;
       for (SCEVUse Op : SA->operands())
         Ops.push_back(getZeroExtendExpr(Op, Ty, Depth + 1));
-      // A use nuw of the add need not hold for other uses of the wide sum.
+      // The wide sum does not wrap for this use; a use nuw of the add need not
+      // hold for its other uses.
       return getAddExpr(
-          Ops, getFlagsIfCanonical(SA, SA->getNoWrapFlags(SCEV::FlagNUW)),
+          Ops,
+          {getFlagsIfCanonical(SA, SA->getNoWrapFlags(SCEV::FlagNUW)),
+           SCEV::FlagNUW | SCEV::FlagNSW},
           Depth + 1);
     }
 
@@ -1778,8 +1784,8 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
   return S;
 }
 
-const SCEV *ScalarEvolution::getSignExtendExpr(SCEVUse Op, Type *Ty,
-                                               unsigned Depth) {
+SCEVUse ScalarEvolution::getSignExtendExpr(SCEVUse Op, Type *Ty,
+                                           unsigned Depth) {
   assert(getTypeSizeInBits(Op->getType()) < getTypeSizeInBits(Ty) &&
          "This is not an extending conversion!");
   assert(isSCEVable(Ty) &&
@@ -1797,6 +1803,8 @@ const SCEV *ScalarEvolution::getSignExtendExpr(SCEVUse Op, Type *Ty,
   return S;
 }
 
+// Unlike getZeroExtendExprImpl, return an expression; use flags of folds,
+// e.g. to a zext, are dropped.
 const SCEV *ScalarEvolution::getSignExtendExprImpl(SCEVUse Op, Type *Ty,
                                                    unsigned Depth) {
   assert(getTypeSizeInBits(Op->getType()) < getTypeSizeInBits(Ty) &&
@@ -2214,7 +2222,7 @@ bool ScalarEvolution::willNotOverflow(Instruction::BinaryOps BinOp, bool Signed,
     }
   };
 
-  const SCEV *(ScalarEvolution::*Extension)(SCEVUse, Type *, unsigned) =
+  SCEVUse (ScalarEvolution::*Extension)(SCEVUse, Type *, unsigned) =
       Signed ? &ScalarEvolution::getSignExtendExpr
              : &ScalarEvolution::getZeroExtendExpr;
 
@@ -8147,8 +8155,8 @@ const SCEV *ScalarEvolution::createSCEV(Value *V) {
       // but by that point the NSW information has potentially been lost.
       if (BO->Opcode == Instruction::Sub && BO->IsNSW) {
         Type *Ty = U->getType();
-        auto *V1 = getSignExtendExpr(getSCEV(BO->LHS), Ty);
-        auto *V2 = getSignExtendExpr(getSCEV(BO->RHS), Ty);
+        const SCEV *V1 = getSignExtendExpr(getSCEV(BO->LHS), Ty);
+        const SCEV *V2 = getSignExtendExpr(getSCEV(BO->RHS), Ty);
         return getMinusSCEV(V1, V2, SCEV::FlagNSW);
       }
     }
@@ -16246,7 +16254,7 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(
       while (Bitwidth % 8 == 0 && Bitwidth >= 8 &&
              Bitwidth > Op->getType()->getScalarSizeInBits()) {
         Type *NarrowTy = IntegerType::get(SE.getContext(), Bitwidth);
-        auto *NarrowExt = SE.getZeroExtendExpr(Op, NarrowTy);
+        const SCEV *NarrowExt = SE.getZeroExtendExpr(Op, NarrowTy);
         if (const SCEV *S = lookup(NarrowExt))
           return SE.getZeroExtendExpr(S, Ty);
         Bitwidth = Bitwidth / 2;

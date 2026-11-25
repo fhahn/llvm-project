@@ -1126,7 +1126,6 @@ exit:
 
 ; zexts of the umax of the exit value of %t, a sum with nuw as use flag, and
 ; %c or %d, as %j is 0 at the exit; the second zext of the sum is cached.
-; TODO: The sums of the extended operands have no use flags.
 define void @zext_umax_exit_value_of_nuw_add(i8 %x, i8 %a, i8 %c, i8 %d) {
 ; CHECK-LABEL: 'zext_umax_exit_value_of_nuw_add'
 ; CHECK-NEXT:  Classifying expressions for: @zext_umax_exit_value_of_nuw_add
@@ -1145,13 +1144,13 @@ define void @zext_umax_exit_value_of_nuw_add(i8 %x, i8 %a, i8 %c, i8 %d) {
 ; CHECK-NEXT:    %add.1 = add i8 %umax.1, %j
 ; CHECK-NEXT:    --> ({-9,+,1}<nsw><%loop> + ((({0,+,1}<nuw><nsw><%loop> umax %x) + %a)<nuw> umax %c)) U: full-set S: full-set Exits: (((9 umax %x) + %a)<u nuw> umax %c) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %zext.1 = zext i8 %add.1 to i16
-; CHECK-NEXT:    --> (zext i8 ({-9,+,1}<nsw><%loop> + ((({0,+,1}<nuw><nsw><%loop> umax %x) + %a)<nuw> umax %c)) to i16) U: [0,256) S: [0,256) Exits: ((zext i8 %c to i16) umax ((zext i8 %a to i16) + (9 umax (zext i8 %x to i16)))) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> (zext i8 ({-9,+,1}<nsw><%loop> + ((({0,+,1}<nuw><nsw><%loop> umax %x) + %a)<nuw> umax %c)) to i16) U: [0,256) S: [0,256) Exits: ((zext i8 %c to i16) umax ((zext i8 %a to i16) + (9 umax (zext i8 %x to i16)))<u nuw><u nsw>) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %umax.2 = call i8 @llvm.umax.i8(i8 %t, i8 %d)
 ; CHECK-NEXT:    --> ((({0,+,1}<nuw><nsw><%loop> umax %x) + %a)<nuw> umax %d) U: full-set S: full-set Exits: (((9 umax %x) + %a)<u nuw> umax %d) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %add.2 = add i8 %umax.2, %j
 ; CHECK-NEXT:    --> ({-9,+,1}<nsw><%loop> + ((({0,+,1}<nuw><nsw><%loop> umax %x) + %a)<nuw> umax %d)) U: full-set S: full-set Exits: (((9 umax %x) + %a)<u nuw> umax %d) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %zext.2 = zext i8 %add.2 to i16
-; CHECK-NEXT:    --> (zext i8 ({-9,+,1}<nsw><%loop> + ((({0,+,1}<nuw><nsw><%loop> umax %x) + %a)<nuw> umax %d)) to i16) U: [0,256) S: [0,256) Exits: ((zext i8 %d to i16) umax ((zext i8 %a to i16) + (9 umax (zext i8 %x to i16)))) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> (zext i8 ({-9,+,1}<nsw><%loop> + ((({0,+,1}<nuw><nsw><%loop> umax %x) + %a)<nuw> umax %d)) to i16) U: [0,256) S: [0,256) Exits: ((zext i8 %d to i16) umax ((zext i8 %a to i16) + (9 umax (zext i8 %x to i16)))<u nuw><u nsw>) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nuw i8 %iv, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %j.next = add i8 %j, 1

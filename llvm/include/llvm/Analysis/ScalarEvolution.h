@@ -761,12 +761,10 @@ public:
   LLVM_ABI const SCEV *getVScale(Type *Ty);
   LLVM_ABI const SCEV *getElementCount(Type *Ty, ElementCount EC,
                                        SCEVFlags Flags = SCEV::FlagNone);
-  LLVM_ABI const SCEV *getZeroExtendExpr(SCEVUse Op, Type *Ty,
+  LLVM_ABI SCEVUse getZeroExtendExpr(SCEVUse Op, Type *Ty, unsigned Depth = 0);
+  LLVM_ABI SCEVUse getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
                                          unsigned Depth = 0);
-  LLVM_ABI const SCEV *getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
-                                             unsigned Depth = 0);
-  LLVM_ABI const SCEV *getSignExtendExpr(SCEVUse Op, Type *Ty,
-                                         unsigned Depth = 0);
+  LLVM_ABI SCEVUse getSignExtendExpr(SCEVUse Op, Type *Ty, unsigned Depth = 0);
   LLVM_ABI const SCEV *getSignExtendExprImpl(SCEVUse Op, Type *Ty,
                                              unsigned Depth = 0);
   LLVM_ABI const SCEV *getCastExpr(SCEVTypes Kind, SCEVUse Op, Type *Ty);
@@ -1766,7 +1764,7 @@ private:
 
   /// This is a cache for expressions that got folded to a different existing
   /// SCEV.
-  DenseMap<FoldID, const SCEV *> FoldCache;
+  DenseMap<FoldID, SCEVUse> FoldCache;
   DenseMap<const SCEV *, SmallVector<FoldID, 2>> FoldCacheUser;
 
   /// Mark predicate values currently being processed by isImpliedCond.
