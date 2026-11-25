@@ -1083,7 +1083,6 @@ exit:
   %t = add i64 %start, 10
 
 ; zext of the umax of the exit value of %iv and %x, as %j is 0 at the exit.
-; TODO: The zext of the exit value of %iv is not folded.
 define void @zext_umax_exit_value(i8 %start, i8 %x) {
 ; CHECK-LABEL: 'zext_umax_exit_value'
 ; CHECK-NEXT:  Classifying expressions for: @zext_umax_exit_value
@@ -1096,7 +1095,7 @@ define void @zext_umax_exit_value(i8 %start, i8 %x) {
 ; CHECK-NEXT:    %add = add i8 %umax, %j
 ; CHECK-NEXT:    --> ({-9,+,1}<nsw><%loop> + ({%start,+,1}<nuw><%loop> umax %x)) U: full-set S: full-set Exits: ((9 + %start)<u nuw> umax %x) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %zext = zext i8 %add to i16
-; CHECK-NEXT:    --> (zext i8 ({-9,+,1}<nsw><%loop> + ({%start,+,1}<nuw><%loop> umax %x)) to i16) U: [0,256) S: [0,256) Exits: ((zext i8 (9 + %start)<u nuw> to i16) umax (zext i8 %x to i16)) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> (zext i8 ({-9,+,1}<nsw><%loop> + ({%start,+,1}<nuw><%loop> umax %x)) to i16) U: [0,256) S: [0,256) Exits: ((zext i8 %x to i16) umax (9 + (zext i8 %start to i16))<nuw><nsw>) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nuw i8 %iv, 1
 ; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%loop> U: full-set S: full-set Exits: (10 + %start) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %j.next = add i8 %j, 1

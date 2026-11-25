@@ -2266,27 +2266,31 @@ TEST_F(ScalarEvolutionsTest, CastsOfUsesWithNoWrapFlags) {
     SCEVUse Add = SE.getAddExpr(SE.getSCEV(getArgByName(F, "a")),
                                 SE.getSCEV(getArgByName(F, "b")));
     SCEVUse NUWAdd(Add, SCEV::FlagNUW);
+    // zext distributes over adds with nuw as use flag, so extend an nsw use.
+    SCEVUse NSWAdd(Add, SCEV::FlagNSW);
 
-    // Check that Cast keeps the use-specific flags of NUWAdd and is a
-    // node distinct from Canon, the same cast of the canonical operand.
-    auto CheckCast = [&Add](const SCEV *Cast, const SCEV *Canon) {
+    // Check that Cast keeps the use-specific flags Flags of its operand and is
+    // a node distinct from Canon, the same cast of the canonical operand.
+    auto CheckCast = [&Add](const SCEV *Cast, const SCEV *Canon,
+                            SCEVFlags Flags = SCEV::FlagNUW) {
       SCEVUse Op = cast<SCEVCastExpr>(Cast)->getOperand();
       EXPECT_EQ(Op.getPointer(), Add.getPointer());
-      EXPECT_EQ(Op.getUseNoWrapFlags(), SCEV::FlagNUW | SCEV::FlagNW);
+      EXPECT_EQ(Op.getUseNoWrapFlags(), Flags | SCEV::FlagNW);
       EXPECT_NE(Cast, Canon);
     };
     CheckCast(SE.getTruncateExpr(NUWAdd, I16), SE.getTruncateExpr(Add, I16));
-    CheckCast(SE.getZeroExtendExpr(NUWAdd, I64),
-              SE.getZeroExtendExpr(Add, I64));
+    CheckCast(SE.getZeroExtendExpr(NSWAdd, I64), SE.getZeroExtendExpr(Add, I64),
+              SCEV::FlagNSW);
     CheckCast(SE.getSignExtendExpr(NUWAdd, I64),
               SE.getSignExtendExpr(Add, I64));
     CheckCast(SE.getCastExpr(scTruncate, NUWAdd, I16),
               SE.getCastExpr(scTruncate, Add, I16));
-    CheckCast(SE.getCastExpr(scZeroExtend, NUWAdd, I64),
-              SE.getCastExpr(scZeroExtend, Add, I64));
+    CheckCast(SE.getCastExpr(scZeroExtend, NSWAdd, I64),
+              SE.getCastExpr(scZeroExtend, Add, I64), SCEV::FlagNSW);
     CheckCast(SE.getCastExpr(scSignExtend, NUWAdd, I64),
               SE.getCastExpr(scSignExtend, Add, I64));
-    CheckCast(SE.getAnyExtendExpr(NUWAdd, I64), SE.getAnyExtendExpr(Add, I64));
+    CheckCast(SE.getAnyExtendExpr(NSWAdd, I64), SE.getAnyExtendExpr(Add, I64),
+              SCEV::FlagNSW);
   });
 }
 

@@ -1407,6 +1407,13 @@ static void insertFoldCacheEntry(
   FoldCacheUser[S].push_back(ID);
 }
 
+// Return \p Flags if no operand of \p S has use flags. A zext or sext must
+// equal the exact wide value, which an operand extended using a use flag only
+// does where that use holds.
+static SCEVFlags getFlagsIfCanonical(const SCEV *S, SCEVFlags Flags) {
+  return SCEVUse(S).isCanonical() ? Flags : SCEV::FlagNone;
+}
+
 const SCEV *ScalarEvolution::getZeroExtendExpr(SCEVUse Op, Type *Ty,
                                                unsigned Depth) {
   assert(getTypeSizeInBits(Op->getType()) < getTypeSizeInBits(Ty) &&
@@ -1451,7 +1458,8 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
     if (AR->hasNoUnsignedWrap()) {
       Start = getExtendAddRecStart<SCEVZeroExtendExpr>(AR, Ty, this, Depth + 1);
       Step = getZeroExtendExpr(Step, Ty, Depth + 1);
-      return getAddRecExpr(Start, Step, L, AR->getNoWrapFlags());
+      return getAddRecExpr(Start, Step, L,
+                           getFlagsIfCanonical(AR, AR->getNoWrapFlags()));
     }
   }
 
@@ -1538,7 +1546,8 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
           Start =
               getExtendAddRecStart<SCEVZeroExtendExpr>(AR, Ty, this, Depth + 1);
           Step = getZeroExtendExpr(Step, Ty, Depth + 1);
-          return getAddRecExpr(Start, Step, L, AR->getNoWrapFlags());
+          return getAddRecExpr(Start, Step, L,
+                               getFlagsIfCanonical(AR, AR->getNoWrapFlags()));
         }
         // Similar to above, only this time treat the step value as signed.
         // This covers loops that count down.
@@ -1556,7 +1565,8 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
           Start =
               getExtendAddRecStart<SCEVZeroExtendExpr>(AR, Ty, this, Depth + 1);
           Step = getSignExtendExpr(Step, Ty, Depth + 1);
-          return getAddRecExpr(Start, Step, L, AR->getNoWrapFlags());
+          return getAddRecExpr(Start, Step, L,
+                               getFlagsIfCanonical(AR, AR->getNoWrapFlags()));
         }
       }
     }
@@ -1581,7 +1591,8 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
         Start =
             getExtendAddRecStart<SCEVZeroExtendExpr>(AR, Ty, this, Depth + 1);
         Step = getZeroExtendExpr(Step, Ty, Depth + 1);
-        return getAddRecExpr(Start, Step, L, AR->getNoWrapFlags());
+        return getAddRecExpr(Start, Step, L,
+                             getFlagsIfCanonical(AR, AR->getNoWrapFlags()));
       }
 
       // For a negative step, we can extend the operands iff doing so only
@@ -1599,7 +1610,8 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
           Start =
               getExtendAddRecStart<SCEVZeroExtendExpr>(AR, Ty, this, Depth + 1);
           Step = getSignExtendExpr(Step, Ty, Depth + 1);
-          return getAddRecExpr(Start, Step, L, AR->getNoWrapFlags());
+          return getAddRecExpr(Start, Step, L,
+                               getFlagsIfCanonical(AR, AR->getNoWrapFlags()));
         }
       }
     }
@@ -1624,7 +1636,8 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
       setNoWrapFlags(const_cast<SCEVAddRecExpr *>(AR), SCEV::FlagNUW);
       Start = getExtendAddRecStart<SCEVZeroExtendExpr>(AR, Ty, this, Depth + 1);
       Step = getZeroExtendExpr(Step, Ty, Depth + 1);
-      return getAddRecExpr(Start, Step, L, AR->getNoWrapFlags());
+      return getAddRecExpr(Start, Step, L,
+                           getFlagsIfCanonical(AR, AR->getNoWrapFlags()));
     }
   }
 
@@ -1643,14 +1656,19 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
                        getZeroExtendExpr(Div->getRHS(), Ty, Depth + 1));
 
   if (auto *SA = dyn_cast<SCEVAddExpr>(Op)) {
-    // zext((A + B + ...)<nuw>) --> (zext(A) + zext(B) + ...)<nuw>
-    if (SA->hasNoUnsignedWrap()) {
+    // zext((A + B + ...)<nuw>) --> (zext(A) + zext(B) + ...), also for a use
+    // nuw. The wide sum only keeps nuw as expression flag via
+    // getFlagsIfCanonical.
+    if (any(Op.getNoWrapFlags(SCEV::FlagNUW))) {
       // If the addition does not unsign overflow then we can, by definition,
       // commute the zero extension with the addition operation.
       SmallVector<SCEVUse, 4> Ops;
       for (SCEVUse Op : SA->operands())
         Ops.push_back(getZeroExtendExpr(Op, Ty, Depth + 1));
-      return getAddExpr(Ops, SCEV::FlagNUW, Depth + 1);
+      // A use nuw of the add need not hold for other uses of the wide sum.
+      return getAddExpr(
+          Ops, getFlagsIfCanonical(SA, SA->getNoWrapFlags(SCEV::FlagNUW)),
+          Depth + 1);
     }
 
     const APInt *C, *C2;
@@ -1689,14 +1707,15 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
   }
 
   if (auto *SM = dyn_cast<SCEVMulExpr>(Op)) {
-    // zext((A * B * ...)<nuw>) --> (zext(A) * zext(B) * ...)<nuw>
+    // zext((A * B * ...)<nuw>) --> (zext(A) * zext(B) * ...). The wide product
+    // only keeps nuw via getFlagsIfCanonical.
     if (SM->hasNoUnsignedWrap()) {
       // If the multiply does not unsign overflow then we can, by definition,
       // commute the zero extension with the multiply operation.
       SmallVector<SCEVUse, 4> Ops;
       for (SCEVUse Op : SM->operands())
         Ops.push_back(getZeroExtendExpr(Op, Ty, Depth + 1));
-      return getMulExpr(Ops, SCEV::FlagNUW, Depth + 1);
+      return getMulExpr(Ops, getFlagsIfCanonical(SM, SCEV::FlagNUW), Depth + 1);
     }
 
     // zext(2^K * (trunc X to iN)) to iM ->
@@ -1722,7 +1741,7 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
       return getMulExpr(
           getZeroExtendExpr(SM->getOperand(0), Ty),
           getZeroExtendExpr(getTruncateExpr(TruncRHS, NewTruncTy), Ty),
-          SCEV::FlagNUW, Depth + 1);
+          getFlagsIfCanonical(SM, SCEV::FlagNUW), Depth + 1);
     }
   }
 
@@ -1808,7 +1827,8 @@ const SCEV *ScalarEvolution::getSignExtendExprImpl(SCEVUse Op, Type *Ty,
     if (AR->hasNoSignedWrap()) {
       Start = getExtendAddRecStart<SCEVSignExtendExpr>(AR, Ty, this, Depth + 1);
       Step = getSignExtendExpr(Step, Ty, Depth + 1);
-      return getAddRecExpr(Start, Step, L, AR->getNoWrapFlags());
+      return getAddRecExpr(Start, Step, L,
+                           getFlagsIfCanonical(AR, AR->getNoWrapFlags()));
     }
   }
 
@@ -1852,7 +1872,7 @@ const SCEV *ScalarEvolution::getSignExtendExprImpl(SCEVUse Op, Type *Ty,
       SmallVector<SCEVUse, 4> Ops;
       for (SCEVUse Op : SA->operands())
         Ops.push_back(getSignExtendExpr(Op, Ty, Depth + 1));
-      return getAddExpr(Ops, SCEV::FlagNSW, Depth + 1);
+      return getAddExpr(Ops, getFlagsIfCanonical(SA, SCEV::FlagNSW), Depth + 1);
     }
 
     // sext(C + x + y + ...) --> (sext(D) + sext((C - D) + x + y + ...))
@@ -1929,7 +1949,8 @@ const SCEV *ScalarEvolution::getSignExtendExprImpl(SCEVUse Op, Type *Ty,
           Start =
               getExtendAddRecStart<SCEVSignExtendExpr>(AR, Ty, this, Depth + 1);
           Step = getSignExtendExpr(Step, Ty, Depth + 1);
-          return getAddRecExpr(Start, Step, L, AR->getNoWrapFlags());
+          return getAddRecExpr(Start, Step, L,
+                               getFlagsIfCanonical(AR, AR->getNoWrapFlags()));
         }
         // Similar to above, only this time treat the step value as unsigned.
         // This covers loops that count up with an unsigned step.
@@ -1954,7 +1975,8 @@ const SCEV *ScalarEvolution::getSignExtendExprImpl(SCEVUse Op, Type *Ty,
           Start =
               getExtendAddRecStart<SCEVSignExtendExpr>(AR, Ty, this, Depth + 1);
           Step = getZeroExtendExpr(Step, Ty, Depth + 1);
-          return getAddRecExpr(Start, Step, L, AR->getNoWrapFlags());
+          return getAddRecExpr(Start, Step, L,
+                               getFlagsIfCanonical(AR, AR->getNoWrapFlags()));
         }
       }
     }
@@ -1968,7 +1990,8 @@ const SCEV *ScalarEvolution::getSignExtendExprImpl(SCEVUse Op, Type *Ty,
       // reverted.  Be conservative for the moment.
       Start = getExtendAddRecStart<SCEVSignExtendExpr>(AR, Ty, this, Depth + 1);
       Step = getSignExtendExpr(Step, Ty, Depth + 1);
-      return getAddRecExpr(Start, Step, L, AR->getNoWrapFlags());
+      return getAddRecExpr(Start, Step, L,
+                           getFlagsIfCanonical(AR, AR->getNoWrapFlags()));
     }
 
     // sext({C,+,Step}) --> (sext(D) + sext({C-D,+,Step}))<nuw><nsw>
@@ -1991,7 +2014,8 @@ const SCEV *ScalarEvolution::getSignExtendExprImpl(SCEVUse Op, Type *Ty,
       setNoWrapFlags(const_cast<SCEVAddRecExpr *>(AR), SCEV::FlagNSW);
       Start = getExtendAddRecStart<SCEVSignExtendExpr>(AR, Ty, this, Depth + 1);
       Step = getSignExtendExpr(Step, Ty, Depth + 1);
-      return getAddRecExpr(Start, Step, L, AR->getNoWrapFlags());
+      return getAddRecExpr(Start, Step, L,
+                           getFlagsIfCanonical(AR, AR->getNoWrapFlags()));
     }
   }
 
@@ -13333,7 +13357,8 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
           Type *Ty = ZExt->getType();
           const SCEV *S = getAddRecExpr(
               getExtendAddRecStart<SCEVZeroExtendExpr>(AR, Ty, this, 0),
-              getZeroExtendExpr(Step, Ty, 0), L, AR->getNoWrapFlags());
+              getZeroExtendExpr(Step, Ty, 0), L,
+              getFlagsIfCanonical(AR, AR->getNoWrapFlags()));
           IV = dyn_cast<SCEVAddRecExpr>(S);
         }
       }
@@ -15155,7 +15180,7 @@ public:
       if (addOverflowAssumption(AR, SCEVWrapPredicate::IncrementNUSW))
         return SE.getAddRecExpr(SE.getZeroExtendExpr(AR->getStart(), Ty),
                                 SE.getSignExtendExpr(Step, Ty), L,
-                                AR->getNoWrapFlags());
+                                getFlagsIfCanonical(AR, AR->getNoWrapFlags()));
     }
     return SE.getZeroExtendExpr(Operand, Expr->getType());
   }
@@ -15171,7 +15196,7 @@ public:
       if (addOverflowAssumption(AR, SCEVWrapPredicate::IncrementNSSW))
         return SE.getAddRecExpr(SE.getSignExtendExpr(AR->getStart(), Ty),
                                 SE.getSignExtendExpr(Step, Ty), L,
-                                AR->getNoWrapFlags());
+                                getFlagsIfCanonical(AR, AR->getNoWrapFlags()));
     }
     return SE.getSignExtendExpr(Operand, Expr->getType());
   }

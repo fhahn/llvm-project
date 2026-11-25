@@ -244,10 +244,7 @@ define i1 @zext_mul_at_scope_operand_folds_with_use_nuw(i8 noundef range(i8 -128
 ; CHECK-SAME: i8 noundef range(i8 -128, -124) [[A:%.*]], i8 noundef [[X:%.*]], i8 noundef [[N:%.*]], ptr [[P:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = zext i8 [[X]] to i9
-; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i8 [[A]], -128
-; CHECK-NEXT:    [[TMP2:%.*]] = zext nneg i8 [[TMP1]] to i9
-; CHECK-NEXT:    [[UMIN1:%.*]] = call i9 @llvm.umin.i9(i9 [[TMP0]], i9 [[TMP2]])
-; CHECK-NEXT:    [[TMP3:%.*]] = mul nuw nsw i9 [[UMIN1]], 3
+; CHECK-NEXT:    [[TMP1:%.*]] = mul i9 [[TMP0]], 3
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
 ; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
@@ -263,7 +260,7 @@ define i1 @zext_mul_at_scope_operand_folds_with_use_nuw(i8 noundef range(i8 -128
 ; CHECK-NEXT:    [[INNER_IV_NEXT]] = add i8 [[INNER_IV]], 1
 ; CHECK-NEXT:    br i1 true, label %[[OUTER_LATCH]], label %[[INNER]]
 ; CHECK:       [[OUTER_LATCH]]:
-; CHECK-NEXT:    store i9 [[TMP3]], ptr [[P]], align 2
+; CHECK-NEXT:    store i9 [[TMP1]], ptr [[P]], align 2
 ; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add i8 [[OUTER_IV]], 1
 ; CHECK-NEXT:    br label %[[OUTER_HEADER]]
 ; CHECK:       [[EXIT]]:
@@ -276,10 +273,10 @@ define i1 @zext_mul_at_scope_operand_folds_with_use_nuw(i8 noundef range(i8 -128
 ; CHECK-NEXT:    [[MUL_I9_EXT:%.*]] = zext i9 [[MUL_I9]] to i32
 ; CHECK-NEXT:    [[X_I32:%.*]] = zext i8 [[X]] to i32
 ; CHECK-NEXT:    [[MUL_I32:%.*]] = mul i32 [[X_I32]], 3
-; CHECK-NEXT:    [[TMP4:%.*]] = add nuw nsw i32 [[MUL_I9_EXT]], 3
-; CHECK-NEXT:    [[TMP5:%.*]] = add nuw nsw i32 [[MUL_I32]], 3
-; CHECK-NEXT:    [[CMP_EXIT:%.*]] = icmp eq i32 [[TMP4]], [[TMP5]]
-; CHECK-NEXT:    ret i1 [[CMP_EXIT]]
+; CHECK-NEXT:    [[TMP2:%.*]] = add nuw nsw i32 [[MUL_I9_EXT]], 3
+; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i32 [[MUL_I32]], 3
+; CHECK-NEXT:    [[CMP_LCSSA:%.*]] = icmp eq i32 [[TMP2]], [[TMP3]]
+; CHECK-NEXT:    ret i1 [[CMP_LCSSA]]
 ;
 entry:
   br label %outer.header
@@ -335,11 +332,8 @@ define i1 @zext_add_at_scope_operand_folds_with_use_nuw(i8 noundef range(i8 -128
 ; CHECK-SAME: i8 noundef range(i8 -128, -124) [[A:%.*]], i8 noundef [[X:%.*]], i8 noundef [[N:%.*]], ptr [[P:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = zext i8 [[X]] to i9
-; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i8 [[A]], -128
-; CHECK-NEXT:    [[TMP2:%.*]] = zext nneg i8 [[TMP1]] to i9
-; CHECK-NEXT:    [[UMIN1:%.*]] = call i9 @llvm.umin.i9(i9 [[TMP0]], i9 [[TMP2]])
-; CHECK-NEXT:    [[TMP3:%.*]] = mul nuw nsw i9 [[UMIN1]], 3
-; CHECK-NEXT:    [[TMP4:%.*]] = add nuw nsw i9 [[TMP3]], 5
+; CHECK-NEXT:    [[TMP1:%.*]] = mul i9 [[TMP0]], 3
+; CHECK-NEXT:    [[TMP2:%.*]] = add i9 [[TMP1]], 5
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
 ; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
@@ -355,7 +349,7 @@ define i1 @zext_add_at_scope_operand_folds_with_use_nuw(i8 noundef range(i8 -128
 ; CHECK-NEXT:    [[INNER_IV_NEXT]] = add i8 [[INNER_IV]], 1
 ; CHECK-NEXT:    br i1 true, label %[[OUTER_LATCH]], label %[[INNER]]
 ; CHECK:       [[OUTER_LATCH]]:
-; CHECK-NEXT:    store i9 [[TMP4]], ptr [[P]], align 2
+; CHECK-NEXT:    store i9 [[TMP2]], ptr [[P]], align 2
 ; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add i8 [[OUTER_IV]], 1
 ; CHECK-NEXT:    br label %[[OUTER_HEADER]]
 ; CHECK:       [[EXIT]]:
@@ -368,10 +362,10 @@ define i1 @zext_add_at_scope_operand_folds_with_use_nuw(i8 noundef range(i8 -128
 ; CHECK-NEXT:    [[ADD_I9:%.*]] = add i9 [[MUL_I9]], 5
 ; CHECK-NEXT:    [[ADD_I9_EXT:%.*]] = zext i9 [[ADD_I9]] to i32
 ; CHECK-NEXT:    [[MUL_I9_EXT:%.*]] = zext i9 [[MUL_I9]] to i32
-; CHECK-NEXT:    [[TMP5:%.*]] = add nuw nsw i32 [[ADD_I9_EXT]], 3
-; CHECK-NEXT:    [[TMP6:%.*]] = add nuw nsw i32 [[MUL_I9_EXT]], 8
-; CHECK-NEXT:    [[CMP_EXIT:%.*]] = icmp eq i32 [[TMP5]], [[TMP6]]
-; CHECK-NEXT:    ret i1 [[CMP_EXIT]]
+; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i32 [[ADD_I9_EXT]], 3
+; CHECK-NEXT:    [[TMP4:%.*]] = add nuw nsw i32 [[MUL_I9_EXT]], 8
+; CHECK-NEXT:    [[CMP_LCSSA:%.*]] = icmp eq i32 [[TMP3]], [[TMP4]]
+; CHECK-NEXT:    ret i1 [[CMP_LCSSA]]
 ;
 entry:
   br label %outer.header
@@ -430,10 +424,7 @@ define i1 @sext_add_at_scope_operand_folds_with_use_nuw(i8 noundef range(i8 -128
 ; CHECK-SAME: i8 noundef range(i8 -128, -124) [[A:%.*]], i8 noundef [[X:%.*]], i8 noundef [[N:%.*]], ptr [[P:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = zext i8 [[X]] to i9
-; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i8 [[A]], -128
-; CHECK-NEXT:    [[TMP2:%.*]] = zext nneg i8 [[TMP1]] to i9
-; CHECK-NEXT:    [[UMIN1:%.*]] = call i9 @llvm.umin.i9(i9 [[TMP0]], i9 [[TMP2]])
-; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i9 [[UMIN1]], 60
+; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i9 [[TMP0]], 60
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
 ; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
@@ -449,7 +440,7 @@ define i1 @sext_add_at_scope_operand_folds_with_use_nuw(i8 noundef range(i8 -128
 ; CHECK-NEXT:    [[INNER_IV_NEXT]] = add i8 [[INNER_IV]], 1
 ; CHECK-NEXT:    br i1 true, label %[[OUTER_LATCH]], label %[[INNER]]
 ; CHECK:       [[OUTER_LATCH]]:
-; CHECK-NEXT:    store i9 [[TMP3]], ptr [[P]], align 2
+; CHECK-NEXT:    store i9 [[TMP1]], ptr [[P]], align 2
 ; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add i8 [[OUTER_IV]], 1
 ; CHECK-NEXT:    br label %[[OUTER_HEADER]]
 ; CHECK:       [[EXIT]]:
@@ -461,10 +452,10 @@ define i1 @sext_add_at_scope_operand_folds_with_use_nuw(i8 noundef range(i8 -128
 ; CHECK-NEXT:    [[ADD_I9:%.*]] = add i9 [[X_I9]], 60
 ; CHECK-NEXT:    [[ADD_I9_EXT:%.*]] = sext i9 [[ADD_I9]] to i32
 ; CHECK-NEXT:    [[X_I32:%.*]] = zext i8 [[X]] to i32
-; CHECK-NEXT:    [[TMP4:%.*]] = add nsw i32 [[ADD_I9_EXT]], 3
-; CHECK-NEXT:    [[TMP5:%.*]] = add nuw nsw i32 [[X_I32]], 63
-; CHECK-NEXT:    [[CMP_EXIT:%.*]] = icmp eq i32 [[TMP4]], [[TMP5]]
-; CHECK-NEXT:    ret i1 [[CMP_EXIT]]
+; CHECK-NEXT:    [[TMP2:%.*]] = add nsw i32 [[ADD_I9_EXT]], 3
+; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i32 [[X_I32]], 63
+; CHECK-NEXT:    [[CMP_LCSSA:%.*]] = icmp eq i32 [[TMP2]], [[TMP3]]
+; CHECK-NEXT:    ret i1 [[CMP_LCSSA]]
 ;
 entry:
   br label %outer.header
@@ -522,13 +513,9 @@ define i1 @zext_addrec_at_scope_step_folds_with_use_nuw(i8 noundef range(i8 -128
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[X_I9:%.*]] = zext i8 [[X]] to i9
 ; CHECK-NEXT:    [[X_I32:%.*]] = zext i8 [[X]] to i32
-; CHECK-NEXT:    [[TMP0:%.*]] = add nuw i8 [[A]], -128
-; CHECK-NEXT:    [[TMP1:%.*]] = zext nneg i8 [[TMP0]] to i9
-; CHECK-NEXT:    [[UMIN1:%.*]] = call i9 @llvm.umin.i9(i9 [[X_I9]], i9 [[TMP1]])
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i9 [ [[INDVARS_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ], [ 0, %[[ENTRY]] ]
-; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
 ; CHECK-NEXT:    [[IV_I9:%.*]] = phi i9 [ 0, %[[ENTRY]] ], [ [[IV_I9_NEXT:%.*]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    [[IV_I32:%.*]] = phi i32 [ 0, %[[ENTRY]] ], [ [[IV_I32_NEXT:%.*]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    br i1 [[C]], label %[[INNER_PREHEADER:.*]], label %[[OUTER_LATCH]]
@@ -542,7 +529,7 @@ define i1 @zext_addrec_at_scope_step_folds_with_use_nuw(i8 noundef range(i8 -128
 ; CHECK-NEXT:    [[INNER_IV_NEXT]] = add i8 [[INNER_IV]], 1
 ; CHECK-NEXT:    br i1 true, label %[[INNER_EXIT:.*]], label %[[INNER]]
 ; CHECK:       [[INNER_EXIT]]:
-; CHECK-NEXT:    store i9 [[INDVARS_IV]], ptr [[P]], align 2
+; CHECK-NEXT:    store i9 [[IV_I9]], ptr [[P]], align 2
 ; CHECK-NEXT:    br label %[[OUTER_LATCH]]
 ; CHECK:       [[OUTER_LATCH]]:
 ; CHECK-NEXT:    [[IV_I9_EXT:%.*]] = zext i9 [[IV_I9]] to i32
@@ -551,7 +538,6 @@ define i1 @zext_addrec_at_scope_step_folds_with_use_nuw(i8 noundef range(i8 -128
 ; CHECK-NEXT:    [[IV_I32_NEXT]] = add nuw nsw i32 [[IV_I32]], [[X_I32]]
 ; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add nuw nsw i8 [[OUTER_IV]], 1
 ; CHECK-NEXT:    [[OUTER_EC:%.*]] = icmp eq i8 [[OUTER_IV_NEXT]], 4
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i9 [[INDVARS_IV]], [[UMIN1]]
 ; CHECK-NEXT:    br i1 [[OUTER_EC]], label %[[EXIT:.*]], label %[[OUTER_HEADER]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[CMP_LCSSA:%.*]] = phi i1 [ [[CMP]], %[[OUTER_LATCH]] ]
@@ -609,14 +595,9 @@ define i1 @zext_addrec_at_scope_start_folds_with_use_nuw(i8 noundef range(i8 -12
 ; CHECK-NEXT:    [[X_I32:%.*]] = zext i8 [[X]] to i32
 ; CHECK-NEXT:    [[START_I9:%.*]] = mul i9 [[X_I9]], 2
 ; CHECK-NEXT:    [[START_I32:%.*]] = mul i32 [[X_I32]], 2
-; CHECK-NEXT:    [[TMP0:%.*]] = add nuw i8 [[A]], -128
-; CHECK-NEXT:    [[TMP1:%.*]] = zext nneg i8 [[TMP0]] to i9
-; CHECK-NEXT:    [[UMIN1:%.*]] = call i9 @llvm.umin.i9(i9 [[X_I9]], i9 [[TMP1]])
-; CHECK-NEXT:    [[TMP2:%.*]] = shl nuw nsw i9 [[UMIN1]], 1
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i9 [ [[INDVARS_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ], [ [[TMP2]], %[[ENTRY]] ]
-; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
 ; CHECK-NEXT:    [[IV_I9:%.*]] = phi i9 [ [[START_I9]], %[[ENTRY]] ], [ [[IV_I9_NEXT:%.*]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    [[IV_I32:%.*]] = phi i32 [ [[START_I32]], %[[ENTRY]] ], [ [[IV_I32_NEXT:%.*]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    br i1 [[C]], label %[[INNER_PREHEADER:.*]], label %[[OUTER_LATCH]]
@@ -630,7 +611,7 @@ define i1 @zext_addrec_at_scope_start_folds_with_use_nuw(i8 noundef range(i8 -12
 ; CHECK-NEXT:    [[INNER_IV_NEXT]] = add i8 [[INNER_IV]], 1
 ; CHECK-NEXT:    br i1 true, label %[[INNER_EXIT:.*]], label %[[INNER]]
 ; CHECK:       [[INNER_EXIT]]:
-; CHECK-NEXT:    store i9 [[INDVARS_IV]], ptr [[P]], align 2
+; CHECK-NEXT:    store i9 [[IV_I9]], ptr [[P]], align 2
 ; CHECK-NEXT:    br label %[[OUTER_LATCH]]
 ; CHECK:       [[OUTER_LATCH]]:
 ; CHECK-NEXT:    [[IV_I9_EXT:%.*]] = zext i9 [[IV_I9]] to i32
@@ -639,7 +620,6 @@ define i1 @zext_addrec_at_scope_start_folds_with_use_nuw(i8 noundef range(i8 -12
 ; CHECK-NEXT:    [[IV_I32_NEXT]] = add nuw nsw i32 [[IV_I32]], 1
 ; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add nuw nsw i8 [[OUTER_IV]], 1
 ; CHECK-NEXT:    [[OUTER_EC:%.*]] = icmp eq i8 [[OUTER_IV_NEXT]], 4
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i9 [[INDVARS_IV]], 1
 ; CHECK-NEXT:    br i1 [[OUTER_EC]], label %[[EXIT:.*]], label %[[OUTER_HEADER]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[CMP_LCSSA:%.*]] = phi i1 [ [[CMP]], %[[OUTER_LATCH]] ]
@@ -699,15 +679,9 @@ define i1 @zext_nuw_addrec_at_scope_step_folds_with_use_nuw(i8 noundef range(i8 
 ; CHECK-NEXT:    [[X_I10:%.*]] = zext i8 [[X]] to i10
 ; CHECK-NEXT:    [[X_I32:%.*]] = zext i8 [[X]] to i32
 ; CHECK-NEXT:    [[TMP0:%.*]] = zext i8 [[X]] to i9
-; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i8 [[A]], -128
-; CHECK-NEXT:    [[TMP2:%.*]] = zext nneg i8 [[TMP1]] to i9
-; CHECK-NEXT:    [[UMIN1:%.*]] = call i9 @llvm.umin.i9(i9 [[TMP0]], i9 [[TMP2]])
-; CHECK-NEXT:    [[TMP3:%.*]] = zext nneg i8 [[TMP1]] to i10
-; CHECK-NEXT:    [[UMIN2:%.*]] = call i10 @llvm.umin.i10(i10 [[X_I10]], i10 [[TMP3]])
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
-; CHECK-NEXT:    [[INDVARS_IV3:%.*]] = phi i10 [ [[INDVARS_IV_NEXT4:%.*]], %[[OUTER_LATCH:.*]] ], [ 0, %[[ENTRY]] ]
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i9 [ [[INDVARS_IV_NEXT:%.*]], %[[OUTER_LATCH]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i9 [ [[INDVARS_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ], [ 0, %[[ENTRY]] ]
 ; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    [[IV_I10:%.*]] = phi i10 [ 0, %[[ENTRY]] ], [ [[IV_I10_NEXT:%.*]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    [[IV_I32:%.*]] = phi i32 [ 0, %[[ENTRY]] ], [ [[IV_I32_NEXT:%.*]], %[[OUTER_LATCH]] ]
@@ -723,7 +697,7 @@ define i1 @zext_nuw_addrec_at_scope_step_folds_with_use_nuw(i8 noundef range(i8 
 ; CHECK-NEXT:    br i1 true, label %[[INNER_EXIT:.*]], label %[[INNER]]
 ; CHECK:       [[INNER_EXIT]]:
 ; CHECK-NEXT:    store i9 [[INDVARS_IV]], ptr [[P]], align 2
-; CHECK-NEXT:    store i10 [[INDVARS_IV3]], ptr [[Q]], align 2
+; CHECK-NEXT:    store i10 [[IV_I10]], ptr [[Q]], align 2
 ; CHECK-NEXT:    br label %[[OUTER_LATCH]]
 ; CHECK:       [[OUTER_LATCH]]:
 ; CHECK-NEXT:    [[IV_I10_EXT:%.*]] = zext i10 [[IV_I10]] to i32
@@ -732,8 +706,7 @@ define i1 @zext_nuw_addrec_at_scope_step_folds_with_use_nuw(i8 noundef range(i8 
 ; CHECK-NEXT:    [[IV_I32_NEXT]] = add nuw nsw i32 [[IV_I32]], [[X_I32]]
 ; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add nuw nsw i8 [[OUTER_IV]], 1
 ; CHECK-NEXT:    [[OUTER_EC:%.*]] = icmp eq i8 [[OUTER_IV_NEXT]], 8
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i9 [[INDVARS_IV]], [[UMIN1]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT4]] = add nuw nsw i10 [[INDVARS_IV3]], [[UMIN2]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add i9 [[INDVARS_IV]], [[TMP0]]
 ; CHECK-NEXT:    br i1 [[OUTER_EC]], label %[[EXIT:.*]], label %[[OUTER_HEADER]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[CMP_LCSSA:%.*]] = phi i1 [ [[CMP]], %[[OUTER_LATCH]] ]
@@ -795,17 +768,10 @@ define i1 @zext_addrec_at_scope_negative_step_folds_with_use_nuw(i8 noundef rang
 ; CHECK-NEXT:    [[STEP_I9:%.*]] = add i9 [[X_I9]], -100
 ; CHECK-NEXT:    [[STEP_I32:%.*]] = add i32 [[X_I32]], -100
 ; CHECK-NEXT:    [[TMP0:%.*]] = zext i8 [[X]] to i10
-; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i8 [[A]], -128
-; CHECK-NEXT:    [[TMP2:%.*]] = zext nneg i8 [[TMP1]] to i10
-; CHECK-NEXT:    [[UMIN1:%.*]] = call i10 @llvm.umin.i10(i10 [[TMP0]], i10 [[TMP2]])
-; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i10 [[UMIN1]], -100
-; CHECK-NEXT:    [[TMP4:%.*]] = zext nneg i8 [[TMP1]] to i9
-; CHECK-NEXT:    [[UMIN2:%.*]] = call i9 @llvm.umin.i9(i9 [[X_I9]], i9 [[TMP4]])
-; CHECK-NEXT:    [[TMP5:%.*]] = add nuw nsw i9 [[UMIN2]], -100
+; CHECK-NEXT:    [[TMP1:%.*]] = add nsw i10 [[TMP0]], -100
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
-; CHECK-NEXT:    [[INDVARS_IV3:%.*]] = phi i9 [ [[INDVARS_IV_NEXT4:%.*]], %[[OUTER_LATCH:.*]] ], [ 127, %[[ENTRY]] ]
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i10 [ [[INDVARS_IV_NEXT:%.*]], %[[OUTER_LATCH]] ], [ 127, %[[ENTRY]] ]
+; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i10 [ [[INDVARS_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ], [ 127, %[[ENTRY]] ]
 ; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    [[IV_I9:%.*]] = phi i9 [ 127, %[[ENTRY]] ], [ [[IV_I9_NEXT:%.*]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    [[IV_I32:%.*]] = phi i32 [ 127, %[[ENTRY]] ], [ [[IV_I32_NEXT:%.*]], %[[OUTER_LATCH]] ]
@@ -821,7 +787,7 @@ define i1 @zext_addrec_at_scope_negative_step_folds_with_use_nuw(i8 noundef rang
 ; CHECK-NEXT:    br i1 true, label %[[INNER_EXIT:.*]], label %[[INNER]]
 ; CHECK:       [[INNER_EXIT]]:
 ; CHECK-NEXT:    store i10 [[INDVARS_IV]], ptr [[P]], align 2
-; CHECK-NEXT:    store i9 [[INDVARS_IV3]], ptr [[Q]], align 2
+; CHECK-NEXT:    store i9 [[IV_I9]], ptr [[Q]], align 2
 ; CHECK-NEXT:    br label %[[OUTER_LATCH]]
 ; CHECK:       [[OUTER_LATCH]]:
 ; CHECK-NEXT:    [[IV_I9_EXT:%.*]] = sext i9 [[IV_I9]] to i32
@@ -830,8 +796,7 @@ define i1 @zext_addrec_at_scope_negative_step_folds_with_use_nuw(i8 noundef rang
 ; CHECK-NEXT:    [[IV_I32_NEXT]] = add nsw i32 [[IV_I32]], [[STEP_I32]]
 ; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add nuw nsw i8 [[OUTER_IV]], 1
 ; CHECK-NEXT:    [[OUTER_EC:%.*]] = icmp eq i8 [[OUTER_IV_NEXT]], 2
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nsw i10 [[INDVARS_IV]], [[TMP3]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT4]] = add nsw i9 [[INDVARS_IV3]], [[TMP5]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nsw i10 [[INDVARS_IV]], [[TMP1]]
 ; CHECK-NEXT:    br i1 [[OUTER_EC]], label %[[EXIT:.*]], label %[[OUTER_HEADER]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[CMP_LCSSA:%.*]] = phi i1 [ [[CMP]], %[[OUTER_LATCH]] ]
@@ -898,14 +863,9 @@ define i1 @zext_addrec_at_scope_nuw_by_induction_step_folds_with_use_nuw(i8 noun
 ; CHECK-NEXT:    [[Y_I32:%.*]] = zext i8 [[Y]] to i32
 ; CHECK-NEXT:    [[STEP_I9:%.*]] = add i9 [[X_I9]], 1
 ; CHECK-NEXT:    [[STEP_I32:%.*]] = add i32 [[X_I32]], 1
-; CHECK-NEXT:    [[TMP0:%.*]] = add nuw i8 [[A]], -128
-; CHECK-NEXT:    [[TMP1:%.*]] = zext nneg i8 [[TMP0]] to i9
-; CHECK-NEXT:    [[UMIN1:%.*]] = call i9 @llvm.umin.i9(i9 [[X_I9]], i9 [[TMP1]])
-; CHECK-NEXT:    [[TMP2:%.*]] = add nuw nsw i9 [[UMIN1]], 1
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i9 [ [[INDVARS_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ], [ [[Y_I9]], %[[ENTRY]] ]
-; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
 ; CHECK-NEXT:    [[IV_I9:%.*]] = phi i9 [ [[Y_I9]], %[[ENTRY]] ], [ [[IV_I9_NEXT:%.*]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    [[IV_I32:%.*]] = phi i32 [ [[Y_I32]], %[[ENTRY]] ], [ [[IV_I32_NEXT:%.*]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    br i1 [[C]], label %[[INNER_PREHEADER:.*]], label %[[OUTER_LATCH]]
@@ -919,7 +879,7 @@ define i1 @zext_addrec_at_scope_nuw_by_induction_step_folds_with_use_nuw(i8 noun
 ; CHECK-NEXT:    [[INNER_IV_NEXT]] = add i8 [[INNER_IV]], 1
 ; CHECK-NEXT:    br i1 true, label %[[INNER_EXIT:.*]], label %[[INNER]]
 ; CHECK:       [[INNER_EXIT]]:
-; CHECK-NEXT:    store i9 [[INDVARS_IV]], ptr [[P]], align 2
+; CHECK-NEXT:    store i9 [[IV_I9]], ptr [[P]], align 2
 ; CHECK-NEXT:    br label %[[OUTER_LATCH]]
 ; CHECK:       [[OUTER_LATCH]]:
 ; CHECK-NEXT:    [[IV_I9_EXT:%.*]] = zext i9 [[IV_I9]] to i32
@@ -928,7 +888,6 @@ define i1 @zext_addrec_at_scope_nuw_by_induction_step_folds_with_use_nuw(i8 noun
 ; CHECK-NEXT:    [[IV_I32_NEXT]] = add i32 [[IV_I32]], [[STEP_I32]]
 ; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add nuw nsw i8 [[OUTER_IV]], 1
 ; CHECK-NEXT:    [[OUTER_EC:%.*]] = icmp eq i8 [[OUTER_IV_NEXT]], 8
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add i9 [[INDVARS_IV]], [[TMP2]]
 ; CHECK-NEXT:    br i1 [[OUTER_EC]], label %[[EXIT:.*]], label %[[OUTER_HEADER]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[CMP_LCSSA:%.*]] = phi i1 [ [[CMP]], %[[OUTER_LATCH]] ]
@@ -996,17 +955,10 @@ define i1 @zext_addrec_at_scope_negative_step_by_induction_folds_with_use_nuw(i8
 ; CHECK-NEXT:    [[STEP_I32:%.*]] = add i32 [[X_I32]], -5
 ; CHECK-NEXT:    [[TMP0:%.*]] = zext nneg i8 [[Y]] to i10
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext i8 [[X]] to i10
-; CHECK-NEXT:    [[TMP2:%.*]] = add nuw i8 [[A]], -128
-; CHECK-NEXT:    [[TMP3:%.*]] = zext nneg i8 [[TMP2]] to i10
-; CHECK-NEXT:    [[UMIN1:%.*]] = call i10 @llvm.umin.i10(i10 [[TMP1]], i10 [[TMP3]])
-; CHECK-NEXT:    [[TMP4:%.*]] = add nuw nsw i10 [[UMIN1]], -5
-; CHECK-NEXT:    [[TMP5:%.*]] = zext nneg i8 [[TMP2]] to i9
-; CHECK-NEXT:    [[UMIN2:%.*]] = call i9 @llvm.umin.i9(i9 [[X_I9]], i9 [[TMP5]])
-; CHECK-NEXT:    [[TMP6:%.*]] = add nuw nsw i9 [[UMIN2]], -5
+; CHECK-NEXT:    [[TMP2:%.*]] = add nsw i10 [[TMP1]], -5
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
-; CHECK-NEXT:    [[INDVARS_IV3:%.*]] = phi i9 [ [[INDVARS_IV_NEXT4:%.*]], %[[OUTER_LATCH:.*]] ], [ [[Y_I9]], %[[ENTRY]] ]
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i10 [ [[INDVARS_IV_NEXT:%.*]], %[[OUTER_LATCH]] ], [ [[TMP0]], %[[ENTRY]] ]
+; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i10 [ [[INDVARS_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ], [ [[TMP0]], %[[ENTRY]] ]
 ; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    [[IV_I9:%.*]] = phi i9 [ [[Y_I9]], %[[ENTRY]] ], [ [[IV_I9_NEXT:%.*]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    [[IV_I32:%.*]] = phi i32 [ [[Y_I32]], %[[ENTRY]] ], [ [[IV_I32_NEXT:%.*]], %[[OUTER_LATCH]] ]
@@ -1022,7 +974,7 @@ define i1 @zext_addrec_at_scope_negative_step_by_induction_folds_with_use_nuw(i8
 ; CHECK-NEXT:    br i1 true, label %[[INNER_EXIT:.*]], label %[[INNER]]
 ; CHECK:       [[INNER_EXIT]]:
 ; CHECK-NEXT:    store i10 [[INDVARS_IV]], ptr [[P]], align 2
-; CHECK-NEXT:    store i9 [[INDVARS_IV3]], ptr [[Q]], align 2
+; CHECK-NEXT:    store i9 [[IV_I9]], ptr [[Q]], align 2
 ; CHECK-NEXT:    br label %[[OUTER_LATCH]]
 ; CHECK:       [[OUTER_LATCH]]:
 ; CHECK-NEXT:    [[IV_I9_EXT:%.*]] = sext i9 [[IV_I9]] to i32
@@ -1031,8 +983,7 @@ define i1 @zext_addrec_at_scope_negative_step_by_induction_folds_with_use_nuw(i8
 ; CHECK-NEXT:    [[IV_I32_NEXT]] = add i32 [[IV_I32]], [[STEP_I32]]
 ; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add nuw nsw i8 [[OUTER_IV]], 1
 ; CHECK-NEXT:    [[OUTER_EC:%.*]] = icmp eq i8 [[OUTER_IV_NEXT]], 8
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add i10 [[INDVARS_IV]], [[TMP4]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT4]] = add i9 [[INDVARS_IV3]], [[TMP6]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add i10 [[INDVARS_IV]], [[TMP2]]
 ; CHECK-NEXT:    br i1 [[OUTER_EC]], label %[[EXIT:.*]], label %[[OUTER_HEADER]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[CMP_LCSSA:%.*]] = phi i1 [ [[CMP]], %[[OUTER_LATCH]] ]
@@ -1097,13 +1048,9 @@ define i1 @sext_addrec_at_scope_step_folds_with_use_nuw(i8 noundef range(i8 -128
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[X_I9:%.*]] = zext i8 [[X]] to i9
 ; CHECK-NEXT:    [[X_I32:%.*]] = zext i8 [[X]] to i32
-; CHECK-NEXT:    [[TMP0:%.*]] = add nuw i8 [[A]], -128
-; CHECK-NEXT:    [[TMP1:%.*]] = zext nneg i8 [[TMP0]] to i9
-; CHECK-NEXT:    [[UMIN1:%.*]] = call i9 @llvm.umin.i9(i9 [[X_I9]], i9 [[TMP1]])
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i9 [ [[INDVARS_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ], [ 0, %[[ENTRY]] ]
-; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
 ; CHECK-NEXT:    [[IV_I9:%.*]] = phi i9 [ 0, %[[ENTRY]] ], [ [[IV_I9_NEXT:%.*]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    [[IV_I32:%.*]] = phi i32 [ 0, %[[ENTRY]] ], [ [[IV_I32_NEXT:%.*]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    br i1 [[C]], label %[[INNER_PREHEADER:.*]], label %[[OUTER_LATCH]]
@@ -1117,7 +1064,7 @@ define i1 @sext_addrec_at_scope_step_folds_with_use_nuw(i8 noundef range(i8 -128
 ; CHECK-NEXT:    [[INNER_IV_NEXT]] = add i8 [[INNER_IV]], 1
 ; CHECK-NEXT:    br i1 true, label %[[INNER_EXIT:.*]], label %[[INNER]]
 ; CHECK:       [[INNER_EXIT]]:
-; CHECK-NEXT:    store i9 [[INDVARS_IV]], ptr [[P]], align 2
+; CHECK-NEXT:    store i9 [[IV_I9]], ptr [[P]], align 2
 ; CHECK-NEXT:    br label %[[OUTER_LATCH]]
 ; CHECK:       [[OUTER_LATCH]]:
 ; CHECK-NEXT:    [[IV_I9_EXT:%.*]] = sext i9 [[IV_I9]] to i32
@@ -1126,7 +1073,6 @@ define i1 @sext_addrec_at_scope_step_folds_with_use_nuw(i8 noundef range(i8 -128
 ; CHECK-NEXT:    [[IV_I32_NEXT]] = add nuw nsw i32 [[IV_I32]], [[X_I32]]
 ; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add nuw nsw i8 [[OUTER_IV]], 1
 ; CHECK-NEXT:    [[OUTER_EC:%.*]] = icmp eq i8 [[OUTER_IV_NEXT]], 4
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i9 [[INDVARS_IV]], [[UMIN1]]
 ; CHECK-NEXT:    br i1 [[OUTER_EC]], label %[[EXIT:.*]], label %[[OUTER_HEADER]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[CMP_LCSSA:%.*]] = phi i1 [ [[CMP]], %[[OUTER_LATCH]] ]
@@ -1183,15 +1129,9 @@ define i1 @sext_nsw_addrec_at_scope_step_folds_with_use_nuw(i8 noundef range(i8 
 ; CHECK-NEXT:    [[X_I10:%.*]] = zext i8 [[X]] to i10
 ; CHECK-NEXT:    [[X_I32:%.*]] = zext i8 [[X]] to i32
 ; CHECK-NEXT:    [[TMP0:%.*]] = zext i8 [[X]] to i9
-; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i8 [[A]], -128
-; CHECK-NEXT:    [[TMP2:%.*]] = zext nneg i8 [[TMP1]] to i9
-; CHECK-NEXT:    [[UMIN1:%.*]] = call i9 @llvm.umin.i9(i9 [[TMP0]], i9 [[TMP2]])
-; CHECK-NEXT:    [[TMP3:%.*]] = zext nneg i8 [[TMP1]] to i10
-; CHECK-NEXT:    [[UMIN2:%.*]] = call i10 @llvm.umin.i10(i10 [[X_I10]], i10 [[TMP3]])
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
-; CHECK-NEXT:    [[INDVARS_IV3:%.*]] = phi i10 [ [[INDVARS_IV_NEXT4:%.*]], %[[OUTER_LATCH:.*]] ], [ 0, %[[ENTRY]] ]
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i9 [ [[INDVARS_IV_NEXT:%.*]], %[[OUTER_LATCH]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i9 [ [[INDVARS_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ], [ 0, %[[ENTRY]] ]
 ; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    [[IV_I10:%.*]] = phi i10 [ 0, %[[ENTRY]] ], [ [[IV_I10_NEXT:%.*]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    [[IV_I32:%.*]] = phi i32 [ 0, %[[ENTRY]] ], [ [[IV_I32_NEXT:%.*]], %[[OUTER_LATCH]] ]
@@ -1207,7 +1147,7 @@ define i1 @sext_nsw_addrec_at_scope_step_folds_with_use_nuw(i8 noundef range(i8 
 ; CHECK-NEXT:    br i1 true, label %[[INNER_EXIT:.*]], label %[[INNER]]
 ; CHECK:       [[INNER_EXIT]]:
 ; CHECK-NEXT:    store i9 [[INDVARS_IV]], ptr [[P]], align 2
-; CHECK-NEXT:    store i10 [[INDVARS_IV3]], ptr [[Q]], align 2
+; CHECK-NEXT:    store i10 [[IV_I10]], ptr [[Q]], align 2
 ; CHECK-NEXT:    br label %[[OUTER_LATCH]]
 ; CHECK:       [[OUTER_LATCH]]:
 ; CHECK-NEXT:    [[IV_I10_EXT:%.*]] = sext i10 [[IV_I10]] to i32
@@ -1216,8 +1156,7 @@ define i1 @sext_nsw_addrec_at_scope_step_folds_with_use_nuw(i8 noundef range(i8 
 ; CHECK-NEXT:    [[IV_I32_NEXT]] = add nuw nsw i32 [[IV_I32]], [[X_I32]]
 ; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add nuw nsw i8 [[OUTER_IV]], 1
 ; CHECK-NEXT:    [[OUTER_EC:%.*]] = icmp eq i8 [[OUTER_IV_NEXT]], 4
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i9 [[INDVARS_IV]], [[UMIN1]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT4]] = add nuw nsw i10 [[INDVARS_IV3]], [[UMIN2]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add i9 [[INDVARS_IV]], [[TMP0]]
 ; CHECK-NEXT:    br i1 [[OUTER_EC]], label %[[EXIT:.*]], label %[[OUTER_HEADER]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[CMP_LCSSA:%.*]] = phi i1 [ [[CMP]], %[[OUTER_LATCH]] ]
@@ -1280,14 +1219,9 @@ define i1 @sext_addrec_at_scope_nsw_by_induction_step_folds_with_use_nuw(i8 noun
 ; CHECK-NEXT:    [[Y_I32:%.*]] = zext i8 [[Y]] to i32
 ; CHECK-NEXT:    [[STEP_I10:%.*]] = add i10 [[X_I10]], 1
 ; CHECK-NEXT:    [[STEP_I32:%.*]] = add i32 [[X_I32]], 1
-; CHECK-NEXT:    [[TMP0:%.*]] = add nuw i8 [[A]], -128
-; CHECK-NEXT:    [[TMP1:%.*]] = zext nneg i8 [[TMP0]] to i10
-; CHECK-NEXT:    [[UMIN1:%.*]] = call i10 @llvm.umin.i10(i10 [[X_I10]], i10 [[TMP1]])
-; CHECK-NEXT:    [[TMP2:%.*]] = add nuw nsw i10 [[UMIN1]], 1
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i10 [ [[INDVARS_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ], [ [[Y_I10]], %[[ENTRY]] ]
-; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
 ; CHECK-NEXT:    [[IV_I10:%.*]] = phi i10 [ [[Y_I10]], %[[ENTRY]] ], [ [[IV_I10_NEXT:%.*]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    [[IV_I32:%.*]] = phi i32 [ [[Y_I32]], %[[ENTRY]] ], [ [[IV_I32_NEXT:%.*]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    br i1 [[C]], label %[[INNER_PREHEADER:.*]], label %[[OUTER_LATCH]]
@@ -1301,7 +1235,7 @@ define i1 @sext_addrec_at_scope_nsw_by_induction_step_folds_with_use_nuw(i8 noun
 ; CHECK-NEXT:    [[INNER_IV_NEXT]] = add i8 [[INNER_IV]], 1
 ; CHECK-NEXT:    br i1 true, label %[[INNER_EXIT:.*]], label %[[INNER]]
 ; CHECK:       [[INNER_EXIT]]:
-; CHECK-NEXT:    store i10 [[INDVARS_IV]], ptr [[P]], align 2
+; CHECK-NEXT:    store i10 [[IV_I10]], ptr [[P]], align 2
 ; CHECK-NEXT:    br label %[[OUTER_LATCH]]
 ; CHECK:       [[OUTER_LATCH]]:
 ; CHECK-NEXT:    [[IV_I10_EXT:%.*]] = sext i10 [[IV_I10]] to i32
@@ -1310,7 +1244,6 @@ define i1 @sext_addrec_at_scope_nsw_by_induction_step_folds_with_use_nuw(i8 noun
 ; CHECK-NEXT:    [[IV_I32_NEXT]] = add i32 [[IV_I32]], [[STEP_I32]]
 ; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add nuw nsw i8 [[OUTER_IV]], 1
 ; CHECK-NEXT:    [[OUTER_EC:%.*]] = icmp eq i8 [[OUTER_IV_NEXT]], 8
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add i10 [[INDVARS_IV]], [[TMP2]]
 ; CHECK-NEXT:    br i1 [[OUTER_EC]], label %[[EXIT:.*]], label %[[OUTER_HEADER]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[CMP_LCSSA:%.*]] = phi i1 [ [[CMP]], %[[OUTER_LATCH]] ]
