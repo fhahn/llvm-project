@@ -1081,6 +1081,47 @@ loop:
 
 exit:
   %t = add i64 %start, 10
+
+; zext of the umax of the exit value of %iv and %x, as %j is 0 at the exit.
+; TODO: The zext of the exit value of %iv is not folded.
+define void @zext_umax_exit_value(i8 %start, i8 %x) {
+; CHECK-LABEL: 'zext_umax_exit_value'
+; CHECK-NEXT:  Classifying expressions for: @zext_umax_exit_value
+; CHECK-NEXT:    %iv = phi i8 [ %start, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop> U: full-set S: full-set Exits: (9 + %start)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %j = phi i8 [ -9, %entry ], [ %j.next, %loop ]
+; CHECK-NEXT:    --> {-9,+,1}<nsw><%loop> U: [-9,1) S: [-9,1) Exits: 0 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %umax = call i8 @llvm.umax.i8(i8 %iv, i8 %x)
+; CHECK-NEXT:    --> ({%start,+,1}<nuw><%loop> umax %x) U: full-set S: full-set Exits: ((9 + %start)<u nuw> umax %x) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %add = add i8 %umax, %j
+; CHECK-NEXT:    --> ({-9,+,1}<nsw><%loop> + ({%start,+,1}<nuw><%loop> umax %x)) U: full-set S: full-set Exits: ((9 + %start)<u nuw> umax %x) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %zext = zext i8 %add to i16
+; CHECK-NEXT:    --> (zext i8 ({-9,+,1}<nsw><%loop> + ({%start,+,1}<nuw><%loop> umax %x)) to i16) U: [0,256) S: [0,256) Exits: ((zext i8 (9 + %start)<u nuw> to i16) umax (zext i8 %x to i16)) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nuw i8 %iv, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%loop> U: full-set S: full-set Exits: (10 + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %j.next = add i8 %j, 1
+; CHECK-NEXT:    --> {-8,+,1}<nsw><%loop> U: [-8,2) S: [-8,2) Exits: 1 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @zext_umax_exit_value
+; CHECK-NEXT:  Loop %loop: backedge-taken count is i8 9
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 9
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i8 9
+; CHECK-NEXT:  Loop %loop: Trip multiple is 10
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i8 [ %start, %entry ], [ %iv.next, %loop ]
+  %j = phi i8 [ -9, %entry ], [ %j.next, %loop ]
+  %umax = call i8 @llvm.umax.i8(i8 %iv, i8 %x)
+  %add = add i8 %umax, %j
+  %zext = zext i8 %add to i16
+  %iv.next = add nuw i8 %iv, 1
+  %j.next = add i8 %j, 1
+  %c = icmp eq i8 %j, 0
+  br i1 %c, label %exit, label %loop
+
+exit:
   ret void
 }
 
