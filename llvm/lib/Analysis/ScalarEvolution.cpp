@@ -3338,6 +3338,9 @@ const SCEV *ScalarEvolution::getURemExpr(SCEVUse LHS, SCEVUse RHS) {
          getEffectiveSCEVType(RHS->getType()) &&
          "SCEVURemExpr operand types don't match!");
 
+  // Use flags may not hold where the remainder executes, so drop them.
+  RHS = RHS.getCanonical();
+
   // Short-circuit easy cases
   if (const SCEVConstant *RHSC = dyn_cast<SCEVConstant>(RHS)) {
     // If constant is one, the result is trivial

@@ -110,16 +110,19 @@ exit:
 }
 
 ; Same as above, but the exit count of %outer.latch uses the remainder.
-; FIXME: The divisor is expanded as add nuw in %entry, where it may be poison.
 define i8 @exit_count_urem_by_umax_of_exit_value_add_nuw(i8 noundef %x, i8 noundef %y, i8 noundef %n, i8 noundef %m) {
 ; CHECK-LABEL: define i8 @exit_count_urem_by_umax_of_exit_value_add_nuw(
 ; CHECK-SAME: i8 noundef [[X:%.*]], i8 noundef [[Y:%.*]], i8 noundef [[N:%.*]], i8 noundef [[M:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[UMIN:%.*]] = call i8 @llvm.umin.i8(i8 [[X]], i8 10)
-; CHECK-NEXT:    [[TMP0:%.*]] = add nuw i8 [[Y]], [[UMIN]]
-; CHECK-NEXT:    [[UMAX:%.*]] = call i8 @llvm.umax.i8(i8 [[TMP0]], i8 1)
-; CHECK-NEXT:    [[TMP1:%.*]] = urem i8 [[M]], [[UMAX]]
-; CHECK-NEXT:    [[TMP2:%.*]] = freeze i8 [[TMP1]]
+; CHECK-NEXT:    [[TMP5:%.*]] = add nuw i8 [[Y]], [[UMIN]]
+; CHECK-NEXT:    [[UMAX1:%.*]] = call i8 @llvm.umax.i8(i8 [[TMP5]], i8 1)
+; CHECK-NEXT:    [[TMP1:%.*]] = add i8 [[Y]], [[UMIN]]
+; CHECK-NEXT:    [[UMAX2:%.*]] = call i8 @llvm.umax.i8(i8 [[TMP1]], i8 1)
+; CHECK-NEXT:    [[TMP6:%.*]] = udiv i8 [[M]], [[UMAX2]]
+; CHECK-NEXT:    [[TMP7:%.*]] = mul i8 [[UMAX1]], [[TMP6]]
+; CHECK-NEXT:    [[TMP8:%.*]] = sub i8 [[M]], [[TMP7]]
+; CHECK-NEXT:    [[TMP2:%.*]] = freeze i8 [[TMP8]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = add i8 [[TMP2]], -1
 ; CHECK-NEXT:    [[XTRAITER:%.*]] = and i8 [[TMP2]], 1
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp ult i8 [[TMP3]], 1
@@ -179,13 +182,13 @@ define i8 @exit_count_urem_by_umax_of_exit_value_add_nuw(i8 noundef %x, i8 nound
 ; CHECK-NEXT:    [[OUTER_IV_NEXT_EPIL:%.*]] = add nuw i8 [[OUTER_IV_EPIL_INIT]], 1
 ; CHECK-NEXT:    br label %[[EXIT_EPILOG_LCSSA]]
 ; CHECK:       [[EXIT_EPILOG_LCSSA_LOOPEXIT]]:
-; CHECK-NEXT:    [[RES_PH1_PH:%.*]] = phi i8 [ [[OUTER_IV]], %[[OUTER_HEADER]] ], [ [[OUTER_IV_NEXT]], %[[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[RES_PH2_PH:%.*]] = phi i8 [ [[OUTER_IV]], %[[OUTER_HEADER]] ], [ [[OUTER_IV_NEXT]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    br label %[[EXIT_EPILOG_LCSSA]]
 ; CHECK:       [[EXIT_EPILOG_LCSSA]]:
-; CHECK-NEXT:    [[RES_PH1:%.*]] = phi i8 [ [[OUTER_IV_NEXT_EPIL]], %[[OUTER_LATCH_EPIL]] ], [ [[OUTER_IV_EPIL_INIT]], %[[OUTER_HEADER_EPIL]] ], [ [[RES_PH1_PH]], %[[EXIT_EPILOG_LCSSA_LOOPEXIT]] ]
+; CHECK-NEXT:    [[RES_PH2:%.*]] = phi i8 [ [[OUTER_IV_NEXT_EPIL]], %[[OUTER_LATCH_EPIL]] ], [ [[OUTER_IV_EPIL_INIT]], %[[OUTER_HEADER_EPIL]] ], [ [[RES_PH2_PH]], %[[EXIT_EPILOG_LCSSA_LOOPEXIT]] ]
 ; CHECK-NEXT:    br label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[RES:%.*]] = phi i8 [ [[RES_PH]], %[[EXIT_UNR_LCSSA]] ], [ [[RES_PH1]], %[[EXIT_EPILOG_LCSSA]] ]
+; CHECK-NEXT:    [[RES:%.*]] = phi i8 [ [[RES_PH]], %[[EXIT_UNR_LCSSA]] ], [ [[RES_PH2]], %[[EXIT_EPILOG_LCSSA]] ]
 ; CHECK-NEXT:    ret i8 [[RES]]
 ;
 entry:
