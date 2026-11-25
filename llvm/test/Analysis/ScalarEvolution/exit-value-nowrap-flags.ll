@@ -443,7 +443,6 @@ exit:
 
 ; The flags of %mul evaluated at scope must not be used for %t, which is also
 ; executed if %inner is not.
-; FIXME: %t is nuw and %z is folded to a product of zexts.
 define i16 @mul_at_scope_flags_not_used_outside_loop(i8 noundef %x, i8 noundef %y, i8 noundef %n) {
 ; CHECK-LABEL: 'mul_at_scope_flags_not_used_outside_loop'
 ; CHECK-NEXT:  Classifying expressions for: @mul_at_scope_flags_not_used_outside_loop
@@ -454,9 +453,9 @@ define i16 @mul_at_scope_flags_not_used_outside_loop(i8 noundef %x, i8 noundef %
 ; CHECK-NEXT:    %umin = call i8 @llvm.umin.i8(i8 %inner.iv, i8 %x)
 ; CHECK-NEXT:    --> ({1,+,1}<nuw><nsw><%inner> umin %x) U: [0,11) S: [0,11) Exits: (10 umin %x) LoopDispositions: { %inner: Computable, %outer.header: Uniform }
 ; CHECK-NEXT:    %mul = mul nuw i8 %umin, %y
-; CHECK-NEXT:    --> (({1,+,1}<nuw><nsw><%inner> umin %x) * %y)<nuw> U: full-set S: full-set Exits: ((10 umin %x) * %y)<nuw> LoopDispositions: { %inner: Computable, %outer.header: Uniform }
+; CHECK-NEXT:    --> (({1,+,1}<nuw><nsw><%inner> umin %x) * %y)<nuw> U: full-set S: full-set Exits: ((10 umin %x) * %y) LoopDispositions: { %inner: Computable, %outer.header: Uniform }
 ; CHECK-NEXT:    %div = udiv i8 1, %mul
-; CHECK-NEXT:    --> (1 /u (({1,+,1}<nuw><nsw><%inner> umin %x) * %y)<nuw>) U: [0,2) S: [0,2) Exits: (1 /u ((10 umin %x) * %y)<nuw>) LoopDispositions: { %inner: Computable, %outer.header: Uniform }
+; CHECK-NEXT:    --> (1 /u (({1,+,1}<nuw><nsw><%inner> umin %x) * %y)<nuw>) U: [0,2) S: [0,2) Exits: (1 /u ((10 umin %x) * %y)) LoopDispositions: { %inner: Computable, %outer.header: Uniform }
 ; CHECK-NEXT:    %inner.iv.next = add i8 %inner.iv, 1
 ; CHECK-NEXT:    --> {2,+,1}<nuw><nsw><%inner> U: [2,12) S: [2,12) Exits: 11 LoopDispositions: { %inner: Computable, %outer.header: Uniform }
 ; CHECK-NEXT:    %outer.iv.next = add i8 %outer.iv, 1
@@ -464,9 +463,9 @@ define i16 @mul_at_scope_flags_not_used_outside_loop(i8 noundef %x, i8 noundef %
 ; CHECK-NEXT:    %umin.exit = call i8 @llvm.umin.i8(i8 10, i8 %x)
 ; CHECK-NEXT:    --> (10 umin %x) U: [0,11) S: [0,11)
 ; CHECK-NEXT:    %t = mul i8 %umin.exit, %y
-; CHECK-NEXT:    --> ((10 umin %x) * %y)<nuw> U: full-set S: full-set
+; CHECK-NEXT:    --> ((10 umin %x) * %y) U: full-set S: full-set
 ; CHECK-NEXT:    %z = zext i8 %t to i16
-; CHECK-NEXT:    --> ((zext i8 %y to i16) * (10 umin (zext i8 %x to i16)))<nuw> U: [0,2551) S: [0,2551)
+; CHECK-NEXT:    --> (zext i8 ((10 umin %x) * %y) to i16) U: [0,256) S: [0,256)
 ; CHECK-NEXT:  Determining loop execution counts for: @mul_at_scope_flags_not_used_outside_loop
 ; CHECK-NEXT:  Loop %inner: backedge-taken count is i8 9
 ; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i8 9
@@ -507,7 +506,6 @@ exit:
 
 ; The flags of %add evaluated at scope must not be used for %t, which is also
 ; executed if %inner is not.
-; FIXME: %t is nuw.
 define i8 @add_at_scope_flags_not_used_outside_loop(i8 noundef %x, i8 noundef %y, i8 noundef %n) {
 ; CHECK-LABEL: 'add_at_scope_flags_not_used_outside_loop'
 ; CHECK-NEXT:  Classifying expressions for: @add_at_scope_flags_not_used_outside_loop
@@ -518,9 +516,9 @@ define i8 @add_at_scope_flags_not_used_outside_loop(i8 noundef %x, i8 noundef %y
 ; CHECK-NEXT:    %umin = call i8 @llvm.umin.i8(i8 %inner.iv, i8 %x)
 ; CHECK-NEXT:    --> ({1,+,1}<nuw><nsw><%inner> umin %x) U: [0,11) S: [0,11) Exits: (10 umin %x) LoopDispositions: { %inner: Computable, %outer.header: Uniform }
 ; CHECK-NEXT:    %add = add nuw i8 %umin, %y
-; CHECK-NEXT:    --> (({1,+,1}<nuw><nsw><%inner> umin %x) + %y)<nuw> U: full-set S: full-set Exits: ((10 umin %x) + %y)<nuw> LoopDispositions: { %inner: Computable, %outer.header: Uniform }
+; CHECK-NEXT:    --> (({1,+,1}<nuw><nsw><%inner> umin %x) + %y)<nuw> U: full-set S: full-set Exits: ((10 umin %x) + %y)<u nuw> LoopDispositions: { %inner: Computable, %outer.header: Uniform }
 ; CHECK-NEXT:    %div = udiv i8 1, %add
-; CHECK-NEXT:    --> (1 /u (({1,+,1}<nuw><nsw><%inner> umin %x) + %y)<nuw>) U: [0,2) S: [0,2) Exits: (1 /u ((10 umin %x) + %y)<nuw>) LoopDispositions: { %inner: Computable, %outer.header: Uniform }
+; CHECK-NEXT:    --> (1 /u (({1,+,1}<nuw><nsw><%inner> umin %x) + %y)<nuw>) U: [0,2) S: [0,2) Exits: (1 /u ((10 umin %x) + %y)<u nuw>) LoopDispositions: { %inner: Computable, %outer.header: Uniform }
 ; CHECK-NEXT:    %inner.iv.next = add i8 %inner.iv, 1
 ; CHECK-NEXT:    --> {2,+,1}<nuw><nsw><%inner> U: [2,12) S: [2,12) Exits: 11 LoopDispositions: { %inner: Computable, %outer.header: Uniform }
 ; CHECK-NEXT:    %outer.iv.next = add i8 %outer.iv, 1
@@ -528,7 +526,7 @@ define i8 @add_at_scope_flags_not_used_outside_loop(i8 noundef %x, i8 noundef %y
 ; CHECK-NEXT:    %umin.exit = call i8 @llvm.umin.i8(i8 10, i8 %x)
 ; CHECK-NEXT:    --> (10 umin %x) U: [0,11) S: [0,11)
 ; CHECK-NEXT:    %t = add i8 %umin.exit, %y
-; CHECK-NEXT:    --> ((10 umin %x) + %y)<nuw> U: full-set S: full-set
+; CHECK-NEXT:    --> ((10 umin %x) + %y) U: full-set S: full-set
 ; CHECK-NEXT:  Determining loop execution counts for: @add_at_scope_flags_not_used_outside_loop
 ; CHECK-NEXT:  Loop %inner: backedge-taken count is i8 9
 ; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i8 9
@@ -568,7 +566,6 @@ exit:
 
 ; The nsw flag of %mul evaluated at scope must not be used for %t, which is
 ; also executed if %inner is not.
-; FIXME: %t is nsw.
 define i8 @mul_nsw_at_scope_flags_not_used_outside_loop(i8 noundef %x, i8 noundef %y, i8 noundef %n) {
 ; CHECK-LABEL: 'mul_nsw_at_scope_flags_not_used_outside_loop'
 ; CHECK-NEXT:  Classifying expressions for: @mul_nsw_at_scope_flags_not_used_outside_loop
@@ -579,7 +576,7 @@ define i8 @mul_nsw_at_scope_flags_not_used_outside_loop(i8 noundef %x, i8 nounde
 ; CHECK-NEXT:    %smin = call i8 @llvm.smin.i8(i8 %inner.iv, i8 %x)
 ; CHECK-NEXT:    --> ({1,+,1}<nuw><nsw><%inner> smin %x) U: [-128,11) S: [-128,11) Exits: (10 smin %x) LoopDispositions: { %inner: Computable, %outer.header: Uniform }
 ; CHECK-NEXT:    %mul = mul nsw i8 %smin, %y
-; CHECK-NEXT:    --> (({1,+,1}<nuw><nsw><%inner> smin %x) * %y)<nsw> U: full-set S: full-set Exits: ((10 smin %x) * %y)<nsw> LoopDispositions: { %inner: Computable, %outer.header: Uniform }
+; CHECK-NEXT:    --> (({1,+,1}<nuw><nsw><%inner> smin %x) * %y)<nsw> U: full-set S: full-set Exits: ((10 smin %x) * %y) LoopDispositions: { %inner: Computable, %outer.header: Uniform }
 ; CHECK-NEXT:    %div = sdiv i8 1, %mul
 ; CHECK-NEXT:    --> %div U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %inner: Variant, %outer.header: Variant }
 ; CHECK-NEXT:    %inner.iv.next = add i8 %inner.iv, 1
@@ -589,7 +586,7 @@ define i8 @mul_nsw_at_scope_flags_not_used_outside_loop(i8 noundef %x, i8 nounde
 ; CHECK-NEXT:    %smin.exit = call i8 @llvm.smin.i8(i8 10, i8 %x)
 ; CHECK-NEXT:    --> (10 smin %x) U: [-128,11) S: [-128,11)
 ; CHECK-NEXT:    %t = mul i8 %smin.exit, %y
-; CHECK-NEXT:    --> ((10 smin %x) * %y)<nsw> U: full-set S: full-set
+; CHECK-NEXT:    --> ((10 smin %x) * %y) U: full-set S: full-set
 ; CHECK-NEXT:  Determining loop execution counts for: @mul_nsw_at_scope_flags_not_used_outside_loop
 ; CHECK-NEXT:  Loop %inner: backedge-taken count is i8 9
 ; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i8 9
@@ -628,7 +625,6 @@ exit:
 }
 
 ; The sum of %add evaluated at scope is flattened.
-; FIXME: %t is nuw.
 define i16 @add_at_scope_flattened(i8 noundef %start, i16 noundef %x, i8 noundef %n) {
 ; CHECK-LABEL: 'add_at_scope_flattened'
 ; CHECK-NEXT:  Classifying expressions for: @add_at_scope_flattened
@@ -643,9 +639,9 @@ define i16 @add_at_scope_flattened(i8 noundef %start, i16 noundef %x, i8 noundef
 ; CHECK-NEXT:    %umin = call i16 @llvm.umin.i16(i16 %inner.iv.2, i16 %x)
 ; CHECK-NEXT:    --> ({-36,+,1}<nuw><nsw><%inner> umin %x) U: [0,-26) S: [0,-26) Exits: (-27 umin %x) LoopDispositions: { %inner: Computable, %outer.header: Uniform }
 ; CHECK-NEXT:    %add = add nuw i16 %umin, %inner.iv.ext
-; CHECK-NEXT:    --> ({(zext i8 %start to i16),+,1}<nuw><nsw><%inner> + ({-36,+,1}<nuw><nsw><%inner> umin %x))<nuw> U: full-set S: full-set Exits: (9 + (zext i8 %start to i16) + (-27 umin %x))<nuw> LoopDispositions: { %inner: Computable, %outer.header: Uniform }
+; CHECK-NEXT:    --> ({(zext i8 %start to i16),+,1}<nuw><nsw><%inner> + ({-36,+,1}<nuw><nsw><%inner> umin %x))<nuw> U: full-set S: full-set Exits: (9 + (zext i8 %start to i16) + (-27 umin %x)) LoopDispositions: { %inner: Computable, %outer.header: Uniform }
 ; CHECK-NEXT:    %div = udiv i16 1, %add
-; CHECK-NEXT:    --> (1 /u ({(zext i8 %start to i16),+,1}<nuw><nsw><%inner> + ({-36,+,1}<nuw><nsw><%inner> umin %x))<nuw>) U: [0,2) S: [0,2) Exits: (1 /u (9 + (zext i8 %start to i16) + (-27 umin %x))<nuw>) LoopDispositions: { %inner: Computable, %outer.header: Uniform }
+; CHECK-NEXT:    --> (1 /u ({(zext i8 %start to i16),+,1}<nuw><nsw><%inner> + ({-36,+,1}<nuw><nsw><%inner> umin %x))<nuw>) U: [0,2) S: [0,2) Exits: (1 /u (9 + (zext i8 %start to i16) + (-27 umin %x))) LoopDispositions: { %inner: Computable, %outer.header: Uniform }
 ; CHECK-NEXT:    %inner.iv.next = add nuw i8 %inner.iv, 1
 ; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%inner> U: full-set S: full-set Exits: (10 + %start) LoopDispositions: { %inner: Computable, %outer.header: Uniform }
 ; CHECK-NEXT:    %inner.iv.2.next = add i16 %inner.iv.2, 1
@@ -659,7 +655,7 @@ define i16 @add_at_scope_flattened(i8 noundef %start, i16 noundef %x, i8 noundef
 ; CHECK-NEXT:    %umin.exit = call i16 @llvm.umin.i16(i16 -27, i16 %x)
 ; CHECK-NEXT:    --> (-27 umin %x) U: [0,-26) S: [0,-26)
 ; CHECK-NEXT:    %t = add i16 %start.ext.9, %umin.exit
-; CHECK-NEXT:    --> (9 + (zext i8 %start to i16) + (-27 umin %x))<nuw> U: [9,0) S: [9,0)
+; CHECK-NEXT:    --> (9 + (zext i8 %start to i16) + (-27 umin %x)) U: full-set S: full-set
 ; CHECK-NEXT:  Determining loop execution counts for: @add_at_scope_flattened
 ; CHECK-NEXT:  Loop %inner: backedge-taken count is i16 9
 ; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i16 9

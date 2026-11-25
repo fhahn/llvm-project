@@ -3,13 +3,12 @@
 
 ; The flags of %mul evaluated at scope must not be used for %t, which is also
 ; executed if %inner is not.
-; FIXME: %cmp is wrongly folded to true.
 define i1 @mul_at_scope_flags_not_used_outside_loop(i8 noundef %x, i8 noundef %y, i8 noundef %n, ptr %p) {
 ; CHECK-LABEL: define i1 @mul_at_scope_flags_not_used_outside_loop(
 ; CHECK-SAME: i8 noundef [[X:%.*]], i8 noundef [[Y:%.*]], i8 noundef [[N:%.*]], ptr [[P:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[UMIN1:%.*]] = call i8 @llvm.umin.i8(i8 [[X]], i8 10)
-; CHECK-NEXT:    [[TMP0:%.*]] = mul nuw i8 [[Y]], [[UMIN1]]
+; CHECK-NEXT:    [[TMP0:%.*]] = mul i8 [[Y]], [[UMIN1]]
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
 ; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
@@ -31,12 +30,18 @@ define i1 @mul_at_scope_flags_not_used_outside_loop(i8 noundef %x, i8 noundef %y
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i16 [ 0, %[[EXIT]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i16 [[IV]], 1
-; CHECK-NEXT:    [[EC:%.*]] = icmp eq i16 [[IV_NEXT]], 4
-; CHECK-NEXT:    br i1 [[EC]], label %[[RET:.*]], label %[[LOOP]]
+; CHECK-NEXT:    br i1 true, label %[[RET:.*]], label %[[LOOP]]
 ; CHECK:       [[RET]]:
-; CHECK-NEXT:    [[CMP_LCSSA:%.*]] = phi i1 [ true, %[[LOOP]] ]
+; CHECK-NEXT:    [[UMIN_EXIT:%.*]] = call i8 @llvm.umin.i8(i8 10, i8 [[X]])
+; CHECK-NEXT:    [[T:%.*]] = mul i8 [[UMIN_EXIT]], [[Y]]
+; CHECK-NEXT:    [[Z:%.*]] = zext i8 [[T]] to i16
+; CHECK-NEXT:    [[X_EXT:%.*]] = zext i8 [[X]] to i16
+; CHECK-NEXT:    [[Y_EXT:%.*]] = zext i8 [[Y]] to i16
+; CHECK-NEXT:    [[UMIN_WIDE:%.*]] = call i16 @llvm.umin.i16(i16 10, i16 [[X_EXT]])
+; CHECK-NEXT:    [[W:%.*]] = mul i16 [[UMIN_WIDE]], [[Y_EXT]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add nuw nsw i16 [[Z]], 3
+; CHECK-NEXT:    [[TMP2:%.*]] = add nuw nsw i16 [[W]], 3
+; CHECK-NEXT:    [[CMP_LCSSA:%.*]] = icmp eq i16 [[TMP1]], [[TMP2]]
 ; CHECK-NEXT:    ret i1 [[CMP_LCSSA]]
 ;
 entry:
@@ -88,7 +93,6 @@ ret:
 
 ; The flags of %add evaluated at scope must not be used for %t, which is also
 ; executed if %inner is not.
-; FIXME: %cmp is wrongly folded to true.
 define i1 @add_at_scope_flags_not_used_outside_loop(i8 noundef %x, i8 noundef %y, i8 noundef %n, ptr %p) {
 ; CHECK-LABEL: define i1 @add_at_scope_flags_not_used_outside_loop(
 ; CHECK-SAME: i8 noundef [[X:%.*]], i8 noundef [[Y:%.*]], i8 noundef [[N:%.*]], ptr [[P:%.*]]) {
@@ -116,12 +120,18 @@ define i1 @add_at_scope_flags_not_used_outside_loop(i8 noundef %x, i8 noundef %y
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i16 [ 0, %[[EXIT]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i16 [[IV]], 1
-; CHECK-NEXT:    [[EC:%.*]] = icmp eq i16 [[IV_NEXT]], 4
-; CHECK-NEXT:    br i1 [[EC]], label %[[RET:.*]], label %[[LOOP]]
+; CHECK-NEXT:    br i1 true, label %[[RET:.*]], label %[[LOOP]]
 ; CHECK:       [[RET]]:
-; CHECK-NEXT:    [[CMP_LCSSA:%.*]] = phi i1 [ true, %[[LOOP]] ]
+; CHECK-NEXT:    [[UMIN_EXIT:%.*]] = call i8 @llvm.umin.i8(i8 10, i8 [[X]])
+; CHECK-NEXT:    [[T:%.*]] = add i8 [[UMIN_EXIT]], [[Y]]
+; CHECK-NEXT:    [[Z:%.*]] = zext i8 [[T]] to i16
+; CHECK-NEXT:    [[X_EXT:%.*]] = zext i8 [[X]] to i16
+; CHECK-NEXT:    [[Y_EXT:%.*]] = zext i8 [[Y]] to i16
+; CHECK-NEXT:    [[UMIN_WIDE:%.*]] = call i16 @llvm.umin.i16(i16 10, i16 [[X_EXT]])
+; CHECK-NEXT:    [[W:%.*]] = add i16 [[UMIN_WIDE]], [[Y_EXT]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add nuw nsw i16 [[Z]], 3
+; CHECK-NEXT:    [[TMP2:%.*]] = add i16 [[W]], 3
+; CHECK-NEXT:    [[CMP_LCSSA:%.*]] = icmp eq i16 [[TMP1]], [[TMP2]]
 ; CHECK-NEXT:    ret i1 [[CMP_LCSSA]]
 ;
 entry:
@@ -174,7 +184,6 @@ ret:
 ; The offset of %gep is a sum of more than 2 operands, whose nsw only holds
 ; for the order of the GEP indices. Its exit value folds the constant operands
 ; and must not be nsw.
-; FIXME: The exit value of %off is expanded with nsw.
 define i64 @gep_offset_at_scope_nsw_of_more_than_2_operands(ptr %p, i64 %y) {
 ; CHECK-LABEL: define i64 @gep_offset_at_scope_nsw_of_more_than_2_operands(
 ; CHECK-SAME: ptr [[P:%.*]], i64 [[Y:%.*]]) {
@@ -188,7 +197,7 @@ define i64 @gep_offset_at_scope_nsw_of_more_than_2_operands(ptr %p, i64 %y) {
 ; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = shl nsw i64 [[Y]], 1
-; CHECK-NEXT:    [[TMP1:%.*]] = add nsw i64 [[TMP0]], -9223372036854775802
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], -9223372036854775802
 ; CHECK-NEXT:    ret i64 [[TMP1]]
 ;
 entry:

@@ -10074,8 +10074,8 @@ static Constant *BuildConstantFromSCEV(const SCEV *V) {
   llvm_unreachable("Unknown SCEV kind!");
 }
 
-const SCEV *ScalarEvolution::getWithOperands(const SCEV *S,
-                                             SmallVectorImpl<SCEVUse> &NewOps) {
+SCEVUse ScalarEvolution::getWithOperands(const SCEV *S,
+                                         SmallVectorImpl<SCEVUse> &NewOps) {
   switch (S->getSCEVType()) {
   case scTruncate:
   case scZeroExtend:
@@ -10086,10 +10086,19 @@ const SCEV *ScalarEvolution::getWithOperands(const SCEV *S,
     auto *AddRec = cast<SCEVAddRecExpr>(S);
     return getAddRecExpr(NewOps, AddRec->getLoop(), AddRec->getNoWrapFlags());
   }
-  case scAddExpr:
-    return getAddExpr(NewOps, cast<SCEVAddExpr>(S)->getNoWrapFlags());
+  case scAddExpr: {
+    // The nsw of more than 2 operands may only hold for their original order,
+    // which is not kept when sorting and folding the new operands.
+    SCEVFlags Mask = SCEV::FlagNUW;
+    if (NewOps.size() == 2)
+      Mask |= SCEV::FlagNSW;
+    return getAddExpr(NewOps, {SCEV::FlagNone,
+                               cast<SCEVAddExpr>(S)->getNoWrapFlags(Mask)});
+  }
   case scMulExpr:
-    return getMulExpr(NewOps, cast<SCEVMulExpr>(S)->getNoWrapFlags());
+    // Use flags of products are not used to fold or for ranges, but would be
+    // emitted by SCEVExpander, also where they may not hold.
+    return getMulExpr(NewOps);
   case scUDivExpr:
     return getUDivExpr(NewOps[0], NewOps[1]);
   case scUMaxExpr:

@@ -2617,8 +2617,9 @@ private:
                           Function &F);
 
   /// Return the given SCEV expression with a new set of operands.
-  /// This preserves the origial nowrap flags.
-  const SCEV *getWithOperands(const SCEV *S, SmallVectorImpl<SCEVUse> &NewOps);
+  /// The nuw and nsw flags of sums are returned as use flags, as they may only
+  /// hold where \p NewOps are evaluated. Products get no flags.
+  SCEVUse getWithOperands(const SCEV *S, SmallVectorImpl<SCEVUse> &NewOps);
 
   FoldingSet<SCEV> UniqueSCEVs;
   FoldingSet<SCEVPredicate> UniquePreds;
