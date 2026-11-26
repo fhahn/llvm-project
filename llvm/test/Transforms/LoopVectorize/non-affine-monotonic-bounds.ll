@@ -400,3 +400,42 @@ loop:
 exit:
   ret void
 }
+
+; Loop with access pattern %k + %iv/64.
+define void @udiv_plus_invariant(ptr %a, ptr %b, i64 %N, i64 %k) {
+; CHECK-LABEL: define void @udiv_plus_invariant(
+; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]], i64 [[K:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[GEP_A_K:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 [[K]]
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[DIV:%.*]] = lshr i64 [[IV]], 6
+; CHECK-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds nuw i8, ptr [[GEP_A_K]], i64 [[DIV]]
+; CHECK-NEXT:    [[L_A:%.*]] = load i8, ptr [[GEP_A]], align 1
+; CHECK-NEXT:    [[GEP_B:%.*]] = getelementptr inbounds nuw i8, ptr [[B]], i64 [[IV]]
+; CHECK-NEXT:    store i8 [[L_A]], ptr [[GEP_B]], align 1
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %gep.a.k = getelementptr inbounds nuw i8, ptr %a, i64 %k
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %div = lshr i64 %iv, 6
+  %gep.a = getelementptr inbounds nuw i8, ptr %gep.a.k, i64 %div
+  %l.a = load i8, ptr %gep.a, align 1
+  %gep.b = getelementptr inbounds nuw i8, ptr %b, i64 %iv
+  store i8 %l.a, ptr %gep.b, align 1
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %N
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}

@@ -1510,3 +1510,180 @@ latch:
 exit:
   ret void
 }
+
+; The pointer add (%iv /u 64) + %k + %a has NUW and is non-decreasing, but
+; subtracting %a rebuilds the offset without flags.
+define void @udiv_plus_invariant(ptr %a, ptr %b, i64 %N, i64 %k) {
+; CHECK-LABEL: 'udiv_plus_invariant'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %gep.a.k = getelementptr inbounds nuw i8, ptr %a, i64 %k
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %div = lshr i64 %iv, 6
+  %gep.a = getelementptr inbounds nuw i8, ptr %gep.a.k, i64 %div
+  %l.a = load i8, ptr %gep.a, align 1
+  %gep.b = getelementptr inbounds nuw i8, ptr %b, i64 %iv
+  store i8 %l.a, ptr %gep.b, align 1
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %N
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The offset (%iv /u 3) + (%iv /u 64) has two loop-variant terms.
+define void @two_udivs(ptr %a, ptr %b, i64 %N) {
+; CHECK-LABEL: 'two_udivs'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %div.64 = lshr i64 %iv, 6
+  %div.3 = udiv i64 %iv, 3
+  %gep.a.64 = getelementptr inbounds nuw i8, ptr %a, i64 %div.64
+  %gep.a = getelementptr inbounds nuw i8, ptr %gep.a.64, i64 %div.3
+  %l.a = load i8, ptr %gep.a, align 1
+  %gep.b = getelementptr inbounds nuw i8, ptr %b, i64 %iv
+  store i8 %l.a, ptr %gep.b, align 1
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %N
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; %iv xor 5 is not monotonic.
+define void @xor_plus_invariant(ptr %a, ptr %b, i64 %N, i64 %k) {
+; CHECK-LABEL: 'xor_plus_invariant'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %gep.a.k = getelementptr inbounds nuw i8, ptr %a, i64 %k
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %xor = xor i64 %iv, 5
+  %gep.a = getelementptr inbounds nuw i8, ptr %gep.a.k, i64 %xor
+  %l.a = load i8, ptr %gep.a, align 1
+  %gep.b = getelementptr inbounds nuw i8, ptr %b, i64 %iv
+  store i8 %l.a, ptr %gep.b, align 1
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %N
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; %M - %iv decreases.
+define void @decreasing_udiv_plus_invariant(ptr %a, ptr %b, i64 %N, i64 %M, i64 %k) {
+; CHECK-LABEL: 'decreasing_udiv_plus_invariant'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %gep.a.k = getelementptr inbounds nuw i8, ptr %a, i64 %k
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %sub = sub i64 %M, %iv
+  %div = lshr i64 %sub, 6
+  %gep.a = getelementptr inbounds nuw i8, ptr %gep.a.k, i64 %div
+  %l.a = load i8, ptr %gep.a, align 1
+  %gep.b = getelementptr inbounds nuw i8, ptr %b, i64 %iv
+  store i8 %l.a, ptr %gep.b, align 1
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %N
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The access is conditional, so the pointer add has no NUW.
+define void @cond_udiv_plus_invariant(ptr %a, ptr %b, ptr %c, i64 %N, i64 %k) {
+; CHECK-LABEL: 'cond_udiv_plus_invariant'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %gep.a.k = getelementptr inbounds nuw i8, ptr %a, i64 %k
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  %gep.c = getelementptr inbounds nuw i8, ptr %c, i64 %iv
+  %l.c = load i8, ptr %gep.c, align 1
+  %cmp = icmp eq i8 %l.c, 0
+  br i1 %cmp, label %then, label %latch
+
+then:
+  %div = lshr i64 %iv, 6
+  %gep.a = getelementptr inbounds nuw i8, ptr %gep.a.k, i64 %div
+  %l.a = load i8, ptr %gep.a, align 1
+  %gep.b = getelementptr inbounds nuw i8, ptr %b, i64 %iv
+  store i8 %l.a, ptr %gep.b, align 1
+  br label %latch
+
+latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %N
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
