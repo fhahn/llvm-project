@@ -350,11 +350,13 @@ getUnsignedRangeBounds(const Loop *Lp, const SCEV *Base, const SCEV *Offset,
           SE->getAddExpr(Base, End)};
 }
 
-/// Try to bound a loop-variant pointer that is not an affine AddRec.
+/// Try to bound a loop-variant pointer Base + Offset that is not an affine
+/// AddRec. The caller must ensure that it does not unsigned wrap for any
+/// accessed Offset (see isNonAffinePtrNoWrap).
 ///
-/// If the offset is provably monotonically non-decreasing the accessed range is
-/// bounded by the offset's value at the first iteration (via
-/// SplitIntoInitAndPostInc) and last iteration (via getSCEVAtScope). The
+/// If the add has NUW and the offset is provably monotonically non-decreasing
+/// the accessed range is bounded by the offset's value at the first iteration
+/// (via SplitIntoInitAndPostInc) and last iteration (via getSCEVAtScope). The
 /// returned range is half-open: \p EltSizeSCEV is added to the address of the
 /// last accessed element to form the end. Otherwise, or if those values are not
 /// loop-invariant, the offset's unsigned range is used.
@@ -364,7 +366,7 @@ static std::pair<const SCEV *, const SCEV *>
 getNonAffineBounds(const Loop *Lp, const SCEV *PtrExpr, const SCEV *EltSizeSCEV,
                    ScalarEvolution *SE) {
   const auto *PtrAdd = dyn_cast<SCEVAddExpr>(PtrExpr);
-  if (!PtrAdd || !PtrAdd->hasNoUnsignedWrap())
+  if (!PtrAdd)
     return {nullptr, nullptr};
 
   const SCEV *Base = *find_if(PtrAdd->operands(), [](const auto &Op) {
@@ -376,7 +378,12 @@ getNonAffineBounds(const Loop *Lp, const SCEV *PtrExpr, const SCEV *EltSizeSCEV,
   const SCEV *Offset = SE->getMinusSCEV(PtrExpr, Base);
   if (isa<SCEVCouldNotCompute>(Offset))
     return {nullptr, nullptr};
-  if (!isKnownNonDecreasingInLoop(Offset, Lp, *SE))
+  // The first/last-iteration bounds, e.g. %iv /u %d, are expanded before the
+  // loop, so they need the access to execute in every iteration. Require NUW on
+  // the add: SCEV only applies a GEP's nuw in that case (see
+  // isSCEVExprNeverPoison), unlike a nuw GEP chain.
+  if (!PtrAdd->hasNoUnsignedWrap() ||
+      !isKnownNonDecreasingInLoop(Offset, Lp, *SE))
     return getUnsignedRangeBounds(Lp, Base, Offset, EltSizeSCEV, SE);
 
   const SCEV *OffStart = SE->SplitIntoInitAndPostInc(Lp, Offset).first;
@@ -387,6 +394,28 @@ getNonAffineBounds(const Loop *Lp, const SCEV *PtrExpr, const SCEV *EltSizeSCEV,
 
   return {SE->getAddExpr(Base, OffStart),
           SE->getAddExpr(Base, OffEnd, EltSizeSCEV)};
+}
+
+/// Return true if \p PtrExpr = Base + Offset, a runtime-check pointer for
+/// \p Ptr, does not unsigned wrap for any accessed Offset. This holds if the
+/// add has NUW or if \p Ptr is a chain of nuw GEPs from Base, which unlike
+/// NUW does not require the access to execute in every iteration.
+static bool isNonAffinePtrNoWrap(const SCEV *PtrExpr, Value *Ptr,
+                                 ScalarEvolution *SE) {
+  const auto *PtrAdd = dyn_cast<SCEVAddExpr>(PtrExpr);
+  if (!PtrAdd)
+    return false;
+  if (PtrAdd->hasNoUnsignedWrap())
+    return true;
+  while (auto *GEP = dyn_cast<GEPOperator>(Ptr)) {
+    if (!GEP->hasNoUnsignedWrap())
+      return false;
+    Ptr = GEP->getPointerOperand();
+    // Only Base is pointer-typed, so this checks for Base.
+    if (is_contained(PtrAdd->operands(), SE->getSCEV(Ptr)))
+      return true;
+  }
+  return false;
 }
 
 std::pair<const SCEV *, const SCEV *> llvm::getStartAndEndForAccess(
@@ -2172,7 +2201,8 @@ bool AccessAnalysis::createCheckForAccess(RuntimePointerChecking &RtCheck,
   }
 
   /// Check whether all pointers can participate in a runtime bounds check. They
-  /// must either be invariant or non-wrapping affine AddRecs.
+  /// must either be invariant, non-wrapping affine AddRecs or non-affine
+  /// pointers that do not unsigned wrap.
   SmallVector<const SCEVPredicate *> Predicates;
   for (auto &P : RTCheckPtrs) {
     // The bounds for loop-invariant pointer is trivial.
@@ -2186,7 +2216,7 @@ bool AccessAnalysis::createCheckForAccess(RuntimePointerChecking &RtCheck,
       // Check if bounds for non-affine expressions can be formed.
       const SCEV *EltSizeSCEV = SE->getStoreSizeOfExpr(
           DL.getIndexType(P.getPointer()->getType()), AccessTy);
-      if (!Assume ||
+      if (!Assume || !isNonAffinePtrNoWrap(P.getPointer(), Ptr, SE) ||
           !getNonAffineBounds(TheLoop, P.getPointer(), EltSizeSCEV, SE).first)
         return false;
       continue;
@@ -3019,9 +3049,17 @@ bool MemoryDepChecker::areAccessesCompletelyBeforeOrAfter(const SCEV *Src,
                                                           Type *SrcTy,
                                                           const SCEV *Sink,
                                                           Type *SinkTy) {
+  // Non-affine pointers can only be bounded if they do not unsigned wrap, which
+  // is only checked for runtime-check pointers (see isNonAffinePtrNoWrap).
+  ScalarEvolution &SE = *PSE.getSE();
+  auto IsInvariantOrAddRec = [&](const SCEV *S) {
+    return isa<SCEVAddRecExpr>(S) || SE.isLoopInvariant(S, InnermostLoop);
+  };
+  if (!IsInvariantOrAddRec(Src) || !IsInvariantOrAddRec(Sink))
+    return false;
+
   const SCEV *BTC = PSE.getBackedgeTakenCount();
   const SCEV *SymbolicMaxBTC = PSE.getSymbolicMaxBackedgeTakenCount();
-  ScalarEvolution &SE = *PSE.getSE();
   const auto &[SrcStart_, SrcEnd_] =
       getStartAndEndForAccess(InnermostLoop, Src, SrcTy, BTC, SymbolicMaxBTC,
                               &SE, &PointerBounds, DT, AC, LoopGuards);

@@ -1414,10 +1414,29 @@ exit:
 define void @conditional_nuw_gep_udiv_variable_divisor_const_tc(ptr %a, ptr %b, ptr %c, i64 %d) {
 ; CHECK-LABEL: 'conditional_nuw_gep_udiv_variable_divisor_const_tc'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: cannot identify array bounds
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.b = getelementptr inbounds nuw i8, ptr %b, i64 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.c = getelementptr inbounds nuw i8, ptr %c, i64 %iv
+; CHECK-NEXT:      Check 1:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.b = getelementptr inbounds nuw i8, ptr %b, i64 %iv
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.a = getelementptr nuw i8, ptr %a, i64 %div
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %b High: (64 + %b))
+; CHECK-NEXT:            Member: {%b,+,1}<nw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %c High: (64 + %c))
+; CHECK-NEXT:            Member: {%c,+,1}<nuw><%loop>
+; CHECK-NEXT:        Group GRP2:
+; CHECK-NEXT:          (Low: %a High: ((64 umin (-1 + (-1 * (ptrtoaddr ptr %a to i64)))) + %a))
+; CHECK-NEXT:            Member: (({0,+,1}<nuw><nsw><%loop> /u %d) + %a)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:

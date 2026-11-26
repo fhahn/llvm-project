@@ -101,13 +101,71 @@ define void @lut_struct_field(ptr %dst, ptr %src, ptr %s, i64 %n) {
 ; CHECK-LABEL: define void @lut_struct_field(
 ; CHECK-SAME: ptr [[DST:%.*]], ptr [[SRC:%.*]], ptr [[S:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[S8:%.*]] = ptrtoaddr ptr [[S]] to i64
 ; CHECK-NEXT:    [[LUT:%.*]] = getelementptr inbounds nuw i8, ptr [[S]], i64 3128
 ; CHECK-NEXT:    [[C:%.*]] = icmp sgt i64 [[N]], 0
 ; CHECK-NEXT:    br i1 [[C]], label %[[LOOP_PREHEADER:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[LOOP_PREHEADER]]:
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP0]]
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[N]]
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[S]], i64 3132
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 -1, [[S8]]
+; CHECK-NEXT:    [[TMP5:%.*]] = call i64 @llvm.umin.i64(i64 [[TMP4]], i64 6196)
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr [[S]], i64 [[TMP5]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[TMP2]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC]], [[TMP1]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[BOUND09:%.*]] = icmp ult ptr [[DST]], [[TMP6]]
+; CHECK-NEXT:    [[BOUND110:%.*]] = icmp ult ptr [[TMP3]], [[TMP1]]
+; CHECK-NEXT:    [[FOUND_CONFLICT11:%.*]] = and i1 [[BOUND09]], [[BOUND110]]
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT11]]
+; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP7:%.*]] = and i64 [[N]], 3
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP7]]
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds nuw i8, ptr [[SRC]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i8>, ptr [[TMP8]], align 1, !alias.scope [[META12:![0-9]+]]
+; CHECK-NEXT:    [[TMP9:%.*]] = zext <4 x i8> [[WIDE_LOAD]] to <4 x i64>
+; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <4 x i64> [[TMP9]], i64 0
+; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds nuw [3 x float], ptr [[LUT]], i64 [[TMP10]]
+; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <4 x i64> [[TMP9]], i64 1
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds nuw [3 x float], ptr [[LUT]], i64 [[TMP12]]
+; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <4 x i64> [[TMP9]], i64 2
+; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr inbounds nuw [3 x float], ptr [[LUT]], i64 [[TMP14]]
+; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <4 x i64> [[TMP9]], i64 3
+; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds nuw [3 x float], ptr [[LUT]], i64 [[TMP16]]
+; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP11]], i64 4
+; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP13]], i64 4
+; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP15]], i64 4
+; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP17]], i64 4
+; CHECK-NEXT:    [[TMP22:%.*]] = load float, ptr [[TMP18]], align 4, !alias.scope [[META15:![0-9]+]]
+; CHECK-NEXT:    [[TMP23:%.*]] = load float, ptr [[TMP19]], align 4, !alias.scope [[META15]]
+; CHECK-NEXT:    [[TMP24:%.*]] = load float, ptr [[TMP20]], align 4, !alias.scope [[META15]]
+; CHECK-NEXT:    [[TMP25:%.*]] = load float, ptr [[TMP21]], align 4, !alias.scope [[META15]]
+; CHECK-NEXT:    [[TMP26:%.*]] = insertelement <4 x float> poison, float [[TMP22]], i64 0
+; CHECK-NEXT:    [[TMP27:%.*]] = insertelement <4 x float> [[TMP26]], float [[TMP23]], i64 1
+; CHECK-NEXT:    [[TMP28:%.*]] = insertelement <4 x float> [[TMP27]], float [[TMP24]], i64 2
+; CHECK-NEXT:    [[TMP29:%.*]] = insertelement <4 x float> [[TMP28]], float [[TMP25]], i64 3
+; CHECK-NEXT:    [[TMP30:%.*]] = getelementptr inbounds nuw float, ptr [[DST]], i64 [[INDEX]]
+; CHECK-NEXT:    store <4 x float> [[TMP29]], ptr [[TMP30]], align 4, !alias.scope [[META17:![0-9]+]], !noalias [[META19:![0-9]+]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP31:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP31]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP20:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT_LOOPEXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[LOOP_PREHEADER]] ], [ 0, %[[VECTOR_MEMCHECK]] ]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[IV_NEXT:%.*]], %[[LOOP]] ], [ 0, %[[LOOP_PREHEADER]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[IV_NEXT:%.*]], %[[LOOP]] ], [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ]
 ; CHECK-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds nuw i8, ptr [[SRC]], i64 [[IV]]
 ; CHECK-NEXT:    [[L_SRC:%.*]] = load i8, ptr [[GEP_SRC]], align 1
 ; CHECK-NEXT:    [[IDX:%.*]] = zext i8 [[L_SRC]] to i64
@@ -118,7 +176,7 @@ define void @lut_struct_field(ptr %dst, ptr %src, ptr %s, i64 %n) {
 ; CHECK-NEXT:    store float [[L_LUT]], ptr [[GEP_DST]], align 4
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT_LOOPEXIT:.*]], label %[[LOOP]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT_LOOPEXIT]], label %[[LOOP]], !llvm.loop [[LOOP21:![0-9]+]]
 ; CHECK:       [[EXIT_LOOPEXIT]]:
 ; CHECK-NEXT:    br label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
