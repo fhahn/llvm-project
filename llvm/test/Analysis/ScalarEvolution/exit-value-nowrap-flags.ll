@@ -382,7 +382,7 @@ define void @exit_count_with_exit_value_nuw_may_be_poison(i8 noundef %start, i8 
 ; CHECK-LABEL: 'exit_count_with_exit_value_nuw_may_be_poison'
 ; CHECK-NEXT:  Classifying expressions for: @exit_count_with_exit_value_nuw_may_be_poison
 ; CHECK-NEXT:    %outer.iv = phi i8 [ 0, %entry ], [ %outer.iv.next, %outer.latch ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%outer.header> U: [0,100) S: [0,100) Exits: (%n umin_seq (-1 + (1 umax (100 umin (9 + %start)<u nuw>)))<nsw>) LoopDispositions: { %outer.header: Computable, %inner: Invariant }
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%outer.header> U: [0,100) S: [0,100) Exits: (%n umin_seq (-1 + (100 umin (9 + %start)<u nuw>))<nsw>) LoopDispositions: { %outer.header: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %inner.iv = phi i8 [ %start, %inner.ph ], [ %inner.iv.next, %inner ]
 ; CHECK-NEXT:    --> {%start,+,1}<nuw><%inner> U: full-set S: full-set Exits: (9 + %start)<u nuw> LoopDispositions: { %inner: Computable, %outer.header: Uniform }
 ; CHECK-NEXT:    %inner.count = phi i32 [ 0, %inner.ph ], [ %inner.count.next, %inner ]
@@ -396,19 +396,19 @@ define void @exit_count_with_exit_value_nuw_may_be_poison(i8 noundef %start, i8 
 ; CHECK-NEXT:    %outer.bound = call i8 @llvm.umin.i8(i8 %inner.iv.lcssa, i8 100)
 ; CHECK-NEXT:    --> (100 umin {%start,+,1}<nuw><%inner>) U: [0,101) S: [0,101) --> (100 umin (9 + %start)<u nuw>) U: [0,101) S: [0,101) Exits: (100 umin (9 + %start)<u nuw>) LoopDispositions: { %outer.header: Uniform, %inner: Computable }
 ; CHECK-NEXT:    %outer.iv.next = add i8 %outer.iv, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%outer.header> U: [1,101) S: [1,101) Exits: (1 + (%n umin_seq (-1 + (1 umax (100 umin (9 + %start)<u nuw>)))<nsw>))<nuw><nsw> LoopDispositions: { %outer.header: Computable, %inner: Invariant }
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%outer.header> U: [1,101) S: [1,101) Exits: (1 + (%n umin_seq (-1 + (100 umin (9 + %start)<u nuw>))<nsw>))<u nuw> LoopDispositions: { %outer.header: Computable, %inner: Invariant }
 ; CHECK-NEXT:  Determining loop execution counts for: @exit_count_with_exit_value_nuw_may_be_poison
 ; CHECK-NEXT:  Loop %inner: backedge-taken count is i32 9
 ; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i32 9
 ; CHECK-NEXT:  Loop %inner: symbolic max backedge-taken count is i32 9
 ; CHECK-NEXT:  Loop %inner: Trip multiple is 10
-; CHECK-NEXT:  Loop %outer.header: <multiple exits> backedge-taken count is (%n umin_seq (-1 + (1 umax (100 umin (9 + %start)<u nuw>)))<nsw>)
+; CHECK-NEXT:  Loop %outer.header: <multiple exits> backedge-taken count is (%n umin_seq (-1 + (100 umin (9 + %start)<u nuw>))<nsw>)
 ; CHECK-NEXT:    exit count for outer.header: %n
-; CHECK-NEXT:    exit count for outer.latch: (-1 + (1 umax (100 umin (9 + %start)<u nuw>)))<nsw>
+; CHECK-NEXT:    exit count for outer.latch: (-1 + (100 umin (9 + %start)<u nuw>))<nsw>
 ; CHECK-NEXT:  Loop %outer.header: constant max backedge-taken count is i8 99
-; CHECK-NEXT:  Loop %outer.header: symbolic max backedge-taken count is (%n umin_seq (-1 + (1 umax (100 umin (9 + %start)<u nuw>)))<nsw>)
+; CHECK-NEXT:  Loop %outer.header: symbolic max backedge-taken count is (%n umin_seq (-1 + (100 umin (9 + %start)<u nuw>))<nsw>)
 ; CHECK-NEXT:    symbolic max exit count for outer.header: %n
-; CHECK-NEXT:    symbolic max exit count for outer.latch: (-1 + (1 umax (100 umin (9 + %start)<u nuw>)))<nsw>
+; CHECK-NEXT:    symbolic max exit count for outer.latch: (-1 + (100 umin (9 + %start)<u nuw>))<nsw>
 ; CHECK-NEXT:  Loop %outer.header: Trip multiple is 1
 ;
 entry:
@@ -1004,7 +1004,7 @@ define i32 @inc_from_umax_of_exit_value_of_nuw_addrec(i32 %start, i32 %x, i32 %n
 ; CHECK-NEXT:    --> ({%start,+,1}<nuw><%loop.1> umax %x) U: full-set S: full-set --> ((4 + %start)<u nuw> umax %x) U: full-set S: full-set
 ; CHECK-NEXT:  Determining loop execution counts for: @inc_from_umax_of_exit_value_of_nuw_addrec
 ; CHECK-NEXT:  Loop %loop.2: backedge-taken count is ((-1 * ((4 + %start)<u nuw> umax %x)) + ((4 + %start)<u nuw> umax %x umax %n))
-; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i32 -5
 ; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is ((-1 * ((4 + %start)<u nuw> umax %x)) + ((4 + %start)<u nuw> umax %x umax %n))
 ; CHECK-NEXT:  Loop %loop.2: Trip multiple is 1
 ; CHECK-NEXT:  Loop %loop.1: backedge-taken count is i32 4

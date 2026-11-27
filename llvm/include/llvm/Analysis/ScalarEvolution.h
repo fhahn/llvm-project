@@ -2019,12 +2019,12 @@ private:
   /// Memoized results from getRange
   DenseMap<const SCEV *, ConstantRange> SignedRanges;
 
-  /// Memoized results from getRangeForUse for uses with flags, keyed by
-  /// getUseRangeKey.
+  /// Memoized results from getRangeForUse for uses that are not canonical,
+  /// keyed by getUseRangeKey.
   DenseMap<SCEVUse, ConstantRange> UnsignedUseRanges;
 
-  /// Memoized results from getRangeForUse for uses with flags, keyed by
-  /// getUseRangeKey.
+  /// Memoized results from getRangeForUse for uses that are not canonical,
+  /// keyed by getUseRangeKey.
   DenseMap<SCEVUse, ConstantRange> SignedUseRanges;
 
   /// Used to parameterize getRange
@@ -2032,14 +2032,14 @@ private:
 
   /// Return the key of the memoized range of a use of \p S with the use flags
   /// \p UseFlags. Only the use flags of adds that \p S does not have itself
-  /// are part of the key. A key without use flags is \p S, whose range is that
-  /// of the expression.
+  /// are part of the key.
   static SCEVUse getUseRangeKey(const SCEV *S, SCEVFlags UseFlags);
 
-  /// Set the memoized range for \p S, a key returned by getUseRangeKey.
-  const ConstantRange &setRange(SCEVUse S, RangeSignHint Hint,
-                                ConstantRange CR) {
-    if (S.hasUseFlags()) {
+  /// Set the memoized range for \p S, a key returned by getUseRangeKey, of the
+  /// use \p S if \p IsUse and of the expression otherwise.
+  const ConstantRange &setRange(SCEVUse S, RangeSignHint Hint, ConstantRange CR,
+                                bool IsUse = false) {
+    if (IsUse) {
       DenseMap<SCEVUse, ConstantRange> &Cache =
           Hint == HINT_RANGE_UNSIGNED ? UnsignedUseRanges : SignedUseRanges;
       return Cache.insert_or_assign(S, std::move(CR)).first->second;
@@ -2056,17 +2056,24 @@ private:
   /// copied if its needed for longer.
   const ConstantRange &getRangeRef(const SCEV *S, RangeSignHint Hint,
                                    unsigned Depth = 0) {
-    return getRangeForUse(S, Hint, Depth);
+    return getRangeImpl(S, Hint, Depth, /*IsUse=*/false);
   }
 
-  /// Determine the range of the use \p S. For a use of an add, the no-wrap
-  /// flags of the use are added to those of the expression, so the range only
-  /// holds where \p S is used. Operands are queried as expressions. For a
-  /// SCEV without use flags, this is the range of the expression.
+  /// Determine the range of the use \p S. The no-wrap flags of the use, if it
+  /// is an add, and those of the uses of its operands are used as well, so the
+  /// range only holds where \p S is used. For a canonical SCEV, this is the
+  /// range of the expression.
   /// NOTE: This returns a reference to an entry in a cache. It must be
   /// copied if its needed for longer.
-  LLVM_ABI const ConstantRange &getRangeForUse(SCEVUse S, RangeSignHint Hint,
-                                               unsigned Depth = 0);
+  const ConstantRange &getRangeForUse(SCEVUse S, RangeSignHint Hint,
+                                      unsigned Depth = 0) {
+    return getRangeImpl(S, Hint, Depth, /*IsUse=*/true);
+  }
+
+  /// Implements getRangeForUse if \p IsUse, and getRangeRef for the expression
+  /// of \p S otherwise.
+  LLVM_ABI const ConstantRange &getRangeImpl(SCEVUse S, RangeSignHint Hint,
+                                             unsigned Depth, bool IsUse);
 
   /// Determine the range for a particular SCEV, but evaluates ranges for
   /// operands iteratively first.

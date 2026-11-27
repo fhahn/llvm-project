@@ -93,7 +93,7 @@ define void @inc_from_umax_of_exit_value_of_rewritten_start(i1 %skip, i64 %end, 
 ; CHECK-NEXT:    --> {(1 + ({%start,+,1}<nuw><nsw><%loop.2> umax %x)),+,1}<nw><%loop.3> U: full-set S: full-set --> {(1 + ((9 + %start)<nsw><u nuw> umax %x)),+,1}<nw><%loop.3> U: full-set S: full-set Exits: (1 + ((9 + %start)<nsw> umax %n umax %x)) LoopDispositions: { %loop.3: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @inc_from_umax_of_exit_value_of_rewritten_start
 ; CHECK-NEXT:  Loop %loop.3: backedge-taken count is ((-1 * ((9 + %start)<nsw><u nuw> umax %x)) + ((9 + %start)<nsw><u nuw> umax %n umax %x))
-; CHECK-NEXT:  Loop %loop.3: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop.3: constant max backedge-taken count is i64 -10
 ; CHECK-NEXT:  Loop %loop.3: symbolic max backedge-taken count is ((-1 * ((9 + %start)<nsw><u nuw> umax %x)) + ((9 + %start)<nsw><u nuw> umax %n umax %x))
 ; CHECK-NEXT:  Loop %loop.3: Trip multiple is 1
 ; CHECK-NEXT:  Loop %loop.2: backedge-taken count is i64 9
@@ -166,7 +166,7 @@ define void @inc_from_add_of_umax_of_exit_value_of_rewritten_start(i1 %skip, i64
 ; CHECK-NEXT:    --> {({%start,+,1}<nuw><nsw><%loop.2> umax %x),+,1}<nw><%loop.3> U: full-set S: full-set --> {((9 + %start)<nsw><u nuw> umax %x),+,1}<nw><%loop.3> U: full-set S: full-set Exits: (1 + ((-1 + ((9 + %start)<nsw> umax %x)) umax %n)) LoopDispositions: { %loop.3: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @inc_from_add_of_umax_of_exit_value_of_rewritten_start
 ; CHECK-NEXT:  Loop %loop.3: backedge-taken count is (1 + (-1 * ((9 + %start)<nsw><u nuw> umax %x)) + ((-1 + ((9 + %start)<nsw><u nuw> umax %x)) umax %n))
-; CHECK-NEXT:  Loop %loop.3: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop.3: constant max backedge-taken count is i64 -9
 ; CHECK-NEXT:  Loop %loop.3: symbolic max backedge-taken count is (1 + (-1 * ((9 + %start)<nsw><u nuw> umax %x)) + ((-1 + ((9 + %start)<nsw><u nuw> umax %x)) umax %n))
 ; CHECK-NEXT:  Loop %loop.3: Trip multiple is 1
 ; CHECK-NEXT:  Loop %loop.2: backedge-taken count is i64 9
