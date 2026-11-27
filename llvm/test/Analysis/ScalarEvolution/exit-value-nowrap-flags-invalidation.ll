@@ -67,3 +67,148 @@ loop.3:
 exit:
   ret void
 }
+
+; IndVars rewrites %start, so the range of the start of %iv.3, the umax of %x
+; and the exit value of %iv.2, must be forgotten.
+define void @inc_from_umax_of_exit_value_of_rewritten_start(i1 %skip, i64 %end, i64 %n, i64 %x, ptr %p) {
+; CHECK-LABEL: 'inc_from_umax_of_exit_value_of_rewritten_start'
+; CHECK-NEXT:  Classifying expressions for: @inc_from_umax_of_exit_value_of_rewritten_start
+; CHECK-NEXT:    %start = phi i64 [ -7, %entry ], [ %end, %loop.1.exit.loopexit ]
+; CHECK-NEXT:    --> %start U: full-set S: full-set
+; CHECK-NEXT:    %iv.2 = phi i64 [ %start, %loop.1.exit ], [ %iv.2.next, %loop.2 ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><nsw><%loop.2> U: full-set S: full-set Exits: (9 + %start)<nsw><u nuw> LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %i = phi i64 [ 0, %loop.1.exit ], [ %i.next, %loop.2 ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop.2> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %umax = call i64 @llvm.umax.i64(i64 %iv.2, i64 %x)
+; CHECK-NEXT:    --> ({%start,+,1}<nuw><nsw><%loop.2> umax %x) U: full-set S: full-set Exits: ((9 + %start)<nsw><u nuw> umax %x) LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %iv.2.next = add nuw i64 %iv.2, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%loop.2> U: full-set S: full-set Exits: (10 + %start)<nsw> LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %i.next = add nuw nsw i64 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop.2> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %umax.lcssa = phi i64 [ %umax, %loop.2 ]
+; CHECK-NEXT:    --> ({%start,+,1}<nuw><nsw><%loop.2> umax %x) U: full-set S: full-set --> ((9 + %start)<nsw><u nuw> umax %x) U: full-set S: full-set
+; CHECK-NEXT:    %iv.3 = phi i64 [ %iv.3.next, %loop.3 ], [ %umax.lcssa, %loop.3.preheader ]
+; CHECK-NEXT:    --> {({%start,+,1}<nuw><nsw><%loop.2> umax %x),+,1}<nuw><%loop.3> U: full-set S: full-set --> {((9 + %start)<nsw><u nuw> umax %x),+,1}<nw><%loop.3> U: full-set S: full-set Exits: ((9 + %start)<nsw> umax %n umax %x) LoopDispositions: { %loop.3: Computable }
+; CHECK-NEXT:    %iv.3.next = add i64 %iv.3, 1
+; CHECK-NEXT:    --> {(1 + ({%start,+,1}<nuw><nsw><%loop.2> umax %x)),+,1}<nw><%loop.3> U: full-set S: full-set --> {(1 + ((9 + %start)<nsw><u nuw> umax %x)),+,1}<nw><%loop.3> U: full-set S: full-set Exits: (1 + ((9 + %start)<nsw> umax %n umax %x)) LoopDispositions: { %loop.3: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @inc_from_umax_of_exit_value_of_rewritten_start
+; CHECK-NEXT:  Loop %loop.3: backedge-taken count is ((-1 * ((9 + %start)<nsw><u nuw> umax %x)) + ((9 + %start)<nsw><u nuw> umax %n umax %x))
+; CHECK-NEXT:  Loop %loop.3: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop.3: symbolic max backedge-taken count is ((-1 * ((9 + %start)<nsw><u nuw> umax %x)) + ((9 + %start)<nsw><u nuw> umax %n umax %x))
+; CHECK-NEXT:  Loop %loop.3: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop.2: backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop.2: Trip multiple is 10
+; CHECK-NEXT:  Loop %loop.1: backedge-taken count is i1 false
+; CHECK-NEXT:  Loop %loop.1: constant max backedge-taken count is i1 false
+; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is i1 false
+; CHECK-NEXT:  Loop %loop.1: Trip multiple is 1
+;
+entry:
+  br i1 %skip, label %loop.1.exit, label %loop.1
+
+loop.1:
+  %iv.1 = phi i64 [ -1, %entry ], [ %iv.1.next, %loop.1 ]
+  %iv.1.next = add nsw i64 %iv.1, -1
+  %ec.1 = icmp ne i64 %iv.1.next, %end
+  br i1 %ec.1, label %loop.1, label %loop.1.exit
+
+loop.1.exit:
+  %start = phi i64 [ -7, %entry ], [ %iv.1.next, %loop.1 ]
+  br label %loop.2
+
+loop.2:
+  %iv.2 = phi i64 [ %start, %loop.1.exit ], [ %iv.2.next, %loop.2 ]
+  %i = phi i64 [ 0, %loop.1.exit ], [ %i.next, %loop.2 ]
+  %umax = call i64 @llvm.umax.i64(i64 %iv.2, i64 %x)
+  store volatile i64 %umax, ptr %p
+  %iv.2.next = add nuw i64 %iv.2, 1
+  %i.next = add i64 %i, 1
+  %ec.2 = icmp ult i64 %i.next, 10
+  br i1 %ec.2, label %loop.2, label %loop.3
+
+loop.3:
+  %iv.3 = phi i64 [ %umax, %loop.2 ], [ %iv.3.next, %loop.3 ]
+  store volatile i64 %iv.3, ptr %p
+  %iv.3.next = add i64 %iv.3, 1
+  %ec.3 = icmp ult i64 %iv.3, %n
+  br i1 %ec.3, label %loop.3, label %exit
+
+exit:
+  ret void
+}
+
+; Same as above, but %iv.3 starts at an add without use flags of the umax,
+; whose range as use must be forgotten as well.
+define void @inc_from_add_of_umax_of_exit_value_of_rewritten_start(i1 %skip, i64 %end, i64 %n, i64 %x, ptr %p) {
+; CHECK-LABEL: 'inc_from_add_of_umax_of_exit_value_of_rewritten_start'
+; CHECK-NEXT:  Classifying expressions for: @inc_from_add_of_umax_of_exit_value_of_rewritten_start
+; CHECK-NEXT:    %start = phi i64 [ -7, %entry ], [ %end, %loop.1.exit.loopexit ]
+; CHECK-NEXT:    --> %start U: full-set S: full-set
+; CHECK-NEXT:    %iv.2 = phi i64 [ %start, %loop.1.exit ], [ %iv.2.next, %loop.2 ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><nsw><%loop.2> U: full-set S: full-set Exits: (9 + %start)<nsw><u nuw> LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %i = phi i64 [ 0, %loop.1.exit ], [ %i.next, %loop.2 ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop.2> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %umax = call i64 @llvm.umax.i64(i64 %iv.2, i64 %x)
+; CHECK-NEXT:    --> ({%start,+,1}<nuw><nsw><%loop.2> umax %x) U: full-set S: full-set Exits: ((9 + %start)<nsw><u nuw> umax %x) LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %sum = add i64 %umax, -1
+; CHECK-NEXT:    --> (-1 + ({%start,+,1}<nuw><nsw><%loop.2> umax %x)) U: full-set S: full-set Exits: (-1 + ((9 + %start)<nsw><u nuw> umax %x)) LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %iv.2.next = add nuw i64 %iv.2, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nw><%loop.2> U: full-set S: full-set Exits: (10 + %start)<nsw> LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %i.next = add nuw nsw i64 %i, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop.2> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %loop.2: Computable }
+; CHECK-NEXT:    %sum.lcssa = phi i64 [ %sum, %loop.2 ]
+; CHECK-NEXT:    --> (-1 + ({%start,+,1}<nuw><nsw><%loop.2> umax %x)) U: full-set S: full-set --> (-1 + ((9 + %start)<nsw><u nuw> umax %x)) U: full-set S: full-set
+; CHECK-NEXT:    %iv.3 = phi i64 [ %iv.3.next, %loop.3 ], [ %sum.lcssa, %loop.3.preheader ]
+; CHECK-NEXT:    --> {(-1 + ({%start,+,1}<nuw><nsw><%loop.2> umax %x)),+,1}<nuw><%loop.3> U: full-set S: full-set --> {(-1 + ((9 + %start)<nsw><u nuw> umax %x)),+,1}<nw><%loop.3> U: full-set S: full-set Exits: ((-1 + ((9 + %start)<nsw> umax %x)) umax %n) LoopDispositions: { %loop.3: Computable }
+; CHECK-NEXT:    %iv.3.next = add i64 %iv.3, 1
+; CHECK-NEXT:    --> {({%start,+,1}<nuw><nsw><%loop.2> umax %x),+,1}<nw><%loop.3> U: full-set S: full-set --> {((9 + %start)<nsw><u nuw> umax %x),+,1}<nw><%loop.3> U: full-set S: full-set Exits: (1 + ((-1 + ((9 + %start)<nsw> umax %x)) umax %n)) LoopDispositions: { %loop.3: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @inc_from_add_of_umax_of_exit_value_of_rewritten_start
+; CHECK-NEXT:  Loop %loop.3: backedge-taken count is (1 + (-1 * ((9 + %start)<nsw><u nuw> umax %x)) + ((-1 + ((9 + %start)<nsw><u nuw> umax %x)) umax %n))
+; CHECK-NEXT:  Loop %loop.3: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop.3: symbolic max backedge-taken count is (1 + (-1 * ((9 + %start)<nsw><u nuw> umax %x)) + ((-1 + ((9 + %start)<nsw><u nuw> umax %x)) umax %n))
+; CHECK-NEXT:  Loop %loop.3: Trip multiple is 1
+; CHECK-NEXT:  Loop %loop.2: backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop.2: constant max backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop.2: symbolic max backedge-taken count is i64 9
+; CHECK-NEXT:  Loop %loop.2: Trip multiple is 10
+; CHECK-NEXT:  Loop %loop.1: backedge-taken count is i1 false
+; CHECK-NEXT:  Loop %loop.1: constant max backedge-taken count is i1 false
+; CHECK-NEXT:  Loop %loop.1: symbolic max backedge-taken count is i1 false
+; CHECK-NEXT:  Loop %loop.1: Trip multiple is 1
+;
+entry:
+  br i1 %skip, label %loop.1.exit, label %loop.1
+
+loop.1:
+  %iv.1 = phi i64 [ -1, %entry ], [ %iv.1.next, %loop.1 ]
+  %iv.1.next = add nsw i64 %iv.1, -1
+  %ec.1 = icmp ne i64 %iv.1.next, %end
+  br i1 %ec.1, label %loop.1, label %loop.1.exit
+
+loop.1.exit:
+  %start = phi i64 [ -7, %entry ], [ %iv.1.next, %loop.1 ]
+  br label %loop.2
+
+loop.2:
+  %iv.2 = phi i64 [ %start, %loop.1.exit ], [ %iv.2.next, %loop.2 ]
+  %i = phi i64 [ 0, %loop.1.exit ], [ %i.next, %loop.2 ]
+  %umax = call i64 @llvm.umax.i64(i64 %iv.2, i64 %x)
+  %sum = add i64 %umax, -1
+  store volatile i64 %sum, ptr %p
+  %iv.2.next = add nuw i64 %iv.2, 1
+  %i.next = add i64 %i, 1
+  %ec.2 = icmp ult i64 %i.next, 10
+  br i1 %ec.2, label %loop.2, label %loop.3
+
+loop.3:
+  %iv.3 = phi i64 [ %sum, %loop.2 ], [ %iv.3.next, %loop.3 ]
+  store volatile i64 %iv.3, ptr %p
+  %iv.3.next = add i64 %iv.3, 1
+  %ec.3 = icmp ult i64 %iv.3, %n
+  br i1 %ec.3, label %loop.3, label %exit
+
+exit:
+  ret void
+}
