@@ -381,9 +381,10 @@ getNonAffineBounds(const Loop *Lp, const SCEV *PtrExpr, const SCEV *EltSizeSCEV,
   // The first/last-iteration bounds, e.g. %iv /u %d, are expanded before the
   // loop, so they need the access to execute in every iteration. Require NUW on
   // the add: SCEV only applies a GEP's nuw in that case (see
-  // isSCEVExprNeverPoison), unlike a nuw GEP chain.
+  // isSCEVExprNeverPoison), unlike a nuw GEP chain. Check that PtrExpr rather
+  // than Offset is non-decreasing, as getMinusSCEV drops the add's flags.
   if (!PtrAdd->hasNoUnsignedWrap() ||
-      !isKnownNonDecreasingInLoop(Offset, Lp, *SE))
+      !isKnownNonDecreasingInLoop(PtrExpr, Lp, *SE))
     return getUnsignedRangeBounds(Lp, Base, Offset, EltSizeSCEV, SE);
 
   const SCEV *OffStart = SE->SplitIntoInitAndPostInc(Lp, Offset).first;
