@@ -8478,7 +8478,7 @@ ScalarEvolution::getBackedgeTakenInfo(const Loop *L) {
 
   // Proving L's entry guards may need the BTCs of dominating loops. When deep
   // in nested isImpliedCond queries, compute those first, furthest first.
-  if (PendingLoopPredicates.size() > 8) {
+  if (PendingLoopPredicates.size() > 4) {
     SmallVector<const Loop *> Dominating;
     for (auto *N = DT[L->getHeader()]->getIDom(); N; N = N->getIDom()) {
       const Loop *DomL = LI.getLoopFor(N->getBlock());
